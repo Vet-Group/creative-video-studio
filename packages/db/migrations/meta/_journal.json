@@ -764,6 +764,13 @@
 			"when": 1796100000000,
 			"tag": "0109_pet_apps",
 			"breakpoints": true
+		},
+		{
+			"idx": 109,
+			"version": "7",
+			"when": 1796200000000,
+			"tag": "0110_workspace_contract",
+			"breakpoints": true
 		}
 	]
 }

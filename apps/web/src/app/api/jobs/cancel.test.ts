@@ -28,13 +28,13 @@ async function newUser(email: string) {
 async function job(userId: string, status = 'queued'): Promise<string> {
   const id = `job-${randomBytes(4).toString('hex')}`;
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status)
-     values ($1, $2, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', $3)`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, workspace_id)
+     values ($1, $2, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', $3, 'ws_vet')`,
     [id, userId, status],
   );
   await pool.query(
-    `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final)
-     select 'estimate', '1.5000', to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, false from jobs where id = $1`,
+    `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final, workspace_id)
+     select 'estimate', '1.5000', to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, false, workspace_id from jobs where id = $1`,
     [id],
   );
   return id;

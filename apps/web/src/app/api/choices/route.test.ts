@@ -47,8 +47,8 @@ let jobSeq = 0;
 async function job(userId: string, params: Record<string, string>, { days = 0, retryOf = null as string | null, deleted = false } = {}) {
   const id = `job-${++jobSeq}`;
   await pool.query(
-    `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, status, retry_of, created_at, deleted_at)
-     values ($1, $2, 'team-unassigned', 'marketing', 'kling-o3-pro', 'fal', 'p', '9:16', 5, $3, '{}', 'succeeded', $4, now() - make_interval(days => $5), case when $6 then now() end)`,
+    `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, status, retry_of, created_at, deleted_at, workspace_id)
+     values ($1, $2, 'team-unassigned', 'marketing', 'kling-o3-pro', 'fal', 'p', '9:16', 5, $3, '{}', 'succeeded', $4, now() - make_interval(days => $5), case when $6 then now() end, 'ws_vet')`,
     [id, userId, JSON.stringify(params), retryOf, days, deleted],
   );
   return id;
@@ -57,7 +57,7 @@ async function job(userId: string, params: Record<string, string>, { days = 0, r
 /** A finished clip of the member's job: an output and a poster asset (the poster's id is returned), optionally the poster deleted since. */
 async function clip(jobId: string, userId: string, { posterDeleted = false } = {}) {
   for (const kind of ['out', 'poster']) {
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at) values ($1, $2, 'output', $1, $1, $3, 1, case when $4 then now() end)`, [
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at, workspace_id) values ($1, $2, 'output', $1, $1, $3, 1, case when $4 then now() end, 'ws_vet')`, [
       `${jobId}-${kind}`, userId, kind === 'out' ? 'video/mp4' : 'image/jpeg', kind === 'poster' && posterDeleted,
     ]);
   }
@@ -142,7 +142,7 @@ describe('/api/choices', () => {
 
   test('keeps at most 50 of each kind per member and refuses the 51st, while the other kind still has room', async () => {
     const u = await newUser();
-    await pool.query(`insert into user_choices (id, user_id, kind, name, phrase) select $1 || g, $1, 'hook', 'h' || g, 'p' from generate_series(1, 49) g`, [u.id]);
+    await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, workspace_id) select $1 || g, $1, 'hook', 'h' || g, 'p', 'ws_vet' from generate_series(1, 49) g`, [u.id]);
     expect((await add(u, hook)).status).toBe(201);
     const res = await add(u, hook);
     expect([res.status, await error(res)]).toEqual([409, 'you can keep at most 50 hooks; delete one first']);
@@ -219,7 +219,7 @@ describe('/api/choices by store, niche, photo and ending', { timeout: 30_000 }, 
   let storeSeq = 0;
   async function store(hidden = false) {
     const id = `st${++storeSeq}`;
-    await pool.query(`insert into stores (id, name, code, hidden) values ($1, $2, $1, $3)`, [id, `Shop ${id}`, hidden]);
+    await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ($1, $2, $1, $3, 'ws_vet')`, [id, `Shop ${id}`, hidden]);
     return id;
   }
   async function editor() {
@@ -230,7 +230,7 @@ describe('/api/choices by store, niche, photo and ending', { timeout: 30_000 }, 
   let assetSeq = 0;
   async function asset(ownerId: string, { mime = 'image/jpeg', kind = 'input', deleted = false } = {}) {
     const id = `ca${++assetSeq}`;
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at) values ($1, $2, $3, $1, 'f.jpg', $4, 1, case when $5 then now() end)`, [id, ownerId, kind, mime, deleted]);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at, workspace_id) values ($1, $2, $3, $1, 'f.jpg', $4, 1, case when $5 then now() end, 'ws_vet')`, [id, ownerId, kind, mime, deleted]);
     return id;
   }
   const created = async (res: Response) => {
@@ -353,7 +353,7 @@ describe('/api/choices by store, niche, photo and ending', { timeout: 30_000 }, 
   test('the 50 a member keeps count store ones too, company ones do not; taking a company one back needs room', async () => {
     const u = await newUser();
     const s = await store();
-    await pool.query(`insert into user_choices (id, user_id, kind, name, phrase) select $1 || g, $1, 'hook', 'h' || g, 'p' from generate_series(1, 50) g`, [u.id]);
+    await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, workspace_id) select $1 || g, $1, 'hook', 'h' || g, 'p', 'ws_vet' from generate_series(1, 50) g`, [u.id]);
     expect((await add(u, hook)).status).toBe(409);
     expect((await add(u, { ...hook, storeId: s })).status).toBe(409);
     await pool.query("update users set can_edit_templates = true where id = $1", [u.id]);

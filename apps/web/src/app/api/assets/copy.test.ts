@@ -38,10 +38,10 @@ const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0
 async function clip(id: string, owner: string, o: { mime?: string; bytes?: number; purged?: boolean; deleted?: boolean; kind?: string; object?: boolean; image?: boolean } = {}): Promise<void> {
   const bytes = o.image ? PNG : mp4Fixture({ ms: 6200, width: 720, height: 1280, fps: 30, size: 1024 });
   if (o.object !== false) await putObject(`assets/${id}`, bytes, o.image ? 'image/png' : 'video/mp4');
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, $3, $4, 'video.mp4', $5, $6)`, [id, owner, o.kind ?? 'output', `assets/${id}`, o.mime ?? (o.image ? 'image/png' : 'video/mp4'), o.bytes ?? bytes.length]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, $3, $4, 'video.mp4', $5, $6, 'ws_vet')`, [id, owner, o.kind ?? 'output', `assets/${id}`, o.mime ?? (o.image ? 'image/png' : 'video/mp4'), o.bytes ?? bytes.length]);
   await pool.query(
-    `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, purged_at, deleted_at)
-     values ($1, $2, 'team-unassigned', 'marketing', 'mock-model', 'mock', 'p', '9:16', 7, '{}', 'succeeded', $3, $4, $5)`,
+    `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, purged_at, deleted_at, workspace_id)
+     values ($1, $2, 'team-unassigned', 'marketing', 'mock-model', 'mock', 'p', '9:16', 7, '{}', 'succeeded', $3, $4, $5, 'ws_vet')`,
     [`job-${id}`, owner, id, o.purged ? new Date() : null, o.deleted ? new Date() : null],
   );
 }
@@ -133,7 +133,7 @@ describe('POST /api/assets/copy', () => {
     await clip('busy-clip', busyId);
     const add = (count: number, age: string, kind: string) =>
       pool.query(
-        `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at) select g || '-' || $3, $4, $5, 'busy/' || g || '-' || $3, 'x.jpg', 'image/jpeg', 1, now() - $2::interval from generate_series(1, $1) g`,
+        `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at, workspace_id) select g || '-' || $3, $4, $5, 'busy/' || g || '-' || $3, 'x.jpg', 'image/jpeg', 1, now() - $2::interval, 'ws_vet' from generate_series(1, $1) g`,
         [count, age, `${kind}-${age.replace(' ', '')}`, busyId, kind],
       );
     await add(COPY_HOURLY_LIMIT, '2 hours', 'input'); // older than the hour: not counted

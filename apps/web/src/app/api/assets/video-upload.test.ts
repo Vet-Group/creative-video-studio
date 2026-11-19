@@ -48,7 +48,7 @@ beforeAll(async () => {
   userId = user.id;
   const res = await auth.api.signInEmail({ body: { email: 'm@example.test', password: PASSWORD }, asResponse: true });
   cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
-  await pool.query(`insert into stores (id, name, code) values ('store-hidden', 'Gone', 'SGONE')`);
+  await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-hidden', 'Gone', 'SGONE', 'ws_vet')`);
   await pool.query(`update stores set hidden = true where id = 'store-hidden'`);
 });
 beforeEach(() => {
@@ -124,7 +124,7 @@ test('finalize deletes the object and refuses a non-video, and 409s when it is m
 test('finalize of another user’s finalized id is not found and leaves their object alone', async () => {
   const { user } = await auth.api.createUser({ body: { email: 'owner@example.test', name: 'O', password: PASSWORD, role: 'member' } });
   const id = randomUUID();
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $3, 'theirs.mp4', 'video/mp4', 1000)`, [id, user.id, `r2:assets/${id}`]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $3, 'theirs.mp4', 'video/mp4', 1000, 'ws_vet')`, [id, user.id, `r2:assets/${id}`]);
   expect((await finalize({ assetId: id })).status).toBe(404);
   expect(vi.mocked(storage.deleteObject)).not.toHaveBeenCalled();
   expect((await pool.query('select owner_id from assets where id = $1', [id])).rows[0].owner_id).toBe(user.id);

@@ -48,7 +48,7 @@ const valid = { kind: 'feature', title: 'Dark mode', body: 'Please add a dark th
 async function ownedAsset(ownerId: string) {
   const id = randomUUID();
   await pool.query(
-    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $3, 'a.png', 'image/png', 10)`,
+    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $3, 'a.png', 'image/png', 10, 'ws_vet')`,
     [id, ownerId, `assets/${id}`],
   );
   return id;

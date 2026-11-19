@@ -24,8 +24,8 @@ let seq = 0;
 async function job(userId: string, feature: string, o: { prompt?: string; preset?: string; params?: Record<string, string>; deleted?: boolean } = {}) {
   seq++;
   await pool.query(
-    `insert into jobs (id, user_id, team_id, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, status, created_at, deleted_at)
-     values ($1, $2, 'team-unassigned', $3, 'recent-test', 'fal', $4, $5, '9:16', 8, $6, '{}', 'succeeded', now() + make_interval(secs => $7), case when $8 then now() end)`,
+    `insert into jobs (id, user_id, team_id, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, status, created_at, deleted_at, workspace_id)
+     values ($1, $2, 'team-unassigned', $3, 'recent-test', 'fal', $4, $5, '9:16', 8, $6, '{}', 'succeeded', now() + make_interval(secs => $7), case when $8 then now() end, 'ws_vet')`,
     [`job-${seq}`, userId, feature, o.preset ?? null, o.prompt ?? 'composed', JSON.stringify(o.params ?? {}), seq, o.deleted ?? false],
   );
 }

@@ -40,7 +40,7 @@ afterAll(async () => {
 });
 
 async function asset(id: string, kind: 'input' | 'output') {
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', $2, $3, $1, 'x/y', 1)`, [id, kind, `assets/${id}`]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, 'u1', $2, $3, $1, 'x/y', 1, 'ws_vet')`, [id, kind, `assets/${id}`]);
   await putObject(`assets/${id}`, new Uint8Array(1), 'x/y');
 }
 
@@ -49,14 +49,14 @@ async function clip(id: string, inputs: string[], deletedDaysAgo: number | null,
   await asset(`${id}-video`, 'output');
   await asset(`${id}-poster`, 'output');
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, poster_asset_id, deleted_at, params)
-     values ($1, 'u1', 'team-unassigned', 'm', 'fal', 'p', '9:16', 5, $2, 'succeeded', $3, $4, case when $5::int is null then null else now() - make_interval(days => $5::int) end, $6)`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, poster_asset_id, deleted_at, params, workspace_id)
+     values ($1, 'u1', 'team-unassigned', 'm', 'fal', 'p', '9:16', 5, $2, 'succeeded', $3, $4, case when $5::int is null then null else now() - make_interval(days => $5::int) end, $6, 'ws_vet')`,
     [id, inputs, `${id}-video`, `${id}-poster`, deletedDaysAgo, JSON.stringify(params)],
   );
   await pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, marked_by) values ($1, $2, $3, 'pass', 'u1')`, [`v-${id}`, id, `${id}-video`]);
   for (const [kind, usd, isFinal] of [['estimate', '1.0000', false], ['actual_adjustment', '0.2500', true]] as const) {
     await pool.query(
-      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final) values ($1, $2, '2026-10', '2026-10-01', 'u1', 'team-unassigned', $3, $4)`,
+      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final, workspace_id) values ($1, $2, '2026-10', '2026-10-01', 'u1', 'team-unassigned', $3, $4, 'ws_vet')`,
       [kind, usd, id, isFinal],
     );
   }
@@ -78,7 +78,7 @@ describe('purgeDeletedClips', () => {
     await clip('recent', ['in-other-live'], 29);
     // A failed Run that still names the old clip's other input also keeps it.
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status) values ('failed', 'u1', 'team-unassigned', 'm', 'fal', 'p', '9:16', 5, '{in-own}', 'failed')`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, workspace_id) values ('failed', 'u1', 'team-unassigned', 'm', 'fal', 'p', '9:16', 5, '{in-own}', 'failed', 'ws_vet')`,
     );
 
     expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(1);
@@ -139,7 +139,7 @@ describe('purgeDeletedClips', () => {
   });
   test('keeps the picture of a saved AI model, and lets go of the picture of a deleted one so it can be purged', async () => {
     for (const id of ['fm-live', 'fm-gone']) await asset(id, 'input');
-    await pool.query(`insert into fashion_models (id, user_id, name, asset_id, deleted_at) values ('fmx-live', 'u1', 'Live', 'fm-live', null), ('fmx-gone', 'u1', 'Gone', 'fm-gone', now())`);
+    await pool.query(`insert into fashion_models (id, user_id, name, asset_id, deleted_at, workspace_id) values ('fmx-live', 'u1', 'Live', 'fm-live', null, 'ws_vet'), ('fmx-gone', 'u1', 'Gone', 'fm-gone', now(), 'ws_vet')`);
     await clip('fm-clip', ['fm-live', 'fm-gone'], 31);
     expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(1);
     const ids = (await pool.query(`select id from assets where id like 'fm-%'`)).rows.map((r) => r.id);
@@ -151,9 +151,9 @@ describe('purgeDeletedClips', () => {
 
   test('keeps an input a saved template, a company hook or location, or a feedback item still shows, and removes the one nothing names', async () => {
     for (const id of ['keep-template', 'keep-choice', 'keep-feedback', 'keep-solo']) await asset(id, 'input');
-    await pool.query(`insert into user_templates (id, user_id, feature, name, data) values ('tpl', 'u1', 'try_on', 'T', $1)`, [JSON.stringify({ images: ['keep-template'], prompt: 'p' })]);
-    await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, image_asset_id) values ('ch', 'u1', 'location', 'L', 'a phrase', 'keep-choice')`);
-    await pool.query(`insert into feedback (id, user_id, team_id, kind, title, body, image_asset_ids) values ('fb', 'u1', 'team-unassigned', 'bug', 't', 'b', '{keep-feedback}')`);
+    await pool.query(`insert into user_templates (id, user_id, feature, name, data, workspace_id) values ('tpl', 'u1', 'try_on', 'T', $1, 'ws_vet')`, [JSON.stringify({ images: ['keep-template'], prompt: 'p' })]);
+    await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, image_asset_id, workspace_id) values ('ch', 'u1', 'location', 'L', 'a phrase', 'keep-choice', 'ws_vet')`);
+    await pool.query(`insert into feedback (id, user_id, team_id, kind, title, body, image_asset_ids, workspace_id) values ('fb', 'u1', 'team-unassigned', 'bug', 't', 'b', '{keep-feedback}', 'ws_vet')`);
     await clip('keep-clip', ['keep-template', 'keep-choice', 'keep-feedback', 'keep-solo'], 31);
     expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(1);
     expect((await pool.query(`select id from assets where id like 'keep-%' and id not like 'keep-clip-%' order by id`)).rows.map((r) => r.id)).toEqual(['keep-choice', 'keep-feedback', 'keep-template']);

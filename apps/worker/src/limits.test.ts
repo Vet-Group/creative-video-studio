@@ -33,8 +33,8 @@ async function member(): Promise<string> {
 async function newJob(userId: string, createdAt: string, o: { status?: string; estimate?: string } = {}): Promise<string> {
   const id = next('job');
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at)
-     values ($1, $2, 'team-b', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', $3)`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, workspace_id)
+     values ($1, $2, 'team-b', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', $3, 'ws_vet')`,
     [id, userId, createdAt],
   );
   if (o.estimate) await withTransaction(pool, (tx) => reserve(tx, id, o.estimate!));
@@ -75,7 +75,7 @@ describe('daily clips per Member (ICT day)', () => {
     await pool.query(`update jobs set status = 'failed' where id = $1`, [jobs[0]]);
     expect(await checkCaps(pool, u, '1.0000', at('2026-10-31T06:00:00Z'))).toBe('daily_clips'); // failed, but its estimate is still booked
     await pool.query(
-      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final) select 'release', -usd, month, day, user_id, team_id, job_id, provider, model, true from cost_entries where job_id = $1`,
+      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final, workspace_id) select 'release', -usd, month, day, user_id, team_id, job_id, provider, model, true, workspace_id from cost_entries where job_id = $1`,
       [jobs[0]],
     );
     expect(await checkCaps(pool, u, '1.0000', at('2026-10-31T06:00:00Z'))).toBeNull(); // failed and total 0: the slot is back
@@ -147,8 +147,8 @@ describe('image and apps features', () => {
   async function featureJob(userId: string, feature: string, createdAt: string, estimate: string): Promise<string> {
     const id = next('job');
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature)
-       values ($1, $2, 'team-b', 'kling-o3-pro', 'fal', 'p', '1:1', 5, '{}', $3, $4)`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature, workspace_id)
+       values ($1, $2, 'team-b', 'kling-o3-pro', 'fal', 'p', '1:1', 5, '{}', $3, $4, 'ws_vet')`,
       [id, userId, createdAt, feature],
     );
     await withTransaction(pool, (tx) => reserve(tx, id, estimate));
@@ -286,13 +286,13 @@ describe('LLM calls', () => {
     await bookLlm(pool, { enhance: video }, { costUsd: 500, ...llm });
     const image = next('job');
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature)
-       values ($1, $2, 'team-b', 'kling-o3-pro', 'fal', 'p', '1:1', 5, '{}', '2032-05-10T03:00:00Z', 'image')`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature, workspace_id)
+       values ($1, $2, 'team-b', 'kling-o3-pro', 'fal', 'p', '1:1', 5, '{}', '2032-05-10T03:00:00Z', 'image', 'ws_vet')`,
       [image, u],
     );
     expect(await withTransaction(pool, (tx) => reserve(tx, image, '1.0000'))).toBe(true);
     await bookLlm(pool, { enhance: image }, { costUsd: 500, ...llm });
-    await pool.query(`insert into suggestion_runs (id, user_id, input, created_at) values ('limits-run', $1, '{}', '2032-05-10T03:00:00Z')`, [u]);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, created_at, workspace_id) values ('limits-run', $1, '{}', '2032-05-10T03:00:00Z', 'ws_vet')`, [u]);
     await bookLlm(pool, { suggestion: 'limits-run' }, { costUsd: 500, ...llm });
     const when = at('2032-05-10T04:00:00Z');
     expect(await checkCaps(pool, u, '9.0000', when)).toBeNull(); // video month: 1 + 9 = 10
@@ -310,8 +310,8 @@ describe('LLM calls', () => {
     await setCaps('10', 5);
     await pool.query('update settings set features_monthly_cap_usd = 10, member_daily_usd_cap = 10, member_monthly_usd_cap = 10');
     const u = await member();
-    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, created_at) values ('limits-an', $1, 'team-b', 's', 'succeeded', '2032-06-10T03:00:00Z')`, [u]);
-    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, created_at) values ('limits-rm', $1, 'team-b', 'limits-an', '[1]', '2032-06-10T03:00:00Z')`, [u]);
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, created_at, workspace_id) values ('limits-an', $1, 'team-b', 's', 'succeeded', '2032-06-10T03:00:00Z', 'ws_vet')`, [u]);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, created_at, workspace_id) values ('limits-rm', $1, 'team-b', 'limits-an', '[1]', '2032-06-10T03:00:00Z', 'ws_vet')`, [u]);
     await bookLlm(pool, { remake: 'limits-rm', step: '1:video' }, { costUsd: 4, provider: 'fal', model: 'm' });
     const when = at('2032-06-10T04:00:00Z');
     expect(await checkCaps(pool, u, '6.0000', when)).toBeNull(); // video month: 4 + 6 = 10

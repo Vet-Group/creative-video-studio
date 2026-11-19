@@ -249,13 +249,13 @@ async function seedModel() {
 async function seedJob(id: string, storeId: string | null) {
   await seedModel();
   await pool.query(
-    `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids)
-     values ($1, $2, 'team-unassigned', $3, 'fal-test', 'fal', 'p', '9:16', 5, '{}')`,
+    `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, workspace_id)
+     values ($1, $2, 'team-unassigned', $3, 'fal-test', 'fal', 'p', '9:16', 5, '{}', 'ws_vet')`,
     [id, member.id, storeId],
   );
   await pool.query(
-    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id)
-     select 'estimate', 1.6, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, store_id, id from jobs where id = $1`,
+    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, workspace_id)
+     select 'estimate', 1.6, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, store_id, id, workspace_id from jobs where id = $1`,
     [id],
   );
 }
@@ -266,8 +266,8 @@ describe('store reassignment', () => {
     Object.fromEntries((await pool.query(`select store_id, sum(usd)::text as usd from cost_entries where job_id = $1 group by store_id`, [jobId])).rows.map((r) => [r.store_id ?? 'none', r.usd]));
 
   beforeAll(async () => {
-    await pool.query(`insert into stores (id, name, code) values ('sa', 'A', 'RA'), ('sb', 'B', 'RB'), ('sc', 'C', 'RC')`);
-    await pool.query(`insert into stores (id, name, code, hidden) values ('sh', 'Hidden', 'RH', true)`);
+    await pool.query(`insert into stores (id, name, code, workspace_id) values ('sa', 'A', 'RA', 'ws_vet'), ('sb', 'B', 'RB', 'ws_vet'), ('sc', 'C', 'RC', 'ws_vet')`);
+    await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('sh', 'Hidden', 'RH', true, 'ws_vet')`);
   });
 
   test('moves the whole job total to the new store as a store_reassign pair in the job month, with one audit entry', async () => {

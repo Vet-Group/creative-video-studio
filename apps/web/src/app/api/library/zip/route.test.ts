@@ -31,11 +31,11 @@ async function job(userId: string, id: string, content: string, status = 'succee
   if (done) {
     const bytes = new TextEncoder().encode(content);
     await putObject(`assets/${id}-out`, bytes, 'video/mp4');
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'output', $3, 'out.mp4', 'video/mp4', $4)`, [`${id}-out`, userId, `assets/${id}-out`, bytes.length]);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'output', $3, 'out.mp4', 'video/mp4', $4, 'ws_vet')`, [`${id}-out`, userId, `assets/${id}-out`, bytes.length]);
   }
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, params, created_at)
-     values ($1, $2, 'team-unassigned', 'zip-test', 'fal', 'gentle-push-in', 'a prompt', '9:16', 8, '{}', $3, $4, $5, '2026-10-23T03:00:00Z')`,
+    `insert into jobs (id, user_id, team_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, params, created_at, workspace_id)
+     values ($1, $2, 'team-unassigned', 'zip-test', 'fal', 'gentle-push-in', 'a prompt', '9:16', 8, '{}', $3, $4, $5, '2026-10-23T03:00:00Z', 'ws_vet')`,
     [id, userId, status, done ? `${id}-out` : null, params],
   );
   return id;

@@ -39,7 +39,7 @@ function boxes(b: Uint8Array): string[] {
 async function video(id: string, file: string, mime = 'video/mp4') {
   const bytes = new Uint8Array(await readFile(file));
   await putObject(`assets/${id}`, bytes, mime);
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', 'output', $2, $1, $3, $4)`, [id, `assets/${id}`, mime, bytes.length]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, 'u1', 'output', $2, $1, $3, $4, 'ws_vet')`, [id, `assets/${id}`, mime, bytes.length]);
   return bytes.length;
 }
 
@@ -100,7 +100,7 @@ describe('compressVideoAsset', () => {
 
   test('refuses an image, an input video, one over the size cap and a missing asset', async () => {
     const row = (id: string, kind: string, mime: string, bytes: number) =>
-      pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', $2, $3, $1, $4, $5)`, [id, kind, `assets/${id}`, mime, bytes]);
+      pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, 'u1', $2, $3, $1, $4, $5, 'ws_vet')`, [id, kind, `assets/${id}`, mime, bytes]);
     await row('pic', 'output', 'image/png', 1);
     await row('upload', 'input', 'video/mp4', 1);
     await row('huge', 'output', 'video/mp4', COMPRESS_MAX_BYTES + 1);

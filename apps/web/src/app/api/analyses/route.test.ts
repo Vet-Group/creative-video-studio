@@ -54,14 +54,14 @@ beforeAll(async () => {
   cookie = await signIn('member@example.test');
   adminCookie = await signIn('admin@example.test');
   await pool.query(
-    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values
-       ('v1', $1, 'input', 's3/v1', 'ref.mp4', 'video/mp4', 1000, 5000),
-       ('img', $1, 'input', 's3/img', 'a.png', 'image/png', 1, null),
-       ('v-theirs', $2, 'input', 's3/theirs', 't.mp4', 'video/mp4', 1000, 5000),
-       ('v-shared', $2, 'input', 's3/shared', 'tee-front.mp4', 'video/mp4', 1000, 8000)`,
+    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values
+       ('v1', $1, 'input', 's3/v1', 'ref.mp4', 'video/mp4', 1000, 5000, 'ws_vet'),
+       ('img', $1, 'input', 's3/img', 'a.png', 'image/png', 1, null, 'ws_vet'),
+       ('v-theirs', $2, 'input', 's3/theirs', 't.mp4', 'video/mp4', 1000, 5000, 'ws_vet'),
+       ('v-shared', $2, 'input', 's3/shared', 'tee-front.mp4', 'video/mp4', 1000, 8000, 'ws_vet')`,
     [userId, other.user.id],
   );
-  await pool.query(`insert into stores (id, name, code) values ('store-ok', 'Shop', 'SOK'), ('store-hidden', 'Gone', 'SGONE')`);
+  await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-ok', 'Shop', 'SOK', 'ws_vet'), ('store-hidden', 'Gone', 'SGONE', 'ws_vet')`);
   await pool.query(`update stores set hidden = true where id = 'store-hidden'`);
 });
 
@@ -104,7 +104,7 @@ test('polls one of the caller’s analyses and hides another user’s', async ()
   const got = await ONE(call(`/api/analyses/${id}`), { params: Promise.resolve({ id }) });
   expect(got.status).toBe(200);
   expect(((await got.json()) as { status: string }).status).toBe('queued');
-  await pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key) select 'an-theirs', u.id, u.team_id, null, 's3/x' from users u where u.email = 'other@example.test'`);
+  await pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, workspace_id) select 'an-theirs', u.id, u.team_id, null, 's3/x', 'ws_vet' from users u where u.email = 'other@example.test'`);
   expect((await ONE(call('/api/analyses/an-theirs'), { params: Promise.resolve({ id: 'an-theirs' }) })).status).toBe(404);
 });
 
@@ -116,7 +116,7 @@ test('lists the caller’s analyses newest first', async () => {
 
 const remove = (id: string) => REMOVE(call(`/api/analyses/${id}`, 'DELETE'), { params: Promise.resolve({ id }) });
 const addAnalysis = (id: string, status: string, user = 'member@example.test') =>
-  pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, status) select $1, u.id, u.team_id, null, 's3/x', $2 from users u where u.email = $3`, [id, status, user]);
+  pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, status, workspace_id) select $1, u.id, u.team_id, null, 's3/x', $2, 'ws_vet' from users u where u.email = $3`, [id, status, user]);
 
 test('deletes one of the caller’s finished analyses and nothing else', async () => {
   await addAnalysis('del-ok', 'succeeded');
@@ -146,7 +146,7 @@ test('refuses a queued or running analysis with 409', async () => {
 
 test('refuses an analysis a remake was made from with 409, not a database error', async () => {
   await addAnalysis('del-remade', 'succeeded');
-  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots) select 'rm-del', u.id, u.team_id, 'del-remade', '[1]' from users u where u.email = 'member@example.test'`);
+  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, workspace_id) select 'rm-del', u.id, u.team_id, 'del-remade', '[1]', 'ws_vet' from users u where u.email = 'member@example.test'`);
   const res = await remove('del-remade');
   expect(res.status).toBe(409);
   expect(await errorOf(res)).toContain('lượt làm lại');
@@ -168,14 +168,14 @@ describe('shared reference videos', () => {
   // Another member's analysis of `source`, finished unless a status is given.
   const theirs = (id: string, source: string, status = 'succeeded') =>
     pool.query(
-      `insert into analyses (id, user_id, team_id, source_key, status, result, provider, model, cost_usd) select $1, u.id, u.team_id, $3, $4, $5::jsonb, 'gemini', 'flash', 0.5 from users u where u.id = $2`,
+      `insert into analyses (id, user_id, team_id, source_key, status, result, provider, model, cost_usd, workspace_id) select $1, u.id, u.team_id, $3, $4, $5::jsonb, 'gemini', 'flash', 0.5, 'ws_vet' from users u where u.id = $2`,
       [id, otherId, source, status, status === 'succeeded' ? shots : null],
     );
 
   beforeAll(async () => {
     await pool.query(
-      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at) values
-         ('v-gone', $1, 'input', 's3/gone', 'gone.mp4', 'video/mp4', 1, now()), ('v-later', $1, 'input', 's3/later', 'later.mp4', 'video/mp4', 1, null)`,
+      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at, workspace_id) values
+         ('v-gone', $1, 'input', 's3/gone', 'gone.mp4', 'video/mp4', 1, now(), 'ws_vet'), ('v-later', $1, 'input', 's3/later', 'later.mp4', 'video/mp4', 1, null, 'ws_vet')`,
       [otherId],
     );
     await theirs('an-share', 's3/shared');
@@ -217,7 +217,7 @@ describe('shared reference videos', () => {
   test('every member lists the shared ones, newest share first, with only what a card shows, and none whose source video was deleted', async () => {
     expect(await shared()).toEqual([]);
     await pool.query(
-      `insert into analyses (id, user_id, team_id, source_key, status, result, provider) select 'an-mine-shared', u.id, u.team_id, 's3/v1', 'succeeded', $2::jsonb, 'gemini' from users u where u.id = $1`,
+      `insert into analyses (id, user_id, team_id, source_key, status, result, provider, workspace_id) select 'an-mine-shared', u.id, u.team_id, 's3/v1', 'succeeded', $2::jsonb, 'gemini', 'ws_vet' from users u where u.id = $1`,
       [userId, shots],
     );
     await share('an-later', { title: 'Later' });
@@ -253,10 +253,10 @@ describe('shared reference videos', () => {
   });
 
   test('the owner of a shared analysis that another member remade gets its own refusal; their own remake keeps the usual one', async () => {
-    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots) select 'rm-by-other', u.id, u.team_id, 'an-mine-shared', '[1]' from users u where u.id = $1`, [otherId]);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, workspace_id) select 'rm-by-other', u.id, u.team_id, 'an-mine-shared', '[1]', 'ws_vet' from users u where u.id = $1`, [otherId]);
     const byOther = await remove('an-mine-shared');
     expect([byOther.status, await errorOf(byOther)]).toEqual([409, 'Video mẫu này đã có người dùng để làm lại nên không xoá được.']);
-    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots) select 'rm-by-owner', u.id, u.team_id, 'an-mine-shared', '[1]' from users u where u.id = $1`, [userId]);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, workspace_id) select 'rm-by-owner', u.id, u.team_id, 'an-mine-shared', '[1]', 'ws_vet' from users u where u.id = $1`, [userId]);
     const own = await remove('an-mine-shared');
     expect([own.status, await errorOf(own)]).toEqual([409, 'Phân tích này đã có lượt làm lại nên không xoá được.']);
     expect((await pool.query(`select id from analyses where id = 'an-mine-shared'`)).rowCount).toBe(1);

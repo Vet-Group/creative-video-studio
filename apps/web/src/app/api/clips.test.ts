@@ -53,17 +53,17 @@ async function clip(userId: string, o: ClipOptions = {}): Promise<string> {
   const status = o.status ?? 'succeeded';
   const done = status === 'succeeded';
   for (const [asset, kind] of [[`${id}-video`, 'video/mp4'], [`${id}-poster`, 'image/jpeg']]) {
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'output', $3, $1, $4, 10)`, [asset, userId, `assets/${asset}`, kind]);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'output', $3, $1, $4, 10, 'ws_vet')`, [asset, userId, `assets/${asset}`, kind]);
   }
   await pool.query(
-    `insert into jobs (id, user_id, team_id, store_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, poster_asset_id, created_at)
-     values ($1, $2, 'team-unassigned', $3, $4, 'fal', 'gentle-push-in', 'a prompt', $5, 8, $6, $7, $8, $9, coalesce($10::timestamptz, now()))`,
+    `insert into jobs (id, user_id, team_id, store_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, poster_asset_id, created_at, workspace_id)
+     values ($1, $2, 'team-unassigned', $3, $4, 'fal', 'gentle-push-in', 'a prompt', $5, 8, $6, $7, $8, $9, coalesce($10::timestamptz, now()), 'ws_vet')`,
     [id, userId, o.storeId ?? null, o.model ?? 'fal-test', o.aspect ?? '9:16', o.inputs ?? [], status, done ? `${id}-video` : null, done ? `${id}-poster` : null, o.createdAt ?? null],
   );
   const book = (kind: string, usd: string, isFinal: boolean) =>
     pool.query(
-      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final)
-       select $2, $3, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, $4 from jobs where id = $1`,
+      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final, workspace_id)
+       select $2, $3, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, $4, workspace_id from jobs where id = $1`,
       [id, kind, usd, isFinal],
     );
   await book('estimate', '1.6000', false);
@@ -72,7 +72,7 @@ async function clip(userId: string, o: ClipOptions = {}): Promise<string> {
 }
 
 async function input(id: string, ownerId: string) {
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $3, 'in.png', 'image/png', 1)`, [id, ownerId, `assets/${id}`]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $3, 'in.png', 'image/png', 1, 'ws_vet')`, [id, ownerId, `assets/${id}`]);
 }
 
 const audits = async (target: string) => (await pool.query('select actor_id, action, old_value, new_value from audit_entries where target = $1 order by id', [target])).rows;
@@ -84,7 +84,7 @@ let admin: Awaited<ReturnType<typeof newUser>>;
 
 beforeAll(async () => {
   await ensureBucket();
-  await pool.query(`insert into stores (id, name, code, hidden) values ('store-ok', 'Store', 'S1', false), ('store-hidden', 'Hidden', 'S2', true)`);
+  await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('store-ok', 'Store', 'S1', false, 'ws_vet'), ('store-hidden', 'Hidden', 'S2', true, 'ws_vet')`);
   await pool.query(
     `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled, pass_seed_passes, pass_seed_total) values
        ('fal-test', 'fal', 'x', 'Fal test', '{9:16,1:1}', '{5,8,10}', 2, '720p', 0.2, '{}', true, 8, 10),
@@ -345,7 +345,7 @@ describe('GET /api/library', () => {
     await pool.query(
       `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('diac-model', 'fal', 'x', 'Diacritics', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false)`,
     );
-    await pool.query(`insert into stores (id, name, code) values ('store-diac', 'Cửa hàng Đỏ Empower', 'S9')`);
+    await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-diac', 'Cửa hàng Đỏ Empower', 'S9', 'ws_vet')`);
     const brief = await clip(alice.id, { id: 'diac-brief', model: 'diac-model' });
     await pool.query(`update jobs set feature = 'marketing', preset_id = null, params = '{"brief":"Người mẫu mặc áo ĐỎ"}' where id = $1`, [brief]);
     const stored = await clip(alice.id, { id: 'diac-store', model: 'diac-model', storeId: 'store-diac' });
@@ -361,7 +361,7 @@ describe('GET /api/library', () => {
 
   test('filters by store (an id, or none), names the store of each item, and keeps a closed store from members', async () => {
     await pool.query(`insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('stf-model', 'fal', 'x', 'Store filter', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false)`);
-    await pool.query(`insert into stores (id, name, code) values ('stf-a', 'Cửa hàng Lọc', 'SF1')`);
+    await pool.query(`insert into stores (id, name, code, workspace_id) values ('stf-a', 'Cửa hàng Lọc', 'SF1', 'ws_vet')`);
     const open = await clip(alice.id, { id: 'stf-open', model: 'stf-model', storeId: 'stf-a' });
     const closed = await clip(alice.id, { id: 'stf-closed', model: 'stf-model', storeId: 'store-hidden' });
     const none = await clip(alice.id, { id: 'stf-none', model: 'stf-model' });
@@ -425,15 +425,15 @@ describe('images in the Library', () => {
   async function imageClip(userId: string, o: { id?: string; feature?: string; resolution?: string; ratio?: string; filename?: string; createdAt?: string } = {}): Promise<string> {
     const id = o.id ?? `img-${++seqImage}-${randomBytes(4).toString('hex')}`;
     const [w, h] = (o.ratio ?? '1:1').split(':').map((n) => Number(n) * 16); // a picture of the ratio it was asked for
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, width, height) values ($1, $2, 'output', $3, $4, 'image/png', 10, $5, $6)`, [`${id}-out`, userId, `assets/${id}-out`, o.filename ?? `image-${id.slice(0, 8)}.png`, w, h]);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, width, height, workspace_id) values ($1, $2, 'output', $3, $4, 'image/png', 10, $5, $6, 'ws_vet')`, [`${id}-out`, userId, `assets/${id}-out`, o.filename ?? `image-${id.slice(0, 8)}.png`, w, h]);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, status, output_asset_id, created_at)
-       values ($1, $2, 'team-unassigned', $3, 'nano-banana-pro', 'fal', 'a prompt', $4, 0, $5, '{}', 'succeeded', $6, coalesce($7::timestamptz, now()))`,
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, status, output_asset_id, created_at, workspace_id)
+       values ($1, $2, 'team-unassigned', $3, 'nano-banana-pro', 'fal', 'a prompt', $4, 0, $5, '{}', 'succeeded', $6, coalesce($7::timestamptz, now()), 'ws_vet')`,
       [id, userId, o.feature ?? 'image', o.ratio ?? '1:1', JSON.stringify({ resolution: o.resolution ?? '2K' }), `${id}-out`, o.createdAt ?? null],
     );
     await pool.query(
-      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final)
-       select 'estimate', 0.15, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, true from jobs where id = $1`,
+      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final, workspace_id)
+       select 'estimate', 0.15, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, true, workspace_id from jobs where id = $1`,
       [id],
     );
     return id;
@@ -798,7 +798,7 @@ describe('DELETE /api/jobs/:id', () => {
     await input('r-in-1', alice.id);
     await input('r-in-2', alice.id);
     const id = await clip(alice.id, { inputs: ['r-in-1', 'r-in-2'], model: 'seedance-2.5-byteplus' });
-    await pool.query(`insert into stores (id, name, code) values ('r-store', 'R Shop', 'R-CODE')`);
+    await pool.query(`insert into stores (id, name, code, workspace_id) values ('r-store', 'R Shop', 'R-CODE', 'ws_vet')`);
     await pool.query('update jobs set store_id = $2 where id = $1', [id, 'r-store']);
     const label = (await pool.query(`select label from model_configs where id = 'seedance-2.5-byteplus'`)).rows[0].label;
     const detail = async () => (await (await GET_JOB(req(`/api/jobs/${id}`, alice.cookie), ctx(id))).json()) as { inputCount: number; images: { id: string }[]; modelLabel: string; storeId: string | null; storeLost: boolean };
@@ -839,7 +839,7 @@ describe('GET /api/jobs/:id', () => {
   test('gives Reuse the end frame and reference audio that still exist, to the creator only', async () => {
     await input('d-end', alice.id);
     for (const [id, ms] of [['d-clip-1', 3000], ['d-clip-gone', 4000], ['d-clip-2', 5000]] as const) {
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, $2, 'input', $1, 'a.mp3', 'audio/mpeg', 1, $3)`, [id, alice.id, ms]);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ($1, $2, 'input', $1, 'a.mp3', 'audio/mpeg', 1, $3, 'ws_vet')`, [id, alice.id, ms]);
     }
     await pool.query(`update assets set deleted_at = now() where id = 'd-clip-gone'`);
     const id = await clip(alice.id, { inputs: [] });
@@ -992,8 +992,8 @@ describe('GET /api/models', () => {
     const before = await remaining();
     await bookLlm(pool, { enhance: enhanced }, { costUsd: 0.5, provider: 'fal', model: 'm' });
     expect(await remaining()).toBe(before);
-    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('budget-an', $1, 'team-unassigned', 's', 'succeeded')`, [alice.id]);
-    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots) values ('budget-rm', $1, 'team-unassigned', 'budget-an', '[1]')`, [alice.id]);
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ('budget-an', $1, 'team-unassigned', 's', 'succeeded', 'ws_vet')`, [alice.id]);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, workspace_id) values ('budget-rm', $1, 'team-unassigned', 'budget-an', '[1]', 'ws_vet')`, [alice.id]);
     await bookLlm(pool, { remake: 'budget-rm', step: '1:video' }, { costUsd: 3, provider: 'fal', model: 'm' });
     const after = await remaining();
     expect(Number(after)).toBeCloseTo(Number(before) - 3, 4);
@@ -1007,8 +1007,8 @@ describe('GET /api/models', () => {
     const running = await clip(dave.id, { status: 'running' });
     expect((await models(dave.cookie)).monthToDate).toEqual({ usd: '1.6000', provisional: true });
     await pool.query(
-      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final)
-       select 'actual_adjustment', 0.4, month, day, user_id, team_id, job_id, true from cost_entries where job_id = $1 and kind = 'estimate'`,
+      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final, workspace_id)
+       select 'actual_adjustment', 0.4, month, day, user_id, team_id, job_id, true, workspace_id from cost_entries where job_id = $1 and kind = 'estimate'`,
       [running],
     );
     expect((await models(dave.cookie)).monthToDate).toEqual({ usd: '2.0000', provisional: false });
@@ -1087,7 +1087,7 @@ describe('GET /api/jobs?mine clips', () => {
     const before = await clips();
     await clip(alice.id);
     const refunded = await clip(alice.id, { status: 'failed' });
-    await pool.query(`insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final) select 'actual_adjustment', -1.6, month, day, user_id, team_id, job_id, true from cost_entries where job_id = $1`, [refunded]); // failed with 0 USD booked does not count
+    await pool.query(`insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final, workspace_id) select 'actual_adjustment', -1.6, month, day, user_id, team_id, job_id, true, workspace_id from cost_entries where job_id = $1`, [refunded]); // failed with 0 USD booked does not count
     await clip(alice.id, { createdAt: '2026-01-01T00:00:00Z' }); // another day
     await clip(bob.id);
     const cap = (await pool.query(`select member_daily_clip_cap from settings where id = 1`)).rows[0].member_daily_clip_cap;

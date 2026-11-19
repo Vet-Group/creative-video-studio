@@ -25,7 +25,7 @@ async function newUser(role: 'member' | 'admin' = 'member') {
   const { user } = await auth.api.createUser({ body: { email, name: email, password: PASSWORD, role } });
   const res = await auth.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true });
   const cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, 'own.png', 'image/png', 1)`, [`${user.id}-a`, user.id]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, 'own.png', 'image/png', 1, 'ws_vet')`, [`${user.id}-a`, user.id]);
   await putObject(`${user.id}-a`, new Uint8Array([user.id.length]), 'image/png');
   return { id: user.id, cookie, asset: `${user.id}-a` };
 }
@@ -89,7 +89,7 @@ describe('/api/templates', () => {
 
   test("keeps Create video's end frame and audio clips as the images are: the owner's own live uploads only", async () => {
     const [a, b] = [await newUser(), await newUser()];
-    const clip = (u: User, id: string) => pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, $2, 'input', $1, 'a.mp3', 'audio/mpeg', 1, 3000)`, [id, u.id]);
+    const clip = (u: User, id: string) => pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ($1, $2, 'input', $1, 'a.mp3', 'audio/mpeg', 1, 3000, 'ws_vet')`, [id, u.id]);
     await clip(a, `${a.id}-c1`);
     await clip(a, `${a.id}-c2`);
     await clip(b, `${b.id}-c1`);
@@ -132,7 +132,7 @@ describe('/api/templates', () => {
   test("shares a member's store template with whoever lists that store, its photos as their own copies; its author, an Admin or an editor deletes it", async () => {
     const [a, b, admin, editor] = [await newUser(), await newUser(), await newUser('admin'), await newUser()];
     await pool.query(`update users set can_edit_templates = true where id = $1`, [editor.id]);
-    await pool.query(`insert into stores (id, name, code, hidden) values ('st-a', 'Shop A', 'STA', false), ('st-gone', 'Gone', 'STG', true)`);
+    await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('st-a', 'Shop A', 'STA', false, 'ws_vet'), ('st-gone', 'Gone', 'STG', true, 'ws_vet')`);
     const res = await save(a, { ...tryOn(a), storeId: 'st-a' });
     expect(res.status).toBe(201);
     const { id } = (await res.json()) as { id: string };
@@ -168,10 +168,10 @@ describe('/api/templates', () => {
 
   test("hands a store template's live photos, end frame and clips to the member who applies it as that member's copies, once, and nothing else of the author's", async () => {
     const [a, b] = [await newUser(), await newUser()];
-    await pool.query(`insert into stores (id, name, code, hidden) values ('st-copy', 'Shop C', 'STC', false)`);
+    await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('st-copy', 'Shop C', 'STC', false, 'ws_vet')`);
     const upload = async (id: string, mime = 'image/png') => {
       const audio = mime === 'audio/mpeg';
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, $2, 'input', $1, $3, $4, 3, $5)`, [id, a.id, audio ? 'a.mp3' : 'x.png', mime, audio ? 3000 : null]);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ($1, $2, 'input', $1, $3, $4, 3, $5, 'ws_vet')`, [id, a.id, audio ? 'a.mp3' : 'x.png', mime, audio ? 3000 : null]);
       await putObject(id, new Uint8Array([1, 2, 3]), mime);
     };
     const [clip, deleted, purged, unused] = [`${a.id}-clip`, `${a.id}-deleted`, `${a.id}-purged`, `${a.id}-unused`];
@@ -210,10 +210,10 @@ describe('/api/templates', () => {
 
   test('names each saved photo in its place (inputIds), so the photos after a deleted one keep their slots, to the author and to a member applying copies', async () => {
     const [a, b] = [await newUser(), await newUser()];
-    await pool.query(`insert into stores (id, name, code, hidden) values ('st-slots', 'Shop S', 'STS', false)`);
+    await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('st-slots', 'Shop S', 'STS', false, 'ws_vet')`);
     const [person, garment, backdrop] = [`${a.id}-person`, `${a.id}-garment`, `${a.id}-backdrop`];
     for (const [id, name] of [[person, 'person.png'], [garment, 'garment.png'], [backdrop, 'backdrop.png']] as const) {
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, $3, 'image/png', 1)`, [id, a.id, name]);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, $3, 'image/png', 1, 'ws_vet')`, [id, a.id, name]);
       await putObject(id, new Uint8Array([1]), 'image/png');
     }
     const res = await save(a, { feature: 'try_on', name: 'Slots', data: { images: [person, garment, backdrop], garments: 1 }, storeId: 'st-slots' });
@@ -238,10 +238,10 @@ describe('/api/templates', () => {
 
   test('says how many photos it saved (inputCount), so the form counts a photo deleted since as lost, to the author and to a member applying copies', async () => {
     const [a, b] = [await newUser(), await newUser()];
-    await pool.query(`insert into stores (id, name, code, hidden) values ('st-lost', 'Shop L', 'STL', false)`);
+    await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('st-lost', 'Shop L', 'STL', false, 'ws_vet')`);
     const [first, second, third] = [`${a.id}-first`, `${a.id}-second`, `${a.id}-third`];
     for (const id of [first, second, third]) {
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, 'x.png', 'image/png', 1)`, [id, a.id]);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, 'x.png', 'image/png', 1, 'ws_vet')`, [id, a.id]);
       await putObject(id, new Uint8Array([1]), 'image/png');
     }
     const { id } = (await (await save(a, { feature: 'image', name: 'Lost', data: { images: [first, second, third], prompt: 'p' }, storeId: 'st-lost' })).json()) as { id: string };
@@ -277,7 +277,7 @@ describe('/api/templates', () => {
   test("takes own and company custom hooks and locations in data, refuses another member's private one, and keeps a company template to built-in or company ones", async () => {
     const [a, b, admin] = [await newUser(), await newUser(), await newUser('admin')];
     const choice = (id: string, userId: string, kind: string, company = false) =>
-      pool.query(`insert into user_choices (id, user_id, kind, name, phrase, is_company) values ($1, $2, $3, 'n', 'p', $4)`, [id, userId, kind, company]);
+      pool.query(`insert into user_choices (id, user_id, kind, name, phrase, is_company, workspace_id) values ($1, $2, $3, 'n', 'p', $4, 'ws_vet')`, [id, userId, kind, company]);
     await choice(`${a.id}-hook`, a.id, 'hook');
     await choice(`${admin.id}-spot`, admin.id, 'location', true);
     await choice(`${admin.id}-hook`, admin.id, 'hook');
@@ -298,8 +298,8 @@ describe('/api/templates', () => {
     async function job(u: User, row: Row) {
       const id = `tj-${++jobSeq}`;
       await pool.query(
-        `insert into jobs (id, user_id, team_id, feature, model, provider, preset_id, prompt, enhance, aspect, duration_s, params, input_asset_ids, store_id, status)
-         values ($1, $2, 'team-unassigned', $3, $4, 'fal', $5, $6, $7, $8, $9, $10, $11, $12, 'succeeded')`,
+        `insert into jobs (id, user_id, team_id, feature, model, provider, preset_id, prompt, enhance, aspect, duration_s, params, input_asset_ids, store_id, status, workspace_id)
+         values ($1, $2, 'team-unassigned', $3, $4, 'fal', $5, $6, $7, $8, $9, $10, $11, $12, 'succeeded', 'ws_vet')`,
         [id, u.id, row.feature, row.model, row.preset ?? null, row.prompt ?? 'composed', row.enhance ?? false, row.aspect ?? '9:16', row.duration ?? 0, JSON.stringify(row.params ?? {}), row.inputs, row.store ?? null],
       );
       return id;
@@ -312,9 +312,9 @@ describe('/api/templates', () => {
 
     test('builds the data of a Try On, a Marketing and a Motion Control job, and of a free-prompt and a preset video', async () => {
       const u = await newUser();
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, $2, 'input', $1, 'ref.mp4', 'video/mp4', 1, 5300)`, [`${u.id}-v`, u.id]);
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, 'g.png', 'image/png', 1)`, [`${u.id}-g`, u.id]);
-      await pool.query(`insert into user_choices (id, user_id, kind, name, phrase) values ($1, $2, 'hook', 'n', 'p')`, [`${u.id}-hook`, u.id]);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ($1, $2, 'input', $1, 'ref.mp4', 'video/mp4', 1, 5300, 'ws_vet')`, [`${u.id}-v`, u.id]);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, 'g.png', 'image/png', 1, 'ws_vet')`, [`${u.id}-g`, u.id]);
+      await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, workspace_id) values ($1, $2, 'hook', 'n', 'p', 'ws_vet')`, [`${u.id}-hook`, u.id]);
       const tryOn = await job(u, { feature: 'try_on', model: 'nano-banana-pro', aspect: '3:4', params: { resolution: '2K', garments: '1', brief: 'red dress' }, inputs: [u.asset, `${u.id}-g`] });
       expect(await saved(await fromJob(u, tryOn))).toEqual({ feature: 'try_on', data: { images: [u.asset, `${u.id}-g`], brief: 'red dress', garments: 1, ratio: '3:4', resolution: '2K', modelId: 'nano-banana-pro' } });
       const posed = await job(u, { feature: 'try_on', model: 'nano-banana-pro', aspect: '3:4', params: { resolution: '2K', garments: '1', pose: 'kneel' }, inputs: [u.asset, `${u.id}-g`] });
@@ -339,7 +339,7 @@ describe('/api/templates', () => {
 
     test("keeps a Motion Control job's character orientation, returns it on GET, and refuses an unknown one", async () => {
       const u = await newUser();
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, $2, 'input', $1, 'ref2.mp4', 'video/mp4', 1, 5300)`, [`${u.id}-v2`, u.id]);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ($1, $2, 'input', $1, 'ref2.mp4', 'video/mp4', 1, 5300, 'ws_vet')`, [`${u.id}-v2`, u.id]);
       const motion = await job(u, { feature: 'motion_control', model: 'kling-v3-motion-pro', aspect: 'auto', duration: 6, params: { orientation: 'image' }, inputs: [u.asset, `${u.id}-v2`] });
       const { id } = (await (await fromJob(u, motion)).json()) as { id: string };
       expect((await pool.query('select data from user_templates where id = $1', [id])).rows[0].data).toMatchObject({ orientation: 'image' });
@@ -356,7 +356,7 @@ describe('/api/templates', () => {
     test("keeps a video job's own live end frame and audio clips, and leaves out another member's and deleted ones", async () => {
       const [u, other] = [await newUser(), await newUser()];
       for (const [id, owner, gone] of [[`${u.id}-c1`, u, false], [`${u.id}-c2`, u, false], [`${u.id}-cx`, u, true], [`${other.id}-c`, other, false]] as const) {
-        await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, deleted_at) values ($1, $2, 'input', $1, 'a.mp3', 'audio/mpeg', 1, 3000, $3)`, [id, owner.id, gone ? new Date() : null]);
+        await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, deleted_at, workspace_id) values ($1, $2, 'input', $1, 'a.mp3', 'audio/mpeg', 1, 3000, $3, 'ws_vet')`, [id, owner.id, gone ? new Date() : null]);
       }
       const base = { feature: 'video', model: 'kling-o3-pro', prompt: 'p', duration: 5, inputs: [u.asset] };
       const audio = `${u.id}-c2,${other.id}-c,${u.id}-cx,${u.id}-c1`;
@@ -425,8 +425,8 @@ describe('/api/templates', () => {
 
     test("leaves out another member's and deleted inputs, a hidden store and a hook the member cannot use, and keeps a visible store", async () => {
       const [u, other] = [await newUser(), await newUser()];
-      await pool.query(`insert into stores (id, name, code, hidden) values ('tpl-ok', 'Ok', 'TPLOK', false), ('tpl-hidden', 'Hidden', 'TPLH', true)`);
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at) values ($1, $2, 'input', $1, 'x.png', 'image/png', 1, now())`, [`${u.id}-gone`, u.id]);
+      await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('tpl-ok', 'Ok', 'TPLOK', false, 'ws_vet'), ('tpl-hidden', 'Hidden', 'TPLH', true, 'ws_vet')`);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at, workspace_id) values ($1, $2, 'input', $1, 'x.png', 'image/png', 1, now(), 'ws_vet')`, [`${u.id}-gone`, u.id]);
       const base = { feature: 'video', model: 'kling-o3-pro', prompt: 'p', duration: 5, inputs: [other.asset, `${u.id}-gone`, u.asset] };
       // Each one left out keeps its place as an empty slot ('').
       expect((await saved(await fromJob(u, await job(u, { ...base, store: 'tpl-hidden' })))).data).toEqual({ images: ['', '', u.asset], prompt: 'p', enhance: false, ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 5 });
@@ -437,11 +437,11 @@ describe('/api/templates', () => {
 
     test('keeps an empty slot for a photo deleted before the save, so the others keep their roles for the author and for a store member', async () => {
       const [u, m] = [await newUser(), await newUser()];
-      await pool.query(`insert into stores (id, name, code, hidden) values ('tpl-gaps', 'Gaps', 'TPLGAP', false)`);
+      await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('tpl-gaps', 'Gaps', 'TPLGAP', false, 'ws_vet')`);
       const names = ['person', 'garment', 'backdrop', 'product', 'box'];
       const [person, garment, backdrop, product, box] = names.map((n) => `${u.id}-${n}`) as [string, string, string, string, string];
       for (const n of names) {
-        await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, $3, 'image/png', 1)`, [`${u.id}-${n}`, u.id, `${n}.png`]);
+        await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, $3, 'image/png', 1, 'ws_vet')`, [`${u.id}-${n}`, u.id, `${n}.png`]);
         await putObject(`${u.id}-${n}`, new Uint8Array([1]), 'image/png');
       }
       const tryOnJob = await job(u, { feature: 'try_on', model: 'nano-banana-pro', aspect: '3:4', params: { garments: '1' }, inputs: [person, garment, backdrop] });
@@ -491,7 +491,7 @@ describe('/api/templates', () => {
       expect((await fromJob(admin, mine, { isCompany: true })).status).toBe(201);
       expect(await (await list(req(u, '/api/templates?feature=image'))).json()).toMatchObject({ templates: [{ name: 'From history', isCompany: true, mine: false }] });
       // A company template from a job may not hold the Admin's private hook.
-      await pool.query(`insert into user_choices (id, user_id, kind, name, phrase) values ($1, $2, 'hook', 'n', 'p')`, [`${admin.id}-hook`, admin.id]);
+      await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, workspace_id) values ($1, $2, 'hook', 'n', 'p', 'ws_vet')`, [`${admin.id}-hook`, admin.id]);
       const mkt = await job(admin, { feature: 'marketing', model: 'kling-o3-pro', duration: 5, params: { hook: `${admin.id}-hook` }, inputs: [admin.asset] });
       expect(await error(await fromJob(admin, mkt, { isCompany: true }))).toBe('a company or store template may use only built-in or company hooks and locations');
     });

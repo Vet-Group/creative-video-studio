@@ -35,23 +35,23 @@ beforeAll(async () => {
   const res = await auth.api.signInEmail({ body: { email: 'member@example.test', password: PASSWORD }, asResponse: true });
   cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
   await pool.query(
-    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values
-       ('img', $1, 'input', 's3/img', 'shirt.png', 'image/png', 1), ('vid', $1, 'input', 's3/vid', 'ref.mp4', 'video/mp4', 1),
-       ('img-theirs', $2, 'input', 's3/theirs', 't.png', 'image/png', 1)`,
+    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values
+       ('img', $1, 'input', 's3/img', 'shirt.png', 'image/png', 1, 'ws_vet'), ('vid', $1, 'input', 's3/vid', 'ref.mp4', 'video/mp4', 1, 'ws_vet'),
+       ('img-theirs', $2, 'input', 's3/theirs', 't.png', 'image/png', 1, 'ws_vet')`,
     [userId, other.user.id],
   );
-  await pool.query(`insert into stores (id, name, code) values ('store-ok', 'Shop', 'SOK')`);
+  await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-ok', 'Shop', 'SOK', 'ws_vet')`);
   const shots = JSON.stringify({ shots: [1, 2, 3].map((index) => ({ index, start: index - 1, end: index, role: 'r', prompt: `p${index}` })) });
   await pool.query(
-    `insert into analyses (id, user_id, team_id, store_id, source_key, status, result)
-       select 'an-ok', u.id, u.team_id, 'store-ok', 's3/vid', 'succeeded', $3::jsonb from users u where u.id = $1
-       union all select 'an-running', u.id, u.team_id, null, 's3/vid', 'running', null from users u where u.id = $1
-       union all select 'an-theirs', u.id, u.team_id, null, 's3/theirs', 'succeeded', $3::jsonb from users u where u.id = $2`,
+    `insert into analyses (id, user_id, team_id, store_id, source_key, status, result, workspace_id)
+       select 'an-ok', u.id, u.team_id, 'store-ok', 's3/vid', 'succeeded', $3::jsonb, 'ws_vet' from users u where u.id = $1
+       union all select 'an-running', u.id, u.team_id, null, 's3/vid', 'running', null, 'ws_vet' from users u where u.id = $1
+       union all select 'an-theirs', u.id, u.team_id, null, 's3/theirs', 'succeeded', $3::jsonb, 'ws_vet' from users u where u.id = $2`,
     [userId, other.user.id, shots],
   );
   // Shots 1 and 2 share a prompt and a role, so they are one scene (mergeShots).
   const merged = JSON.stringify({ shots: [1, 2, 3].map((index) => ({ index, start: index - 1, end: index, role: 'r', prompt: index < 3 ? 'same' : 'other' })) });
-  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) select 'an-merged', u.id, u.team_id, 's3/vid', 'succeeded', $2::jsonb from users u where u.id = $1`, [userId, merged]);
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result, workspace_id) select 'an-merged', u.id, u.team_id, 's3/vid', 'succeeded', $2::jsonb, 'ws_vet' from users u where u.id = $1`, [userId, merged]);
 });
 
 afterAll(async () => {
@@ -102,7 +102,7 @@ test('polls one of the caller’s remakes and hides another member’s', async (
   expect(got.status).toBe(200);
   expect((await got.json()) as object).toMatchObject({ id, analysisId: 'an-ok', productAssetId: 'img', shots: [1, 3], status: 'queued', outputAssetId: null });
   await pool.query(
-    `insert into remakes (id, user_id, team_id, analysis_id, shots) select 'rm-theirs', u.id, u.team_id, 'an-theirs', '[1]' from users u where u.email = 'other@example.test'`,
+    `insert into remakes (id, user_id, team_id, analysis_id, shots, workspace_id) select 'rm-theirs', u.id, u.team_id, 'an-theirs', '[1]', 'ws_vet' from users u where u.email = 'other@example.test'`,
   );
   expect((await ONE(call('/api/remakes/rm-theirs'), { params: Promise.resolve({ id: 'rm-theirs' }) })).status).toBe(404);
 });
@@ -134,21 +134,21 @@ test('lists the caller’s remakes newest first', async () => {
 
 test('deletes a finished remake with its output assets, keeps the product image and the ledger, then lets the analysis go; refuses an open or another member’s one', async () => {
   const shots = JSON.stringify({ shots: [{ index: 1, start: 0, end: 1, role: 'r', prompt: 'p' }] });
-  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) select 'an-del', u.id, u.team_id, 's3/vid', 'succeeded', $2::jsonb from users u where u.id = $1`, [userId, shots]);
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result, workspace_id) select 'an-del', u.id, u.team_id, 's3/vid', 'succeeded', $2::jsonb, 'ws_vet' from users u where u.id = $1`, [userId, shots]);
   await pool.query(
-    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values
-       ('rm-out', $1, 'output', 'assets/rm-out', 'out.mp4', 'video/mp4', 1), ('rm-cmp', $1, 'output', 'assets/rm-cmp', 'cmp.mp4', 'video/mp4', 1), ('rm-full', $1, 'output', 'assets/rm-full', 'full.mp4', 'video/mp4', 1), ('rm-clip', $1, 'output', 'assets/rm-clip', 'clip.mp4', 'video/mp4', 1)`,
+    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values
+       ('rm-out', $1, 'output', 'assets/rm-out', 'out.mp4', 'video/mp4', 1, 'ws_vet'), ('rm-cmp', $1, 'output', 'assets/rm-cmp', 'cmp.mp4', 'video/mp4', 1, 'ws_vet'), ('rm-full', $1, 'output', 'assets/rm-full', 'full.mp4', 'video/mp4', 1, 'ws_vet'), ('rm-clip', $1, 'output', 'assets/rm-clip', 'clip.mp4', 'video/mp4', 1, 'ws_vet')`,
     [userId],
   );
   const result = JSON.stringify({ shots: [{ index: 1, status: 'succeeded', clipAssetId: 'rm-clip', costUsd: 0.2 }], compareAssetId: 'rm-cmp', fullAssetId: 'rm-full' });
   await pool.query(
-    `insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, status, result, output_asset_id)
-       select 'rm-done', u.id, u.team_id, 'an-del', 'img', '[1]'::jsonb, 'succeeded', $2::jsonb, 'rm-out' from users u where u.id = $1
-       union all select 'rm-open', u.id, u.team_id, 'an-del', 'img', '[1]'::jsonb, 'running', null::jsonb, null from users u where u.id = $1`,
+    `insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, status, result, output_asset_id, workspace_id)
+       select 'rm-done', u.id, u.team_id, 'an-del', 'img', '[1]'::jsonb, 'succeeded', $2::jsonb, 'rm-out', 'ws_vet' from users u where u.id = $1
+       union all select 'rm-open', u.id, u.team_id, 'an-del', 'img', '[1]'::jsonb, 'running', null::jsonb, null, 'ws_vet' from users u where u.id = $1`,
     [userId, result],
   );
   await pool.query(
-    `insert into cost_entries (kind, usd, month, day, user_id, team_id, provider, is_final, ref) select 'llm', 0.2, '2026-11', '2026-11-13', u.id, u.team_id, 'fal', true, 'llm:remake:rm-done:1:video' from users u where u.id = $1`,
+    `insert into cost_entries (kind, usd, month, day, user_id, team_id, provider, is_final, ref, workspace_id) select 'llm', 0.2, '2026-11', '2026-11-13', u.id, u.team_id, 'fal', true, 'llm:remake:rm-done:1:video', 'ws_vet' from users u where u.id = $1`,
     [userId],
   );
   const remove = (id: string) => REMOVE(call(`/api/remakes/${id}`, 'DELETE'), { params: Promise.resolve({ id }) });
@@ -176,8 +176,8 @@ test('deletes a finished remake with its output assets, keeps the product image 
 
 test('remakes another member’s analysis while an Admin shares it, with the caller’s own image and no store, and refuses it once unshared', async () => {
   await pool.query(
-    `insert into analyses (id, user_id, team_id, store_id, source_key, status, result, shared_title, shared_at)
-       select 'an-shared', u.id, u.team_id, 'store-ok', 's3/theirs', 'succeeded', a.result, 'Tee', now() from analyses a, users u where a.id = 'an-theirs' and u.email = 'other@example.test'`,
+    `insert into analyses (id, user_id, team_id, store_id, source_key, status, result, shared_title, shared_at, workspace_id)
+       select 'an-shared', u.id, u.team_id, 'store-ok', 's3/theirs', 'succeeded', a.result, 'Tee', now(), 'ws_vet' from analyses a, users u where a.id = 'an-theirs' and u.email = 'other@example.test'`,
   );
   const shared = { ...ok, analysisId: 'an-shared' };
   const storeOf = async (res: Response) => (await pool.query('select store_id from remakes where id = $1', [((await res.json()) as { id: string }).id])).rows[0].store_id;

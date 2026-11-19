@@ -28,17 +28,17 @@ beforeAll(async () => {
   const res = await auth.api.signInEmail({ body: { email: 'member@example.test', password: PASSWORD }, asResponse: true });
   cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
   await pool.query(
-    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values
-       ('img', $1, 'input', 'img', 'a.png', 'image/png', 1, null),
-       ('end', $1, 'input', 'end', 'end.png', 'image/png', 1, null),
-       ('vid', $1, 'input', 'vid', 'dance.mp4', 'video/mp4', 1, 5400),
-       ('theirs', $2, 'input', 'theirs', 't.png', 'image/png', 1, null),
-       ('c5a', $1, 'input', 'c5a', 'a.mp3', 'audio/mpeg', 1, 5000),
-       ('c5b', $1, 'input', 'c5b', 'b.wav', 'audio/wav', 1, 5000),
-       ('c5c', $1, 'input', 'c5c', 'c.mp3', 'audio/mpeg', 1, 5000),
-       ('c2', $1, 'input', 'c2', 'd.mp3', 'audio/mpeg', 1, 2000),
-       ('short', $1, 'input', 'short', 'e.mp3', 'audio/mpeg', 1, 1900),
-       ('their-clip', $2, 'input', 'their-clip', 'f.mp3', 'audio/mpeg', 1, 5000)`,
+    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values
+       ('img', $1, 'input', 'img', 'a.png', 'image/png', 1, null, 'ws_vet'),
+       ('end', $1, 'input', 'end', 'end.png', 'image/png', 1, null, 'ws_vet'),
+       ('vid', $1, 'input', 'vid', 'dance.mp4', 'video/mp4', 1, 5400, 'ws_vet'),
+       ('theirs', $2, 'input', 'theirs', 't.png', 'image/png', 1, null, 'ws_vet'),
+       ('c5a', $1, 'input', 'c5a', 'a.mp3', 'audio/mpeg', 1, 5000, 'ws_vet'),
+       ('c5b', $1, 'input', 'c5b', 'b.wav', 'audio/wav', 1, 5000, 'ws_vet'),
+       ('c5c', $1, 'input', 'c5c', 'c.mp3', 'audio/mpeg', 1, 5000, 'ws_vet'),
+       ('c2', $1, 'input', 'c2', 'd.mp3', 'audio/mpeg', 1, 2000, 'ws_vet'),
+       ('short', $1, 'input', 'short', 'e.mp3', 'audio/mpeg', 1, 1900, 'ws_vet'),
+       ('their-clip', $2, 'input', 'their-clip', 'f.mp3', 'audio/mpeg', 1, 5000, 'ws_vet')`,
     [user.id, other.user.id],
   );
   await pool.query(`update model_configs set enabled = true where id in ('kling-o3-pro', 'kling-o1')`);
@@ -115,7 +115,7 @@ describe('the end frame', () => {
   });
 
   test('Kling O3 Pro takes an end frame with at most 2 images (fal refuses more), and more images run without one', async () => {
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) select x, owner_id, 'input', x, 'x.png', 'image/png', 1 from assets, unnest(array['img2', 'img3']) x where id = 'img'`);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) select x, owner_id, 'input', x, 'x.png', 'image/png', 1, workspace_id from assets, unnest(array['img2', 'img3']) x where id = 'img'`);
     const r = (await (await GET_MODELS(call('/api/models?feature=video&ratio=9:16&durationSec=5'))).json()) as { models: { id: string; endMaxImages: number | null }[] };
     expect(Object.fromEntries(r.models.map((m) => [m.id, m.endMaxImages]))).toEqual({ 'kling-o3-pro': 2, 'kling-o1': null });
     expect((await run({ assetIds: ['img', 'img2'], params: { endAssetId: 'end' } })).status).toBe(201);
@@ -124,7 +124,7 @@ describe('the end frame', () => {
   });
 
   test('a retry is refused once its end frame was deleted', async () => {
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) select 'end2', owner_id, 'input', 'end2', 'e.png', 'image/png', 1 from assets where id = 'img'`);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) select 'end2', owner_id, 'input', 'end2', 'e.png', 'image/png', 1, workspace_id from assets where id = 'img'`);
     const { id } = (await (await run({ params: { endAssetId: 'end2' } })).json()) as { id: string };
     await pool.query(`update jobs set status = 'failed' where id = $1`, [id]);
     await pool.query(`update assets set deleted_at = now() where id = 'end2'`);
@@ -219,7 +219,7 @@ describe('Marketing Studio: end frame, last shot and end text', () => {
   const ugc = (body: Record<string, unknown>) => run({ feature: 'marketing', assetIds: ['img', 'prod'], ...body });
   const paramsOf = async (res: Response) => (await pool.query('select params from jobs where id = $1', [((await res.json()) as { id: string }).id])).rows[0].params;
   beforeAll(async () => {
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) select 'prod', owner_id, 'input', 'prod', 'p.png', 'image/png', 1 from assets where id = 'img'`);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) select 'prod', owner_id, 'input', 'prod', 'p.png', 'image/png', 1, workspace_id from assets where id = 'img'`);
     await pool.query(`update model_configs set enabled = true where id = 'seedance-2.0-reference'`);
   });
 

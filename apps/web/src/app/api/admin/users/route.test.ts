@@ -331,10 +331,10 @@ describe('PATCH /api/admin/users/:id', () => {
     const m = await member('team-b');
     const job = async (id: string) => {
       await pool.query(
-        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids) select $1, $2, team_id, 'fal-test', 'fal', 'p', '9:16', 5, '{}' from users where id = $2`,
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, workspace_id) select $1, $2, team_id, 'fal-test', 'fal', 'p', '9:16', 5, '{}', 'ws_vet' from users where id = $2`,
         [id, m.id],
       );
-      await pool.query(`insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id) select 'estimate', 1, '2026-10', '2026-10-23', user_id, team_id, id from jobs where id = $1`, [id]);
+      await pool.query(`insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, workspace_id) select 'estimate', 1, '2026-10', '2026-10-23', user_id, team_id, id, workspace_id from jobs where id = $1`, [id]);
     };
     await job('team-job-before');
     expect((await patch(adminCookie, m.id, { teamId: 'team-old' })).status).toBe(400); // hidden
@@ -392,7 +392,7 @@ describe('DELETE /api/admin/users/:id', () => {
 
   test('refuses to delete a user who owns content, leaving the user and the log untouched', async () => {
     const m = await member();
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $3, 'p.jpg', 'image/jpeg', 10)`, [`asset-${m.id}`, m.id, `key-${m.id}`]);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $3, 'p.jpg', 'image/jpeg', 10, 'ws_vet')`, [`asset-${m.id}`, m.id, `key-${m.id}`]);
     expect((await del(adminCookie, m.id)).status).toBe(409);
     expect((await pool.query('select 1 from users where id = $1', [m.id])).rowCount).toBe(1);
     expect(await audits(m.id)).toEqual([]);

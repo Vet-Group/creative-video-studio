@@ -246,8 +246,8 @@ describe('POST /api/assets/samples', () => {
     const busy = await signIn('busy@example.test');
     const add = (count: number, age: string) =>
       pool.query(
-        `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at)
-           select g || '-' || $3, u.id, 'input', 'busy/' || g || '-' || $3, 'x.jpg', 'image/jpeg', 1, now() - $2::interval
+        `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at, workspace_id)
+           select g || '-' || $3, u.id, 'input', 'busy/' || g || '-' || $3, 'x.jpg', 'image/jpeg', 1, now() - $2::interval, 'ws_vet'
            from users u, generate_series(1, $1) g where u.email = 'busy@example.test'`,
         [count, age, age.replace(' ', '')],
       );

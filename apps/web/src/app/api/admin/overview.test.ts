@@ -45,8 +45,8 @@ const START_OF_TODAY = `(date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh'
 /** A job of the member created at the SQL time `at`, holding `usd` on the ledger, then set to `status`. */
 async function job(id: string, at: string, status: string, usd: string, feature = 'video') {
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, created_at)
-     values ($1, $2, 'ot', 'fal-test', 'fal', 'p', '9:16', 5, '{}', $3, ${at})`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, created_at, workspace_id)
+     values ($1, $2, 'ot', 'fal-test', 'fal', 'p', '9:16', 5, '{}', $3, ${at}, 'ws_vet')`,
     [id, member.id, feature],
   );
   await reserve(pool, id, usd);

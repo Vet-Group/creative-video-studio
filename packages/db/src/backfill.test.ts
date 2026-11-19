@@ -28,27 +28,33 @@ test('0005 marks every unverified user verified and touches nothing else', async
 
 test('0055 books the recorded Enhance and suggestion costs as llm rows once, in ICT, and a rerun books nothing', async () => {
   await pool.query(`insert into teams (id, name) values ('tb', 'Team B')`);
-  await pool.query(`insert into stores (id, name, code) values ('sb', 'Shop B', 'SB')`);
+  await pool.query(`insert into stores (id, name, code, workspace_id) values ('sb', 'Shop B', 'SB', 'ws_vet')`);
   await pool.query(`update users set team_id = 'tb' where id = 'u2'`);
   const job = (id: string, cost: string | null, createdAt = '2026-10-31 18:30:00+00') =>
     pool.query(
-      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, enhance, enhance_cost_usd)
-       values ($1, 'u1', 'team-unassigned', 'sb', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', $2, true, $3)`,
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, enhance, enhance_cost_usd, workspace_id)
+       values ($1, 'u1', 'team-unassigned', 'sb', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', $2, true, $3, 'ws_vet')`,
       [id, createdAt, cost],
     );
   await job('j1', '0.000412'); // 01:30 ICT on 1 November
   await job('j2', '0.000040'); // rounds to 0 at the ledger's 4 decimals
   await job('j3', null);
   const run = (id: string, cost: string | null) =>
-    pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at) values ($1, 'u2', '{}', 'succeeded', $2, '2026-10-30 10:00:00+07')`, [id, cost]);
+    pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at, workspace_id) values ($1, 'u2', '{}', 'succeeded', $2, '2026-10-30 10:00:00+07', 'ws_vet')`, [id, cost]);
   await run('s1', '0.000550');
   await run('s2', '0');
   await run('s3', null);
   // The test database has run 0055 already, with no costs to book; its backfill statements follow the constraint changes.
   const file = readFileSync(new URL('../migrations/0055_llm_costs_in_ledger.sql', import.meta.url), 'utf8');
   const sql = file.slice(file.indexOf('-- LLM calls in the ledger'));
-  await pool.query(sql);
-  await pool.query(sql);
+  // 0055 predates workspaces and names none: its replay gets back the default that 0106 filed such rows with and 0110 dropped.
+  await pool.query(`alter table cost_entries alter column workspace_id set default 'ws_vet'`);
+  try {
+    await pool.query(sql);
+    await pool.query(sql);
+  } finally {
+    await pool.query(`alter table cost_entries alter column workspace_id drop default`);
+  }
   const { rows } = await pool.query(
     `select kind, usd::text, month, day::text, user_id, team_id, store_id, job_id, provider, model, is_final, ref from cost_entries where kind = 'llm' order by ref`,
   );
@@ -61,16 +67,16 @@ test('0055 books the recorded Enhance and suggestion costs as llm rows once, in 
 });
 
 test('0068 gives uploads a store column (FK set null, owner/store/date index) and tags each input with the store of its owner\'s latest job with a store', async () => {
-  await pool.query(`insert into stores (id, name, code) values ('sc', 'Shop C', 'SC'), ('sd', 'Shop D', 'SD')`);
+  await pool.query(`insert into stores (id, name, code, workspace_id) values ('sc', 'Shop C', 'SC', 'ws_vet'), ('sd', 'Shop D', 'SD', 'ws_vet')`);
   const asset = (id: string, owner: string, kind = 'input') =>
-    pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, $3, $1, 'f.jpg', 'image/jpeg', 1)`, [id, owner, kind]);
+    pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, $3, $1, 'f.jpg', 'image/jpeg', 1, 'ws_vet')`, [id, owner, kind]);
   for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) await asset(id, 'u1');
   await asset('b1', 'u2');
   await asset('o1', 'u1', 'output');
   const job = (id: string, store: string | null, inputs: string[], createdAt: string, params = '{}') =>
     pool.query(
-      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, params)
-       values ($1, 'u1', 'team-unassigned', $2, 'kling-o3-pro', 'fal', 'p', '9:16', 5, $3, $4, $5)`,
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, params, workspace_id)
+       values ($1, 'u1', 'team-unassigned', $2, 'kling-o3-pro', 'fal', 'p', '9:16', 5, $3, $4, $5, 'ws_vet')`,
       [id, store, inputs, createdAt, params],
     );
   await job('k1', 'sc', ['a1', 'a2', 'b1', 'o1'], '2026-11-01 10:00:00+07');
@@ -100,13 +106,13 @@ test('0068 gives uploads a store column (FK set null, owner/store/date index) an
 
 test('0077 puts each earlier input in the slot of the first job that used it, and leaves outputs and unused inputs alone', async () => {
   const asset = (id: string, kind = 'input') =>
-    pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', $2, $1, 'f.jpg', 'image/jpeg', 1)`, [id, kind]);
+    pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, 'u1', $2, $1, 'f.jpg', 'image/jpeg', 1, 'ws_vet')`, [id, kind]);
   for (const id of ['s-person', 's-top', 's-skirt', 's-bg', 's-model', 's-product', 's-ref', 's-frame', 's-end', 's-img', 's-unused', 's-app', 's-box-product', 's-box-pack']) await asset(id);
   await asset('s-out', 'output');
   const job = (id: string, feature: string, inputs: string[], createdAt: string, params = '{}') =>
     pool.query(
-      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, params)
-       values ($1, 'u1', 'team-unassigned', $2, 'kling-o3-pro', 'fal', 'p', '9:16', 5, $3, $4, $5)`,
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, params, workspace_id)
+       values ($1, 'u1', 'team-unassigned', $2, 'kling-o3-pro', 'fal', 'p', '9:16', 5, $3, $4, $5, 'ws_vet')`,
       [id, feature, inputs, createdAt, params],
     );
   await job('s1', 'try_on', ['s-person', 's-top', 's-skirt', 's-bg'], '2026-11-01 10:00:00+07', '{"garments":"2"}');

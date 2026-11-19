@@ -33,7 +33,7 @@ beforeAll(async () => {
   userId = (await auth.api.createUser({ body: { email: 'member@example.test', name: 'Member', password: PASSWORD, role: 'member' } })).user.id;
   const res = await auth.api.signInEmail({ body: { email: 'member@example.test', password: PASSWORD }, asResponse: true });
   cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('img', $1, 'input', 'img', 'a.png', 'image/png', 1)`, [userId]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('img', $1, 'input', 'img', 'a.png', 'image/png', 1, 'ws_vet')`, [userId]);
   await pool.query('update settings set member_daily_clip_cap = 1000, member_daily_usd_cap = 1000, member_monthly_usd_cap = 1000, monthly_cap_usd = 100000 where id = 1');
 });
 
@@ -149,7 +149,7 @@ describe('POST /api/jobs on a pair', () => {
 describe('a job BytePlus refused for a real person', () => {
   const failed = async (id: string, error: string, model = 'seedance-1.0-pro-byteplus', provider = 'byteplus') => {
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error) values ($1, $2, 'team-unassigned', $3, $4, 'My own prompt.', '9:16', 5, '{img}', 'failed', $5)`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error, workspace_id) values ($1, $2, 'team-unassigned', $3, $4, 'My own prompt.', '9:16', 5, '{img}', 'failed', $5, 'ws_vet')`,
       [id, userId, model, provider, error],
     );
   };
@@ -238,12 +238,12 @@ describe('a pair that acts as one model (migration 0078)', () => {
     await only(['seedance-2.5-byteplus', 'seedance-2.5-reference']);
     const succeeded = (id: string, model: string, retryOf: string | null = null) =>
       pool.query(
-        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, retry_of) values ($1, $2, 'team-unassigned', $3, 'fal', 'p', '9:16', 20, '{img}', 'succeeded', $4)`,
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, retry_of, workspace_id) values ($1, $2, 'team-unassigned', $3, 'fal', 'p', '9:16', 20, '{img}', 'succeeded', $4, 'ws_vet')`,
         [id, userId, model, retryOf],
       );
     const rerun = (id: string) => create({ rerunOf: id, maxUsd: 1000 });
     await succeeded('rr-1', 'seedance-2.5-reference'); // it ran on fal while BytePlus stopped at 15 s
-    await pool.query(`insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status) values ('rr-f', $1, 'team-unassigned', 'seedance-2.5-byteplus', 'byteplus', 'p', '9:16', 20, '{img}', 'failed')`, [userId]);
+    await pool.query(`insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, workspace_id) values ('rr-f', $1, 'team-unassigned', 'seedance-2.5-byteplus', 'byteplus', 'p', '9:16', 20, '{img}', 'failed', 'ws_vet')`, [userId]);
     await succeeded('rr-2', 'seedance-2.5-reference', 'rr-f');
     expect(await booked(await rerun('rr-1'))).toEqual({ model: 'seedance-2.5-byteplus', provider: 'byteplus', usd: '4.6240' }); // 20 s at BytePlus's $0.2312, as a new Run costs
     expect(await booked(await rerun('rr-2'))).toEqual({ model: 'seedance-2.5-reference', provider: 'fal', usd: '9.4600' }); // a twin retry is copied, not chosen again
@@ -258,7 +258,7 @@ describe('a pair that acts as one model (migration 0078)', () => {
   test('offers the twin of the job’s own feature to a job BytePlus refused for a real person', async () => {
     await only(['seedance-2.0-byteplus', 'seedance-2.0', 'seedance-2.0-reference']); // seedance-2.0 (fal) is a twin for Create Video only
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error, feature) values ('rp-m', $1, 'team-unassigned', 'seedance-2.0-byteplus', 'byteplus', 'p', '9:16', 5, '{img}', 'failed', $2, 'marketing')`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error, feature, workspace_id) values ('rp-m', $1, 'team-unassigned', 'seedance-2.0-byteplus', 'byteplus', 'p', '9:16', 5, '{img}', 'failed', $2, 'marketing', 'ws_vet')`,
       [userId, REAL_PERSON],
     );
     const jobs = ((await (await listJobs(as('/api/jobs?mine'))).json()) as { jobs: { id: string; twin: { label: string } | null }[] }).jobs;
@@ -268,7 +268,7 @@ describe('a pair that acts as one model (migration 0078)', () => {
   test('re-runs on the fal twin a clip whose sound BytePlus blocked, with the sound still on', async () => {
     await only(['seedance-2.0-byteplus', 'seedance-2.0-reference']);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error, params) values ('oa-1', $1, 'team-unassigned', 'seedance-2.0-byteplus', 'byteplus', 'p', '9:16', 5, '{img}', 'failed', $2, '{"audio":"on"}')`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error, params, workspace_id) values ('oa-1', $1, 'team-unassigned', 'seedance-2.0-byteplus', 'byteplus', 'p', '9:16', 5, '{img}', 'failed', $2, '{"audio":"on"}', 'ws_vet')`,
       [userId, 'byteplus status: OutputAudioSensitiveContentDetected.PolicyViolation: The request failed because the output audio may be related to copyright restrictions. Request id: 0217'],
     );
     const jobs = ((await (await listJobs(as('/api/jobs?mine'))).json()) as { jobs: { id: string; failureReason: string | null; twin: { label: string; estimateUsd: string } | null }[] }).jobs;
@@ -301,7 +301,7 @@ describe('a pair priced for what the form adds (review of #342)', () => {
   test('re-runs a refused job on the twin that can make it, the reference row before the image row', async () => {
     await only(['seedance-2.5-byteplus', 'seedance-2.5-image', 'seedance-2.5-reference']);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error) values ('rp-16', $1, 'team-unassigned', 'seedance-2.5-byteplus', 'byteplus', 'p', '16:9', 8, '{img}', 'failed', $2)`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error, workspace_id) values ('rp-16', $1, 'team-unassigned', 'seedance-2.5-byteplus', 'byteplus', 'p', '16:9', 8, '{img}', 'failed', $2, 'ws_vet')`,
       [userId, REAL_PERSON],
     );
     const jobs = ((await (await listJobs(as('/api/jobs?mine'))).json()) as { jobs: { id: string; twin: { label: string; estimateUsd: string } | null }[] }).jobs;
