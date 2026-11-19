@@ -2339,6 +2339,49 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'breed-swap': {
+    title: 'Đổi giống chó hàng loạt từ một ảnh',
+    sections: [
+      {
+        title: 'Đổi giống chó hàng loạt là gì?',
+        blocks: [
+          'Từ một ảnh có chó (mockup thảm tròn, ornament, áo in ảnh thú cưng, một thiết kế hay một ảnh chụp), ứng dụng tạo lại đúng ảnh đó với giống chó bạn chọn. Mỗi giống là một ảnh riêng, nên một thiết kế có đủ phiên bản cho từng giống để đăng bán.',
+          `AI chỉ thay chú chó, giữ nguyên tư thế, kích thước, vị trí, chữ, tên, bố cục, nền và phong cách: ảnh chụp vẫn là ảnh chụp, tranh vẽ vẫn là tranh vẽ. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Đổi giống chó trong 3 bước',
+        lead: 'Tải ảnh, chọn giống, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải ảnh có chó', text: 'Thêm một mockup, thiết kế hoặc ảnh chụp có một chú chó nhìn rõ.' },
+              { title: 'Chọn giống chó', text: 'Đánh dấu các giống cần tạo trong danh sách 25 giống phổ biến. Mỗi giống tạo một ảnh riêng và tính tiền riêng; tổng tiền hiện trước khi chạy.' },
+              { title: 'Chạy', text: 'Bấm Chạy. Mỗi giống là một lượt trong tab Lịch sử, thẻ ghi tên giống, dùng lại hay tải về như ảnh thường.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Giới hạn',
+        blocks: [
+          'Mỗi ảnh nên có một chú chó: ảnh có nhiều con vật thì AI có thể đổi nhầm con. Chữ nhỏ hay chữ viết tay đôi khi bị vẽ lại khác đi một chút, nên hãy xem lại từng ảnh, nhất là tên và chữ, trước khi đăng bán.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Mỗi giống tốn bao nhiêu?', `${APP_COST} Mỗi giống là một ảnh nên tổng tiền bằng giá một ảnh nhân số giống đã chọn.`],
+              ['Dùng ảnh nào để có kết quả tốt?', 'Một ảnh rõ nét, chú chó không bị che, thấy rõ dáng và mặt.'],
+              ['Không thấy giống mình cần?', 'Danh sách có 25 giống phổ biến nhất. Cần thêm giống nào thì gửi Góp ý.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'ai-fashion-model': {
     title: 'Tạo người mẫu AI từ vài lựa chọn',
     sections: [

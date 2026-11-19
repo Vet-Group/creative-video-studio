@@ -364,8 +364,8 @@ describe('migration 0007 image models', () => {
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.281', '2K': '0.301', '4K': '0.530' }],
       ['nano-banana', 'fal-ai/nano-banana/edit', ['image', 'try_on', 'jewelry_try_on'], { '1K': '0.0398' }],
       ['nano-banana-2', 'fal-ai/nano-banana-2/edit', ['image', 'fashion_model'], { '1K': '0.08' }],
-      ['nano-banana-2.1', 'google/nano-banana-2.1/edit', ['image', 'try_on', 'jewelry_try_on'], { '1K': '0.04', '2K': '0.059' }],
-      ['nano-banana-pro', 'fal-ai/nano-banana-pro/edit', ['image', 'try_on', 'jewelry_try_on', 'lingerie_try_on'], { '1K': '0.15', '2K': '0.15', '4K': '0.30' }],
+      ['nano-banana-2.1', 'google/nano-banana-2.1/edit', ['image', 'try_on', 'jewelry_try_on', 'breed_swap'], { '1K': '0.04', '2K': '0.059' }],
+      ['nano-banana-pro', 'fal-ai/nano-banana-pro/edit', ['image', 'try_on', 'jewelry_try_on', 'lingerie_try_on', 'breed_swap'], { '1K': '0.15', '2K': '0.15', '4K': '0.30' }],
       ['seedream-5-pro', 'bytedance/seedream/v5/pro/edit', ['image', 'lingerie_try_on'], { '1K': '0.0675', '2K': '0.135' }],
     ]);
     for (const r of rows) {
@@ -1023,5 +1023,17 @@ describe('migration 0105 multi-angle views', () => {
     expect((await pool.query(`select monthly_usd::int as usd from feature_caps where feature = 'multi_angle'`)).rows[0].usd).toBe(10);
     const id = await insertJob(userId);
     await pool.query(`update jobs set feature = 'multi_angle', params = '{"resolution": "1K", "view": "back"}' where id = $1`, [id]);
+  });
+});
+
+describe('migration 0107 pet pack', () => {
+  test('adds breed_swap to the Nano Banana 2.1 and Pro rows and their Vertex twins (none enabled or repriced), its soft cap, a breed swap job and a rug example', async () => {
+    const { rows } = await pool.query(`select id, enabled, image_prices from model_configs where 'breed_swap' = any(features) order by id`);
+    expect(rows.map((r) => [r.id, r.enabled])).toEqual([['nano-banana-2.1', false], ['nano-banana-2.1-vertex', false], ['nano-banana-pro', false], ['nano-banana-pro-vertex', false]]);
+    expect(rows.find((r) => r.id === 'nano-banana-pro').image_prices).toEqual({ '1K': '0.15', '2K': '0.15', '4K': '0.30' });
+    expect((await pool.query(`select monthly_usd::int as usd from feature_caps where feature = 'breed_swap'`)).rows[0].usd).toBe(10);
+    const id = await insertJob(userId);
+    await pool.query(`update jobs set feature = 'breed_swap', params = '{"resolution": "1K", "breed": "Pug"}' where id = $1`, [id]);
+    await pool.query(`insert into examples (job_id, added_by, product_type) values ($1, $2, 'rug')`, [id, userId]);
   });
 });

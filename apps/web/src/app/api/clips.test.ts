@@ -829,7 +829,7 @@ describe('GET /api/jobs/:id', () => {
     const res = await detail(bob.cookie, id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, ratio: '1:1', garments: null, pose: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, durationSec: 8, modelId: 'fal-test',
+      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, breed: null, ratio: '1:1', garments: null, pose: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', storeLost: false, modelLabel: 'Fal test', inputCount: 3, inputIds: ['d-in-2', 'd-in-gone', 'd-in-1'], outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }],
       endFrame: null, videoRef: null, clips: [],

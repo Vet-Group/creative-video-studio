@@ -128,14 +128,17 @@ test('an image result opens full screen from the picture in History, and an imag
       // A sample without a details file opens in place too (owner, 2026-11-18): the picture and its file actions, no new tab.
       const sample = gallery.locator('.gallery-item:has(img[src="/api/samples/image-example-1.jpg"])');
       await expect(sample).toBeVisible();
+      // A result's tile shows its preview (the grid loads the 512 px preview, not the original). The company results load apart from the samples, and their
+      // arrival re-deals the masonry columns and remounts the sample's tile, so the sample is measured only once the result is in the grid too.
+      const result = gallery.locator(`.gallery-item:has(img[src="/api/assets/${preview}/thumb"])`);
+      await expect(result).toBeVisible();
       await page.mouse.click(...(await at(sample, undefined, 12))); // near the top, clear of the Use this template pill
       const plain = page.getByRole('dialog', { name: 'Chi tiết: Ảnh mẫu' });
       await expect(plain.locator('.lightbox-media img')).toHaveAttribute('src', '/api/samples/image-example-1.jpg');
       expect(page.context().pages()).toHaveLength(1);
       await page.keyboard.press('Escape');
       await expect(plain).toHaveCount(0);
-      // A result's tile shows its preview and opens its details in place, as in the Library, with a 1600 px preview of the original.
-      const result = gallery.locator(`.gallery-item:has(img[src="/api/assets/${preview}/thumb"])`); // the grid loads the 512 px preview, not the original
+      // A result's tile opens its details in place, as in the Library, with a 1600 px preview of the original.
       await page.mouse.click(...(await at(result, undefined, 12)));
       await expect(page.getByRole('dialog', { name: /^Chi tiết: / }).locator(`img[src="/api/assets/${out}/thumb?w=1600"]`)).toBeVisible();
     } finally {

@@ -16,6 +16,7 @@ export const PRODUCT_TYPES: Record<string, string> = {
   decal: 'Decal, sticker',
   poster: 'Poster, tranh canvas',
   blanket: 'Chăn',
+  rug: 'Thảm, thảm tròn 3D',
   cap: 'Mũ',
   jewelry: 'Trang sức',
   shoes: 'Giày, Crocs',

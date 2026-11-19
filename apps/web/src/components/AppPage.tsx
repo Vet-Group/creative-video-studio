@@ -5,7 +5,7 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, type AppCategory, DEFAULT_VIEWS, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, type AppCategory, breedSwapPrompt, DEFAULT_VIEWS, DOG_BREEDS, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { alignInputs, placesOf, type Skipped, skippedNote } from '@/lib/reuse';
 import { confirmRun, sendRun } from '@/lib/run-guard';
@@ -119,9 +119,11 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [views, setViews] = useState(DEFAULT_VIEWS); // the multi-angle app: one job per view
+  const [breeds, setBreeds] = useState<string[]>([]); // the breed swap app: one job per breed, none until the member picks (each costs a job)
   const promptId = useId();
   const reasonId = useId();
   const viewsId = useId();
+  const breedsId = useId();
   const { models, failed } = useImageModels(app.feature);
   const count = images.reduce((n, list) => n + list.length, 0);
   const pick = useImageChoice(models, Math.max(1, count));
@@ -156,6 +158,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       const extra = j.images && placed ? j.images.length - placed.flat().length : 0;
       setPrompt(j.brief ?? '');
       if (j.view) setViews([j.view]);
+      if (j.breed) setBreeds([j.breed]);
       pick.refill({ ...j, ...(extra > 0 && { extra: { count: extra, max: slots!.flat().length } }) });
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
@@ -163,13 +166,25 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   // The swaps add the member's text to their fixed instruction, so it shares the model's limit with it.
   const fixed = app.prompt === 'optional' ? FEATURE_PROMPTS[app.feature]!.length + 2 : 0;
   const room = chosen && chosen.maxPromptChars - fixed;
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
   /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
   const sent = basePrompt(app.feature, appInputs(app, { images, prompt }).prompt);
-  // The multi-angle app sends one job per view picked, in the order of PRODUCT_VIEWS; every other app one job without a view.
-  const runs: (string | undefined)[] = app.views ? PRODUCT_VIEWS.filter((v) => views.includes(v.id)).map((v) => v.id) : [undefined];
-  const estimate = app.views ? runTotal(pick.estimate, runs.length) : pick.estimate;
+  // The multi-angle app sends one job per view picked, in the order of PRODUCT_VIEWS, and the breed swap app one per breed picked, in the order of DOG_BREEDS,
+  // each with its breed's prompt; every other app one job with neither.
+  const runs: { view?: string; breed?: string }[] = app.views
+    ? PRODUCT_VIEWS.filter((v) => views.includes(v.id)).map((v) => ({ view: v.id }))
+    : app.breeds
+      ? DOG_BREEDS.filter((b) => breeds.includes(b)).map((breed) => ({ breed }))
+      : [{}];
+  const estimate = app.views || app.breeds ? runTotal(pick.estimate, runs.length) : pick.estimate;
+  // The breed prompts differ only in the breed, so the preview shows the first one.
+  const prompts = app.breeds ? runs.slice(0, 1).map((r) => breedSwapPrompt(r.breed!)) : sent ? [sent] : [];
+  const runCost = runs.length > 0 && pick.estimate !== undefined && (
+    <p className="help" role="status">
+      {runs.length} ảnh × ${pick.estimate} = ${estimate}
+    </p>
+  );
 
   function add(slot: number) {
     return async (files: File[]) => {
@@ -210,13 +225,14 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     setNotice('');
     let done = 0;
     try {
-      for (const view of runs) {
+      for (const one of runs) {
         const body = {
           feature: app.feature,
           modelId: pick.modelId,
           ...appInputs(app, { images, prompt }),
+          ...(one.breed && { prompt: breedSwapPrompt(one.breed) }),
           ratio: pick.ratio,
-          params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }), ...(view && { view }) }, // the member's own text, kept for reuse
+          params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }), ...one }, // the member's own text, kept for reuse
         };
         // As on Create's angles, the first job stands for the batch: a batch the same as the last one asks before anything is sent.
         if (done > 0) await api('/api/jobs', sendJson('POST', body));
@@ -294,11 +310,25 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                   ))}
                 </div>
                 <p className="help">Mỗi góc tạo một ảnh riêng và tính tiền riêng. Mặt sau và hai bên là AI đoán từ ảnh mặt trước; nếu có ảnh thật thì dùng ảnh thật.</p>
-                {runs.length > 0 && pick.estimate !== undefined && (
-                  <p className="help" role="status">
-                    {runs.length} ảnh × ${pick.estimate} = ${estimate}
-                  </p>
-                )}
+                {runCost}
+              </div>
+            )}
+
+            {app.breeds && (
+              <div className="field">
+                <span id={breedsId} className="field-label">
+                  Giống chó cần tạo
+                </span>
+                <div className="segmented theme-choice angle-choice" role="group" aria-labelledby={breedsId}>
+                  {DOG_BREEDS.map((b) => (
+                    <label key={b}>
+                      <input type="checkbox" checked={breeds.includes(b)} onChange={() => setBreeds((cur) => (cur.includes(b) ? cur.filter((x) => x !== b) : [...cur, b]))} />
+                      {b}
+                    </label>
+                  ))}
+                </div>
+                <p className="help">Mỗi giống tạo một ảnh riêng và tính tiền riêng. AI chỉ đổi chú chó, giữ nguyên chữ, tên và bố cục; hãy xem lại từng ảnh trước khi đăng bán.</p>
+                {runCost}
               </div>
             )}
 
@@ -316,7 +346,15 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 ask={chosen ? () => ({ field: 'prompt', feature: app.feature, text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
               />
             )}
-            {sent && <PromptPreview feature={app.feature} prompts={[sent]} limit={chosen?.maxPromptChars} />}
+            {prompts.length > 0 && (
+              <PromptPreview
+                feature={app.feature}
+                prompts={prompts}
+                labels={app.breeds ? [runs[0]!.breed!] : undefined}
+                limit={chosen?.maxPromptChars}
+                note={app.breeds && runs.length > 1 ? `${runs.length - 1} giống còn lại dùng prompt như trên, chỉ khác tên giống.` : undefined}
+              />
+            )}
 
             {chosen && app.ratio && <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />}
             {chosen && app.resolution && <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />}
