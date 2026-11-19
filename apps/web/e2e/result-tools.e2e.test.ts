@@ -136,6 +136,7 @@ test('the listing preset takes several images and makes one .zip of 2048 px squa
   const link = results.getByRole('link', { name: 'Tải xuống .zip' });
   await expect(link).toHaveAttribute('download', 'listing-2-anh.zip');
   await expect(results).toContainText('2 ảnh JPG');
+  await expect(runButton(page)).toBeEnabled(); // the form is free again for the next Run
   const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);
   const entries = zipEntries(readFileSync((await download.path())!));
   expect(entries.map((e) => e.name)).toEqual(['shirt-listing.jpg', 'shirt-listing-2.jpg']);
