@@ -101,7 +101,7 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
           {error}
         </p>
       )}
-      <button type="button" className="primary run" disabled={reason !== null || running} aria-describedby={reason ? ids.reason : undefined} onClick={() => void run()}>
+      <button type="button" className="primary" disabled={reason !== null || running} aria-describedby={reason ? ids.reason : undefined} onClick={() => void run()}>
         Tạo người mẫu
         {running ? <span className="run-cost">· Đang tạo…</span> : pick.estimate !== undefined && <span className="run-cost">· ${Number(pick.estimate)}</span>}
       </button>
