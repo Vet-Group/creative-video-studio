@@ -1,11 +1,12 @@
 import { bad, readBody } from '@/lib/admin';
-import { guard, resolveWorkspace, WORKSPACE_COOKIE } from '@/lib/session';
+import { guard, resolveWorkspace, sameOrigin, WORKSPACE_COOKIE } from '@/lib/session';
 
 /**
  * Switch the browser to another workspace (the shell's switcher): sets the `cvs_ws` cookie the resolver reads, only for a workspace the caller is an
  * active member of (and, while an Admin is signed in as them, one both share); anything else answers 404. The page then reloads in that workspace.
  */
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { workspaceId } = (await readBody(request)) ?? {};

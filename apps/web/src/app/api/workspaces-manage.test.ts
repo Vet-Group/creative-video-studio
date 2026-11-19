@@ -13,7 +13,7 @@ process.env.APP_URL = ORIGIN;
 delete process.env.CVS_COMPANY_EMAIL_DOMAINS;
 
 const { auth, pool } = await import('@/lib/auth');
-const { onCompanyDomain } = await import('@/lib/workspaces');
+const { activeWorkspaces, nameOf, onCompanyDomain } = await import('@/lib/workspaces');
 const adminList = await import('./admin/workspaces/route');
 const one = await import('./workspaces/[id]/route');
 const members = await import('./workspaces/[id]/members/route');
@@ -40,10 +40,10 @@ const join = (ws: string, userId: string, role = 'member') => pool.query('insert
 const leave = (ws: string, userId: string) => pool.query('delete from workspace_members where workspace_id = $1 and user_id = $2', [ws, userId]);
 const roleIn = async (ws: string, userId: string) => (await pool.query('select role from workspace_members where workspace_id = $1 and user_id = $2', [ws, userId])).rows[0]?.role ?? null;
 
-const req = (cookie: string, method = 'GET', body?: unknown, ws?: string) =>
+const req = (cookie: string, method = 'GET', body?: unknown, ws?: string, origin = ORIGIN) =>
   new Request(`${ORIGIN}/api/x`, {
     method,
-    headers: { cookie: ws ? `${cookie}; cvs_ws=${ws}` : cookie, origin: ORIGIN, 'content-type': 'application/json' },
+    headers: { cookie: ws ? `${cookie}; cvs_ws=${ws}` : cookie, origin, 'content-type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 const ctx = (id: string, userId?: string) => ({ params: Promise.resolve({ id, userId: userId ?? '' }) });
@@ -85,7 +85,11 @@ describe('who may manage a workspace', () => {
     // Only this workspace's members: dual is also in ws_vet, which nothing here says.
     expect((own.body.members as { id: string; role: string }[]).map((m) => [m.id, m.role]).sort()).toEqual([[dual, 'member'], [owner, 'owner'], [plain, 'member']].sort());
     expect(JSON.stringify(own.body)).not.toContain('ws_vet');
-    expect((await listOf(cookies.admin!, 'ws_p')).status).toBe(200);
+    // Nor anyone's global role: only an Admin's view says who is an Admin.
+    expect((own.body.members as object[]).some((m) => 'admin' in m)).toBe(false);
+    const asAdmin = await listOf(cookies.admin!, 'ws_p');
+    expect(asAdmin.status).toBe(200);
+    expect((asAdmin.body.members as { admin: boolean }[]).every((m) => m.admin === false)).toBe(true);
     expect(await listOf(cookies.plain!, 'ws_p')).toEqual({ status: 403, body: { error: 'forbidden' } });
     expect(await listOf(cookies.other!, 'ws_p')).toEqual({ status: 404, body: { error: 'not found' } });
     expect(await listOf(cookies.company!, 'ws_p')).toEqual({ status: 404, body: { error: 'not found' } });
@@ -123,23 +127,36 @@ describe('who may manage a workspace', () => {
 
 describe('members', () => {
   test('an owner adds an existing user by email, once; an unknown email and a role beyond owner or member are refused', async () => {
-    expect(await add(cookies.owner!, 'ws_p', { email: ' Staff@Example.test ' })).toEqual({ status: 201, body: { id: staff } });
-    expect(await roleIn('ws_p', staff)).toBe('member');
-    expect(await roleIn('ws_vet', staff)).toBe('member'); // their company membership is untouched
-    expect(await add(cookies.owner!, 'ws_p', { email: 'staff@example.test' })).toEqual({ status: 409, body: { error: 'already_member' } });
+    const outsider = await user('outsider@example.test'); // in no workspace: the trigger is gone
+    expect(await add(cookies.owner!, 'ws_p', { email: ' Outsider@Example.test ' })).toEqual({ status: 201, body: { id: outsider } });
+    expect(await roleIn('ws_p', outsider)).toBe('member');
+    expect(await add(cookies.owner!, 'ws_p', { email: 'outsider@example.test' })).toEqual({ status: 409, body: { error: 'already_member' } });
     expect(await add(cookies.owner!, 'ws_p', { email: 'nobody@example.test' })).toEqual({ status: 404, body: { error: 'no_user' } });
-    for (const role of ['admin', 'editor']) expect((await add(cookies.owner!, 'ws_p', { email: 'company@example.test', role })).status).toBe(400);
-    expect(await roleIn('ws_p', company)).toBeNull();
+    for (const role of ['admin', 'editor']) expect((await add(cookies.owner!, 'ws_p', { email: 'outsider2@example.test', role })).status).toBe(400);
     const audit = (await pool.query(`select actor_id, new_value from audit_entries where action = 'workspace.member_add' and target = 'workspace:ws_p'`)).rows;
-    expect(audit).toEqual([{ actor_id: owner, new_value: { userId: staff, role: 'member' } }]);
+    expect(audit).toEqual([{ actor_id: owner, new_value: { userId: outsider, role: 'member' } }]);
+  });
+
+  test("an owner can neither pull company staff or an Admin in nor learn they exist; an Admin adds them", async () => {
+    // A company member and an Admin answer as an unknown address does; the company's domains are refused before any lookup, existing or not.
+    for (const email of ['staff@example.test', 'admin@example.test', 'nobody@example.test']) expect(await add(cookies.owner!, 'ws_p', { email }), email).toEqual({ status: 404, body: { error: 'no_user' } });
+    await user('lead@vetglobalbrand.com');
+    for (const email of ['lead@vetglobalbrand.com', 'ghost@vetglobalbrand.com', 'Lead@VETGROUP.net']) expect(await add(cookies.owner!, 'ws_p', { email }), email).toEqual({ status: 403, body: { error: 'company_email' } });
+    expect(await roleIn('ws_p', staff)).toBeNull();
+    expect(await add(cookies.admin!, 'ws_p', { email: 'staff@example.test' })).toEqual({ status: 201, body: { id: staff } });
+    expect(await roleIn('ws_vet', staff)).toBe('member'); // their company membership is untouched
   });
 
   test("an owner creates an account with a temporary password: unverified, marked as an owner's, refused on the company's domains", async () => {
-    for (const email of ['new@vetgroup.net', 'New@Sales.VETGROUP.net']) expect(await add(cookies.owner!, 'ws_p', { email, name: 'Staff Lookalike' })).toEqual({ status: 403, body: { error: 'company_email' } });
-    expect((await pool.query(`select 1 from users where email like '%vetgroup.net'`)).rowCount).toBe(0);
+    for (const email of ['new@vetgroup.net', 'New@Sales.VETGROUP.net', 'new@vetglobalbrand.com']) expect(await add(cookies.owner!, 'ws_p', { email, name: 'Staff Lookalike' })).toEqual({ status: 403, body: { error: 'company_email' } });
+    expect((await pool.query(`select 1 from users where email in ('new@vetgroup.net', 'new@sales.vetgroup.net', 'new@vetglobalbrand.com')`)).rowCount).toBe(0);
+    // A trailing dot is no address (zod's, as better-auth's createUser checks), so it cannot slip past the domain rule.
+    expect((await add(cookies.owner!, 'ws_p', { email: 'boss@vetgroup.net.', name: 'Dot' })).status).toBe(400);
     expect(await add(cookies.owner!, 'ws_p', { email: 'plain@example.test', name: 'Again' })).toEqual({ status: 409, body: { error: 'email_taken' } });
 
-    const made = await add(cookies.owner!, 'ws_p', { email: 'Seller@Partner.test', name: 'Seller', role: 'member' });
+    const res = await members.POST(req(cookies.owner!, 'POST', { email: 'Seller@Partner.test', name: 'Seller', role: 'member' }), ctx('ws_p'));
+    expect(res.headers.get('cache-control')).toBe('no-store'); // the temporary password stays out of every cache
+    const made = await json(res);
     expect(made.status).toBe(201);
     const { id, temporaryPassword } = made.body as { id: string; temporaryPassword: string };
     expect(temporaryPassword.length).toBeGreaterThanOrEqual(16);
@@ -152,10 +169,16 @@ describe('members', () => {
     const fresh = await signIn('seller@partner.test', temporaryPassword);
     expect(fresh).toContain('better-auth.session_token');
     expect(await listOf(fresh, 'ws_p')).toEqual({ status: 403, body: { error: 'password_change_required' } });
+    // An Admin cannot bring an owner's account into the company workspace, by mistake or otherwise; any partner one is fine.
+    expect(await add(cookies.admin!, 'ws_vet', { email: 'seller@partner.test' })).toEqual({ status: 409, body: { error: 'owner_made' } });
+    expect(await roleIn('ws_vet', id)).toBeNull();
+    expect((await add(cookies.admin!, 'ws_q', { email: 'seller@partner.test' })).status).toBe(201);
   });
 
-  test('the domains come from CVS_COMPANY_EMAIL_DOMAINS when it is set', () => {
-    expect([onCompanyDomain('a@vetgroup.net'), onCompanyDomain('a@vetgroup.net.evil.test'), onCompanyDomain('a@notvetgroup.net')]).toEqual([true, false, false]);
+  test('the domains are vetgroup.net and vetglobalbrand.com, or CVS_COMPANY_EMAIL_DOMAINS when it is set', () => {
+    expect([onCompanyDomain('a@vetgroup.net'), onCompanyDomain('a@x.vetglobalbrand.com'), onCompanyDomain('a@vetgroup.net.'), onCompanyDomain('a@vetgroup.net.evil.test'), onCompanyDomain('a@notvetgroup.net')]).toEqual([
+      true, true, true, false, false,
+    ]);
     process.env.CVS_COMPANY_EMAIL_DOMAINS = 'vet.example, Corp.Example';
     try {
       expect([onCompanyDomain('a@corp.example'), onCompanyDomain('a@x.vet.example'), onCompanyDomain('a@vetgroup.net')]).toEqual([true, true, false]);
@@ -176,7 +199,7 @@ describe('members', () => {
     expect((await listOf(cookies.owner!, 'ws_p')).status).toBe(403);
     expect(await remove(cookies.plain!, 'ws_p', plain)).toEqual({ status: 409, body: { error: 'last_owner' } });
     expect((await setRole(cookies.admin!, 'ws_p', owner, 'owner')).status).toBe(200);
-    expect((await remove(cookies.owner!, 'ws_p', staff)).status).toBe(200);
+    expect((await remove(cookies.owner!, 'ws_p', staff)).status).toBe(200); // an owner removes a company member an Admin added
     expect(await roleIn('ws_p', staff)).toBeNull();
     expect((await remove(cookies.owner!, 'ws_p', staff)).status).toBe(404);
     const actions = (await pool.query(`select action from audit_entries where target = 'workspace:ws_p' and action <> 'workspace.member_add' order by id`)).rows.map((r) => r.action);
@@ -206,7 +229,7 @@ describe('the Admin Workspaces page', () => {
     expect(list[0]!.id).toBe('ws_vet');
     const p = list.find((w) => w.id === 'ws_p')!;
     expect({ owners: p.owners.map((o) => o.id).sort(), members: p.members, jobs: p.jobsThisMonth, cost: p.costThisMonthUsd, disabled: p.disabled }).toEqual({
-      owners: [owner, plain].sort(), members: 4, jobs: 1, cost: '1.2500', disabled: false,
+      owners: [owner, plain].sort(), members: 5, jobs: 1, cost: '1.2500', disabled: false,
     });
     expect(JSON.stringify(res.body)).not.toContain('"p"'); // no prompt
     expect((await adminList.GET(req(cookies.owner!))).status).toBe(403);
@@ -222,7 +245,9 @@ describe('the Admin Workspaces page', () => {
     expect((await json(await adminList.POST(req(cookies.admin!, 'POST', { name: 'partner r', ownerEmail: 'company@example.test' })))).body).toEqual({ error: 'name_taken' });
     expect((await json(await adminList.POST(req(cookies.admin!, 'POST', { name: 'Partner S', ownerEmail: 'ghost@example.test' })))).body).toEqual({ error: 'no_user' });
 
-    const fresh = await json(await adminList.POST(req(cookies.admin!, 'POST', { name: 'Partner S', ownerEmail: 'boss@partner-s.test', ownerName: 'Boss' })));
+    const raw = await adminList.POST(req(cookies.admin!, 'POST', { name: 'Partner S', ownerEmail: 'boss@partner-s.test', ownerName: 'Boss' }));
+    expect(raw.headers.get('cache-control')).toBe('no-store');
+    const fresh = await json(raw);
     expect(fresh.status).toBe(201);
     const { id: s, ownerId, temporaryPassword } = fresh.body as { id: string; ownerId: string; temporaryPassword: string };
     expect(await roleIn(s, ownerId)).toBe('owner');
@@ -257,6 +282,13 @@ describe('rename and disable', () => {
     expect((await pool.query(`select name, disabled_at from workspaces where id = 'ws_vet'`)).rows[0]).toEqual({ name: 'VET Group', disabled_at: null });
   });
 
+  test('a name is NFKC with no control or format character, so a NUL, a right-to-left override or a zero-width space is refused, not a 500', async () => {
+    for (const name of ['VET\u202EGroup', 'VET\u200BGroup', 'Partner\u0000P', '\u0007', '   ', 'x'.repeat(101)]) expect(await patch(cookies.owner!, 'ws_p', { name }), JSON.stringify(name)).toMatchObject({ status: 400 });
+    expect((await json(await adminList.POST(req(cookies.admin!, 'POST', { name: 'Bad\u0000Name', ownerEmail: 'company@example.test' })))).status).toBe(400);
+    expect([nameOf('\uFF36\uFF25\uFF34 Shop'), nameOf('Cửa hàng Ánh'), nameOf('🐶'.repeat(100))]).toEqual(['VET Shop', 'Cửa hàng Ánh', '🐶'.repeat(100)]);
+    expect((await pool.query(`select name from workspaces where id = 'ws_p'`)).rows[0].name).toBe('Partner P Shop');
+  });
+
   test("a disabled workspace keeps its rows; its members fall back to another membership or get no_workspace, and an Admin enables it again", async () => {
     expect((await patch(cookies.admin!, 'ws_p', { disabled: true })).status).toBe(200);
     expect((await pool.query(`select count(*)::int as n from workspace_members where workspace_id = 'ws_p'`)).rows[0].n).toBeGreaterThan(0);
@@ -273,6 +305,26 @@ describe('rename and disable', () => {
   });
 });
 
+describe('another site', () => {
+  test('cannot send any change: every new write route refuses a foreign or missing Origin, and changes nothing', async () => {
+    for (const origin of ['https://evil.test', '']) {
+      const r = (method: string, body?: unknown) => req(cookies.admin!, method, body, undefined, origin);
+      const refused = [
+        await adminList.POST(r('POST', { name: 'Forged', ownerEmail: 'company@example.test' })),
+        await one.PATCH(r('PATCH', { name: 'Forged' }), ctx('ws_q')),
+        await members.POST(r('POST', { email: 'company@example.test' }), ctx('ws_q')),
+        await member.PATCH(r('PATCH', { role: 'member' }), ctx('ws_q', other)),
+        await member.DELETE(r('DELETE'), ctx('ws_q', other)),
+        await switcher.POST(r('POST', { workspaceId: 'ws_vet' })),
+      ];
+      for (const res of refused) expect(await json(res)).toEqual({ status: 403, body: { error: 'forbidden origin' } });
+    }
+    expect((await pool.query(`select 1 from workspaces where name = 'Forged'`)).rowCount).toBe(0);
+    expect(await roleIn('ws_q', other)).toBe('owner');
+    expect(await roleIn('ws_q', company)).toBeNull();
+  });
+});
+
 describe('the switch cookie', () => {
   test('is set only for an active workspace the caller is a member of', async () => {
     const ok = await switcher.POST(req(cookies.dual!, 'POST', { workspaceId: 'ws_p' }));
@@ -284,6 +336,13 @@ describe('the switch cookie', () => {
       expect(res.headers.getSetCookie()).toEqual([]);
     }
     expect((await switcher.POST(req(cookies.dual!, 'POST', {}))).status).toBe(400);
+  });
+
+  test("marks the company's workspace, which the switcher badges, so a partner named like it cannot pass for it", async () => {
+    expect(await activeWorkspaces(dual, null)).toEqual([
+      { id: 'ws_vet', name: 'VET Group', company: true },
+      { id: 'ws_p', name: 'Partner P Shop', company: false },
+    ]);
   });
 
   test('a switch sent from a tab that rendered another workspace gets 409 workspace_changed', async () => {

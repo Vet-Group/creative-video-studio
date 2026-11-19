@@ -12,8 +12,8 @@ interface Member {
   name: string;
   email: string;
   role: 'owner' | 'member';
-  /** A global Admin of CVS: shown, so a workspace sees when an Admin joined it. */
-  admin: boolean;
+  /** A global Admin of CVS, in an Admin's view only (an owner's list leaves it out). */
+  admin?: boolean;
 }
 
 /** The first letters of the first and last words of a name, for the round badge (as on Admin > Users). */

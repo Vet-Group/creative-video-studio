@@ -653,7 +653,7 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
  * The workspace switcher under the brand, for a user in two or more active workspaces (docs/WORKSPACES.md phase 3): marks the one this page acts in, and a
  * pick sets the browser's workspace (POST /api/me/workspace, which checks the membership) and reloads the page in it.
  */
-function WorkspaceSwitcher({ current, workspaces }: { current: string; workspaces: { id: string; name: string }[] }) {
+function WorkspaceSwitcher({ current, workspaces }: { current: string; workspaces: { id: string; name: string; company: boolean }[] }) {
   const { notify } = useJobs();
   async function pick(id: string) {
     if (id === current) return;
@@ -667,7 +667,7 @@ function WorkspaceSwitcher({ current, workspaces }: { current: string; workspace
   }
   return (
     <div className="ws-switch">
-      <Select label="Không gian làm việc" icon="team" heading="Chuyển không gian làm việc" value={current} options={workspaces.map((w) => ({ value: w.id, label: w.name }))} onChange={(id) => void pick(id)} />
+      <Select label="Không gian làm việc" icon="team" heading="Chuyển không gian làm việc" value={current} options={workspaces.map((w) => ({ value: w.id, label: w.name, ...(w.company ? { tag: 'Công ty' } : {}) }))} onChange={(id) => void pick(id)} />
     </div>
   );
 }
@@ -696,7 +696,7 @@ function WorkspaceChanged() {
   );
 }
 
-export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], feedbackNew = 0, analyzeEnabled = false, account, larkPrompt = false, impersonating = false, changelog = [], initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; /** The workspace this page acts in: `owner` of it, `company` when it is the company's (a partner's hides company-only surfaces). */ workspace: { id: string; owner: boolean; company: boolean }; /** The user's active workspaces, for the switcher. */ workspaces?: { id: string; name: string }[]; feedbackNew?: number; analyzeEnabled?: boolean; account: Account; /** Show the once-a-day reminder to link Lark (lib/lark-prompt.ts). */ larkPrompt?: boolean; /** An Admin is signed in as this user (a session with impersonatedBy): shows the banner with the way out. */ impersonating?: boolean; /** The newest entries this user may read (lib/changelog-seen.ts), for the sidebar dot and the once-a-day popup. */ changelog?: ChangeEntry[]; initialCollapsed: boolean; children: ReactNode }) {
+export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], feedbackNew = 0, analyzeEnabled = false, account, larkPrompt = false, impersonating = false, changelog = [], initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; /** The workspace this page acts in: `owner` of it, `company` when it is the company's (a partner's hides company-only surfaces). */ workspace: { id: string; owner: boolean; company: boolean }; /** The user's active workspaces, for the switcher; `company` gets the fixed badge. */ workspaces?: { id: string; name: string; company: boolean }[]; feedbackNew?: number; analyzeEnabled?: boolean; account: Account; /** Show the once-a-day reminder to link Lark (lib/lark-prompt.ts). */ larkPrompt?: boolean; /** An Admin is signed in as this user (a session with impersonatedBy): shows the banner with the way out. */ impersonating?: boolean; /** The newest entries this user may read (lib/changelog-seen.ts), for the sidebar dot and the once-a-day popup. */ changelog?: ChangeEntry[]; initialCollapsed: boolean; children: ReactNode }) {
   const pathname = usePathname();
   const narrow = useMediaQuery(NARROW);
   const [open, setOpen] = useState(false); // the drawer, below 1024 px

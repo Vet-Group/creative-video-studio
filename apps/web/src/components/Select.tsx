@@ -10,6 +10,8 @@ export interface SelectOption {
   label: string;
   /** What the closed select shows, when the option label is too long for a half-width field. */
   short?: string;
+  /** A fixed badge after the label (the company workspace's), which no label text can imitate. */
+  tag?: string;
   disabled?: boolean;
 }
 
@@ -115,6 +117,12 @@ export function Select({ label, icon, heading, value, options, onChange, chip = 
         >
           <Icon name={icon === 'ratio' ? ratioIcon(value) : icon} />
           <span className="select-value">{options[selected]?.short ?? options[selected]?.label ?? value}</span>
+          {options[selected]?.tag && (
+            <>
+              {' '}
+              <span className="tag">{options[selected].tag}</span>
+            </>
+          )}
           <Icon name={open ? 'up' : 'down'} />
         </button>
         {open && (
@@ -128,6 +136,12 @@ export function Select({ label, icon, heading, value, options, onChange, chip = 
                   <span>
                     {icon === 'ratio' && <Icon name={ratioIcon(o.value)} />}
                     {o.label}
+                    {o.tag && (
+                      <>
+                        {' '}
+                        <span className="tag">{o.tag}</span>
+                      </>
+                    )}
                   </span>
                   {i === selected && <Icon name="check" />}
                 </li>

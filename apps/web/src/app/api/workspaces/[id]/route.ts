@@ -4,7 +4,7 @@ import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { bad, pgCode, readBody } from '@/lib/admin';
 import { type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
-import { guard } from '@/lib/session';
+import { guard, sameOrigin } from '@/lib/session';
 import { managerOf, nameOf } from '@/lib/workspaces';
 
 /**
@@ -13,6 +13,7 @@ import { managerOf, nameOf } from '@/lib/workspaces';
  * keeps its name and cannot be disabled. A name another workspace has, in any case, is refused (409 name_taken). Each change is audited.
  */
 export async function PATCH(request: Request, { params }: RouteContext) {
+  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;

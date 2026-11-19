@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { audit } from '@cvs/core/audit';
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
-import { ACCOUNT_CREATED } from './account-audit';
+import { ACCOUNT_CREATED, ownerMade } from './account-audit';
 import { authFailure, bad, readBody } from './admin';
 import { auth, pool } from './auth';
 import { impersonationRefusal, isImpersonated, type RequestSession } from './session';
@@ -11,24 +11,27 @@ import { impersonationRefusal, isImpersonated, type RequestSession } from './ses
 export type WorkspaceRole = 'owner' | 'member';
 export const isRole = (v: unknown): v is WorkspaceRole => v === 'owner' || v === 'member';
 
-/** An email address as Admin Users accepts one, trimmed and in lower case; null for anything else. */
+/** zod's z.email(), which better-auth's createUser applies: no trailing dot, so "boss@vetgroup.net." is no address. */
+const EMAIL = /^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/;
+/** An email address as an account is created with, trimmed and in lower case; null for anything else. */
 export const emailOf = (v: unknown): string | null => {
   const s = typeof v === 'string' ? v.trim().toLowerCase() : '';
-  return s.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : null;
+  return s.length <= 254 && EMAIL.test(s) ? s : null;
 };
-/** A person's or a workspace's name: 1 to 100 characters once trimmed; null for anything else. */
+/** A person's or a workspace's name: NFKC, 1 to 100 characters once trimmed, no control or format character (a NUL, a right-to-left override); else null. */
 export const nameOf = (v: unknown): string | null => {
-  const s = typeof v === 'string' ? v.trim() : '';
-  return s.length >= 1 && s.length <= 100 ? s : null;
+  const s = typeof v === 'string' ? v.normalize('NFKC').trim() : '';
+  return [...s].length >= 1 && [...s].length <= 100 && !/[\p{Cc}\p{Cf}]/u.test(s) ? s : null;
 };
 
 /**
- * The company's email domains, from CVS_COMPANY_EMAIL_DOMAINS (comma-separated), else the company's own vetgroup.net. A workspace owner may not create
- * an account on one of them or a subdomain of one, so a partner cannot pre-create a staff member's account (docs/WORKSPACES.md §4).
+ * The company's email domains, from CVS_COMPANY_EMAIL_DOMAINS (comma-separated), else vetgroup.net and vetglobalbrand.com, where Lark staff sign in. A
+ * workspace owner may neither create nor add an account on one of them or a subdomain of one, so a partner cannot pre-create a staff member's account
+ * nor learn which staff addresses exist (docs/WORKSPACES.md §4).
  */
 export function onCompanyDomain(email: string): boolean {
-  const host = email.slice(email.lastIndexOf('@') + 1).toLowerCase();
-  const domains = (process.env.CVS_COMPANY_EMAIL_DOMAINS || 'vetgroup.net').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean);
+  const host = email.slice(email.lastIndexOf('@') + 1).toLowerCase().replace(/\.+$/, '');
+  const domains = (process.env.CVS_COMPANY_EMAIL_DOMAINS || 'vetgroup.net,vetglobalbrand.com').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean);
   return domains.some((d) => host === d || host.endsWith(`.${d}`));
 }
 
@@ -46,19 +49,22 @@ export async function managerOf(c: Caller, id: string, write: boolean): Promise<
   return c.workspaceRole === 'owner' && id !== COMPANY_WORKSPACE_ID ? 'owner' : bad('forbidden', 403);
 }
 
-/** The active workspaces a user may switch to, oldest membership first; with `sharedWith` (the Admin of an impersonated session) only those both are in. */
-export async function activeWorkspaces(userId: string, sharedWith: string | null): Promise<{ id: string; name: string }[]> {
+/**
+ * The active workspaces a user may switch to, oldest membership first; with `sharedWith` (the Admin of an impersonated session) only those both are in.
+ * `company` marks the company's, which the switcher badges, so a partner's lookalike name (with a Cyrillic letter) cannot pass for it.
+ */
+export async function activeWorkspaces(userId: string, sharedWith: string | null): Promise<{ id: string; name: string; company: boolean }[]> {
   const { rows } = await pool.query(
-    `select w.id, w.name from workspace_members m join workspaces w on w.id = m.workspace_id
+    `select w.id, w.name, w.id = $3 as company from workspace_members m join workspaces w on w.id = m.workspace_id
       where m.user_id = $1 and w.disabled_at is null
         and ($2::text is null or exists (select 1 from workspace_members a where a.workspace_id = m.workspace_id and a.user_id = $2))
       order by m.created_at, m.workspace_id`,
-    [userId, sharedWith],
+    [userId, sharedWith, COMPANY_WORKSPACE_ID],
   );
   return rows;
 }
 
-/** The members of one workspace, owners first. Only this workspace's: nothing says which other workspaces a member is in. */
+/** The members of one workspace, owners first. Only this workspace's: nothing says which other workspaces a member is in. `admin` is for an Admin's view. */
 export async function membersOf(id: string) {
   const { rows } = await pool.query(
     `select u.id, u.name, u.email, m.role, u.role = 'admin' as admin from workspace_members m join users u on u.id = m.user_id
@@ -82,7 +88,6 @@ export async function createAccount(
   { email, name, byOwner, workspaceId }: { email: string; name: string; byOwner: boolean; workspaceId: string },
   join: (tx: Queryable, userId: string) => Promise<void>,
 ): Promise<{ userId: string; password: string } | Response> {
-  if (byOwner && onCompanyDomain(email)) return bad('company_email', 403);
   if ((await pool.query('select 1 from users where lower(email) = $1', [email])).rowCount) return bad('email_taken', 409);
   const password = randomBytes(12).toString('base64url');
   let userId: string;
@@ -112,19 +117,24 @@ export async function join(tx: Queryable, actorId: string, workspaceId: string, 
 
 /**
  * POST a member: `{ email, role }` adds the existing user with that email; `{ email, name, role }` creates an account (createAccount). Answers 201 with the
- * user's id and, for a new account, the temporary password, shown once.
+ * user's id and, for a new account, the temporary password, shown once and never cached. An owner gets 403 company_email for the company's domains
+ * before any lookup, and no_user for an Admin or a company member as for an unknown address: they can neither pull staff in nor learn who exists. An
+ * account an owner created never joins the company workspace (409 owner_made).
  */
 export async function addMember(request: Request, actorId: string, workspaceId: string, byOwner: boolean): Promise<Response> {
   const body = (await readBody(request)) ?? {};
   const email = emailOf(body.email);
   const role = body.role ?? 'member';
   if (!email || !isRole(role) || (body.name !== undefined && !nameOf(body.name))) return bad('email and role (owner|member) are required; name (1 to 100 characters) creates an account');
+  if (byOwner && onCompanyDomain(email)) return bad('company_email', 403);
   if (body.name !== undefined) {
     const made = await createAccount(actorId, { email, name: nameOf(body.name)!, byOwner, workspaceId }, (tx, userId) => join(tx, actorId, workspaceId, userId, role));
-    return made instanceof Response ? made : Response.json({ id: made.userId, temporaryPassword: made.password }, { status: 201 });
+    return made instanceof Response ? made : Response.json({ id: made.userId, temporaryPassword: made.password }, { status: 201, headers: { 'cache-control': 'no-store' } });
   }
-  const user = (await pool.query('select id from users where lower(email) = $1', [email])).rows[0];
-  if (!user) return bad('no_user', 404);
+  const staff = `select 1 from workspace_members where workspace_id = $2 and user_id = users.id`;
+  const user = (await pool.query(`select id, role = 'admin' or exists (${staff}) as staff from users where lower(email) = $1`, [email, COMPANY_WORKSPACE_ID])).rows[0] as { id: string; staff: boolean } | undefined;
+  if (!user || (byOwner && user.staff)) return bad('no_user', 404);
+  if (workspaceId === COMPANY_WORKSPACE_ID && (await ownerMade(pool, user.id))) return bad('owner_made', 409);
   return withTransaction(pool, async (tx) => {
     if (!(await lockWorkspace(tx, workspaceId))) return bad('not found', 404);
     if ((await tx.query('select 1 from workspace_members where workspace_id = $1 and user_id = $2', [workspaceId, user.id])).rowCount) return bad('already_member', 409);

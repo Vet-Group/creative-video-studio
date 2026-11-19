@@ -150,7 +150,13 @@ export function Feedback() {
                     </span>
                   )}
                   <span className="muted">
-                    {it.workspaceName && `${it.workspaceName} · `}
+                    {it.workspaceName && (
+                      <>
+                        {it.workspaceName}
+                        {it.workspaceCompany && <span className="tag">Công ty</span>}
+                        {' · '}
+                      </>
+                    )}
                     {it.authorName} · {feedbackTime(it.createdAt)} · {it.comments} bình luận
                     {it.imageAssetIds.length > 0 && ` · ${it.imageAssetIds.length} ảnh`}
                   </span>

@@ -2,7 +2,7 @@ import { audit } from '@cvs/core/audit';
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
 import { bad, pgCode, readBody } from '@/lib/admin';
 import { pool } from '@/lib/auth';
-import { guard } from '@/lib/session';
+import { guard, sameOrigin } from '@/lib/session';
 import { createAccount, emailOf, join, nameOf } from '@/lib/workspaces';
 
 /**
@@ -34,6 +34,7 @@ export async function GET(request: Request) {
  * whose temporary password the answer carries once. A name another workspace has (in any case) is refused, 409 name_taken.
  */
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
   const body = (await readBody(request)) ?? {};
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
   try {
     if (body.ownerName !== undefined) {
       const made = await createAccount(actorId, { email, name: nameOf(body.ownerName)!, byOwner: false, workspaceId: id }, open);
-      return made instanceof Response ? made : Response.json({ id, ownerId: made.userId, temporaryPassword: made.password }, { status: 201 });
+      return made instanceof Response ? made : Response.json({ id, ownerId: made.userId, temporaryPassword: made.password }, { status: 201, headers: { 'cache-control': 'no-store' } });
     }
     const owner = (await pool.query('select id from users where lower(email) = $1', [email])).rows[0];
     if (!owner) return bad('no_user', 404);

@@ -67,8 +67,9 @@ const REASONS: Record<string, string> = {
   no_user: 'Chưa có tài khoản nào với email này. Đánh dấu “Tạo tài khoản mới” để tạo.',
   already_member: 'Người này đã là thành viên của không gian làm việc.',
   email_taken: 'Email này đã có tài khoản. Bỏ dấu “Tạo tài khoản mới” để thêm người đó.',
-  company_email: 'Không tạo được tài khoản với email này. Hãy dùng email khác, hoặc nhờ Admin.',
+  company_email: 'Không dùng được email này trong không gian của bạn. Hãy dùng email khác, hoặc nhờ Admin.',
   last_owner: 'Không gian làm việc cần ít nhất một chủ sở hữu.',
+  owner_made: 'Tài khoản này do chủ một không gian đối tác tạo, nên không thêm vào không gian công ty được.',
   name_taken: 'Đã có không gian làm việc khác mang tên này.',
 };
 

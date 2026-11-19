@@ -190,7 +190,7 @@ export const USERS = {
   wscomp: { email: 'wscomp@e2e.test', name: 'E2E WS Company', role: 'member' },
   wspart: { email: 'wspart@e2e.test', name: 'E2E WS Partner', role: 'member' },
   wsdual: { email: 'wsdual@e2e.test', name: 'E2E WS Dual', role: 'member' },
-  // workspaces-manage.e2e: the Admin who creates a partner workspace, and a company member its owner adds, who then switches between the two.
+  // workspaces-manage.e2e: the Admin who creates a partner workspace and adds a company member to it, who then switches between the two.
   wsadm: { email: 'wsadm@e2e.test', name: 'E2E WS Admin', role: 'admin' },
   wsboth: { email: 'wsboth@e2e.test', name: 'E2E WS Both', role: 'member' },
 } as const;

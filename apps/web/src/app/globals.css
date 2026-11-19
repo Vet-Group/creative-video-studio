@@ -366,6 +366,7 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 .ws-switch .field { margin: 0; padding: 0 4px; }
 .ws-switch .field-label { padding-left: 8px; color: var(--text-muted); font-size: 12px; line-height: 16px; }
 .ws-switch .select-trigger { background: var(--surface); border-color: var(--border); }
+.ws-switch .tag { flex: none; margin-left: 6px; } /* the company badge, which no workspace name can imitate */
 @media (pointer: coarse), (max-width: 1023.98px) {
   .ws-switch .select-trigger { height: 44px; }
   .ws-switch .select-pop li { min-height: 44px; }

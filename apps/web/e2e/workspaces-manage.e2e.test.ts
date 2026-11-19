@@ -4,9 +4,9 @@ import { type Browser, type BrowserContext, expect, type Page, test } from '@pla
 import { loginReady, newAddress, openSettings, signIn } from './support.test';
 import { USERS } from './users';
 
-// Workspaces, phase 3 (docs/WORKSPACES.md): an Admin creates a partner workspace with a new owner account, the owner signs in with the temporary password
-// and adds a member, that member (also in the company workspace) switches between the two, a stale tab's write gets the reload dialog, and the partner
-// workspace shows none of the company-only surfaces. CVS_E2E_SHOTS=<folder> saves the screenshots there (390 px dark, 1440 px light), else in the test output.
+// Workspaces, phase 3 (docs/WORKSPACES.md): an Admin creates a partner workspace with a new owner account and adds a company member to it, the owner
+// signs in with the temporary password and creates a member's account (company staff and addresses stay out of reach), the company member switches
+// between the two (the company's carries a fixed badge), a stale tab's write gets the reload dialog, and the partner shows no company-only surface. CVS_E2E_SHOTS=<folder> saves the screenshots there (390 px dark, 1440 px light), else in the test output.
 const url = new URL(process.env.DATABASE_URL!);
 url.pathname = `/${process.env.CVS_E2E_DB ?? 'cvs_e2e'}`;
 const db = createPool(url.toString(), 2);
@@ -14,6 +14,7 @@ const run = Math.random().toString(36).slice(2, 8);
 const WS_NAME = `E2E Đối tác ${run}`;
 const OWNER = { email: `owner-${run}@partner.e2e.test`, name: 'E2E Chủ đối tác', password: `owner-pass-${run}-1` };
 const BOARD_ITEM = `E2E partner board ${run}`;
+const SELLER = `seller-${run}@partner.e2e.test`;
 
 test.afterAll(async () => {
   try {
@@ -37,7 +38,7 @@ const blocking = async (page: Page) =>
   (await new AxeBuilder({ page }).exclude('nextjs-portal').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(' | ')}`);
 const switcher = (page: Page) => page.getByRole('combobox', { name: 'Không gian làm việc', exact: true });
 
-test('an Admin creates a partner workspace, its owner adds a member, who switches workspaces; a stale tab is told to reload', async ({ browser }) => {
+test('an Admin creates a partner workspace and adds a company member, its owner adds a member, the company member switches; a stale tab is told to reload', async ({ browser }) => {
   test.setTimeout(360_000);
   // 1. The Admin creates the workspace with a new account as its owner and copies the temporary password shown once.
   const adminContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light' });
@@ -63,6 +64,13 @@ test('an Admin creates a partner workspace, its owner adds a member, who switche
   await expect(adminPhone.getByRole('row').filter({ hasText: WS_NAME })).toBeVisible();
   await shot(adminPhone, 'admin-workspaces-390-dark', true);
   await adminPhone.context().close();
+  // Only an Admin brings a company member into a partner workspace (an owner cannot even see that the account exists).
+  await row.getByRole('button', { name: `Quản lý ${WS_NAME}` }).click();
+  const editor = admin.getByRole('dialog', { name: `Quản lý ${WS_NAME}` });
+  await editor.getByLabel('Email', { exact: true }).fill(USERS.wsboth.email);
+  await editor.getByRole('button', { name: 'Thêm thành viên' }).click();
+  await expect(editor.getByRole('row').filter({ hasText: USERS.wsboth.email })).toBeVisible();
+  await admin.keyboard.press('Escape');
   const workspaceId = (await db.query('select id from workspaces where name = $1', [WS_NAME])).rows[0].id as string;
 
   // 2. The owner signs in with it, must set their own password first, and lands in the partner workspace.
@@ -98,18 +106,27 @@ test('an Admin creates a partner workspace, its owner adds a member, who switche
   await expect(settings.getByText('Tổng chi phí tháng này của bạn')).toHaveCount(0);
   await owner.keyboard.press('Escape');
 
-  // 3. On the Members page the owner adds an existing user by email; an account on the company's domain is refused.
+  // 3. On the Members page the owner creates a seller's account; an address on the company's domain is refused, and an Admin looks like no account.
   await nav.getByRole('link', { name: 'Thành viên' }).click();
   await expect(owner.getByRole('heading', { name: 'Thành viên', level: 1 })).toBeVisible();
   await owner.getByLabel('Email', { exact: true }).fill('x.staff@vetgroup.net');
   await owner.getByLabel('Tạo tài khoản mới', { exact: true }).check();
   await owner.getByLabel('Tên hiển thị').fill('Lookalike');
   await owner.getByRole('button', { name: 'Thêm thành viên' }).click();
-  await expect(owner.locator('p.error[role="alert"]')).toHaveText('Không tạo được tài khoản với email này. Hãy dùng email khác, hoặc nhờ Admin.');
+  const problem = owner.locator('p.error[role="alert"]');
+  await expect(problem).toHaveText('Không dùng được email này trong không gian của bạn. Hãy dùng email khác, hoặc nhờ Admin.');
   await owner.getByLabel('Tạo tài khoản mới', { exact: true }).uncheck();
-  await owner.getByLabel('Email', { exact: true }).fill(USERS.wsboth.email);
+  await owner.getByLabel('Email', { exact: true }).fill(USERS.wsadm.email);
   await owner.getByRole('button', { name: 'Thêm thành viên' }).click();
+  await expect(problem).toHaveText('Chưa có tài khoản nào với email này. Đánh dấu “Tạo tài khoản mới” để tạo.');
+  await owner.getByLabel('Email', { exact: true }).fill(SELLER);
+  await owner.getByLabel('Tạo tài khoản mới', { exact: true }).check();
+  await owner.getByLabel('Tên hiển thị').fill('E2E Người bán');
+  await owner.getByRole('button', { name: 'Thêm thành viên' }).click();
+  await expect(owner.locator('.temp-password code')).toHaveText(/^\S{16}$/);
+  await owner.getByRole('button', { name: 'Đã lưu' }).click();
   const members = owner.getByRole('table');
+  await expect(members.getByRole('row').filter({ hasText: SELLER })).toBeVisible();
   await expect(members.getByRole('row').filter({ hasText: USERS.wsboth.email })).toBeVisible();
   await expect(members.getByRole('row').filter({ hasText: `${OWNER.name} (bạn)` }).getByLabel(`Vai trò của ${OWNER.email}`)).toHaveValue('owner');
   await shot(owner, 'members-1440-light');
@@ -132,11 +149,12 @@ test('an Admin creates a partner workspace, its owner adds a member, who switche
   const both = await bothContext.newPage();
   await signIn(both, 'wsboth');
   await both.goto('/feedback');
-  await expect(switcher(both)).toHaveText('VET Group');
+  await expect(switcher(both)).toHaveText('VET Group Công ty');
   await expect(both.getByText(BOARD_ITEM)).toHaveCount(0);
   await switcher(both).click();
   const options = both.getByRole('listbox', { name: 'Không gian làm việc' }).getByRole('option');
-  await expect(options).toHaveText(['VET Group', WS_NAME]);
+  await expect(options).toHaveText(['VET Group Công ty', WS_NAME]); // the badge is the company's alone
+  await expect(options.filter({ hasText: WS_NAME }).locator('.tag')).toHaveCount(0);
   await expect(options.filter({ hasText: 'VET Group' })).toHaveAttribute('aria-selected', 'true');
   await shot(both, 'switcher-1440-light');
   await options.filter({ hasText: WS_NAME }).click();
@@ -157,14 +175,14 @@ test('an Admin creates a partner workspace, its owner adds a member, who switche
   await expect(stale.getByText(BOARD_ITEM)).toBeVisible();
   await switcher(both).click();
   await both.getByRole('listbox', { name: 'Không gian làm việc' }).getByRole('option', { name: 'VET Group' }).click();
-  await expect(switcher(both)).toHaveText('VET Group');
+  await expect(switcher(both)).toHaveText('VET Group Công ty');
   await stale.getByRole('listitem').filter({ hasText: BOARD_ITEM }).getByRole('button', { name: /^Bình chọn/ }).click();
   const changed = stale.getByRole('dialog', { name: 'Đã đổi không gian làm việc' });
   await expect(changed).toBeVisible();
   await shot(stale, 'workspace-changed-1440-light');
   expect((await db.query('select count(*)::int as n from feedback_votes where feedback_id = $1', [`wsm-${run}`])).rows[0].n).toBe(0);
   await changed.getByRole('button', { name: 'Tải lại trang' }).click();
-  await expect(switcher(stale)).toHaveText('VET Group');
+  await expect(switcher(stale)).toHaveText('VET Group Công ty');
   await expect(stale.getByText(BOARD_ITEM)).toHaveCount(0);
 
   await Promise.all([adminContext.close(), ownerContext.close(), bothContext.close()]);
