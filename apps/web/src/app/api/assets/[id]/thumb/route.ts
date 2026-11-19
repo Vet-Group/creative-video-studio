@@ -10,7 +10,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
-  const found = await readableAsset(g.session, id);
+  const found = await readableAsset(g.session, g.workspaceId, id);
   if (found.error) return found.error;
   if (!found.asset.mime.startsWith('image/')) return Response.json({ error: 'not an image' }, { status: 400 });
   const w = new URL(request.url).searchParams.get('w');

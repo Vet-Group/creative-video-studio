@@ -13,8 +13,8 @@ export async function GET(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const { rows } = await pool.query(
     `update suggestion_runs set status = case when status = 'queued' and created_at <= now() - make_interval(secs => $3) then 'failed' else status end
-      where id = $1 and user_id = $2 returning status, output`,
-    [id, g.session.user.id, SUGGEST_EXPIRY_SECONDS],
+      where id = $1 and user_id = $2 and workspace_id = $4 returning status, output`,
+    [id, g.session.user.id, SUGGEST_EXPIRY_SECONDS, g.workspaceId],
   );
   if (!rows[0]) return Response.json({ error: 'not found' }, { status: 404 });
   const output = (rows[0].output ?? []) as (string | { text: string; vi: string })[];

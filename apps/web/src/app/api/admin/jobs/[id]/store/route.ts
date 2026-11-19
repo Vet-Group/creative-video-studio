@@ -15,8 +15,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
   const body = await readBody(request);
   const storeId = body?.storeId;
   if (storeId !== null && typeof storeId !== 'string') return bad('storeId must be a store id or null');
-  if (!(await pool.query('select 1 from jobs where id = $1', [id])).rowCount) return bad('not found', 404);
-  if (storeId !== null && !(await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount) return bad('storeId must be the id of a visible store');
+  if (!(await pool.query('select 1 from jobs where id = $1 and workspace_id = $2', [id, g.workspaceId])).rowCount) return bad('not found', 404);
+  if (storeId !== null && !(await pool.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [storeId, g.workspaceId])).rowCount) return bad('storeId must be the id of a visible store');
   const changed = await reassignStore(pool, id, storeId, g.session.user.id);
   return Response.json({ id, storeId, changed });
 }

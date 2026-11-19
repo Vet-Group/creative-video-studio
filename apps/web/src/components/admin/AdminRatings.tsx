@@ -64,7 +64,7 @@ export function AdminRatings() {
                 {data.comments.map((c, i) => (
                   <li key={i}>
                     <span className="muted">
-                      <strong>{c.score}/10</strong> · {c.team} · <time dateTime={c.createdAt}>{fmtDate(c.createdAt)}</time>
+                      <strong>{c.score}/10</strong> · {c.team}{c.workspace && ` · ${c.workspace}`} · <time dateTime={c.createdAt}>{fmtDate(c.createdAt)}</time>
                     </span>
                     <p>{c.comment}</p>
                   </li>

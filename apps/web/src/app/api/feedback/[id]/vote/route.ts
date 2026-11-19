@@ -9,7 +9,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   if (g.error) return g.error;
   const { id } = await params;
   const userId = g.session.user.id;
-  if (!(await pool.query('select 1 from feedback where id = $1', [id])).rowCount) return Response.json({ error: 'not found' }, { status: 404 });
+  if (!(await pool.query('select 1 from feedback where id = $1 and workspace_id = $2', [id, g.workspaceId])).rowCount) return Response.json({ error: 'not found' }, { status: 404 });
   const had = (await pool.query('delete from feedback_votes where feedback_id = $1 and user_id = $2', [id, userId])).rowCount;
   if (!had) await pool.query('insert into feedback_votes (feedback_id, user_id) values ($1, $2) on conflict do nothing', [id, userId]);
   const votes = (await pool.query('select count(*)::int as n from feedback_votes where feedback_id = $1', [id])).rows[0].n;

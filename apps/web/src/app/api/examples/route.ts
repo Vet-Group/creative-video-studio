@@ -9,7 +9,7 @@ import { guard } from '@/lib/session';
 const MAX = 500;
 const badFeature = () => Response.json({ error: `feature must be one of ${Object.keys(GALLERY_SAMPLES).join(', ')}` }, { status: 400 });
 
-/** The results on one page's Examples tab (`?feature=video|image|try_on|marketing|jewelry_try_on|lingerie_try_on`) in the tab's order, for an Admin to reorder. */
+/** The results on one page's Examples tab (`?feature=video|image|try_on|marketing|jewelry_try_on|lingerie_try_on`) of the active workspace in the tab's order, for an Admin to reorder. */
 export async function GET(request: Request) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
@@ -18,9 +18,9 @@ export async function GET(request: Request) {
   const { rows } = await pool.query(
     `select j.id, j.output_asset_id, j.poster_asset_id, j.aspect, m.label as model_label
        from examples e join jobs j on j.id = e.job_id join model_configs m on m.id = j.model
-      where ${LIVE_CLIP} and j.feature = $1
+      where j.workspace_id = $2 and ${LIVE_CLIP} and j.feature = $1
       order by ${EXAMPLE_ORDER}`,
-    [feature],
+    [feature, g.workspaceId],
   );
   return Response.json({ examples: rows.map((r) => ({ id: r.id, videoAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, ratio: r.aspect, modelLabel: r.model_label })) });
 }
@@ -42,7 +42,10 @@ export async function PUT(request: Request) {
   return withTransaction(pool, async (tx): Promise<Response> => {
     // One order at a time per tab, taken before the read, so a second Admin reads the first one's saved order.
     await tx.query(`select pg_advisory_xact_lock(hashtext('example.order:' || $1))`, [feature]);
-    const { rows } = await tx.query(`select e.job_id from examples e join jobs j on j.id = e.job_id where ${LIVE_CLIP} and j.feature = $1 order by ${EXAMPLE_ORDER}`, [feature]);
+    const { rows } = await tx.query(`select e.job_id from examples e join jobs j on j.id = e.job_id where j.workspace_id = $2 and ${LIVE_CLIP} and j.feature = $1 order by ${EXAMPLE_ORDER}`, [
+      feature,
+      g.workspaceId,
+    ]);
     const before = rows.map((r) => r.job_id as string);
     if (before.length !== ids.length || !ids.every((i) => before.includes(i))) return Response.json({ error: 'the Examples tab changed; reload it and order it again' }, { status: 409 });
     await tx.query('update examples e set position = x.n from unnest($1::text[]) with ordinality as x(id, n) where e.job_id = x.id', [ids]);

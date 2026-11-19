@@ -29,7 +29,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
   return withTransaction(pool, async (tx): Promise<Response> => {
     // The job row is locked, so two edits of one clip are audited one after the other.
-    const job = (await tx.query(`select j.user_id, j.output_asset_id from jobs j where j.id = $1 and ${LIVE_CLIP} for update of j`, [id])).rows[0];
+    const job = (await tx.query(`select j.user_id, j.output_asset_id from jobs j where j.id = $1 and j.workspace_id = $2 and ${LIVE_CLIP} for update of j`, [id, g.workspaceId])).rows[0];
     if (!job) return Response.json({ error: 'not found' }, { status: 404 });
     if (job.user_id !== userId && role !== 'admin') return Response.json({ error: 'forbidden' }, { status: 403 });
     const old = (await tx.query('select verdict, fault, featured, marked_by from verdicts where job_id = $1', [id])).rows[0];

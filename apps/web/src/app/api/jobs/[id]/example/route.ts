@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
   const { id } = await params;
-  const job = (await pool.query(`select j.id, j.feature, j.input_asset_ids, ${OWN_PROMPT} as prompt from jobs j where j.id = $1 and ${LIVE_CLIP}`, [id])).rows[0];
+  const job = (await pool.query(`select j.id, j.feature, j.input_asset_ids, ${OWN_PROMPT} as prompt from jobs j where j.id = $1 and j.workspace_id = $2 and ${LIVE_CLIP}`, [id, g.workspaceId])).rows[0];
   if (!job) return Response.json({ error: 'not found' }, { status: 404 });
   const { rows } = await pool.query(
     `select j.id, j.output_asset_id, j.poster_asset_id, j.aspect, m.label as model_label,
@@ -25,9 +25,9 @@ export async function GET(request: Request, { params }: RouteContext) {
        from examples e
        join jobs j on j.id = e.job_id
        join model_configs m on m.id = j.model
-      where ${LIVE_CLIP} and j.feature = $2 and j.id <> $1
+      where j.workspace_id = $5 and ${LIVE_CLIP} and j.feature = $2 and j.id <> $1
       order by 6 nulls last, e.created_at desc`,
-    [id, job.feature, job.input_asset_ids, job.prompt],
+    [id, job.feature, job.input_asset_ids, job.prompt, g.workspaceId],
   );
   return Response.json({
     examples: rows.map((r) => ({ id: r.id, videoAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, ratio: r.aspect, modelLabel: r.model_label, match: r.match })),
@@ -56,7 +56,7 @@ async function set(request: Request, { params }: RouteContext, on: boolean): Pro
   if (!(productType === undefined || productType === null || isProductType(productType))) return Response.json({ error: `productType must be one of ${Object.keys(PRODUCT_TYPES).join(', ')}, or null` }, { status: 400 });
   const userId = g.session.user.id;
   return withTransaction(pool, async (tx): Promise<Response> => {
-    const job = (await tx.query(`select j.feature from jobs j where j.id = $1 and ${LIVE_CLIP} for update of j`, [id])).rows[0];
+    const job = (await tx.query(`select j.feature from jobs j where j.id = $1 and j.workspace_id = $2 and ${LIVE_CLIP} for update of j`, [id, g.workspaceId])).rows[0];
     if (!job) return Response.json({ error: 'not found' }, { status: 404 });
     if (on && !Object.hasOwn(GALLERY_SAMPLES, job.feature)) return Response.json({ error: 'only a Create Videos, Image Generation, Try On, Marketing Studio, Jewelry Try-On or Lingerie Try-On result can be an example' }, { status: 400 });
     const before = (await tx.query('select product_type from examples where job_id = $1', [id])).rows[0]; // the job's lock keeps it until commit

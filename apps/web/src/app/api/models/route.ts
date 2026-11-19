@@ -1,7 +1,7 @@
 import { ALWAYS_AUDIO, estimateUsd, promptLimit, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { capRowOf } from '@cvs/core/limits';
 import { videoInputs } from '@cvs/core/providers/fal';
-import { ASPECTS } from '@cvs/db';
+import { ASPECTS, COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { canServe, onePerPair, vertexOnCredits } from '@/lib/model-twins';
@@ -32,10 +32,13 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * `creditUsd` is what the model's provider can still spend (lib/provider-credit.ts; fal only, null otherwise): the picker locks a model whose estimate is over it, and the
  * model to pre-select is never one of those.
  * `monthToDate` is the caller's own total this ICT month, provisional while a job of it has no closing row. `remainingBudgetUsd` is for Admins only.
+ * Spend and balances are the company's figures: outside the company workspace `creditUsd` and `monthToDate` are null and `remainingBudgetUsd` is left out
+ * (the server still refuses a Run the balance cannot pay, jobs route).
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
+  const company = g.workspaceId === COMPANY_WORKSPACE_ID;
   const q = new URL(request.url).searchParams;
   const ratio = q.get('ratio');
   const durationSec = q.get('durationSec') ? Number(q.get('durationSec')) : NaN;
@@ -72,7 +75,7 @@ export async function GET(request: Request) {
        select coalesce(sum(m.usd), 0)::numeric(12, 4)::text as usd, coalesce(bool_or(not c.is_final), false) as provisional from m left join job_costs c on c.job_id = m.job_id`,
       [userId],
     ),
-    g.session.user.role === 'admin'
+    g.session.user.role === 'admin' && company
       ? pool.query(`select (s.monthly_cap_usd - coalesce((select sum(usd) from cost_entries ce where month = ${MONTH} and ${capRowOf('ce')} and not exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))), 0))::text as remaining from settings s where s.id = 1`)
       : undefined,
     modelStats(null),
@@ -127,7 +130,7 @@ export async function GET(request: Request) {
       // The rows of its pair, so a form reusing a job made on a twin keeps this entry.
       pairIds: pair.map((p) => p.id as string),
       creditUsd: serving.provider === 'fal' ? falCredit : null,
-      creditShown: g.session.user.role === 'admin', // members see that a model is out of budget, not the provider's balance
+      creditShown: g.session.user.role === 'admin' && company, // members see that a model is out of budget, not the provider's balance
     };
   });
   const supported = list.filter((m) => m.supported && !overCredit(m.provider, m.estimateUsd, m.creditUsd)).map((m) => ({ id: m.id, score: m.score, usd: Number(m.estimateUsd), vertex: m.provider === 'vertex' }));
@@ -138,9 +141,9 @@ export async function GET(request: Request) {
   const best = ranked.best;
   const recommended = onCredits ? best : ranked.recommended;
   return Response.json({
-    models: list.map((m) => ({ ...m, recommended: m.id === recommended })),
+    models: list.map((m) => ({ ...m, recommended: m.id === recommended, ...(!company && { creditUsd: null }) })),
     defaultModelId: best,
-    monthToDate: { usd: mine.rows[0].usd, provisional: mine.rows[0].provisional },
+    monthToDate: company ? { usd: mine.rows[0].usd, provisional: mine.rows[0].provisional } : null,
     ...(budget && { remainingBudgetUsd: budget.rows[0].remaining }),
   });
 }

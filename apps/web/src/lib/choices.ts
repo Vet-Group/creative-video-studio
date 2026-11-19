@@ -7,15 +7,18 @@ import { isEditor } from './session';
 
 export type FoundChoice = MarketingChoice & { isCompany: boolean; builtIn: boolean };
 
-/** The choice `id` of `kind` that `userId` may use: a built-in, their own, a company one or one of a store that is not hidden; undefined for any other id. */
-export async function findChoice(userId: string, kind: ChoiceKind, id: string): Promise<FoundChoice | undefined> {
+/**
+ * The choice `id` of `kind` that `userId` may use in workspace `workspaceId`: a built-in, their own, a company (workspace) one or one of a store that is
+ * not hidden; undefined for any other id, and for any choice of another workspace.
+ */
+export async function findChoice(userId: string, workspaceId: string, kind: ChoiceKind, id: string): Promise<FoundChoice | undefined> {
   const builtIn = BUILT_IN_CHOICES[kind].find((c) => c.id === id);
   if (builtIn) return { ...builtIn, isCompany: false, builtIn: true };
   const r = (
     await pool.query(
       `select c.id, c.name, c.description, c.phrase, c.is_company from user_choices c left join stores s on s.id = c.store_id
-        where c.id = $1 and c.kind = $2 and (c.user_id = $3 or c.is_company or not s.hidden)`,
-      [id, kind, userId],
+        where c.id = $1 and c.kind = $2 and c.workspace_id = $4 and (c.user_id = $3 or c.is_company or not s.hidden)`,
+      [id, kind, userId, workspaceId],
     )
   ).rows[0];
   return r && { id: r.id, name: r.name, desc: r.description ?? '', phrase: r.phrase, isCompany: r.is_company, builtIn: false };
@@ -29,7 +32,7 @@ export type ListedChoice = MarketingChoice & {
   imageAssetId: string | null;
 };
 
-/** The select list and joins of a listed choice (`c`, its store `s`); $1 is the caller. */
+/** The select list and joins of a listed choice (`c`, its store `s`); $1 is the caller. The caller's where names the workspace (`c.workspace_id`). */
 export const CHOICE_SQL = `select c.id, c.kind, c.name, c.description, c.phrase, c.is_company, c.store_id, s.name as store_name, c.niche, c.user_id = $1 as mine,
     (select a.id from assets a where a.id = c.image_asset_id and a.deleted_at is null) as image_asset_id
   from user_choices c left join stores s on s.id = c.store_id`;
@@ -50,9 +53,15 @@ export type ChoiceFields = { name: string; phrase: string; desc: string; isCompa
  * Reads and checks the fields of a POST, or with `current` a PATCH's changes over the stored ones: `name` (1 to 40 characters), `phrase` (the English
  * words the prompt takes, 1 to 300), `desc` (up to 100), `niche` (1 to 30, null or empty for none), none holding a newline or another control character;
  * the share level, `isCompany` (a template editor only) or `storeId` (a store that is not hidden), giving one turns the other off; `imageAssetId`, one of
- * the caller's own uploaded photos, or null. A store or photo kept as it was is not checked again. An error has its status.
+ * the caller's own uploaded photos, or null. A store or photo kept as it was is not checked again; one of another workspace than `workspaceId` is refused
+ * as if it did not exist. An error has its status.
  */
-export async function choiceFields(b: Record<string, unknown>, user: Session['user'], current?: ChoiceFields): Promise<ChoiceFields | { error: string; status: number }> {
+export async function choiceFields(
+  b: Record<string, unknown>,
+  user: Session['user'],
+  workspaceId: string,
+  current?: ChoiceFields,
+): Promise<ChoiceFields | { error: string; status: number }> {
   const bad = (error: string, status = 400) => ({ error, status });
   const name = b.name === undefined && current ? current.name : text(b.name, MAX_CHOICE_NAME);
   if (name === null) return bad(`name must have 1 to ${MAX_CHOICE_NAME} characters on one line`);
@@ -68,12 +77,16 @@ export async function choiceFields(b: Record<string, unknown>, user: Session['us
   const isCompany = level ? b.isCompany === true : (current?.isCompany ?? false);
   const storeId = level ? ((b.storeId as string | null | undefined) ?? null) : (current?.storeId ?? null);
   if (isCompany && storeId !== null) return bad('storeId is a store id, given without isCompany');
-  if (isCompany && !current?.isCompany && !isEditor(user)) return bad('only an Admin or a template editor shares with the company', 403);
-  if (storeId !== null && storeId !== current?.storeId && !(await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount) return bad('the store does not exist or is hidden');
+  if (isCompany && !current?.isCompany && !isEditor(user, workspaceId)) return bad('only an Admin or a template editor shares with the company', 403);
+  if (storeId !== null && storeId !== current?.storeId && !(await pool.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [storeId, workspaceId])).rowCount) return bad('the store does not exist or is hidden');
   if (b.imageAssetId !== undefined && b.imageAssetId !== null && typeof b.imageAssetId !== 'string') return bad('imageAssetId must be one of your own uploaded photos');
   const imageAssetId = b.imageAssetId === undefined ? (current?.imageAssetId ?? null) : (b.imageAssetId as string | null);
   if (imageAssetId !== null && imageAssetId !== current?.imageAssetId) {
-    const own = await pool.query(`select 1 from assets where id = $1 and owner_id = $2 and kind = 'input' and deleted_at is null and mime like 'image/%'`, [imageAssetId, user.id]);
+    const own = await pool.query(`select 1 from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null and mime like 'image/%'`, [
+      imageAssetId,
+      user.id,
+      workspaceId,
+    ]);
     if (!own.rowCount) return bad('imageAssetId must be one of your own uploaded photos');
   }
   return { name, phrase, desc, isCompany, storeId, niche, imageAssetId };

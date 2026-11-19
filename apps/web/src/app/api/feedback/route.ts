@@ -21,12 +21,13 @@ export async function GET(request: Request) {
   const top = url.searchParams.get('sort') === 'top';
   const rows = await pool.query(
     `${FEEDBACK_SELECT}
-      where ($2::text is null or f.kind = $2) and ($3::text is null or f.status = $3)
+      where (f.workspace_id = $4 or $5) and ($2::text is null or f.kind = $2) and ($3::text is null or f.status = $3)
       order by ${top ? 'votes desc, f.created_at desc' : 'f.created_at desc'}, f.id
       limit 200`,
-    [g.session.user.id, kind, status],
+    // An Admin triages the items of every workspace (feedback reaches the company that runs CVS, docs/WORKSPACES.md); a member sees their workspace's board.
+    [g.session.user.id, kind, status, g.workspaceId, g.session.user.role === 'admin'],
   );
-  return Response.json({ items: rows.rows.map(toListed) });
+  return Response.json({ items: rows.rows.map((r) => toListed(r, g.workspaceId)) });
 }
 
 /**
@@ -47,17 +48,17 @@ export async function POST(request: Request) {
   if (assetIds.length > MAX_IMAGES) return bad(`at most ${MAX_IMAGES} images`);
   const userId = g.session.user.id;
   if (assetIds.length) {
-    const own = (await pool.query('select count(*)::int as n from assets where id = any($1) and owner_id = $2 and deleted_at is null', [assetIds, userId])).rows[0].n;
+    const own = (await pool.query('select count(*)::int as n from assets where id = any($1) and owner_id = $2 and workspace_id = $3 and deleted_at is null', [assetIds, userId, g.workspaceId])).rows[0].n;
     if (own !== assetIds.length) return bad('an attached image was not found');
   }
-  const recent = (await pool.query(`select count(*)::int as n from feedback where user_id = $1 and created_at > now() - interval '1 hour'`, [userId])).rows[0].n;
+  const recent = (await pool.query(`select count(*)::int as n from feedback where user_id = $1 and created_at > now() - interval '1 hour'`, [userId])).rows[0].n; // one limit across workspaces
   if (recent >= FEEDBACK_HOURLY_LIMIT) return bad('too many submissions in the last hour; try again later', 429);
   const id = randomUUID();
   await pool.query(
-    `insert into feedback (id, user_id, team_id, kind, title, body, image_asset_ids)
-       values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6)`,
-    [id, userId, kind, title, body, assetIds],
+    `insert into feedback (id, user_id, team_id, kind, title, body, image_asset_ids, workspace_id)
+       values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6, $7)`,
+    [id, userId, kind, title, body, assetIds, g.workspaceId],
   );
-  const row = (await pool.query(`${FEEDBACK_SELECT} where f.id = $2`, [userId, id])).rows[0];
-  return Response.json(toListed(row), { status: 201 });
+  const row = (await pool.query(`${FEEDBACK_SELECT} where f.id = $2 and f.workspace_id = $3`, [userId, id, g.workspaceId])).rows[0];
+  return Response.json(toListed(row, g.workspaceId), { status: 201 });
 }

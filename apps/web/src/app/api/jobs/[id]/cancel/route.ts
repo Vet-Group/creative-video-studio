@@ -11,7 +11,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
-  const result = await cancelQueued(pool, id, g.session.user.id);
+  const result = await cancelQueued(pool, id, g.session.user.id, g.workspaceId);
   if (result === 'not_found') return Response.json({ error: 'not found' }, { status: 404 });
   if (result === 'started') return Response.json({ error: 'Job đã bắt đầu chạy, không huỷ được nữa.' }, { status: 409 });
   return Response.json({ id, status: 'failed', canceled: true });

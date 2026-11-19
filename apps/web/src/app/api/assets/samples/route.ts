@@ -48,9 +48,9 @@ export async function POST(request: Request) {
   }
   const slot = isUploadSlot(body?.slot) ? body.slot : null;
   const hashes = copies.map((c) => createHash('sha256').update(c.bytes).digest('hex'));
-  const kept = await keptInputs(pool, g.session.user.id, [...new Set(hashes)], slot);
+  const kept = await keptInputs(pool, g.session.user.id, g.workspaceId, [...new Set(hashes)], slot);
   const fresh = copies.map((c, i) => ({ ...c, sha256: hashes[i]! })).filter((c, i) => !kept.has(c.sha256) && hashes.indexOf(c.sha256) === i);
-  const rows = fresh.map(({ id, name, bytes, mime, durationMs, sha256 }) => ({ id, ownerId: g.session.user.id, kind: 'input' as const, s3Key: `assets/${id}`, filename: name, mime, bytes: bytes.length, durationMs, sha256, slot }));
+  const rows = fresh.map(({ id, name, bytes, mime, durationMs, sha256 }) => ({ id, ownerId: g.session.user.id, workspaceId: g.workspaceId, kind: 'input' as const, s3Key: `assets/${id}`, filename: name, mime, bytes: bytes.length, durationMs, sha256, slot }));
   const puts = await Promise.allSettled(fresh.map(({ id, bytes, mime }) => putObject(`assets/${id}`, bytes, mime)));
   try {
     const failed = puts.find((p): p is PromiseRejectedResult => p.status === 'rejected');

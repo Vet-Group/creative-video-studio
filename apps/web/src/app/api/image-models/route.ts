@@ -1,5 +1,5 @@
 import { imagePricesFor, promptLimit, textToImage } from '@cvs/core/models';
-import { FEATURES } from '@cvs/db';
+import { COMPANY_WORKSPACE_ID, FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { onePerPair, vertexOnCredits } from '@/lib/model-twins';
@@ -13,11 +13,13 @@ import { guard } from '@/lib/session';
  * (lib/model-scores.ts), and the best (the cheaper on a tie) is flagged `recommended` unless all score the same; for `?feature=image` (Create Image) while the active Vertex
  * account runs on credits alone (vertexOnCredits), the best Vertex model is flagged instead, whatever the others score. `creditUsd` is what the model's provider can still
  * spend (lib/provider-credit.ts; fal only, null otherwise): the picker locks a model whose price at the chosen resolution is over it. Of a pair of duplicate models (`twin_of`, migration 0075) one is listed:
- * the cheaper, or the dearer in its place while the cheaper cannot serve (lib/model-twins.ts). Members and Admins.
+ * the cheaper, or the dearer in its place while the cheaper cannot serve (lib/model-twins.ts). Members and Admins. The balance is the company's figure:
+ * outside the company workspace `creditUsd` is null (the jobs route still refuses a Run it cannot pay).
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
+  const company = g.workspaceId === COMPANY_WORKSPACE_ID;
   const feature = new URL(request.url).searchParams.get('feature');
   if (feature === null || !(FEATURES as readonly string[]).includes(feature) || feature === 'video' || feature === 'marketing') {
     return Response.json({ error: 'feature must be an image feature such as try_on or image' }, { status: 400 });
@@ -50,8 +52,8 @@ export async function GET(request: Request) {
       thinking: r.thinking_levels as string[],
       thinkingPrices: Object.fromEntries((r.thinking_levels as string[]).map((t) => [t, Object.fromEntries(shown(imagePricesFor(r, t)))])),
       isNew: r.is_new as boolean,
-      creditUsd: r.provider === 'fal' ? falCredit : null,
-      creditShown: g.session.user.role === 'admin', // members see that a model is out of budget, not the provider's balance
+      creditUsd: r.provider === 'fal' && company ? falCredit : null,
+      creditShown: g.session.user.role === 'admin' && company, // members see that a model is out of budget, not the provider's balance
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,

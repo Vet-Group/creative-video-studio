@@ -31,11 +31,15 @@ export async function POST(request: Request) {
   const assetId = b?.assetId;
   if (typeof assetId !== 'string' || !UUID.test(assetId)) return bad('assetId must be a presigned upload id');
   const storeId = b?.storeId == null ? null : b.storeId;
-  if (storeId !== null && (typeof storeId !== 'string' || (await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount === 0)) return bad('the store does not exist or is hidden');
+  if (storeId !== null && (typeof storeId !== 'string' || (await pool.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [storeId, g.workspaceId])).rowCount === 0)) return bad('the store does not exist or is hidden');
 
-  // Idempotent: a repeated finalize of the same upload returns the row already made rather than conflicting on the primary key.
-  const existing = (await pool.query('select id, filename, duration_ms as "durationMs", bytes from assets where id = $1 and owner_id = $2', [assetId, userId])).rows[0];
-  if (existing) return Response.json({ asset: existing });
+  // Idempotent: a repeated finalize of the same upload returns the row already made rather than conflicting on the primary key; one finalized in another
+  // workspace is not found here (and its object is left alone).
+  const existing = (await pool.query('select id, filename, duration_ms as "durationMs", bytes, workspace_id from assets where id = $1 and owner_id = $2', [assetId, userId])).rows[0];
+  if (existing) {
+    const { workspace_id: workspaceId, ...asset } = existing;
+    return workspaceId === g.workspaceId ? Response.json({ asset }) : bad('not found', 404);
+  }
 
   const key = r2Key(`assets/${assetId}`);
   let size: number;
@@ -67,7 +71,7 @@ export async function POST(request: Request) {
     await deleteObject(key);
     return bad(`Mỗi giờ chỉ tải lên được tối đa ${UPLOAD_HOURLY_LIMIT} tệp; hãy thử lại sau.`, 429);
   }
-  const row = { id: assetId, ownerId: userId, kind: 'input' as const, s3Key: key, filename: shortName(typeof b?.filename === 'string' && b.filename ? b.filename : 'video.mp4'), mime, bytes: size, durationMs, storeId, slot: null };
+  const row = { id: assetId, ownerId: userId, workspaceId: g.workspaceId, kind: 'input' as const, s3Key: key, filename: shortName(typeof b?.filename === 'string' && b.filename ? b.filename : 'video.mp4'), mime, bytes: size, durationMs, storeId, slot: null };
   try {
     await insertAssets(db, [row]);
   } catch (e) {

@@ -11,11 +11,15 @@ const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
  * The viewer's own copy of each of the author's live uploads among `ids` (the source id to the copy's id), copied on the server the first time. A copy, not
  * a shared row: an object belongs to one asset (s3_key is unique) and the purge removes an input's object with its last job, so the author's clean-up never
  * takes the viewer's copy, and every check that an input is the caller's own stays as it is. The copy's id comes from the source and the viewer, so applying
- * the template again reuses it; one that fails to copy is left out, as a deleted upload is.
+ * the template again reuses it; one that fails to copy is left out, as a deleted upload is. Sources and copies are of the template's workspace `workspaceId`.
  */
-async function copiesOf(ids: string[], authorId: string, viewerId: string): Promise<Map<string, string>> {
+async function copiesOf(ids: string[], authorId: string, viewerId: string, workspaceId: string): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map();
-  const { rows } = await pool.query(`select id, s3_key from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null`, [ids, authorId]);
+  const { rows } = await pool.query(`select id, s3_key from assets where id = any($1::text[]) and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [
+    ids,
+    authorId,
+    workspaceId,
+  ]);
   const copyId = (id: string) => createHash('sha256').update(`template-copy:${id}:${viewerId}`).digest('hex').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12}).*$/, '$1-$2-$3-$4-$5');
   const made = new Set((await pool.query('select id from assets where id = any($1::text[])', [rows.map((r) => copyId(r.id))])).rows.map((r) => r.id as string));
   await Promise.allSettled(
@@ -25,9 +29,9 @@ async function copiesOf(ids: string[], authorId: string, viewerId: string): Prom
         const id = copyId(r.id);
         await copyObject(r.s3_key, `assets/${id}`);
         await pool.query(
-          `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms)
-             select $1, $2, kind, $3, filename, mime, bytes, duration_ms from assets where id = $4 on conflict (id) do nothing`,
-          [id, viewerId, `assets/${id}`, r.id],
+          `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id)
+             select $1, $2, kind, $3, filename, mime, bytes, duration_ms, workspace_id from assets where id = $4 and workspace_id = $5 on conflict (id) do nothing`,
+          [id, viewerId, `assets/${id}`, r.id, workspaceId],
         );
       }),
   );
@@ -46,16 +50,22 @@ export async function GET(request: Request, { params }: RouteContext) {
   if (g.error) return g.error;
   const { id } = await params;
   const userId = g.session.user.id;
-  const t = (await pool.query('select id, user_id, feature, name, data, is_company from user_templates where id = $1 and (user_id = $2 or is_company or store_id is not null)', [id, userId])).rows[0];
+  const t = (
+    await pool.query('select id, user_id, feature, name, data, is_company from user_templates where id = $1 and workspace_id = $3 and (user_id = $2 or is_company or store_id is not null)', [
+      id,
+      userId,
+      g.workspaceId,
+    ])
+  ).rows[0];
   if (!t) return notFound();
   const data = t.data as TemplateData;
-  const copies = t.user_id === userId ? null : await copiesOf([...data.images, ...(data.endFrame ? [data.endFrame] : []), ...(data.videoRef ? [data.videoRef] : []), ...(data.clips ?? [])], t.user_id, userId);
+  const copies = t.user_id === userId ? null : await copiesOf([...data.images, ...(data.endFrame ? [data.endFrame] : []), ...(data.videoRef ? [data.videoRef] : []), ...(data.clips ?? [])], t.user_id, userId, g.workspaceId);
   // `bytes` adds the size, which the reference video's form check reads (ReferenceVideo.tsx); the other inputs do not carry it.
   const own = async (ids: string[], bytes = false) =>
     (
       await pool.query(
-        `select id, filename, mime${bytes ? ', bytes' : ''}, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
-        [copies ? ids.flatMap((i) => copies.get(i) ?? []) : ids, userId],
+        `select id, filename, mime${bytes ? ', bytes' : ''}, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
+        [copies ? ids.flatMap((i) => copies.get(i) ?? []) : ids, userId, g.workspaceId],
       )
     ).rows;
   const [images, endFrame, videoRef, clips] = await Promise.all([own(data.images), own(data.endFrame ? [data.endFrame] : []), own(data.videoRef ? [data.videoRef] : [], true), own(data.clips ?? [])]);
@@ -74,8 +84,15 @@ export async function DELETE(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
-  const res = await pool.query('delete from user_templates where id = $1 and (user_id = $2 or ($3 and (is_company or store_id is not null)))', [id, g.session.user.id, isEditor(g.session.user)]);
+  const res = await pool.query('delete from user_templates where id = $1 and workspace_id = $4 and (user_id = $2 or ($3 and (is_company or store_id is not null)))', [
+    id,
+    g.session.user.id,
+    isEditor(g.session.user, g.workspaceId),
+    g.workspaceId,
+  ]);
   if (res.rowCount) return new Response(null, { status: 204 });
   // A shared template the caller sees but may not delete.
-  return (await pool.query('select 1 from user_templates where id = $1 and (is_company or store_id is not null)', [id])).rowCount ? Response.json({ error: 'forbidden' }, { status: 403 }) : notFound();
+  return (await pool.query('select 1 from user_templates where id = $1 and workspace_id = $2 and (is_company or store_id is not null)', [id, g.workspaceId])).rowCount
+    ? Response.json({ error: 'forbidden' }, { status: 403 })
+    : notFound();
 }

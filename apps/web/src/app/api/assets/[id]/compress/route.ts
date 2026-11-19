@@ -33,7 +33,7 @@ async function allowed(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return { error: g.error };
   const { id } = await params;
-  const found = await readableAsset(g.session, id);
+  const found = await readableAsset(g.session, g.workspaceId, id);
   if (found.error) return { error: found.error };
   if (!found.asset.mime.startsWith('video/') || found.asset.kind !== 'output') return { error: Response.json({ error: 'Chỉ nén được video kết quả.' }, { status: 400 }) };
   if (found.asset.bytes > COMPRESS_MAX_BYTES) return { error: Response.json({ error: `Video nặng hơn ${COMPRESS_MAX_BYTES / 1024 / 1024} MB nên không nén được.` }, { status: 400 }) };

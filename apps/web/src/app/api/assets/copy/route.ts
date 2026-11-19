@@ -20,8 +20,8 @@ export async function POST(request: Request) {
   const found = (
     await pool.query(
       `select a.s3_key, a.bytes, a.mime, j.duration_s from assets a join jobs j on j.output_asset_id = a.id
-        where a.id = $1 and a.owner_id = $2 and a.kind = 'output' and a.mime in ('video/mp4', 'image/png', 'image/jpeg', 'image/webp') and a.deleted_at is null and j.deleted_at is null and j.purged_at is null`,
-      [body.assetId, userId],
+        where a.id = $1 and a.owner_id = $2 and a.workspace_id = $3 and j.workspace_id = $3 and a.kind = 'output' and a.mime in ('video/mp4', 'image/png', 'image/jpeg', 'image/webp') and a.deleted_at is null and j.deleted_at is null and j.purged_at is null`,
+      [body.assetId, userId, g.workspaceId],
     )
   ).rows[0] as { s3_key: string; bytes: number; mime: string; duration_s: number } | undefined;
   if (!found) return Response.json({ error: 'the result does not exist or is not yours' }, { status: 404 });
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
   const row = {
     id,
     ownerId: userId,
+    workspaceId: g.workspaceId,
     kind: 'input' as const,
     s3Key: `assets/${id}`,
     filename: `history-${id.slice(0, 8)}.${video ? 'mp4' : mime === 'image/jpeg' ? 'jpg' : mime.slice(6)}`,

@@ -20,23 +20,23 @@ export async function GET(request: Request, { params }: RouteContext) {
     await pool.query(
       `select j.id, j.user_id, j.status, j.error, j.is_mock, j.feature, j.params, j.preset_id, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.model, j.input_asset_ids, j.output_asset_id, j.poster_asset_id, j.store_id as job_store_id,
               (select m.label from model_configs m where m.id = j.model) as model_label,
-              (select s.id from stores s where s.id = j.store_id and not s.hidden) as store_id
-         from jobs j where j.id = $1 and j.deleted_at is null and j.purged_at is null`,
-      [id],
+              (select s.id from stores s where s.id = j.store_id and s.workspace_id = j.workspace_id and not s.hidden) as store_id
+         from jobs j where j.id = $1 and j.workspace_id = $2 and j.deleted_at is null and j.purged_at is null`,
+      [id, g.workspaceId],
     )
   ).rows[0];
   const own = job?.user_id === g.session.user.id;
   const mine = own || g.session.user.role === 'admin';
   if (!job || !(mine || (job.status === 'succeeded' && job.output_asset_id))) return notFound();
   const images = await pool.query(
-    'select id, filename, width, height, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and deleted_at is null order by array_position($1::text[], id)',
-    [job.input_asset_ids],
+    'select id, filename, width, height, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and workspace_id = $2 and deleted_at is null order by array_position($1::text[], id)',
+    [job.input_asset_ids, g.workspaceId],
   );
   // `bytes` adds the size, which the reference video's form check reads (ReferenceVideo.tsx); the other inputs do not carry it.
   const owned = (ids: string[], bytes = false) =>
     pool.query(
-      `select id, filename, mime${bytes ? ', bytes' : ''}, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
-      [own ? ids : [], job.user_id],
+      `select id, filename, mime${bytes ? ', bytes' : ''}, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
+      [own ? ids : [], job.user_id, g.workspaceId],
     );
   const [end, clips, video] = await Promise.all([owned(job.params.endAssetId ? [job.params.endAssetId] : []), owned(job.params.audioAssetIds?.split(',') ?? []), owned(job.params.videoAssetId ? [job.params.videoAssetId] : [], true)]);
   return Response.json({
@@ -56,11 +56,11 @@ export async function DELETE(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const { id: userId, role } = g.session.user;
   const refused = await withTransaction(pool, async (tx): Promise<Response | null> => {
-    const job = (await tx.query(`select j.user_id, j.output_asset_id, j.poster_asset_id from jobs j where j.id = $1 and ${LIVE_CLIP} for update of j`, [id])).rows[0];
+    const job = (await tx.query(`select j.user_id, j.output_asset_id, j.poster_asset_id from jobs j where j.id = $1 and j.workspace_id = $2 and ${LIVE_CLIP} for update of j`, [id, g.workspaceId])).rows[0];
     if (!job) return notFound();
     if (job.user_id !== userId && role !== 'admin') return Response.json({ error: 'forbidden' }, { status: 403 });
     await tx.query('update jobs set deleted_at = now() where id = $1', [id]);
-    await tx.query('update assets set deleted_at = now() where id = any($1::text[])', [[job.output_asset_id, job.poster_asset_id].filter(Boolean)]);
+    await tx.query('update assets set deleted_at = now() where id = any($1::text[]) and workspace_id = $2', [[job.output_asset_id, job.poster_asset_id].filter(Boolean), g.workspaceId]);
     if (job.user_id !== userId) await audit(tx, { actorId: userId, action: 'clip.delete', target: `job:${id}`, oldValue: { ownerId: job.user_id, deleted: false }, newValue: { ownerId: job.user_id, deleted: true } });
     return null;
   });

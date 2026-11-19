@@ -11,17 +11,18 @@ export const OWN_PROMPT = `case when j.feature in ('image', 'video') and j.prese
 /** An Examples tab's order over its `examples e` rows: the Admin's order, any added since first, newest first. */
 export const EXAMPLE_ORDER = 'e.position asc nulls first, e.created_at desc, e.job_id';
 
-/** Per model, the company's best Library clip as card media: a real (not mock) Create Videos or Image Generation clip marked Pass, a featured one first, then the most favourited, then the newest.
+/** Per model, the best Library clip of workspace `workspaceId` as card media: a real (not mock) Create Videos or Image Generation clip marked Pass, a featured one first, then the most favourited, then the newest.
  * A video clip gives its loop and poster, an image its preview (else the image itself); any member may read both (`readableAsset`).
  * Other features (Try On, Face Swap and the apps) run on the same models but show staff photos, so they never qualify. */
-export async function bestClips(): Promise<Map<string, { video: string | null; poster: string | null }>> {
+export async function bestClips(workspaceId: string): Promise<Map<string, { video: string | null; poster: string | null }>> {
   const { rows } = await pool.query<{ model: string; output_asset_id: string; poster_asset_id: string | null; mime: string }>(
     `select distinct on (j.model) j.model, j.output_asset_id, j.poster_asset_id, o.mime
        from jobs j
        join verdicts v on v.job_id = j.id and v.verdict = 'pass'
        join assets o on o.id = j.output_asset_id
-      where ${LIVE_CLIP} and not j.is_mock and j.feature in ('video', 'image') and (o.mime like 'video/%' or o.mime like 'image/%')
+      where j.workspace_id = $1 and ${LIVE_CLIP} and not j.is_mock and j.feature in ('video', 'image') and (o.mime like 'video/%' or o.mime like 'image/%')
       order by j.model, v.featured desc, (select count(*) from favorites f where f.job_id = j.id) desc, j.created_at desc, j.id desc`,
+    [workspaceId],
   );
   const content = (id: string | null) => (id ? `/api/assets/${id}/content` : null);
   const thumb = (id: string | null) => (id ? thumbUrl(id) : null); // the card's picture is a tile, not the original
@@ -48,11 +49,12 @@ export function downloadName(day: string, creatorName: string, jobId: string, ex
 /** The extension of an asset's filename: the stored name of a generated image ends in its real type. */
 export const extensionOf = (filename: string): string => filename.slice(filename.lastIndexOf('.') + 1);
 
-/** The download name when the asset is the output (video or image) of a job, else null. */
-export async function clipDownloadName(assetId: string): Promise<string | null> {
+/** The download name when the asset is the output (video or image) of a job of workspace `workspaceId`, else null. */
+export async function clipDownloadName(assetId: string, workspaceId: string): Promise<string | null> {
   const { rows } = await pool.query(
-    `select ${ICT_DAY} as day, u.name, j.id, o.filename, o.mime from jobs j join users u on u.id = j.user_id join assets o on o.id = j.output_asset_id where j.output_asset_id = $1`,
-    [assetId],
+    `select ${ICT_DAY} as day, u.name, j.id, o.filename, o.mime from jobs j join users u on u.id = j.user_id join assets o on o.id = j.output_asset_id
+      where j.output_asset_id = $1 and j.workspace_id = $2`,
+    [assetId, workspaceId],
   );
   return rows[0] ? downloadName(rows[0].day, rows[0].name, rows[0].id, rows[0].mime.startsWith('image/') ? extensionOf(rows[0].filename) : 'mp4') : null;
 }

@@ -213,20 +213,21 @@ export function audioDurationMs(b: Uint8Array, mime: string): number | undefined
 }
 
 /**
- * The asset for a signed-in user: 404 when it does not exist, 403 unless the user owns it, is an Admin, or it belongs to a Library clip (its video, poster
- * or input images), is the photo of a company or store choice (user_choices) or of a shared AI model (fashion_models), or is the source video of an
- * analysis shared as a Smart Remake reference video, which every member sees.
+ * The asset for a signed-in user in workspace `workspaceId`: 404 when it does not exist there (an asset of another workspace is not found, docs/WORKSPACES.md
+ * §3), 403 unless the user owns it, is an Admin, or it belongs to a Library clip (its video, poster or input images), is the photo of a company or store
+ * choice (user_choices) or of a shared AI model (fashion_models), or is the source video of an analysis shared as a Smart Remake reference video, which
+ * every member of the workspace sees.
  */
-export async function readableAsset(session: Session, id: string): Promise<{ asset: Asset; error?: never } | { asset?: never; error: Response }> {
-  const asset = await findAsset(db, id);
+export async function readableAsset(session: Session, workspaceId: string, id: string): Promise<{ asset: Asset; error?: never } | { asset?: never; error: Response }> {
+  const asset = await findAsset(db, id, workspaceId);
   if (!asset) return { error: Response.json({ error: 'not found' }, { status: 404 }) };
   if (asset.ownerId !== session.user.id && session.user.role !== 'admin') {
     const inLibrary = await pool.query(
-      `select 1 from jobs j where ${LIVE_CLIP} and ($1 in (j.output_asset_id, j.poster_asset_id) or $1 = any(j.input_asset_ids))
-       union all select 1 from user_choices c where c.image_asset_id = $1 and (c.is_company or c.store_id is not null)
-       union all select 1 from fashion_models f where f.asset_id = $1 and f.shared and f.deleted_at is null
-       union all select 1 from analyses an where an.source_key = $2 and an.shared_at is not null limit 1`,
-      [id, asset.s3Key],
+      `select 1 from jobs j where j.workspace_id = $3 and ${LIVE_CLIP} and ($1 in (j.output_asset_id, j.poster_asset_id) or $1 = any(j.input_asset_ids))
+       union all select 1 from user_choices c where c.workspace_id = $3 and c.image_asset_id = $1 and (c.is_company or c.store_id is not null)
+       union all select 1 from fashion_models f where f.workspace_id = $3 and f.asset_id = $1 and f.shared and f.deleted_at is null
+       union all select 1 from analyses an where an.workspace_id = $3 and an.source_key = $2 and an.shared_at is not null limit 1`,
+      [id, asset.s3Key, workspaceId],
     );
     if (!inLibrary.rowCount) return { error: Response.json({ error: 'forbidden' }, { status: 403 }) };
   }

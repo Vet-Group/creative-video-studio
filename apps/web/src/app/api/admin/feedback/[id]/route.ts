@@ -9,7 +9,8 @@ import { guard } from '@/lib/session';
 
 /**
  * Admin triage of one board item: set `status` (new|reviewing|done|rejected) and/or `adminNote` (the reply the author sees; null or empty clears it).
- * Each change is audited. A no-op body (the same status and note) changes nothing.
+ * Each change is audited. A no-op body (the same status and note) changes nothing. Any workspace's item: feedback reaches the company that runs CVS (the
+ * owner-overridable exception in docs/WORKSPACES.md).
  */
 export async function PATCH(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'admin');

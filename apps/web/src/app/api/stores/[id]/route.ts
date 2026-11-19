@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const parsed = parseBrand((await readBody(request)) ?? {});
   if (parsed.error) return bad(parsed.error);
   return withTransaction(pool, async (tx): Promise<Response> => {
-    const old = (await tx.query(`select brand_voice as "brandVoice", brand_colors as "brandColors", brand_tagline as "brandTagline" from stores where id = $1 for update`, [id])).rows[0];
+    const old = (await tx.query(`select brand_voice as "brandVoice", brand_colors as "brandColors", brand_tagline as "brandTagline" from stores where id = $1 and workspace_id = $2 for update`, [id, g.workspaceId])).rows[0];
     if (!old) return bad('not found', 404);
     const next = { ...old, ...parsed.kit };
     if (JSON.stringify(next) !== JSON.stringify(old)) {

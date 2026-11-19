@@ -53,14 +53,14 @@ export async function GET(request: Request) {
     const { rows } = await pool.query(
       `select id, filename from (
          select distinct on (coalesce(nullif(a.sha256, 'unreadable'), a.id)) a.id, a.filename, a.created_at from assets a
-          where a.owner_id = $1 and a.kind = 'input' and a.deleted_at is null and a.mime like 'image/%'
+          where a.owner_id = $1 and a.workspace_id = $5 and a.kind = 'input' and a.deleted_at is null and a.mime like 'image/%'
             and ($3::text is null or a.store_id = $3) and ($4::text is null or a.slot = $4)
             and not exists (select 1 from fashion_models f where f.asset_id = a.id and f.deleted_at is null)
             and (exists (select 1 from jobs j where a.id = any(${imagesOf('j')}) and j.deleted_at is null)
               or not exists (select 1 from jobs j where a.id = any(${imagesOf('j')})))
           order by coalesce(nullif(a.sha256, 'unreadable'), a.id), a.created_at desc, a.id) u
         order by created_at desc, id limit $2`,
-      [g.session.user.id, UPLOADS_LIMIT, params.get('storeId') || null, isUploadSlot(params.get('slot')) ? params.get('slot') : null],
+      [g.session.user.id, UPLOADS_LIMIT, params.get('storeId') || null, isUploadSlot(params.get('slot')) ? params.get('slot') : null, g.workspaceId],
     );
     return Response.json({ assets: rows });
   }
@@ -69,11 +69,11 @@ export async function GET(request: Request) {
   const { rows } = await pool.query(
     `select id, filename from (
        select distinct on (a.id) a.id, a.filename, j.created_at from jobs j join assets a on a.id = j.input_asset_ids[$2]
-        where j.user_id = $1 and j.feature = $3 and coalesce(j.params->>'format', '') in ('', 'review') and j.deleted_at is null
-          and a.owner_id = $1 and a.deleted_at is null
+        where j.user_id = $1 and j.workspace_id = $4 and j.feature = $3 and coalesce(j.params->>'format', '') in ('', 'review') and j.deleted_at is null
+          and a.owner_id = $1 and a.workspace_id = $4 and a.deleted_at is null
         order by a.id, j.created_at desc) p
      order by created_at desc limit 12`,
-    [g.session.user.id, recent.at, recent.feature],
+    [g.session.user.id, recent.at, recent.feature, g.workspaceId],
   );
   return Response.json({ assets: rows });
 }
@@ -88,10 +88,11 @@ export async function POST(request: Request) {
     return Response.json({ error: `send 1 to ${MAX_FILES} files in the "file" field` }, { status: 400 });
   }
   // shortcut: counted before the files are stored, so parallel requests can each pass; lock per member around count and insert if that is ever abused.
+  // One limit per member across workspaces, as the caps are.
   const { n } = (await pool.query(`select count(*)::int as n from assets where owner_id = $1 and kind = 'input' and created_at > now() - interval '1 hour'`, [g.session.user.id])).rows[0];
   if (n + files.length > UPLOAD_HOURLY_LIMIT) return Response.json({ error: `Mỗi giờ chỉ tải lên được tối đa ${UPLOAD_HOURLY_LIMIT} tệp; hãy thử lại sau.` }, { status: 429 });
   const storeId = form?.get('storeId') || null;
-  if (storeId !== null && (typeof storeId !== 'string' || (await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount === 0)) {
+  if (storeId !== null && (typeof storeId !== 'string' || (await pool.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [storeId, g.workspaceId])).rowCount === 0)) {
     return Response.json({ error: 'the store does not exist or is hidden' }, { status: 400 });
   }
   const checked: { id: string; file: File; bytes: Uint8Array; mime: string; durationMs: number | null }[] = [];
@@ -121,12 +122,13 @@ export async function POST(request: Request) {
   const slotField = form?.get('slot');
   const slot = isUploadSlot(slotField) ? slotField : null;
   const hashes = checked.map((c) => createHash('sha256').update(c.bytes).digest('hex'));
-  const kept = await keptInputs(pool, g.session.user.id, [...new Set(hashes)], slot, storeId);
+  const kept = await keptInputs(pool, g.session.user.id, g.workspaceId, [...new Set(hashes)], slot, storeId);
   // Only the first of the new files with one hash is stored; a repeat in the same upload and a file the caller already has return that one.
   const fresh = checked.map((c, i) => ({ ...c, sha256: hashes[i]! })).filter((c, i) => !kept.has(c.sha256) && hashes.indexOf(c.sha256) === i);
   const rows = fresh.map(({ id, file, bytes, mime, durationMs, sha256 }) => ({
     id,
     ownerId: g.session.user.id,
+    workspaceId: g.workspaceId,
     kind: 'input' as const,
     s3Key: `assets/${id}`,
     filename: shortName(file.name || 'upload'),

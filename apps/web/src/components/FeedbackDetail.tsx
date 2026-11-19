@@ -106,6 +106,7 @@ export function FeedbackDetail({ id, isAdmin, shipped = [] }: { id: string; isAd
                 {item.authorName}
               </span>
               <span className="muted">{feedbackTime(item.createdAt)}</span>
+              {item.workspaceName && <span className="muted">{item.workspaceName}</span>}
             </div>
           </div>
         </header>

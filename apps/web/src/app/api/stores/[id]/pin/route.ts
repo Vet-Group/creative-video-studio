@@ -14,7 +14,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const userId = g.session.user.id;
   return withTransaction(pool, async (tx): Promise<Response> => {
-    const store = (await tx.query('select 1 from stores where id = $1 and not hidden', [id])).rows[0];
+    const store = (await tx.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [id, g.workspaceId])).rows[0];
     if (!store) return bad('not found', 404);
     const row = (
       await tx.query(

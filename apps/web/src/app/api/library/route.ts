@@ -1,4 +1,4 @@
-import { FEATURES, IMAGE_RATIOS } from '@cvs/db';
+import { COMPANY_WORKSPACE_ID, FEATURES, IMAGE_RATIOS } from '@cvs/db';
 import { JOB_APPS } from '@/lib/apps';
 import { pool } from '@/lib/auth';
 import { downloadName, EXAMPLE_ORDER, extensionOf, ICT_DAY, LIVE_CLIP, OWN_PROMPT } from '@/lib/clips';
@@ -77,6 +77,7 @@ export async function GET(request: Request) {
   if (sort !== 'newest' && sort !== 'oldest') return bad('sort must be newest or oldest');
   if (text !== null && text.length > 200) return bad('q must be at most 200 characters');
   const me = g.session.user;
+  const company = g.workspaceId === COMPANY_WORKSPACE_ID;
 
   const [clips, creators, stores, shapes, unmarked] = await Promise.all([
     pool.query(
@@ -93,7 +94,7 @@ export async function GET(request: Request) {
          left join job_costs c on c.job_id = j.id
          left join verdicts v on v.job_id = j.id
          left join examples e on e.job_id = j.id
-        where ${LIVE_CLIP}
+        where j.workspace_id = $15 and ${LIVE_CLIP}
           and ($1::text is null or j.user_id = $1)
           and ($11::text is null or case when $11 = 'none' then j.store_id is null else j.store_id = $11 and (not s.hidden or $12::boolean) end)
           and ($2::date is null or (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date = $2::date)
@@ -107,13 +108,20 @@ export async function GET(request: Request) {
           and ($8::text is null or ${SEARCHED.map((c) => `unaccent(${c}) ilike unaccent($8)`).join(' or ')})
         order by ${example === '1' && sort === 'newest' && Object.hasOwn(GALLERY_SAMPLES, kind) ? EXAMPLE_ORDER : `j.created_at ${sort === 'oldest' ? 'asc' : 'desc'}, j.id ${sort === 'oldest' ? 'asc' : 'desc'}`} limit $4 offset $5`,
       // The words match literally: LIKE's own wildcards and escape are escaped.
-      [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`, days === null ? null : Number(days), example === '1', store, me.role === 'admin', suggested === '1', Object.keys(GALLERY_SAMPLES)],
+      [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`, days === null ? null : Number(days), example === '1', store, me.role === 'admin', suggested === '1', Object.keys(GALLERY_SAMPLES), g.workspaceId],
     ),
-    pool.query(`select distinct u.id, u.name from jobs j join users u on u.id = j.user_id where ${LIVE_CLIP} order by u.name, u.id`),
+    pool.query(`select distinct u.id, u.name from jobs j join users u on u.id = j.user_id where j.workspace_id = $1 and ${LIVE_CLIP} order by u.name, u.id`, [g.workspaceId]),
     // A closed store is the Admin's to see, as in the store picker.
-    pool.query(`select s.id, s.name from stores s where (not s.hidden or $1::boolean) and exists (select 1 from jobs j where j.store_id = s.id and ${LIVE_CLIP}) order by s.name, s.id`, [me.role === 'admin']),
-    pool.query(`select distinct ${SHAPE} as shape from jobs j join assets o on o.id = j.output_asset_id ${SHAPE_JOIN} where ${LIVE_CLIP}`),
-    pool.query(`select count(*)::int as n from jobs j where ${LIVE_CLIP} and ($1::boolean or j.user_id = $2) and not exists (select 1 from verdicts v where v.job_id = j.id)`, [me.role === 'admin', me.id]),
+    pool.query(
+      `select s.id, s.name from stores s where s.workspace_id = $2 and (not s.hidden or $1::boolean) and exists (select 1 from jobs j where j.store_id = s.id and j.workspace_id = $2 and ${LIVE_CLIP}) order by s.name, s.id`,
+      [me.role === 'admin', g.workspaceId],
+    ),
+    pool.query(`select distinct ${SHAPE} as shape from jobs j join assets o on o.id = j.output_asset_id ${SHAPE_JOIN} where j.workspace_id = $1 and ${LIVE_CLIP}`, [g.workspaceId]),
+    pool.query(`select count(*)::int as n from jobs j where j.workspace_id = $3 and ${LIVE_CLIP} and ($1::boolean or j.user_id = $2) and not exists (select 1 from verdicts v where v.job_id = j.id)`, [
+      me.role === 'admin',
+      me.id,
+      g.workspaceId,
+    ]),
   ]);
   return Response.json({
     hasMore: clips.rows.length > PAGE,
@@ -139,7 +147,8 @@ export async function GET(request: Request) {
       posterAssetId: r.poster_asset_id,
       storeId: r.store_id,
       storeName: r.store_name,
-      costUsd: r.cost_usd,
+      // What the company paid is its own figure (docs/WORKSPACES.md §3): another workspace gets null.
+      costUsd: company ? r.cost_usd : null,
       costFinal: r.cost_final,
       verdict: r.verdict ? { verdict: r.verdict, fault: r.fault, featured: r.featured, markedBy: r.marked_by } : null,
       favorite: r.favorite,

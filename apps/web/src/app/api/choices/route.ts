@@ -34,24 +34,24 @@ export async function GET(request: Request) {
   const [rows, used, latest] = await Promise.all([
     pool.query(
       `${CHOICE_SQL}
-        where ((c.store_id is null and (c.is_company or c.user_id = $1)) or (not s.hidden and ($2::text is null or c.store_id = $2)))
+        where c.workspace_id = $5 and ((c.store_id is null and (c.is_company or c.user_id = $1)) or (not s.hidden and ($2::text is null or c.store_id = $2)))
           and ($3::text is null or c.kind = $3) and ($4::text is null or c.niche = $4)
         order by (c.user_id = $1) desc, c.created_at desc, c.id`,
-      [userId, params.get('storeId') || null, kind, niche],
+      [userId, params.get('storeId') || null, kind, niche, g.workspaceId],
     ),
     pool.query(
       `select c.kind, c.id from jobs j, lateral (values ('hook', j.params->>'hook'), ('location', j.params->>'location')) as c (kind, id)
-        where j.user_id = $1 and j.feature = 'marketing' and j.params->>'format' is not distinct from $2::text and j.retry_of is null and j.deleted_at is null
+        where j.user_id = $1 and j.workspace_id = $3 and j.feature = 'marketing' and j.params->>'format' is not distinct from $2::text and j.retry_of is null and j.deleted_at is null
           and j.created_at > now() - interval '90 days' and c.id is not null
         group by c.kind, c.id having count(*) >= 2 order by count(*) desc, max(j.created_at) desc`,
-      [userId, format],
+      [userId, format, g.workspaceId],
     ),
     pool.query(
       `select distinct on (c.kind, c.id) c.kind, c.id, j.poster_asset_id from jobs j join assets p on p.id = j.poster_asset_id and p.deleted_at is null,
               lateral (values ('hook', j.params->>'hook'), ('location', j.params->>'location')) as c (kind, id)
-        where j.user_id = $1 and j.feature = 'marketing' and j.params->>'format' is not distinct from $2::text and ${LIVE_CLIP} and c.id is not null
+        where j.user_id = $1 and j.workspace_id = $3 and j.feature = 'marketing' and j.params->>'format' is not distinct from $2::text and ${LIVE_CLIP} and c.id is not null
         order by c.kind, c.id, j.created_at desc, j.id desc`,
-      [userId, format],
+      [userId, format, g.workspaceId],
     ),
   ]);
   const choices = rows.rows.map(listedChoice);
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
   const posters = Object.fromEntries(
     CHOICE_KINDS.map((k) => [k, Object.fromEntries(latest.rows.filter((r) => r.kind === k && often[k].includes(r.id)).map((r) => [r.id as string, r.poster_asset_id as string]))]),
   );
-  return Response.json({ ...Object.fromEntries(CHOICE_KINDS.map((k) => [LISTS[k], lists[k]])), often, posters, canShare: isEditor(g.session.user) });
+  return Response.json({ ...Object.fromEntries(CHOICE_KINDS.map((k) => [LISTS[k], lists[k]])), often, posters, canShare: isEditor(g.session.user, g.workspaceId) });
 }
 
 /**
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
   const b = (await readJson(request)) as Record<string, unknown> | null;
   const kind = b?.kind as ChoiceKind;
   if (!b || !CHOICE_KINDS.includes(kind)) return bad('kind must be hook, location or ending');
-  const f = await choiceFields(b, g.session.user);
+  const f = await choiceFields(b, g.session.user, g.workspaceId);
   if ('error' in f) return bad(f.error, f.status);
   const userId = g.session.user.id;
   const id = randomUUID();
@@ -91,14 +91,14 @@ export async function POST(request: Request) {
   try {
     await client.query('begin');
     await client.query(`select pg_advisory_xact_lock(hashtext('choices:' || $1))`, [userId]);
-    const count = (await client.query('select count(*)::int as n from user_choices where user_id = $1 and kind = $2 and not is_company', [userId, kind])).rows[0].n;
+    const count = (await client.query('select count(*)::int as n from user_choices where user_id = $1 and kind = $2 and not is_company', [userId, kind])).rows[0].n; // one limit across workspaces
     if (!f.isCompany && count >= MAX_CHOICES) {
       await client.query('rollback');
       return bad(`you can keep at most ${MAX_CHOICES} ${kind}s; delete one first`, 409);
     }
     await client.query(
-      'insert into user_choices (id, user_id, kind, name, phrase, description, is_company, store_id, niche, image_asset_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-      [id, userId, kind, f.name, f.phrase, f.desc || null, f.isCompany, f.storeId, f.niche, f.imageAssetId],
+      'insert into user_choices (id, user_id, kind, name, phrase, description, is_company, store_id, niche, image_asset_id, workspace_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+      [id, userId, kind, f.name, f.phrase, f.desc || null, f.isCompany, f.storeId, f.niche, f.imageAssetId, g.workspaceId],
     );
     await client.query('commit');
   } catch (e) {
@@ -107,5 +107,5 @@ export async function POST(request: Request) {
   } finally {
     client.release();
   }
-  return Response.json(listedChoice((await pool.query(`${CHOICE_SQL} where c.id = $2`, [userId, id])).rows[0]), { status: 201 });
+  return Response.json(listedChoice((await pool.query(`${CHOICE_SQL} where c.id = $2 and c.workspace_id = $3`, [userId, id, g.workspaceId])).rows[0]), { status: 201 });
 }

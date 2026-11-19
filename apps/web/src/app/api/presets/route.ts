@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (g.error) return g.error;
   const feature = presetFeature(new URL(request.url).searchParams.get('feature'));
   if (!feature) return bad('feature must be video or image');
-  const canEdit = isEditor(g.session.user);
+  const canEdit = isEditor(g.session.user, g.workspaceId);
   const { rows } = await pool.query(
     canEdit
       ? 'select id, label, prompt, enabled, sort_order as "sortOrder", "group" from presets where feature = $1 order by sort_order, id'

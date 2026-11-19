@@ -7,7 +7,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
-  const found = await readableAsset(g.session, id);
+  const found = await readableAsset(g.session, g.workspaceId, id);
   if (found.error) return found.error;
   const { asset } = found;
   const t = signDownloadToken(asset.id, g.session.user.id);

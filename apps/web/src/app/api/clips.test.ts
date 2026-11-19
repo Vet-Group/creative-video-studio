@@ -1055,21 +1055,21 @@ describe('bestClips', () => {
     await pool.query(`update jobs set deleted_at = now() where id = $1`, [deleted]);
     await pool.query(`update jobs set is_mock = true where id = $1`, [mock]);
     await pool.query('insert into favorites (user_id, job_id) values ($1, $2), ($3, $2)', [alice.id, unmarked, bob.id]); // favourites alone do not qualify
-    expect((await bestClips()).get('best-video')).toEqual({ video: `/api/assets/${newer}-video/content`, poster: `/api/assets/${newer}-poster/thumb` });
+    expect((await bestClips('ws_vet')).get('best-video')).toEqual({ video: `/api/assets/${newer}-video/content`, poster: `/api/assets/${newer}-poster/thumb` });
     await pool.query('insert into favorites (user_id, job_id) values ($1, $2)', [bob.id, old]);
-    expect((await bestClips()).get('best-video')?.video).toBe(`/api/assets/${old}-video/content`); // the favourite outranks the newer one
+    expect((await bestClips('ws_vet')).get('best-video')?.video).toBe(`/api/assets/${old}-video/content`); // the favourite outranks the newer one
     await pool.query(`update verdicts set featured = true where job_id = $1`, [newer]);
-    expect((await bestClips()).get('best-video')?.video).toBe(`/api/assets/${newer}-video/content`); // a featured Pass outranks favourites
+    expect((await bestClips('ws_vet')).get('best-video')?.video).toBe(`/api/assets/${newer}-video/content`); // a featured Pass outranks favourites
 
     const image = await clip(alice.id, { model: 'best-image' });
     await pool.query(`update jobs set feature = 'image' where id = $1`, [image]);
     await pool.query(`update assets set mime = 'image/png' where id = $1`, [`${image}-video`]);
     await mark(image, 'pass');
     await clip(alice.id, { model: 'best-none' });
-    const best = await bestClips();
+    const best = await bestClips('ws_vet');
     expect(best.get('best-image')).toEqual({ video: null, poster: `/api/assets/${image}-poster/thumb` }); // an image's preview
     expect(best.has('best-none')).toBe(false);
     await pool.query('update jobs set poster_asset_id = null where id = $1', [image]); // an image from before previews shows itself
-    expect((await bestClips()).get('best-image')).toEqual({ video: null, poster: `/api/assets/${image}-video/thumb` });
+    expect((await bestClips('ws_vet')).get('best-image')).toEqual({ video: null, poster: `/api/assets/${image}-video/thumb` });
   });
 });
