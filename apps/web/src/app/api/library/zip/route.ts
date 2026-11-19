@@ -1,10 +1,11 @@
+import { crc32 } from 'node:zlib';
 import { itemLabel } from '@/lib/apps';
 import { pool } from '@/lib/auth';
 import { downloadName, extensionOf, ICT_DAY, LIVE_CLIP } from '@/lib/clips';
 import { signDownloadToken, verifyDownloadToken } from '@/lib/download-token';
 import { guard } from '@/lib/session';
 import { getObject } from '@/lib/storage';
-import { ZIP32_LIMIT, zipStream } from '@/lib/zip';
+import { uniqueName, ZIP32_LIMIT, zipStream } from '@/lib/zip';
 import { readJson } from '@/lib/assets';
 
 const MAX_IDS = 50;
@@ -56,14 +57,11 @@ export async function GET(request: Request) {
   if (found.error) return found.error;
   const taken = new Set<string>();
   const entries = found.rows.map((r) => {
-    const base = downloadName(r.day, r.name, r.id, r.mime.startsWith('image/') ? safeExtension(r.filename) : 'mp4', itemLabel(r.params));
-    let name = base;
-    for (let n = 2; taken.has(name); n++) name = base.replace(/(\.[^.]*)?$/, `-${n}$1`);
-    taken.add(name);
+    const name = uniqueName(taken, downloadName(r.day, r.name, r.id, r.mime.startsWith('image/') ? safeExtension(r.filename) : 'mp4', itemLabel(r.params)));
     return { name, bytes: Number(r.bytes), open: () => getObject(r.s3_key) };
   });
   const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()).replaceAll('-', '');
-  return new Response(zipStream(entries), {
+  return new Response(zipStream(entries, new Date(), crc32), {
     headers: {
       'content-type': 'application/zip',
       'content-disposition': `attachment; filename="cvs-${day}-${entries.length}.zip"`,

@@ -2,7 +2,7 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameOk, nameSwapPrompt, parseNames, PET_STYLES, petPortraitPrompt, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, parseNames, PET_STYLES, petPortraitPrompt, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -318,6 +318,24 @@ describe('Đổi tên hàng loạt', () => {
     expect(appReason(app, d(many(5), 5))).toBeNull();
     expect(appReason(app, d(many(5), 6))).toBe('Tối đa 25 ảnh mỗi lần chạy, đang là 30: bớt tên hoặc giống chó.');
     expect(appReason(app, d('Max 🐶', 1))).toMatch(/^Tên "Max 🐶"/);
+  });
+
+  it("picks a CSV's column of names: a pet's name first, then one called name or tên, then one with either in it, else the first", () => {
+    expect(nameColumn(['Name', 'Email', 'Lineitem name', 'Pet Name'])).toBe(3); // a Shopify export's Name is the order number
+    expect(nameColumn(['Order', "Pet's name (engraving)"])).toBe(1);
+    expect(nameColumn(['Mã đơn', 'Tên thú cưng'])).toBe(1);
+    expect(nameColumn(['Email', ' NAME ', 'Billing Name'])).toBe(1);
+    expect(nameColumn(['Mã đơn', 'Tên'])).toBe(1);
+    expect(nameColumn(['Order', 'Billing Name'])).toBe(1);
+    expect(nameColumn(['Order', 'Email'])).toBe(0);
+  });
+
+  it("takes a CSV column's names through the box's rules: cleaned, blanks and repeats dropped, bad ones listed, the first 25 kept", () => {
+    const rows = [['Name', 'Pet Name'], ['#1001', ' Max '], ['#1002', ''], ['#1003', 'Max'], ['#1004', 'Mary\nJane'], ['#1005', 'Max 🐶'], ['#1006', 'Nguyễn Ánh'], ['#1007']];
+    expect(csvNames(rows, 1)).toEqual({ names: ['Max', 'Mary Jane', 'Nguyễn Ánh'], invalid: ['Max 🐶'], over: 0 });
+    expect(csvNames(rows, 0)).toEqual({ names: [], invalid: ['#1001', '#1002', '#1003', '#1004', '#1005', '#1006', '#1007'], over: 0 });
+    const many = [['Pet Name'], ...Array.from({ length: 30 }, (_, i) => [`Dog ${i + 1}`])];
+    expect(csvNames(many, 0)).toEqual({ names: Array.from({ length: 25 }, (_, i) => `Dog ${i + 1}`), invalid: [], over: 5 });
   });
 
   it('writes one English prompt per name that swaps only the name, and with a breed the dog too', () => {

@@ -1,20 +1,27 @@
 import { readFileSync } from 'node:fs';
+import { createPool } from '@cvs/db/client';
 import { expect, type Page, test } from '@playwright/test';
-import { modelButton, png, signIn } from './support.test';
+import sharp from 'sharp';
+import { DOG_BREEDS } from '../src/lib/apps';
+import { jpg, modelButton, openTab, png, signIn } from './support.test';
+import { USERS } from './users';
 
 const runButton = (page: Page) => page.getByRole('button', { name: /^Chạy/ });
 const history = (page: Page) => page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
 const card = (page: Page, title: string) => history(page).locator('li.job-card').filter({ has: page.getByRole('heading', { name: title, level: 3 }) });
 
-/** The entry names of a zip, read through its central directory. */
-function zipNames(zip: Buffer): string[] {
+/** The entries of a STORE zip (names and bytes), read through its central directory. */
+function zipEntries(zip: Buffer): { name: string; data: Buffer }[] {
   const end = zip.length - 22;
   let p = zip.readUInt32LE(end + 16);
   return Array.from({ length: zip.readUInt16LE(end + 10) }, () => {
     const n = zip.readUInt16LE(p + 28);
     const name = zip.subarray(p + 46, p + 46 + n).toString('utf8');
+    const local = zip.readUInt32LE(p + 42);
+    const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
+    const data = zip.subarray(start, start + zip.readUInt32LE(p + 24));
     p += 46 + n + zip.readUInt16LE(p + 30) + zip.readUInt16LE(p + 32);
-    return name;
+    return { name, data };
   });
 }
 
@@ -41,7 +48,7 @@ test('a breed swap batch downloads as a ZIP named by breed, and Xoá nền on a 
   await history(page).getByRole('button', { name: 'Chọn', exact: true }).click();
   for (const breed of ['Golden Retriever', 'Pug']) await history(page).getByRole('checkbox', { name: new RegExp(`^Chọn Đổi giống chó · ${breed} `) }).check();
   const [download] = await Promise.all([page.waitForEvent('download'), history(page).getByRole('button', { name: 'Tải xuống .zip' }).click()]);
-  const names = zipNames(readFileSync((await download.path())!)).sort();
+  const names = zipEntries(readFileSync((await download.path())!)).map((e) => e.name).sort();
   expect(names).toHaveLength(2);
   expect(names[0]).toMatch(/^\d{8}-e2e-tools-a-golden-retriever-[\w-]{8}\.(png|jpg|webp)$/);
   expect(names[1]).toMatch(/^\d{8}-e2e-tools-a-pug-[\w-]{8}\.(png|jpg|webp)$/);
@@ -107,4 +114,79 @@ test('the listing preset makes a 2048 px square JPEG with the whole image on whi
   // Off again, the size picked returns.
   await preset.click();
   await expect(page.getByLabel('Chiều rộng (px)')).toHaveValue('400');
+});
+
+test('the listing preset takes several images and makes one .zip of 2048 px square JPEGs, a repeated name with -2', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'toolsc');
+  await page.goto('/apps/media-optimizer');
+  const input = page.getByLabel('Ảnh cần tối ưu');
+  await expect(input).toBeEnabled();
+  const preset = page.getByRole('button', { name: 'Ảnh listing Etsy/Shopify' });
+  await preset.click();
+  await input.setInputFiles([
+    { name: 'shirt.png', mimeType: 'image/png', buffer: png() },
+    { name: 'shirt.jpg', mimeType: 'image/jpeg', buffer: jpg() },
+  ]);
+  const slot = page.getByRole('group', { name: 'Ảnh', exact: true });
+  await expect(slot.getByRole('img')).toHaveCount(2);
+  await expect(page.getByText('2 ảnh · ', { exact: false })).toContainText('Chạy để tạo một tệp .zip gồm 2 ảnh listing.');
+  await runButton(page).click();
+  const results = page.getByRole('complementary', { name: 'Kết quả trong phiên này' });
+  const link = results.getByRole('link', { name: 'Tải xuống .zip' });
+  await expect(link).toHaveAttribute('download', 'listing-2-anh.zip');
+  await expect(results).toContainText('2 ảnh JPG');
+  await expect(runButton(page)).toBeEnabled(); // the form is free again for the next Run
+  const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);
+  const entries = zipEntries(readFileSync((await download.path())!));
+  expect(entries.map((e) => e.name)).toEqual(['shirt-listing.jpg', 'shirt-listing-2.jpg']);
+  for (const e of entries) expect(await sharp(e.data).metadata()).toMatchObject({ format: 'jpeg', width: 2048, height: 2048 });
+
+  // Without the preset a Run makes one image again: the other leaves the slot.
+  await preset.click();
+  await expect(slot.getByRole('img')).toHaveCount(1);
+  await expect(page.getByText('Đã bỏ 1 ảnh thêm: không dùng mẫu listing thì mỗi lần chạy xử lý một ảnh.')).toBeVisible();
+});
+
+// A Run of 22 jobs, seeded straight into the e2e database (serve.ts's), is more than the 20 latest jobs History loads; "Chọn cả lô" still picks all 22.
+test.describe('a Run of more than 20 jobs', () => {
+  const url = new URL(process.env.DATABASE_URL!);
+  url.pathname = `/${process.env.CVS_E2E_DB ?? 'cvs_e2e'}`;
+  const db = createPool(url.toString(), 2);
+  const batch = '5b3f7c1e-2d4a-4e6b-8c9d-0e1f2a3b4c5d';
+  const ids = Array.from({ length: 22 }, (_, i) => `bigrun-${i}`);
+
+  test.beforeAll(async () => {
+    const user = (await db.query('select id from users where email = $1', [USERS.toolsd.email])).rows[0].id as string;
+    await db.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('bigrun-in', $1, 'input', 'bigrun/in', 'in.png', 'image/png', 10, 'ws_vet')`, [user]);
+    for (const [i, id] of ids.entries()) {
+      await db.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'output', $3, 'out.png', 'image/png', 10, 'ws_vet')`, [`${id}-out`, user, `bigrun/${id}`]);
+      // Long ago, so no other spec's Library or today's figures move while they exist.
+      await db.query(
+        `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, params, status, output_asset_id, is_mock, created_at, finished_at, workspace_id)
+         values ($1, $2, 'team-unassigned', 'breed_swap', 'mock-breeds-e2e', 'mock', 'p', 'auto', 0, '{bigrun-in}', $3, 'succeeded', $4, true, $5, $5, 'ws_vet')`,
+        [id, user, { resolution: '1K', breed: DOG_BREEDS[i], batch }, `${id}-out`, new Date(Date.UTC(2020, 0, 1, 0, 0, i)).toISOString()],
+      );
+    }
+  });
+
+  test.afterAll(async () => {
+    try {
+      await db.query('delete from jobs where id = any($1)', [ids]);
+      await db.query('delete from assets where id = any($1)', [[...ids.map((id) => `${id}-out`), 'bigrun-in']]);
+    } finally {
+      await db.end();
+    }
+  });
+
+  test('"Chọn cả lô" picks every result of the Run, not only the 20 History shows', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'toolsd');
+    await page.goto('/apps/breed-swap');
+    await openTab(page, 'Lịch sử');
+    await expect(history(page).locator('li.job-card')).toHaveCount(20);
+    await card(page, `Đổi giống chó · ${DOG_BREEDS[21]}`).getByRole('button', { name: 'Chọn cả lô' }).click();
+    await expect(history(page).getByRole('group', { name: 'Tải nhiều mục' })).toContainText('Đã chọn 22');
+    await expect(history(page).getByRole('checkbox', { checked: true })).toHaveCount(20);
+  });
 });

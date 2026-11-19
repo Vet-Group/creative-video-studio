@@ -867,13 +867,17 @@ describe('GET /api/jobs/:id', () => {
 
   test('gives the creator the items of every job of a batch app Run, in the order sent, and anyone else only the job itself', async () => {
     const batch = '0c8a7a0e-9d6e-4a54-8a39-6d1c4c7f2b10';
-    const item = async (params: Record<string, string>, at: string, o: { status?: string; deleted?: boolean; feature?: string; userId?: string } = {}) => {
-      const id = await clip(o.userId ?? alice.id, { status: o.status, createdAt: at });
+    // The jobs added for the results run on a model of their own, so the model scores read later in this file stay as they were.
+    await pool.query(`insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('batch-test', 'fal', 'x', 'Batch test', '{9:16}', '{8}', 2, '720p', 0.2, '{}', false)`);
+    const item = async (params: Record<string, string>, at: string, o: { status?: string; deleted?: boolean; feature?: string; userId?: string; model?: string } = {}) => {
+      const id = await clip(o.userId ?? alice.id, { status: o.status, createdAt: at, model: o.model });
       await pool.query(`update jobs set feature = $2, params = $3, deleted_at = case when $4 then now() end where id = $1`, [id, o.feature ?? 'name_swap', { resolution: '1K', ...params }, o.deleted ?? false]);
       return id;
     };
     const max = await item({ name: 'Max', breed: 'Pug', batch }, '2026-11-19T01:00:00Z');
-    await item({ name: 'Bella', breed: 'Pug', batch }, '2026-11-19T01:00:01Z', { status: 'failed' }); // a failed one is part of the Run
+    const bella = await item({ name: 'Bella', breed: 'Pug', batch }, '2026-11-19T01:00:01Z', { status: 'failed' }); // a failed one is part of the Run
+    const rio = await item({ name: 'Rio', breed: 'Pug', batch }, '2026-11-19T01:00:01.5Z', { model: 'batch-test' });
+    await pool.query('update jobs set purged_at = now() where id = $1', [rio]); // its result is gone
     await item({ name: 'Luna', breed: 'Pug', batch }, '2026-11-19T01:00:02Z', { deleted: true }); // a deleted one is not
     await item({ name: 'Coco', batch: '0c8a7a0e-9d6e-4a54-8a39-6d1c4c7f2b11' }, '2026-11-19T01:00:03Z'); // another Run
     await item({ style: 'oil', batch }, '2026-11-19T01:00:04Z', { feature: 'pet_portrait' }); // another app
@@ -881,9 +885,16 @@ describe('GET /api/jobs/:id', () => {
     const own = (await (await detail(alice.cookie, max)).json()) as { name: string; breed: string; batchItems: unknown };
     expect([own.name, own.breed]).toEqual(['Max', 'Pug']);
     expect(own.batchItems).toEqual([
-      { view: null, breed: 'Pug', style: null, product: null, name: 'Max' },
-      { view: null, breed: 'Pug', style: null, product: null, name: 'Bella' },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Max', id: max, status: 'succeeded', outputAssetId: `${max}-video` },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Bella', id: bella, status: 'failed', outputAssetId: null },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Rio', id: rio, status: 'succeeded', outputAssetId: null },
     ]);
+    // A Run of more than the 20 jobs History loads: every one, for the select-the-Run button.
+    const big = '0c8a7a0e-9d6e-4a54-8a39-6d1c4c7f2b12';
+    const all = [];
+    for (let i = 0; i < 22; i++) all.push(await item({ breed: 'Pug', batch: big }, `2026-11-19T02:00:${String(i).padStart(2, '0')}Z`, { feature: 'breed_swap', model: 'batch-test' }));
+    const run = (await (await detail(alice.cookie, all[21]!)).json()) as { batchItems: { id: string; outputAssetId: string }[] };
+    expect(run.batchItems.map((b) => [b.id, b.outputAssetId])).toEqual(all.map((id) => [id, `${id}-video`]));
     expect(await (await detail(bob.cookie, max)).json()).toMatchObject({ name: 'Max', breed: 'Pug', batchItems: null });
     expect(await (await detail(admin.cookie, max)).json()).toMatchObject({ batchItems: null });
   });

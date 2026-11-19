@@ -16,6 +16,7 @@ import { cardSample, GALLERY_SAMPLES } from '@/lib/examples';
 import { sampleThumb, useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
+import { CsvNames } from './CsvNames';
 import { Icon, type IconName } from './Icon';
 import { copyError, copySamples, FormNotice, Gallery, type Img, PhotoDialog, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, useApplier, useJobs } from './jobs';
@@ -388,6 +389,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                 <p id={namesHelpId} className="help">
                   Tối đa {MAX_BATCH} tên, mỗi tên tối đa {MAX_NAME} ký tự: chữ cái (có dấu), chữ số, khoảng trắng, dấu nháy đơn và gạch nối. Tên trùng chỉ tạo một lần.
                 </p>
+                <CsvNames disabled={busy} onNames={setNames} />
               </div>
             )}
 

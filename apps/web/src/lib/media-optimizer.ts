@@ -45,6 +45,8 @@ export function outputSizeText(original: number, output: number): string {
 
 /** The listing preset (Etsy, Shopify): a square JPEG of this side with the whole image on white. */
 export const LISTING_SIDE = 2048;
+/** The most images the listing preset takes at once; two or more come back as one .zip. */
+export const MAX_LISTING_IMAGES = 50;
 
 /** Where an image of `width` × `height` lands when fitted whole and centred in a `boxWidth` × `boxHeight` box; the rest is padding. */
 export function fitRect(width: number, height: number, boxWidth: number, boxHeight: number) {

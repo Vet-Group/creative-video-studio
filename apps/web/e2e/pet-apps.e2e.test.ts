@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { mockupPrompt, nameSwapPrompt, petPortraitPrompt } from '../src/lib/apps';
-import { modelButton, png, signIn } from './support.test';
+import { modelButton, png, select, selectText, signIn } from './support.test';
 
 // The pet apps: one picture in, one job per item picked (a style, a product, a name or a name and breed), each with the prompt its item makes,
 // all of one Run sharing one batch id, which History's select-the-batch button and Reuse read back.
@@ -164,4 +164,36 @@ test('name swap: checks the names, prices names times breeds, runs one job per n
   await expect(names).toHaveValue('Max\nNguyễn Ánh');
   await expect(breeds.getByRole('checkbox', { name: 'Pug' })).toBeChecked();
   await expect(breeds.getByRole('checkbox', { name: 'Beagle' })).not.toBeChecked();
+});
+
+test('name swap: fills the names from a CSV file, the pet name column first, through the rules of the box', async ({ page }) => {
+  await signIn(page, 'namesb');
+  await openApp(page, 'Đổi tên hàng loạt', 'name-swap');
+  await page.getByLabel('Ảnh thiết kế có tên').setInputFiles({ name: 'named.png', mimeType: 'image/png', buffer: png() });
+  const names = page.getByLabel('Tên mới, mỗi dòng một tên');
+  await names.fill('Old');
+  const csvFile = page.getByLabel('Tệp CSV chứa tên');
+  const note = page.getByRole('status').filter({ hasText: 'Đã lấy' });
+
+  // An export with a byte order mark, CRLF, quoted fields with a comma or a line break, a repeat, a blank and a value that is no name.
+  const csv = '﻿Name,Email,Pet Name\r\n#1001,a@e2e.test,Max\r\n#1002,b@e2e.test,"Bella"\r\n#1003,c@e2e.test,Max\r\n#1004,d@e2e.test,"Max 🐶, the dog"\r\n#1005,e@e2e.test,\r\n#1006,f@e2e.test,"Nguyễn\r\nÁnh"\r\n';
+  await csvFile.setInputFiles({ name: 'orders.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await expect(select(page, 'Cột chứa tên')).toContainText('Pet Name');
+  await expect(names).toHaveValue('Max\nBella\nNguyễn Ánh');
+  await expect(note).toHaveText('Đã lấy 3 tên từ cột “Pet Name” của orders.csv. Bỏ qua 1 giá trị không hợp lệ: "Max 🐶, the dog".');
+  await pickModel(page, /Mock pets priced/);
+  await expect(cost(page)).toHaveText('3 ảnh × $0.1500 = $0.4500');
+
+  // Another column: order numbers are no names, so the box empties and the note says why.
+  await selectText(page, 'Cột chứa tên', 'Name');
+  await expect(names).toHaveValue('');
+  await expect(note).toHaveText('Đã lấy 0 tên từ cột “Name” của orders.csv. Bỏ qua 6 giá trị không hợp lệ: "#1001", "#1002", "#1003"….');
+  await expect(reason(page)).toHaveText('Nhập ít nhất một tên.');
+
+  // More than 25 names: the first 25 are kept.
+  const many = ['Pet Name', ...Array.from({ length: 30 }, (_, i) => `Dog ${i + 1}`)].join('\n');
+  await csvFile.setInputFiles({ name: 'many.csv', mimeType: 'text/csv', buffer: Buffer.from(many) });
+  await expect(names).toHaveValue(Array.from({ length: 25 }, (_, i) => `Dog ${i + 1}`).join('\n'));
+  await expect(note).toHaveText('Đã lấy 25 tên từ cột “Pet Name” của many.csv. Chỉ giữ 25 tên đầu, bỏ 5 tên còn lại.');
+  await expect(cost(page)).toHaveText('25 ảnh × $0.1500 = $3.7500');
 });

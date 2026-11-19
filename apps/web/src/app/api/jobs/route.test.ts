@@ -757,6 +757,7 @@ describe('POST /api/jobs for an image feature', () => {
     });
 
     const BATCH = '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11';
+    const BLANK_RUN = '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a12';
     /** One member's Runs of `feature` on its model: each sends the first `count` of the member's photo and `n - 1` more, and returns the response and the stored job with its workspace. */
     async function runner(feature: string, n = 1) {
       const m = await newMember();
@@ -797,8 +798,47 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await post({ ...mug, prompt: mockupPrompt('tshirt', true) }, 2)).error).toBe('the prompt must be the one the product makes');
       expect((await post({ ...mug, prompt: mockupPrompt('mug', true) }, 3)).error).toBe('the mockup pack takes the design and an optional blank product photo');
       expect(await post(mug, 1)).toMatchObject({ status: 201, job: { prompt: mockupPrompt('mug', false), params: { resolution: '1K', product: 'mug', batch: BATCH } } });
-      const blank = await post({ ...mug, prompt: mockupPrompt('mug', true) }, 2);
-      expect([blank.status, blank.job]).toEqual([201, { feature: 'mockup_pack', model: 'app-mockups', prompt: mockupPrompt('mug', true), aspect: 'auto', params: { resolution: '1K', product: 'mug', batch: BATCH }, workspace_id: 'ws_vet' }]);
+      const onBlank = { prompt: mockupPrompt('mug', true), params: { ...mug.params, batch: BLANK_RUN } };
+      const blank = await post(onBlank, 2);
+      expect([blank.status, blank.job]).toEqual([201, { feature: 'mockup_pack', model: 'app-mockups', prompt: mockupPrompt('mug', true), aspect: 'auto', params: { resolution: '1K', product: 'mug', batch: BLANK_RUN }, workspace_id: 'ws_vet' }]);
+    });
+
+    test('a mockup pack Run with a blank product photo makes one product: a second job is refused, and so is a blank-photo job in a Run that has one', async () => {
+      const post = await runner('mockup_pack', 2);
+      const oneProduct = 'with a blank product photo the mockup pack makes one product per Run';
+      const job = (product: string, blank: boolean, batch: string) => ({ prompt: mockupPrompt(product, blank), params: { resolution: '1K', product, batch } });
+      expect((await post(job('mug', true, BLANK_RUN), 2)).status).toBe(201);
+      expect(await post(job('tshirt', true, BLANK_RUN), 2)).toMatchObject({ status: 400, error: oneProduct });
+      expect(await post(job('tshirt', false, BLANK_RUN), 1)).toMatchObject({ status: 400, error: oneProduct });
+      // A Run of products in their scenes takes several, but no blank-photo job after its first.
+      expect((await post(job('mug', false, BATCH), 1)).status).toBe(201);
+      expect((await post(job('canvas', false, BATCH), 1)).status).toBe(201);
+      expect(await post(job('tshirt', true, BATCH), 2)).toMatchObject({ status: 400, error: oneProduct });
+    });
+
+    test("a Run takes at most 25 jobs, also sent at once, and only the member's own jobs of this workspace with its id count", async () => {
+      const m = await newMember();
+      const send = (name: string, batch: string) =>
+        run(m.cookie, { assetIds: [m.asset], modelId: 'app-names', feature: 'name_swap', ratio: 'auto', prompt: nameSwapPrompt(name), params: { resolution: '1K', name, batch } });
+      const tooMany = 'a Run (params.batch) takes at most 25 jobs';
+      // Another member's 25 jobs and the member's own 25 in another workspace, with the same id, are not this Run's.
+      const other = await newMember();
+      await pool.query(`insert into workspaces (id, name) values ('ws_batch', 'Batch elsewhere')`);
+      await pool.query(
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, params, workspace_id)
+         select 'batch-' || w.user_id || '-' || n, w.user_id, 'team-unassigned', 'app-names', 'mock', 'p', 'auto', 0, '{}', 'name_swap', 'succeeded', jsonb_build_object('resolution', '1K', 'batch', $3::text), w.ws
+           from (values ($1, 'ws_vet'), ($2, 'ws_batch')) as w(user_id, ws) cross join generate_series(1, 25) n`,
+        [other.id, m.id, BATCH],
+      );
+      for (let i = 1; i <= 25; i++) expect([i, (await send(`Dog ${i}`, BATCH)).status]).toEqual([i, 201]);
+      const late = await send('Dog 26', BATCH);
+      expect([late.status, await error(late)]).toEqual([400, tooMany]);
+      // 30 jobs of a new Run sent at once: the count is taken under the lock, so 25 pass.
+      const atOnce = '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a13';
+      const all = await Promise.all(Array.from({ length: 30 }, (_, i) => send(`Pup ${i + 1}`, atOnce)));
+      expect(all.map((r) => r.status).sort()).toEqual([...Array<number>(25).fill(201), ...Array<number>(5).fill(400)]);
+      expect(new Set(await Promise.all(all.filter((r) => r.status === 400).map(error)))).toEqual(new Set([tooMany]));
+      expect((await pool.query(`select count(*)::int as n from jobs where user_id = $1 and workspace_id = 'ws_vet' and params->>'batch' = $2`, [m.id, atOnce])).rows[0].n).toBe(25);
     });
 
     test('the name swap app takes one clean name of letters, digits, spaces, apostrophes and hyphens per job, an optional known breed, and exactly the prompt they make', async () => {
