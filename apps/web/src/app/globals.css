@@ -246,6 +246,8 @@ h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
 p { margin: .25rem 0; }
 a { color: var(--link); }
 button, .button { font: inherit; padding: .45rem .8rem; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
+/* A textarea takes the page's font, not the browser's monospace default; each form's own rule still sets its size. */
+textarea { font: inherit; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 button[aria-pressed='true'] { background: var(--fill); border-color: var(--ink); }
 button.primary { background: var(--brand); border-color: var(--brand); color: var(--on-dark); margin-top: .5rem; }
@@ -1022,6 +1024,8 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .template-list li a::before { content: ''; position: absolute; inset: 0; } /* the whole row opens the template; its Delete button stays on top */
 .template-list li button { position: relative; }
 .choice-dialog input:not([type]) { width: 100%; height: 40px; margin: 6px 0 12px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+/* The store brand kit's style box (BrandKit.tsx), sized and bordered as the dialog's text inputs. */
+.brand-kit textarea { display: block; width: 100%; margin: 6px 0 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; }
 .template-share { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 14px; }
 .template-share input { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width pushed the box away from its text */
 .field-label { margin: 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 500; }
