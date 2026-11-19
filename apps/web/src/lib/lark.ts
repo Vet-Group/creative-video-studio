@@ -2,6 +2,7 @@
 // UNVERIFIED against a live tenant: the endpoints, the JSON token request, the PKCE parameters, the scope name and the user_info fields
 // (`tenant_key`, `enterprise_email`, `open_id`) follow Lark's published docs only. The D.5-lark live check is what verifies them.
 import type { Queryable } from '@cvs/core/ledger';
+import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { APIError } from 'better-auth/api';
 import type { GenericOAuthConfig } from 'better-auth/plugins/generic-oauth';
 import { rememberLarkEmail } from './account-audit';
@@ -76,5 +77,17 @@ export function refuseLikelyDuplicate(q: Queryable) {
     if ((rows as { name: string }[]).some((r) => personName(r.name) === name)) {
       throw new APIError('FORBIDDEN', { code: 'lark_account_not_linked', message: 'A user with this name already exists; link Lark from their account' });
     }
+  };
+}
+
+/**
+ * databaseHooks.user.create.after: a user a Lark sign-in auto-provisions joins the company workspace (docs/WORKSPACES.md §4). Only the OAuth callback
+ * creates users this way and Lark's is gated to the company's tenant (Google has disableSignUp), so a user an Admin or a workspace owner creates passes
+ * through this hook without joining: they join the workspace they are created in.
+ */
+export function joinCompanyWorkspace(q: Queryable) {
+  return async (user: { id: string }, ctx?: { path?: string } | null) => {
+    if (!ctx?.path?.startsWith('/callback/')) return;
+    await q.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'member') on conflict do nothing`, [COMPANY_WORKSPACE_ID, user.id]);
   };
 }

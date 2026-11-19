@@ -80,6 +80,8 @@ describe('Lark sign-in', () => {
 
   test('auto-provisions a new member in the seeded team for an unknown enterprise email', async () => {
     const ref = await user('ref@example.test');
+    // Lark's provisioning path files the user under the company workspace by itself, without the test database's trigger (docs/WORKSPACES.md §4).
+    await pool.query('drop trigger test_company_member on users');
     const refTeam = (await pool.query('select team_id from users where id = $1', [ref])).rows[0].team_id;
     const users = await count('users');
     const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'newbie@example.test', name: 'Trần  Minh Nhật - Seller' }) });
@@ -91,6 +93,8 @@ describe('Lark sign-in', () => {
     expect(row).toEqual({ email: 'newbie@example.test', name: 'Trần Minh Nhật', role: 'member', team_id: refTeam, email_verified: true });
     // Lark-only: an auto-provisioned account has no password credential.
     expect((await pool.query(`select provider_id from accounts where user_id = $1`, [newId])).rows).toEqual([{ provider_id: 'lark' }]);
+    expect((await pool.query('select workspace_id, role from workspace_members where user_id = $1', [newId])).rows).toEqual([{ workspace_id: 'ws_vet', role: 'member' }]);
+    await pool.query('create trigger test_company_member after insert on users for each row execute function test_company_member()');
   });
 
   test('a repeat Lark sign-in reuses the provisioned user and creates no duplicate', async () => {

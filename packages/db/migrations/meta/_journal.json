@@ -750,6 +750,13 @@
 			"when": 1795900000000,
 			"tag": "0107_pet_pack",
 			"breakpoints": true
+		},
+		{
+			"idx": 107,
+			"version": "7",
+			"when": 1796000000000,
+			"tag": "0108_workspace_memberships",
+			"breakpoints": true
 		}
 	]
 }
