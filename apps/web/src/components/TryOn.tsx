@@ -8,6 +8,7 @@ import { tryOnPlaces, tryOnSlots } from '@/lib/reuse';
 import { confirmRun, sendRun } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { parseFashionTraits } from '@/lib/fashion-model';
 import { usable } from '@/lib/fashion-models';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useRecall } from '@/lib/use-recall';
@@ -80,10 +81,15 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const reasonId = useId();
   const { models, failed } = useImageModels('try_on');
   const total = garments.length + person.length + background.length;
-  const pick = useImageChoice(models, Math.max(2, total));
+  // Without a model picked, the first one that takes the garments too (13 only on Nano Banana 2.1), so a long list is not judged by a 5-garment model.
+  const pick = useImageChoice(models, Math.max(2, total), '', (m) => garmentCap(m.id) >= garments.length);
   const { chosen } = pick;
   /** How many garments the chosen model takes (13 on Nano Banana 2.1, else 5); a switch to a lower cap keeps the photos and stops Run until some go. */
   const cap = garmentCap(chosen?.id);
+  /** How many the slot offers: the cap, within the model's image limit less the person and a background. */
+  const slotCap = chosen ? Math.max(1, Math.min(cap, chosen.maxImages - 1 - background.length)) : cap;
+  /** How many photos past the model's limit; when the background alone is that many, the reason names it, and garments only while one would stay. */
+  const overBy = chosen ? total - chosen.maxImages : 0;
   // The member's last model and settings, unless a refill opens the page.
   const recall = useRecall(
     'try_on',
@@ -135,8 +141,10 @@ export function TryOn({ reuse }: { reuse?: string }) {
                 ? `Mô hình này nhận tối đa ${cap} ảnh trang phục. Bỏ bớt ${garments.length - cap} ảnh để chạy.`
                 : person.length === 0
                   ? 'Tải lên ảnh người mẫu.'
-                  : total > chosen.maxImages
-                    ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh (người mẫu, trang phục và bối cảnh).`
+                  : overBy > 0
+                    ? background.length > 0 && overBy <= background.length
+                      ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh, tính cả ảnh bối cảnh. ${garments.length > overBy ? `Bỏ ảnh bối cảnh hoặc bớt ${overBy} ảnh trang phục` : 'Bỏ ảnh bối cảnh'} để chạy.`
+                      : `Mô hình này nhận tối đa ${chosen.maxImages} ảnh (người mẫu, trang phục và bối cảnh).`
                     : promptTooLong(chosen, tryOnPrompt(garments.length, background.length > 0, prompt, pose)?.length ?? 0);
   const canRun = reason === null && !busy;
   /** What the member may write: the model's limit less the image roles the prompt starts with. */
@@ -144,13 +152,13 @@ export function TryOn({ reuse }: { reuse?: string }) {
 
   /** A detail's photo in its slot, as Fash's clicks on a detail's inputs and its Use Result do. */
   async function take(p: Photo, role: PhotoRole, note?: string) {
-    if (role === 'garment' && garments.length >= cap) return notify(`Tối đa ${cap} ảnh trang phục`);
+    if (role === 'garment' && garments.length >= slotCap) return notify(`Tối đa ${slotCap} ảnh trang phục`);
     setError('');
     try {
       const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
       if (role === 'model') setPerson([img]);
       else if (role === 'background') setBackground([img]);
-      else setGarments((cur) => (cur.length < cap ? [...cur, img] : cur));
+      else setGarments((cur) => (cur.length < slotCap ? [...cur, img] : cur));
       notify(note ?? (role === 'model' ? 'Đã dùng ảnh người mẫu' : role === 'background' ? 'Đã chọn bối cảnh' : 'Đã thêm trang phục'));
     } catch (e) {
       setError(copyError(e, UPLOAD_ERROR));
@@ -205,18 +213,23 @@ export function TryOn({ reuse }: { reuse?: string }) {
   /** The pose step: after a model in the picker (`picker.of`: a pick takes that model too) or from the Model slot's chip (the photo in the slot: a pick sets the pose only). */
   const posing = picker?.role === 'pose' || (picker?.role === 'model' && picker.of !== undefined);
   const inSlot = picker?.role === 'pose' ? person[0] : undefined;
-  // The chip's previews are of the portrait's gender, else (an own photo) of the gender that has them.
-  const poseGender = picker?.role === 'pose' ? (portraitGender(inSlot?.filename ?? '') ?? (posesFor('woman').length > 0 ? 'woman' : 'man')) : portraitOf;
+  // The chip's previews are of the portrait's gender, or an AI model's, else (an own photo) of the gender that has them.
+  const aiGender = parseFashionTraits(aiModels.find((m) => m.assetId === inSlot?.id)?.traits)?.gender;
+  const poseGender = picker?.role === 'pose' ? (portraitGender(inSlot?.filename ?? '') ?? (aiGender === 'male' ? 'man' : aiGender === 'female' ? 'woman' : null) ?? (posesFor('woman').length > 0 ? 'woman' : 'man')) : portraitOf;
   const poseSrc = inSlot ? (inSlot.url ?? thumbUrl(inSlot.id)) : picker?.role === 'model' && picker.of ? sampleThumb(picker.of) : undefined;
   const choosePose = (value: string | null) => {
     setPose(value);
     if (picker?.role === 'model') void take({ sample: picker.of! }, 'model');
   };
-  // "Không chọn tư thế" first, as Fash's "No pose"; a stock model's own pose photos have no names, so no captions and no chosen mark.
+  // "Không chọn tư thế" first, as Fash's "No pose", then every pose: its picture on the model's gender, or its name until one is uploaded.
+  // A stock model's own pose photos have no names, so no captions and no chosen mark.
   const poseTiles = [
     { key: 'none', label: 'Không chọn tư thế', note: 'Bạn có thể tả tư thế trong ô Mô tả. (Tuỳ chọn)', pressed: poseGender ? pose === null : undefined, pick: () => choosePose(null) },
     ...(poseGender
-      ? posesFor(poseGender).map((p) => ({ key: p.value, src: sampleThumb(`try-on-pose-${poseGender}-${p.value}.jpg`), label: p.label, caption: p.label, pressed: pose === p.value, pick: () => choosePose(p.value) }))
+      ? POSES.map((p) => {
+          const file = `try-on-pose-${poseGender}-${p.value}.jpg`;
+          return { key: p.value, src: have.has(file) ? sampleThumb(file) : undefined, label: p.label, caption: p.label, pressed: pose === p.value, pick: () => choosePose(p.value) };
+        })
       : picker?.of ? posesOf(have, picker.of).map((name, i) => ({ key: name, src: sampleThumb(name), label: `Tư thế ${i + 1}`, pick: () => void take({ sample: name }, 'model') })) : []),
   ];
 
@@ -235,11 +248,12 @@ export function TryOn({ reuse }: { reuse?: string }) {
         <div className="card form-card" id="tryon-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'tryon-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <PageHint href="/try-on" />
-            <Slot label="Trang phục" empty={`Thêm 1 đến ${cap} ảnh trang phục`} inputLabel="Ảnh trang phục" images={garments} max={cap} count busy={busy} onAdd={add(setGarments, 'garment')} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onSample={addSample(setGarments, 'garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} onPick={(a) => setGarments((c) => (c.length < cap ? [...c, a] : c))} />
+            <Slot label="Trang phục" empty={slotCap === 1 ? 'Thêm 1 ảnh trang phục' : `Thêm 1 đến ${slotCap} ảnh trang phục`} inputLabel="Ảnh trang phục" images={garments} max={slotCap} count busy={busy} onAdd={add(setGarments, 'garment')} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onSample={addSample(setGarments, 'garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} onPick={(a) => setGarments((c) => (c.length < slotCap ? [...c, a] : c))} />
             <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson, 'model')} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson, 'model')} onBrowse={() => setPicker({ role: 'model' })} onPick={(a) => setPerson([a])} extra={(person.length > 0 || pose) && (
               // The pose beside the model photo, as Fash's "Hand on Hip x" chip; it opens the pose step's pictures for the photo in the slot.
+              // A click focuses it (Safari does not), so the closing dialog hands the focus back to it.
               <span className="pose-chip">
-                <button type="button" className="pose-trigger" data-value={pose ?? ''} aria-haspopup="dialog" onClick={() => setPicker({ role: 'pose' })}>
+                <button type="button" className="pose-trigger" data-value={pose ?? ''} aria-haspopup="dialog" onClick={(e) => (e.currentTarget.focus(), setPicker({ role: 'pose' }))}>
                   <Icon name="model" />
                   <span className="sr-only">Tư thế: </span>
                   <span className="pose-name">{poseOf(pose)?.label ?? 'Chọn tư thế'}</span>

@@ -670,11 +670,14 @@ describe('POST /api/jobs for an image feature', () => {
     expect(await jobCount()).toBe(before);
   });
 
-  test("takes up to 13 garments (Nano Banana 2.1's cap), numbered past nine, while the model's own image limit still holds the run", async () => {
+  test("takes up to 13 garments on Nano Banana 2.1 (and its Vertex twin), numbered past nine, 5 on any other model, while the model's own image limit still holds the run", async () => {
     const m = await newMember();
     const garments: string[] = [];
     for (let i = 1; i <= 14; i++) await insertAsset(`${m.id}-many-${i}`, m.id).then(() => garments.push(`${m.id}-many-${i}`));
-    const tryOn = (n: number, count = String(n)) => ({ feature: 'try_on', prompt: undefined, assetIds: [m.asset, ...garments.slice(0, n)], params: { resolution: '1K', garments: count } });
+    const tryOn = (n: number, count = String(n), modelId = 'nano-banana-2.1') => ({ modelId, feature: 'try_on', prompt: undefined, assetIds: [m.asset, ...garments.slice(0, n)], params: { resolution: '1K', garments: count } });
+    // The seeded Nano Banana 2.1 row takes 14 images (migration 0030); it is switched on for this test only.
+    const was = (await pool.query(`select enabled from model_configs where id = 'nano-banana-2.1'`)).rows[0].enabled as boolean;
+    await pool.query(`update model_configs set enabled = true where id = 'nano-banana-2.1'`);
     await pool.query(`update model_configs set max_images = 16 where id = 'img-pro'`);
     try {
       const res = await runImage(m, tryOn(13));
@@ -685,11 +688,15 @@ describe('POST /api/jobs for an image feature', () => {
       expect(await error(await runImage(m, tryOn(14)))).toMatch(/params.garments must count the garment images \(1 to 13\)/);
       expect(await error(await runImage(m, tryOn(10, '010')))).toMatch(/params.garments must count the garment images \(1 to 10\)/);
       expect(await error(await runImage(m, tryOn(10, '0')))).toMatch(/params.garments must count the garment images/);
+      // Any other model takes 5, even when its own image limit would take more.
+      expect(await error(await runImage(m, tryOn(6, '6', 'img-pro')))).toMatch(/params.garments must count the garment images \(1 to 5\)/);
       expect(await jobCount()).toBe(before);
+      expect((await runImage(m, tryOn(5, '5', 'img-pro'))).status).toBe(201);
     } finally {
       await pool.query(`update model_configs set max_images = 2 where id = 'img-pro'`);
+      await pool.query(`update model_configs set enabled = $1 where id = 'nano-banana-2.1'`, [was]);
     }
-    expect(await error(await runImage(m, tryOn(13)))).toMatch(/the model does not allow this ratio, resolution or number of images/); // 14 images on a model that takes 2
+    expect(await error(await runImage(m, tryOn(5, '5', 'img-pro')))).toMatch(/the model does not allow this ratio, resolution or number of images/); // 6 images on a model that takes 2
   });
 
   describe('the image apps', () => {

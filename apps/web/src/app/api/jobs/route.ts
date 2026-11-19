@@ -20,7 +20,7 @@ import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, M
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 import { getObject } from '@/lib/storage';
-import { MOST_GARMENTS, poseOf } from '@/lib/try-on-stock';
+import { garmentCap, poseOf } from '@/lib/try-on-stock';
 
 /** Create Video takes up to 9 images (the most a fal reference schema allows, as Fash offers); the model's max_images is checked under the lock. */
 const MAX_IMAGES = 9;
@@ -245,8 +245,8 @@ export async function POST(request: Request) {
       return bad(`params.endTextPos goes with params.endText and must be one of ${END_TEXT_POSITIONS.join(', ')}`);
     }
     if (given.script !== undefined && !advanced && !review) return bad('params.script is for Advanced and Review only');
-    // Up to 13 garments (Nano Banana 2.1's cap on the page); the model's own max_images still holds the whole run below.
-    const mostGarments = Math.min(MOST_GARMENTS, assetIds.length - 1);
+    // The model's garment cap (13 on Nano Banana 2.1, 5 elsewhere, as on the page); the model's own max_images still holds the whole run below.
+    const mostGarments = Math.min(garmentCap(modelId), assetIds.length - 1);
     if (given.garments !== undefined && !(/^[1-9]\d?$/.test(given.garments) && Number(given.garments) <= mostGarments)) {
       return bad(`params.garments must count the garment images (1 to ${mostGarments})`);
     }

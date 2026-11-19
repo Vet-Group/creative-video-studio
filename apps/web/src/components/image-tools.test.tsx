@@ -4,7 +4,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { Clip } from '@/lib/api';
 import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
 import { AudioSwitch } from './AudioSwitch';
-import { nearestOption, pastedImages, ProductTypeFilter, refillNote, shownType, shrinkImage, Slot, uploadImages } from './image-tools';
+import { garmentCap } from '@/lib/try-on-stock';
+import { type ImageModel, nearestOption, pastedImages, ProductTypeFilter, refillNote, shownType, shrinkImage, Slot, uploadImages, useImageChoice } from './image-tools';
 
 vi.mock('@/lib/media-optimizer', () => ({ decodeOptimizerImage: vi.fn(), optimizeImage: vi.fn() }));
 
@@ -20,6 +21,30 @@ test('a pick of 7 images goes up as 4 then 3, the most one POST /api/assets take
   const files = Array.from({ length: 7 }, (_, i) => new File(['x'], `ref-${i + 1}.png`, { type: 'image/png' }));
   expect((await uploadImages(files)).map((a) => a.id)).toEqual(files.map((f) => f.name));
   expect(sizes).toEqual([4, 3]);
+});
+
+test("with no model picked, Try On's garments count too: 13 go to Nano Banana 2.1 even past its image limit, not to the first 5-garment model, which stays pickable", () => {
+  const model = (id: string, maxImages: number, recommended = false) =>
+    ({ id, label: id, provider: 'fal', isMock: false, ratios: ['auto'], resolutions: ['1K'], prices: { '1K': '0.0400' }, maxImages, maxPromptChars: 5000, textToImage: false, thinking: [], thinkingPrices: {}, score: 0, recommended, isNew: false, creditUsd: null, creditShown: false, total: 0 }) satisfies ImageModel;
+  const models = [model('fashn', 16, true), model('nano-banana-pro', 14), model('nano-banana-2.1', 14)];
+  function Probe({ images, garments }: { images: number; garments: number }) {
+    const { chosen, options } = useImageChoice(models, images, '', (m) => garmentCap(m.id) >= garments);
+    return <p data-chosen={chosen?.id} data-supported={options.filter((o) => o.supported).map((o) => o.id).join(' ')} />;
+  }
+  const html = (images: number, garments: number) => renderToStaticMarkup(<Probe images={images} garments={garments} />);
+  expect(html(3, 2)).toContain('data-chosen="fashn" data-supported="fashn nano-banana-pro nano-banana-2.1"'); // the recommended one while it takes them
+  expect(html(14, 13)).toContain('data-chosen="nano-banana-2.1" data-supported="fashn nano-banana-pro nano-banana-2.1"'); // a pick of another says why it cannot run
+  expect(html(15, 13)).toContain('data-chosen="nano-banana-2.1" data-supported="fashn"'); // the background is the one too many: the form says so, on this model
+});
+
+test('a counted slot shows "3/13" and says "3 trên 13 ảnh trang phục" to a screen reader, as the slot group description', () => {
+  const images = [1, 2, 3].map((n) => ({ id: `g${n}`, filename: `g${n}.png` }));
+  const html = renderToStaticMarkup(<Slot label="Trang phục" empty="Thêm 1 đến 13 ảnh trang phục" inputLabel="Ảnh trang phục" images={images} max={13} count busy={false} onAdd={() => undefined} onRemove={() => undefined} />);
+  expect(html).toContain('<span aria-hidden="true">3/13</span>');
+  const id = /<span id="([^"]+)" class="sr-only">3 trên 13 ảnh trang phục<\/span>/.exec(html)?.[1];
+  expect(id).toBeDefined();
+  expect(html).toContain(`role="group" aria-labelledby=`);
+  expect(html).toContain(`aria-describedby="${id}"`);
 });
 
 test('an empty slot shows a picture by default and the icon it is given, as the plus on the Advanced wide slot', () => {

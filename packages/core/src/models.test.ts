@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { BAKEOFF_MODELS, estimateUsd, imagePricesFor, PROMPT_CEILING, promptLimit, usdPerSecondFor, usdPerSecondWithVideo, validateRequest } from './models';
+import { BAKEOFF_MODELS, estimateUsd, extraInputUsd, imagePricesFor, PROMPT_CEILING, promptLimit, usdPerSecondFor, usdPerSecondWithVideo, validateRequest } from './models';
 
 describe.each(BAKEOFF_MODELS)('$id', (model) => {
   const ok = { ratio: '9:16', durationSec: 5, imageCount: 1 };
@@ -69,6 +69,13 @@ test('an image job is priced at its thinking level, the default (first) level wh
   expect(imagePricesFor(row, 'medium')).toEqual(row.image_prices);
   expect(imagePricesFor(row, 'constructor')).toEqual(row.image_prices);
   expect(imagePricesFor({ ...row, thinking_levels: [], thinking_prices: null })).toEqual(row.image_prices);
+});
+
+describe('Nano Banana 2.1 input images (1,120 tokens each, read 2026-11-20)', () => {
+  test("Try On's 14 photos add 13 input images to the estimate on fal and on Vertex; one image adds nothing, and Pro adds nothing", () => {
+    expect([extraInputUsd('google/nano-banana-2.1/edit', 14), extraInputUsd('gemini-nano-banana-2.1', 14)]).toEqual([0.0257, 0.0218]);
+    expect([extraInputUsd('google/nano-banana-2.1/edit', 1), extraInputUsd('fal-ai/nano-banana-pro/edit', 14)]).toEqual([0, 0]);
+  });
 });
 
 describe('a reference video prices the Run (fal model pages, read 2026-11-06)', () => {

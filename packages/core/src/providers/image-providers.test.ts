@@ -59,6 +59,34 @@ describe('fal image submit', () => {
     expect((await bodyFor(req(nb21))).body).not.toHaveProperty('thinking_level');
   });
 
+  test("Try On's 14 photos on Nano Banana 2.1 (each about 400 KB once shrunk) go through fal storage, as inlined they pass the inline limit; 4 stay inlined", async () => {
+    // fal's storage and queue: each initiate gets its own file URL, each PUT succeeds, the submit returns a request id.
+    const storageFake = () => {
+      const calls: { url: string; body: unknown }[] = [];
+      let n = 0;
+      const fn = (async (url: string, init: RequestInit = {}) => {
+        calls.push({ url, body: typeof init.body === 'string' ? JSON.parse(init.body) : init.body });
+        if (url.startsWith('https://rest.fal.ai/storage/upload/initiate')) return Response.json({ upload_url: `https://upload.test/${++n}`, file_url: `https://v3b.fal.media/files/p${n}.jpg` });
+        if (url.startsWith('https://upload.test/')) return new Response('', { status: 200 });
+        return Response.json({ request_id: 'r14' });
+      }) as unknown as typeof fetch;
+      return { fn, calls };
+    };
+    const photo = async () => ({ bytes: new Uint8Array(400_000), contentType: 'image/jpeg' });
+    const photos = Array.from({ length: 14 }, (_, i) => `asset://p${i}`);
+    const nb21 = { ...model('google/nano-banana-2.1/edit', { '1K': '0.04' }), maxImages: 14 };
+    const many = storageFake();
+    expect((await createFalImageProvider({ apiKey: 'k', fetch: many.fn, readImage: photo }).submit(req(nb21, { imageUrls: photos }))).providerJobId).toBe('r14');
+    expect(many.calls.filter((c) => c.url.includes('/storage/upload/initiate'))).toHaveLength(14);
+    const sent = (many.calls.at(-1)!.body as { image_urls: string[] }).image_urls;
+    expect(new Set(sent).size).toBe(14);
+    expect(sent.every((u) => u.startsWith('https://v3b.fal.media/files/'))).toBe(true);
+    const four = storageFake();
+    await createFalImageProvider({ apiKey: 'k', fetch: four.fn, readImage: photo }).submit(req(nb21, { imageUrls: photos.slice(0, 4) }));
+    expect(four.calls).toHaveLength(1); // the submit alone: no upload
+    expect((four.calls[0]!.body as { image_urls: string[] }).image_urls.every((u) => u.startsWith('data:image/jpeg;base64,'))).toBe(true);
+  });
+
   test.each([
     ['fal-ai/nano-banana-pro/edit', 'fal-ai/nano-banana-pro'],
     ['google/nano-banana-2.1/edit', 'google/nano-banana-2.1'],

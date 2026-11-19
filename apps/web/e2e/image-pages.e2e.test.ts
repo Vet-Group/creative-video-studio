@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { POSES } from '../src/lib/try-on-stock';
 import { addExamples, gotoTryOn, jpg, modelButton, optionsOf, pickModel, png, select, selectValue, settled, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
@@ -35,7 +36,7 @@ test('Try On takes 5 garments, as Fash does with Nano Banana Pro, when the model
   await expect(page.locator('.form-message').getByRole('status')).toHaveCount(0);
 });
 
-test('Try On takes 13 garments on Nano Banana 2.1 and counts them on the slot; a model that takes 5 keeps all 13 and holds Run until 8 go', async ({ page }) => {
+test('Try On takes 13 garments on Nano Banana 2.1 and counts them on the slot; a background past the image limit is named, and a model that takes 5 keeps all 13 and holds Run until 8 go', async ({ page }) => {
   // The mock model is listed again under Nano Banana 2.1's id, which takes 13 garments (Fash's About page); both take 14 photos. Nothing is run.
   await page.route(/\/api\/image-models\?/, async (r) => {
     const res = await r.fetch();
@@ -57,24 +58,33 @@ test('Try On takes 13 garments on Nano Banana 2.1 and counts them on the slot; a
   await page.getByLabel('Ảnh trang phục').setInputFiles(Array.from({ length: 14 }, (_, i) => file(`cap${i + 1}.png`)));
   await expect(chosen).toHaveCount(13); // the fourteenth is left out
   await expect(page.getByText('Chỉ lấy 13 ảnh đầu.')).toBeVisible();
-  await expect(garments).toHaveAccessibleDescription('13/13'); // the count beside the slot's name, read with the slot
+  await expect(garments).toHaveAccessibleDescription('13 trên 13 ảnh trang phục'); // the count beside the slot's name, read with the slot
+  await expect(page.locator('.slot-count > [aria-hidden="true"]')).toHaveText('13/13'); // on screen; screen readers hear the words
   await expect(page.getByRole('button', { name: 'Tải lên Trang phục' })).toHaveCount(0); // full: no add tile
   await page.getByLabel('Ảnh người mẫu').setInputFiles(file('cap-person.png'));
   await expect(run).toBeEnabled(); // 14 photos: the model's 14
   await expect(reason).toHaveCount(0);
+  // A background makes 15: the reason names it as the photo too many, and the slot now offers 12.
+  await page.getByLabel('Ảnh bối cảnh').setInputFiles(file('cap-scene.png'));
+  await expect(reason).toHaveText('Mô hình này nhận tối đa 14 ảnh, tính cả ảnh bối cảnh. Bỏ ảnh bối cảnh hoặc bớt 1 ảnh trang phục để chạy.');
+  await expect(garments).toHaveAccessibleDescription('13 trên 12 ảnh trang phục');
+  await expect(run).toBeDisabled();
+  await page.getByRole('button', { name: 'Bỏ ảnh cap-scene.png' }).click();
+  await expect(reason).toHaveCount(0);
+  await expect(run).toBeEnabled();
 
   // A model that takes 5 drops none of the 13: the count reads over its cap and Run waits with the reason until 8 go.
   await pickModel(page, /Mock image E2E/);
   await expect(chosen).toHaveCount(13);
-  await expect(garments).toHaveAccessibleDescription('13/5');
+  await expect(garments).toHaveAccessibleDescription('13 trên 5 ảnh trang phục');
   await expect(reason).toHaveText('Mô hình này nhận tối đa 5 ảnh trang phục. Bỏ bớt 8 ảnh để chạy.');
   await expect(run).toBeDisabled();
   for (let n = 13; n > 5; n--) await page.getByRole('button', { name: `Bỏ ảnh cap${n}.png` }).click();
-  await expect(garments).toHaveAccessibleDescription('5/5');
+  await expect(garments).toHaveAccessibleDescription('5 trên 5 ảnh trang phục');
   await expect(reason).toHaveCount(0);
   await expect(run).toBeEnabled();
   await page.getByRole('button', { name: 'Bỏ ảnh cap5.png' }).click();
-  await expect(garments).toHaveAccessibleDescription('4/5');
+  await expect(garments).toHaveAccessibleDescription('4 trên 5 ảnh trang phục');
   await expect(page.getByRole('button', { name: 'Tải lên Trang phục' })).toBeVisible(); // room again: the add tile is back
 });
 
@@ -742,7 +752,7 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
   }
 });
 
-test("Try On, as Fash's model catalog: the filter chips narrow the named portraits, a portrait goes on to the pose step, the pose rides the run's prompt and params, and the pose chip opens the same pictures", async ({ page }) => {
+test("Try On, as Fash's model catalog: the filter chips narrow the named portraits, a portrait goes on to the pose step, the pose rides the run's prompt and params, and the pose chip opens the same pictures, every pose by name where it has none", async ({ page }) => {
   const names = ['try-on-portrait-woman-isla.jpg', 'try-on-portrait-man-kai.jpg', 'try-on-pose-woman-front.jpg', 'try-on-pose-woman-hand-on-hip.jpg'];
   const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
     await page.context().clearCookies();
@@ -773,7 +783,7 @@ test("Try On, as Fash's model catalog: the filter chips narrow the named portrai
     await selectValue(page, 'Giới tính', '');
     await models.getByRole('button', { name: 'Người mẫu Isla' }).click();
 
-    // Fash's pose step: the chosen model beside the question, "Không chọn tư thế" first, then only the poses with a preview for her gender, each named.
+    // Fash's pose step: the chosen model beside the question, "Không chọn tư thế" first, then every pose, each named: a picture where her gender has one.
     const poses = page.getByRole('dialog', { name: 'Chọn tư thế' });
     await expect(poses.getByText('Người mẫu tạo dáng thế nào?')).toBeVisible();
     await expect(poses.locator('.pose-head img')).toHaveAttribute('src', '/api/samples/try-on-portrait-woman-isla.jpg?thumb=1');
@@ -784,6 +794,9 @@ test("Try On, as Fash's model catalog: the filter chips narrow the named portrai
     await expect(poses.getByRole('button', { name: /^(Mặt trước|Tay chống hông)$/ })).toHaveCount(2);
     await expect(poses.getByRole('button', { name: 'Tay chống hông' }).locator('.photo-caption')).toHaveText('Tay chống hông');
     await expect(poses.getByRole('button', { name: 'Mặt trước' }).locator('img')).toHaveAttribute('src', '/api/samples/try-on-pose-woman-front.jpg?thumb=1');
+    await expect(poses.locator('.model-grid > button')).toHaveCount(POSES.length + 1); // no pose is left out for want of a picture
+    await expect(poses.getByRole('button', { name: 'Quỳ một gối' })).toHaveClass('photo-name'); // no picture yet: its name
+    await expect(poses.getByRole('button', { name: 'Quỳ một gối' })).toHaveText('Quỳ một gối');
     await poses.getByRole('button', { name: 'Tay chống hông' }).click();
     await expect(poses).toBeHidden();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-woman-isla.jpg' })).toBeVisible();
@@ -834,6 +847,61 @@ test("Try On, as Fash's model catalog: the filter chips narrow the named portrai
     await expect(poses).toBeHidden();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-woman-isla.jpg' })).toBeVisible();
     await expect(poseChip).toHaveAttribute('data-value', '');
+
+    // Kai is a man, and no man's pose has a picture here: his pick goes straight to the slot, and the chip still offers every pose by its name.
+    await page.getByRole('button', { name: 'Bỏ ảnh try-on-portrait-woman-isla.jpg' }).click();
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    await models.getByRole('button', { name: 'Người mẫu Kai' }).click();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-man-kai.jpg' })).toBeVisible();
+    await poseChip.click();
+    await expect(poses.locator('.model-grid > button')).toHaveCount(POSES.length + 1);
+    await expect(poses.locator('.model-grid img')).toHaveCount(0);
+    const hip = poses.getByRole('button', { name: 'Tay chống hông' });
+    await expect(hip).toHaveClass('photo-name');
+    await hip.click();
+    await expect(poses).toBeHidden();
+    await expect(poseChip).toHaveAttribute('data-value', 'hand-on-hip');
+    await expect(poseChip).toHaveAccessibleName('Tư thế: Tay chống hông');
+    await expect(poseChip).toBeFocused(); // a click focused the chip, so the dialog handed the focus back to it
+
+    // On a 390 px phone: the filter chips stay inside the dialog, 2 tiles a row, and no tile's words are cut nor a caption hides the photo.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('tab', { name: 'Tạo' }).click(); // the narrow page's form tab (the run above opened History)
+    await page.getByRole('button', { name: 'Bỏ ảnh try-on-portrait-man-kai.jpg' }).click();
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    const inside = async (dialog: Locator, items: Locator) => {
+      const d = await box(dialog);
+      for (const item of await items.all()) {
+        const b = await box(item);
+        expect(b.x >= d.x && b.x + b.width <= d.x + d.width + 0.5, `${await item.innerText()} at ${b.x}+${b.width} in ${d.x}+${d.width}`).toBe(true);
+      }
+    };
+    const unclipped = (loc: Locator) => loc.evaluate((el) => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1);
+    const noSideways = (loc: Locator) => loc.evaluate((el) => el.scrollWidth <= el.clientWidth + 1);
+    const captionShare = async (tile: Locator) => (await box(tile.locator('.photo-caption'))).height / (await box(tile)).height;
+    await expect(models.locator('.portrait-filter .select-trigger')).toHaveCount(4);
+    await inside(models, models.locator('.portrait-filter .select-trigger'));
+    expect(await noSideways(models)).toBe(true);
+    expect(await captionShare(models.getByRole('button', { name: 'Người mẫu Isla' }))).toBeLessThan(0.5);
+    for (const tile of await models.locator('.model-upload, .model-grid > button:not(:has(img))').all()) expect(await unclipped(tile), await tile.innerText()).toBe(true); // the upload and create tiles
+    await models.getByRole('button', { name: 'Người mẫu Isla' }).click();
+    const tops = await poses.locator('.model-grid > button').evaluateAll((els) => els.slice(0, 3).map((el) => Math.round(el.getBoundingClientRect().top)));
+    expect(tops[1] === tops[0] && tops[2]! > tops[0]!, `tile tops ${tops.join(', ')}`).toBe(true); // 2 a row
+    expect(await unclipped(poses.getByRole('button', { name: 'Không chọn tư thế' }))).toBe(true);
+    for (const tile of await poses.locator('.model-grid > button.photo-name').all()) expect(await unclipped(tile), await tile.innerText()).toBe(true);
+    expect(await captionShare(poses.getByRole('button', { name: 'Tay chống hông' }))).toBeLessThan(0.5);
+    expect(await noSideways(poses)).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(poses).toBeHidden();
+    // Kai's poses are words alone: two a row as well, none cut.
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    await models.getByRole('button', { name: 'Người mẫu Kai' }).click();
+    await poseChip.click();
+    const wordTops = await poses.locator('.model-grid > button').evaluateAll((els) => els.slice(0, 3).map((el) => Math.round(el.getBoundingClientRect().top)));
+    expect(wordTops[1] === wordTops[0] && wordTops[2]! > wordTops[0]!, `tile tops ${wordTops.join(', ')}`).toBe(true);
+    for (const tile of await poses.locator('.model-grid > button').all()) expect(await unclipped(tile), await tile.innerText()).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(poses).toBeHidden();
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }

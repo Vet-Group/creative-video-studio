@@ -1279,7 +1279,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
   .preset-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 /* The chosen card's check badge, on the clip's top-right corner. */
-.preset-card:has(> button[aria-pressed='true'])::after, .choice-grid button:has(> video, > img):is([aria-selected='true'], [aria-pressed='true'])::after, .model-grid button.photo-none[aria-pressed='true']::after { content: '\2713'; position: absolute; top: 8px; right: 8px; z-index: 2; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink-strong); color: var(--on-ink); font-size: 12px; line-height: 1; }
+.preset-card:has(> button[aria-pressed='true'])::after, .choice-grid button:has(> video, > img):is([aria-selected='true'], [aria-pressed='true'])::after, .model-grid button:is(.photo-none, .photo-name)[aria-pressed='true']::after { content: '\2713'; position: absolute; top: 8px; right: 8px; z-index: 2; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink-strong); color: var(--on-ink); font-size: 12px; line-height: 1; }
 
 dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 0; border: 0; border-radius: 1rem; overflow: auto; }
 .modal-body { padding: 1rem; }
@@ -2150,11 +2150,26 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 /* A name over a photo's foot, as Fash's model and pose names: small capitals on a dark fade, so it reads on the white studio ground. */
 .photo-caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; margin: 0; padding: 28px 10px 10px; background: linear-gradient(to top, rgb(var(--shade) / .72), rgb(var(--shade) / 0)); color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .06em; text-align: left; text-transform: uppercase; overflow-wrap: anywhere; pointer-events: none; } /* a long Vietnamese name wraps rather than losing its end */
 .model-grid button[aria-pressed='true'] { outline: 2px solid var(--ink-strong); outline-offset: 2px; } /* the chosen tile's ring, outside the tile's own clip */
+/* The chosen tile with the keyboard focus: its ring moves to a shadow, so the focus ring shows apart from it, outside. */
+.model-grid button[aria-pressed='true']:focus-visible { outline: 2px solid var(--ink); outline-offset: 6px; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink-strong); }
 /* A tile of words among the photos (the pose step's no-pose tile): dashed as the upload tile it stands in for. */
 .model-grid button.photo-none { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--fill); color: var(--ink); text-align: center; transition: border-color var(--dur-fast), background-color var(--dur-fast); }
 .model-grid button.photo-none:hover { border-color: var(--ink-strong); background: var(--surface); }
 .photo-none strong { font-size: 14px; line-height: 20px; font-weight: 600; }
 .photo-none span { color: var(--text-subtle); font-size: 12px; line-height: 16px; font-weight: 400; }
+/* A pose with no picture yet: its name centred on the grey a loading photo shows, in the captions' small capitals, so every pose can be picked. */
+.model-grid button.photo-name { display: flex; align-items: center; justify-content: center; padding: 12px; border: 1px solid var(--border); background: var(--fill); color: var(--ink); text-align: center; transition: border-color var(--dur-fast); }
+.model-grid button.photo-name:hover { border-color: var(--ink-strong); }
+.photo-name strong { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; overflow-wrap: anywhere; }
+/* On a small screen the no-pose tile drops its note (the header above says the same, and it stays the tile's description), words start at the top
+   rather than spill both ways, and a caption is slimmer, so no tile's words are cut and a caption leaves the photo in view. */
+@media (max-width: 640px) {
+  .model-grid button:is(.photo-none, .photo-name) { padding: 8px; justify-content: safe center; }
+  .photo-none span { display: none; }
+  .photo-caption { padding: 16px 6px 6px; letter-spacing: .02em; }
+}
+/* On a phone a grid of words alone is two a row too, as the photo grids are (the rule below), not four tiles 75 px wide. */
+@media (max-width: 480px) { .choice-grid.model-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
 .model-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; margin: 0; padding: 12px; border: 1px dashed var(--border-strong); background: var(--fill); color: var(--text-subtle); font-size: 13px; line-height: 18px; text-align: center; cursor: pointer; transition: border-color var(--dur-fast), background-color var(--dur-fast), color var(--dur-fast); }
 .model-upload > * { pointer-events: none; } /* a drag over the words stays a drag over the tile */
 .model-upload .icon { display: grid; place-items: center; width: 40px; height: 40px; padding: 10px; border-radius: 50%; background: var(--surface); color: var(--ink); }

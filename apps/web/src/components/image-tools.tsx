@@ -125,16 +125,19 @@ export function refillNote(asked: { ratio?: string | null; resolution?: string |
  * The model, ratio, resolution and thinking level of a Run. The chosen model stays while it is listed (until one is chosen, the recommended model that takes the inputs);
  * a ratio or resolution the model lacks falls back to its nearest, a thinking level to its first (a model with no levels has none),
  * so the options always match the model. `images` is how many inputs the Run has: a model that takes fewer is shown as not supported.
+ * `takes` adds a page's own limit (Try On's garment cap) to the automatic choice only: with no model that fits both, one that `takes` the inputs comes
+ * before the first; a model it refuses can still be picked, and the page says why it cannot run.
  * `refill` sets what a sample or job asks for, and `note` says what the model could not take until the member picks a setting.
  */
-export function useImageChoice(models: ImageModel[] | null, images: number, initialModel = '') {
+export function useImageChoice(models: ImageModel[] | null, images: number, initialModel = '', takes: (m: ImageModel) => boolean = () => true) {
   const [modelId, pickModel] = useState(initialModel);
   const [wantRatio, pickRatio] = useState('auto');
   const [wantResolution, pickResolution] = useState('1K');
   const [wantThinking, setThinking] = useState('');
   const [asked, setAsked] = useState<{ ratio: string | null; resolution: string | null; modelId: string | null; modelLabel: string | null; lost: number; extra?: Skipped['extra']; store: boolean; kept: number } | null>(null);
   const fits = (m: ImageModel) => m.maxImages >= images;
-  const chosen = models?.find((m) => m.id === modelId) ?? models?.find((m) => m.recommended && fits(m)) ?? models?.find(fits) ?? models?.[0];
+  const both = (m: ImageModel) => fits(m) && takes(m);
+  const chosen = models?.find((m) => m.id === modelId) ?? models?.find((m) => m.recommended && both(m)) ?? models?.find(both) ?? models?.find(takes) ?? models?.[0];
   const ratio = chosen ? nearestOption(chosen.ratios, wantRatio) : wantRatio;
   const resolution = chosen ? nearestOption(chosen.resolutions, wantResolution) : wantResolution;
   const thinking = chosen?.thinking.includes(wantThinking) ? wantThinking : chosen?.thinking[0];
@@ -413,9 +416,15 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       {optional && <span className="sr-only"> (tuỳ chọn)</span>}
     </span>
   );
+  // "3/13" on screen; a screen reader hears "3 trên 13 ảnh trang phục", as a bare fraction reads badly.
   const counter = count && images.length > 0 && (
-    <span id={countId} className="slot-count" data-over={images.length > max || undefined}>
-      {images.length}/{max}
+    <span className="slot-count" data-over={images.length > max || undefined}>
+      <span aria-hidden="true">
+        {images.length}/{max}
+      </span>
+      <span id={countId} className="sr-only">
+        {`${images.length} trên ${max} ${inputLabel.toLowerCase()}`}
+      </span>
     </span>
   );
   // An optional slot shows the optional pill beside its name, as the prompt boxes do.
@@ -619,17 +628,17 @@ export function SizeSlider({ size, last = 2, onChange }: { size: number; last?: 
 /** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time.
  * `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser.
  * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
-/** A tile of a photo dialog: its photo, or with no `src` a light tile of words (the pose step's "Không chọn tư thế") with an optional `note` line;
- * `caption` is a name shown over the photo's foot, as Fash's model and pose names; `pressed` marks the current choice. */
+/** A tile of a photo dialog: its photo, or with no `src` a tile of words: with a `note` line the pose step's "Không chọn tư thế", without one a pose that
+ * has no picture yet, by its name; `caption` is a name shown over the photo's foot, as Fash's model and pose names; `pressed` marks the current choice. */
 type PhotoTile = { key: string; src?: string; label: string; caption?: string; note?: string; pressed?: boolean; pick: () => void };
 
 /** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits, after an upload tile that also takes a dropped photo (with `onFile`) and an optional `create` tile (Try On's own model). A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. `filter` shows above the photos. */
 export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [], filter, create }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile?: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[]; filter?: ReactNode; create?: { label: string; onClick: () => void } }) {
   const tile = (t: PhotoTile) => (
-    <button key={t.key} type="button" className={t.src ? undefined : 'photo-none'} aria-label={t.label} aria-describedby={t.note ? `${ids.note}-${t.key}` : undefined} aria-pressed={t.pressed} disabled={busy} onClick={() => (onClose(), t.pick())}>
+    <button key={t.key} type="button" className={t.src ? undefined : t.note ? 'photo-none' : 'photo-name'} aria-label={t.label} aria-describedby={t.note ? `${ids.note}-${t.key}` : undefined} aria-pressed={t.pressed} disabled={busy} onClick={() => (onClose(), t.pick())}>
       {t.src ? open && <img src={t.src} alt="" /> : <strong>{t.label}</strong>}
       {t.note && <span id={`${ids.note}-${t.key}`}>{t.note}</span>}
-      {t.caption && <span className="photo-caption">{t.caption}</span>}
+      {t.src && t.caption && <span className="photo-caption">{t.caption}</span>}
     </button>
   );
   const [over, setOver] = useState(false);

@@ -313,7 +313,7 @@ async function uploadInputs(f: Fetch, apiKey: string, urls: string[], readImage?
   );
 }
 
-/** The worker shrinks each inlined input to 600 KB so that 4 fit the inline limit; more (up to 9 references) go through fal storage instead. */
+/** The worker shrinks each inlined input to 600 KB so that 4 fit the inline limit; more (up to 9 video references, 14 Try On photos) go through fal storage instead. */
 const MAX_INLINE_INPUTS = 4;
 
 export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage; startTimeoutSec?: number; pause?: (ms: number) => Promise<void> }): VideoProvider {
@@ -495,7 +495,7 @@ export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; re
       const endpoint = text ? FAL_TEXT_ENDPOINTS[req.model.endpoint] : req.model.endpoint;
       if (!endpoint) throw new ImageReadError(`fal image: ${req.model.endpoint} needs an input image`);
       // Built before any network call, so a request the model cannot take submits nothing.
-      const body = build(req, await resolveImages(req.imageUrls, opts.readImage));
+      const body = build(req, req.imageUrls.length > MAX_INLINE_INPUTS ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage));
       if (text) {
         delete body.image_urls;
         // Nano Banana's text endpoint has no 'auto' ratio; without one each takes its own default.

@@ -55,8 +55,12 @@ export const FAL_TEXT_ENDPOINTS: Record<string, string> = {
 export const textToImage = (m: { provider: string; endpoint: string }): boolean =>
   m.provider === 'mock' || m.provider === 'byteplus' || (m.provider === 'vertex' ? m.endpoint.startsWith('gemini-') : Object.hasOwn(FAL_TEXT_ENDPOINTS, m.endpoint));
 
-/** USD per input image after the first, by endpoint: Seedream 5.0 Pro on BytePlus (https://docs.byteplus.com/en/docs/modelark/model-pricing, read 2026-11-03); Flash input images are free. */
-export const EXTRA_INPUT_IMAGE_USD: Record<string, number> = { 'dola-seedream-5-0-pro-260628': 0.003 };
+/**
+ * USD per input image after the first, by endpoint: Seedream 5.0 Pro on BytePlus (https://docs.byteplus.com/en/docs/modelark/model-pricing, read 2026-11-03);
+ * Flash input images are free. Nano Banana 2.1 bills 1,120 input tokens an image, at $1.764 per million on fal (https://fal.ai/models/google/nano-banana-2.1/edit)
+ * and $1.50 on Vertex (https://cloud.google.com/vertex-ai/generative-ai/pricing), both read 2026-11-20: small for one garment, a quarter more for Try On's 14.
+ */
+export const EXTRA_INPUT_IMAGE_USD: Record<string, number> = { 'dola-seedream-5-0-pro-260628': 0.003, 'google/nano-banana-2.1/edit': 0.00198, 'gemini-nano-banana-2.1': 0.00168 };
 
 /** What `images` input images add to an image job's price on this endpoint. */
 export const extraInputUsd = (endpoint: string, images: number): number => (Object.hasOwn(EXTRA_INPUT_IMAGE_USD, endpoint) ? Number((EXTRA_INPUT_IMAGE_USD[endpoint]! * Math.max(0, images - 1)).toFixed(4)) : 0);

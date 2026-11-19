@@ -29,6 +29,9 @@ const RETRIES = 3;
 const RETRY_MIN_MS = 20_000;
 const RETRY_MAX_MS = 60_000;
 const RETRY_JITTER_MS = 20_000;
+/** The Gemini image models take 14 input images in a request of up to 500 MiB (Gemini 3.1 Flash Image spec, read 2026-11-20), far over the inline limit
+ * a Replicate reset set (http.ts); the worker shrinks each input to 600 KB, so Try On's 14 come to under 12 M characters of base64. */
+const MAX_BODY_CHARS = 16_000_000;
 const unrefSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
 
 const b64url = (s: string | Buffer): string => Buffer.from(s).toString('base64url');
@@ -157,7 +160,7 @@ export function createVertexImageProvider(opts: {
   const keyOf = (id: string) => `vertex-outcomes/${id}.json`;
   return {
     async submit(req) {
-      const call = callFor(req, (await resolveImages(req.imageUrls, opts.readImage)).map(inline), opts.project, region);
+      const call = callFor(req, (await resolveImages(req.imageUrls, opts.readImage, { maxChars: MAX_BODY_CHARS })).map(inline), opts.project, region);
       const id = randomUUID();
       const billed = imageEstimate(req);
       try {
