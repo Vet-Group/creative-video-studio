@@ -237,8 +237,8 @@ export function videoInputs(endpoint: string, withVideo = false) {
   const spec = withVideo && twin ? twin : plain;
   // BytePlus Seedance runs from the prompt alone and takes neither an end frame nor reference audio (byteplus.ts).
   if (isByteplusVideo(endpoint)) return { endFrame: false, endMaxSec: null, endMaxImages: null, textOnly: true, audioClips: null, videoRefs: null };
-  // Vertex Omni runs from the prompt alone, takes a last frame with one first frame up to 10 s, and no reference audio (vertex-omni.ts).
-  if (endpoint === VERTEX_OMNI_MODEL) return { endFrame: true, endMaxSec: 10, endMaxImages: null, textOnly: true, audioClips: null, videoRefs: null };
+  // Vertex Omni runs from the prompt alone, takes a last frame with exactly one first frame up to 10 s (submit refuses more), and no reference audio (vertex-omni.ts).
+  if (endpoint === VERTEX_OMNI_MODEL) return { endFrame: true, endMaxSec: 10, endMaxImages: 1, textOnly: true, audioClips: null, videoRefs: null };
   const video = (twin ?? plain)?.video;
   return {
     endFrame: spec?.end !== undefined, endMaxSec: spec?.endMaxSec ?? null, endMaxImages: spec?.endMaxImages ?? null, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null,

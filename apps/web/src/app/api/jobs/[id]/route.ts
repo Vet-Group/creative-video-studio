@@ -9,7 +9,8 @@ const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
 
 /**
  * A job (an image job carries its `feature` and `resolution`, and `durationSec` 0) with what Reuse needs to prefill Create: the input images that still exist, preset, prompt, ratio, duration, model and store
- * (null when the store is hidden now, since a Run cannot take it, and `storeLost` says so), the model's label, how many input images the job had (`inputCount`, so the form can say how many no longer exist) and their ids in the job's order (`inputIds`, so each image goes back to its own slot when one before it is gone), and to its creator the end frame and reference audio that still exist (a Run takes only the caller's own). Visible to its owner and to Admins, and to everyone once it is a
+ * (null when the store is hidden now, since a Run cannot take it, and `storeLost` says so), the model's label, how many input images the job had (`inputCount`, so the form can say how many no longer exist) and their ids in the job's order (`inputIds`, so each image goes back to its own slot when one before it is gone), the end frame that still exists (to everyone who gets the inputs when it is one of them, a clip that loops, since a Run takes an end frame among its own images;
+ * else to its creator only, as a Run takes only the caller's own), and to its creator the reference audio that still exists. Visible to its owner and to Admins, and to everyone once it is a
  * Library clip. A deleted or purged job is 404. `batchItems` lists, to its creator, the item (view, breed, style, product, name) of every job of a batch app's Run, else null.
  */
 export async function GET(request: Request, { params }: RouteContext) {
@@ -38,7 +39,10 @@ export async function GET(request: Request, { params }: RouteContext) {
       `select id, filename, mime${bytes ? ', bytes' : ''}, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
       [own ? ids : [], job.user_id, g.workspaceId],
     );
-  const [end, clips, video] = await Promise.all([owned(job.params.endAssetId ? [job.params.endAssetId] : []), owned(job.params.audioAssetIds?.split(',') ?? []), owned(job.params.videoAssetId ? [job.params.videoAssetId] : [], true)]);
+  // An end frame that is one of the inputs (a clip that loops) comes back with them, as a Run takes it (POST /api/jobs); any other only to its creator.
+  const endId = job.params.endAssetId;
+  const looped = endId !== undefined && job.input_asset_ids.includes(endId);
+  const [end, clips, video] = await Promise.all([looped ? { rows: images.rows.filter((r) => r.id === endId) } : owned(endId ? [endId] : []), owned(job.params.audioAssetIds?.split(',') ?? []), owned(job.params.videoAssetId ? [job.params.videoAssetId] : [], true)]);
   // A job of a batch app's Run (params.batch): the item of every job of that Run, so Reuse picks them all again. Only the creator's own Run: another member reuses the one job.
   const items = own && job.params.batch
     ? (

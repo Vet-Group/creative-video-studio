@@ -65,9 +65,11 @@ export const lengths = (d: number[] | undefined) => {
   return min === max ? `${min} giây` : `${min}–${max} giây`;
 };
 
-export function ModelPicker({ models: given, value, onChange }: { models: ModelOption[]; value: string; onChange: (id: string) => void }) {
+/** `id` is the trigger button's, for a page that opens the picker from elsewhere (a click on it). */
+export function ModelPicker({ models: given, value, onChange, id }: { models: ModelOption[]; value: string; onChange: (id: string) => void; id?: string }) {
   const models = given.map(withCredit);
   const uid = useId();
+  const triggerId = id ?? `${uid}-trigger`;
   const labelId = `${uid}-label`;
   const valueId = `${uid}-value`;
   const listId = `${uid}-list`;
@@ -315,13 +317,13 @@ export function ModelPicker({ models: given, value, onChange }: { models: ModelO
   return (
     <div className="field">
       {/* A label, so a click on it opens the picker as a select's label does. */}
-      <label id={labelId} htmlFor={`${uid}-trigger`} className="field-label">
+      <label id={labelId} htmlFor={triggerId} className="field-label">
         Mô hình
       </label>
       <div className="select" data-open={open}>
         <button
           ref={trigger}
-          id={`${uid}-trigger`}
+          id={triggerId}
           type="button"
           className="select-trigger"
           data-value={value}

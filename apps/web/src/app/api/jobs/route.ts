@@ -318,10 +318,13 @@ export async function POST(request: Request) {
         if (problem) return bad(problem);
       }
     }
-    // The end frame is the caller's own image (whether the model takes one is checked with the model below).
+    // The end frame is the caller's own image, or one of the Run's images (a clip that loops), which the check above already allowed: a company example's
+    // photo is not the member's own (whether the model takes one is checked with the model below).
     if (given.endAssetId !== undefined) {
-      const end = await pool.query(`select mime from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [given.endAssetId, userId, g.workspaceId]);
-      if (!end.rows[0]?.mime.startsWith('image/')) return bad('params.endAssetId must be one of your own images');
+      const mime: string | undefined = assetIds.includes(given.endAssetId)
+        ? byId.get(given.endAssetId)?.mime
+        : (await pool.query(`select mime from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [given.endAssetId, userId, g.workspaceId])).rows[0]?.mime;
+      if (!mime?.startsWith('image/')) return bad('params.endAssetId must be one of your own images');
     }
     const length = motion ? Math.ceil(byId.get(assetIds[1] as string)!.duration_ms! / 1000) : (durationSec as number);
     // A style's prompt joins the member's under the lock below; their own words stay the brief, as History and Reuse read them.
@@ -397,7 +400,7 @@ export async function POST(request: Request) {
     const endMax = takesNow.endMaxSec;
     if (params.endAssetId !== undefined && endMax !== null && durationSec > endMax) return bad(`the model takes an end frame on clips of at most ${endMax} seconds`);
     const endImages = takesNow.endMaxImages;
-    if (params.endAssetId !== undefined && endImages !== null && assetIds.length > endImages) return bad(`the model takes an end frame with at most ${endImages} images`);
+    if (params.endAssetId !== undefined && endImages !== null && assetIds.length > endImages) return bad(`the model takes an end frame with at most ${endImages} image${endImages === 1 ? '' : 's'}`);
     if (clips.length > 0) {
       const takes = takesNow.audioClips;
       const ms = (await tx.query('select coalesce(sum(duration_ms), 0)::int as ms from assets where id = any($1::text[]) and workspace_id = $2', [clips, g.workspaceId])).rows[0].ms as number;

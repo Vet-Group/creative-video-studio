@@ -1950,6 +1950,20 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .slot-add:has(.slot-hint) { flex: 1 1 100%; flex-direction: column; justify-content: center; align-self: stretch; gap: 6px; width: auto; height: auto; min-height: 79px; border: 0; background: transparent; text-align: center; }
 .slot:has(.slot-hint) { min-height: 105px; }
 .slot-add:has(.slot-hint) .slot-icon { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--divider); color: var(--text-icon); }
+/* Create video's end frame (CreateForm.tsx): the loop pill under the slot (a pill like Enhance, black while on), the first-to-last strip under it, and the hint of a
+   model without one. On a touch screen each takes a 44 px tap, drawn that tall rather than through an ::after that would reach over the slot. */
+.end-loop { display: flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; min-height: 30px; margin-top: 8px; padding: 6px 12px; border-radius: 999px; color: var(--ink); font-size: 12px; line-height: 16px; font-weight: 500; text-align: left; }
+.end-loop:not(:disabled):hover { border-color: var(--ink); }
+.end-loop[aria-pressed='true'] { border-color: var(--ink); background: var(--ink); color: var(--on-ink); font-weight: 600; }
+.end-path { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; color: var(--text-muted); font-size: 12px; line-height: 16px; }
+.end-path img { flex: none; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px; object-fit: cover; }
+.end-off { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; }
+.end-frame .slot-chip { display: none; } /* the field's name, cut to "K…" on a 56 px thumbnail; the label and the strip already say it */
+@media (pointer: coarse) {
+  .end-loop, .end-off .link-button { min-height: 44px; }
+  .end-frame .slot-thumbs button::after { content: ''; position: absolute; inset: -12px; } /* the end frame's remove button; the full slot has no other control there */
+}
+@media (prefers-reduced-motion: no-preference) { .end-path img { animation: slot-in .9s ease-out; } }
 .run-cost { font-weight: 400; }
 
 .gallery-item { position: relative; overflow: hidden; border-radius: 14px; background: var(--fill); transition: transform var(--dur-base), box-shadow var(--dur-base); }

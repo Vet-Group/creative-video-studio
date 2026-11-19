@@ -854,6 +854,17 @@ describe('GET /api/jobs/:id', () => {
     expect(await (await detail(alice.cookie, id)).json()).toMatchObject({ endFrame: null });
   });
 
+  test('gives Reuse an end frame that is one of the inputs (a clip that loops) with them, to everyone who gets the inputs, though the creator does not own it', async () => {
+    await input('d-loop', bob.id); // a company example's photo, say
+    const id = await clip(alice.id, { inputs: ['d-loop'] });
+    await pool.query(`update jobs set params = $2 where id = $1`, [id, { endAssetId: 'd-loop' }]);
+    for (const cookie of [alice.cookie, bob.cookie, admin.cookie]) {
+      expect(await (await detail(cookie, id)).json()).toMatchObject({ images: [{ id: 'd-loop' }], endFrame: { id: 'd-loop', filename: 'in.png', mime: 'image/png' } });
+    }
+    await pool.query(`update assets set deleted_at = now() where id = 'd-loop'`);
+    expect(await (await detail(alice.cookie, id)).json()).toMatchObject({ images: [], endFrame: null });
+  });
+
   test('gives the creator the items of every job of a batch app Run, in the order sent, and anyone else only the job itself', async () => {
     const batch = '0c8a7a0e-9d6e-4a54-8a39-6d1c4c7f2b10';
     const item = async (params: Record<string, string>, at: string, o: { status?: string; deleted?: boolean; feature?: string; userId?: string } = {}) => {
