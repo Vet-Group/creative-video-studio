@@ -603,8 +603,8 @@ export function SizeSlider({ size, last = 2, onChange }: { size: number; last?: 
  * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
 type PhotoTile = { key: string; src: string; label: string; pick: () => void };
 
-/** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits, after an upload tile that also takes a dropped photo (with `onFile`). A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. `filter` shows above the photos. */
-export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [], filter }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile?: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[]; filter?: ReactNode }) {
+/** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits, after an upload tile that also takes a dropped photo (with `onFile`) and an optional `create` tile (Try On's own model). A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. `filter` shows above the photos. */
+export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [], filter, create }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile?: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[]; filter?: ReactNode; create?: { label: string; onClick: () => void } }) {
   const tile = (t: PhotoTile) => (
     <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
       {open && <img src={t.src} alt="" />}
@@ -646,6 +646,12 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
             </span>
             <input type="file" accept="image/*" className="sr-only" aria-labelledby={ids.upload} aria-describedby={ids.hint} disabled={busy} onChange={(e) => take(e.target.files?.[0])} />
           </label>
+        )}
+        {create && (
+          <button type="button" className="choice-add-card" disabled={busy} onClick={create.onClick}>
+            <Icon name="wand" size={20} />
+            {create.label}
+          </button>
         )}
         {tiles.map(tile)}
       </div>
