@@ -87,6 +87,19 @@ test('reads the real rea-video breakdown.json fixture: the English action, the m
   expect(Object.keys(cut.look)).toEqual(expect.arrayContaining(['framing', 'camera', 'lighting', 'grade']));
 });
 
+test('reads the ac47077 breakdown: each cut keeps its action and look, and the video look is left out as its plan unit has no prompt', async () => {
+  const fixture = JSON.parse(readFileSync(new URL('./__fixtures__/breakdown.survey.sample.json', import.meta.url), 'utf8'));
+  let user = '';
+  await writeScenePrompts(parseBreakdown(fixture), fixture, async (_s, u) => ((user = u), { text: '{"prompts":["a","b","c"]}', costUsd: null }));
+  const sent = JSON.parse(user);
+  expect(sent.scenes.map((s: { cuts: unknown[] }) => s.cuts.length)).toEqual([2, 3, 1]);
+  const cut = sent.scenes[0].cuts[0];
+  expect(cut.action.length).toBeGreaterThan(20);
+  expect(Object.keys(cut.look)).toEqual(expect.arrayContaining(['framing', 'camera', 'lighting', 'grade']));
+  expect(sent.video.format).toBe('product showcase');
+  expect(sent.video.look).toBeUndefined();
+});
+
 test('createAnalysisPromptWriter is undefined without a key, and a function with OpenAI or fal', () => {
   expect(createAnalysisPromptWriter({})).toBeUndefined();
   expect(createAnalysisPromptWriter({ openAiKey: 'k' })).toBeTypeOf('function');

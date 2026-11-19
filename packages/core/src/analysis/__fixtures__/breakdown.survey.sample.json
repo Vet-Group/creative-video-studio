@@ -1,0 +1,864 @@
+{
+ "schema": "rea_video.breakdown.v1",
+ "tool": {
+  "name": "rea-video",
+  "version": "0.1.0"
+ },
+ "summary": {
+  "duration": 8.042,
+  "shots": 6
+ },
+ "whole_video_vlm": {
+  "format": "product showcase",
+  "hook": "The opening 3 seconds start with a static flat-lay shot of the top, then immediately animate the garment floating off the ground, using surreal anti-gravity motion to stop scrollers instantly.",
+  "summary": "A dynamic animated product showcase of a futuristic cyberpunk-style cropped long-sleeve athletic top, using gravity-defying floating effects to highlight its design details and coordinated styling accessories."
+ },
+ "shots": [
+  {
+   "id": "shot_001",
+   "index": 1,
+   "start": 0.0,
+   "end": 1.167,
+   "duration": 1.167,
+   "keyframes": [
+    {
+     "t": 0.0,
+     "frame": 0,
+     "role": "first",
+     "by": "tool"
+    },
+    {
+     "t": 0.042,
+     "frame": 1,
+     "role": "change",
+     "by": "tool"
+    },
+    {
+     "t": 0.583,
+     "frame": 14,
+     "role": "change",
+     "by": "tool"
+    },
+    {
+     "t": 1.083,
+     "frame": 26,
+     "role": "change",
+     "by": "tool"
+    },
+    {
+     "t": 1.125,
+     "frame": 27,
+     "role": "last",
+     "by": "tool"
+    }
+   ],
+   "survey_look": {
+    "label_probs": {
+     "live_action": 0.0,
+     "ai_video": 0.0,
+     "avatar": 0.0,
+     "cg_3d": 0.9,
+     "code_render": 0.0,
+     "screen_capture": 0.0,
+     "still_motion": 0.0,
+     "static_hold": 0.0,
+     "anim_2d": 0.0,
+     "stop_motion": 0.0,
+     "film_footage": 0.0
+    },
+    "answer": "cg_3d",
+    "_by": "vlm",
+    "evidence": []
+   },
+   "narrative": {
+    "role": "hook",
+    "point": "The video opens with a flat-lay shot of the athletic top, zooms in to show logo and fabric details, then the garment begins to lift off the ground."
+   },
+   "aspects": {
+    "framing": {
+     "measured": {
+      "subject": "focus",
+      "subject_share": 1.0,
+      "center_x": 0.657,
+      "center_y": 0.448,
+      "area": 0.226,
+      "shot_size": "medium close-up",
+      "shot_size_rough": true,
+      "position": "right of centre"
+     }
+    },
+    "camera": {
+     "measured": {
+      "support": "fixed",
+      "motion": "planar_zoom_pan",
+      "move": "push-in",
+      "shake": 0.0
+     }
+    }
+   },
+   "vlm": {
+    "description": "俯拍视角下，一件黑银拼色的赛博运动风短款长袖上衣平铺在粗糙水泥地面上，画面上方露出金属工业框架的边缘，镜头缓慢小幅平移推近，展示上衣的拼接剪裁、胸前X-07标识和星形眼形logo，整体是暗调工业风的商品展示画面",
+    "shot_size": "商品特写",
+    "camera_move": "缓慢推+小幅平面平移",
+    "aspects": {
+     "framing": {
+      "shot_size": "商品特写",
+      "camera_angle": "俯拍（俯视正上方拍摄地面）",
+      "composition": "上衣位于画面中心，竖屏构图，画面上方保留金属框架的边缘留白",
+      "orientation": "竖屏"
+     },
+     "camera": {
+      "camera_support": "桌面俯拍支架固定",
+      "lens": "手机后置主摄，无明显透视变形",
+      "speed": "正常速度，镜头移动平缓"
+     },
+     "lighting": {
+      "location": "室内工业风场景，水泥地面+金属框架",
+      "key_light": "侧上方自然光，从画面左侧照射，在衣物和地面形成清晰的长阴影",
+      "light_quality": "硬光，阴影边缘锐利，明暗对比明显",
+      "fill_light": "弱，暗部保留自然的水泥纹理细节",
+      "rim_light": "无",
+      "catchlight": "不适用",
+      "practicals": "无可见人工光源",
+      "color_temp": "中性偏冷",
+      "lighting_setup": "侧上方单光源打亮衣物，形成自然明暗过渡，突出面料的光泽和拼接结构"
+     },
+     "grade": {
+      "color_grade": "暗调工业风，低饱和，整体以黑、灰、银色调为主，对比度适中"
+     }
+    },
+    "style": "工业风写实商品摄影，哑光面料质感，低饱和暗调色",
+    "replication": {
+     "video_prompt_en": "Keep the cropped long-sleeve top lying flat on the concrete floor, apply subtle slow pan and zoom Ken Burns effect, keep all textures and lighting consistent throughout the shot, gradually reveal the panel design and chest logo details."
+    }
+   }
+  },
+  {
+   "id": "shot_002",
+   "index": 2,
+   "start": 1.167,
+   "end": 2.333,
+   "duration": 1.167,
+   "keyframes": [
+    {
+     "t": 1.167,
+     "frame": 28,
+     "role": "first",
+     "by": "tool"
+    },
+    {
+     "t": 1.667,
+     "frame": 40,
+     "role": "change",
+     "by": "tool"
+    },
+    {
+     "t": 2.25,
+     "frame": 54,
+     "role": "change",
+     "by": "tool"
+    },
+    {
+     "t": 2.292,
+     "frame": 55,
+     "role": "last",
+     "by": "tool"
+    }
+   ],
+   "survey_look": {
+    "label_probs": {
+     "live_action": 0.0,
+     "ai_video": 0.0,
+     "avatar": 0.0,
+     "cg_3d": 0.9,
+     "code_render": 0.0,
+     "screen_capture": 0.0,
+     "still_motion": 0.0,
+     "static_hold": 0.0,
+     "anim_2d": 0.0,
+     "stop_motion": 0.0,
+     "film_footage": 0.0
+    },
+    "answer": "cg_3d",
+    "_by": "vlm",
+    "evidence": []
+   },
+   "narrative": {
+    "role": "hook",
+    "point": "The video opens with a flat-lay shot of the athletic top, zooms in to show logo and fabric details, then the garment begins to lift off the ground."
+   },
+   "aspects": {
+    "framing": {
+     "measured": {
+      "subject": "focus",
+      "subject_share": 1.0,
+      "center_x": 0.346,
+      "center_y": 0.374,
+      "area": 0.22,
+      "shot_size": "medium shot",
+      "shot_size_rough": true,
+      "position": "left of centre"
+     }
+    },
+    "camera": {
+     "measured": {
+      "support": "moving",
+      "motion": "smooth_move",
+      "move": "push-in",
+      "shake": 0.0
+     }
+    }
+   },
+   "vlm": {
+    "description": "特写拍摄一件黑底白边的运动速干上衣背部，上衣印有银色星形眼睛科幻风格logo和“X-07”字样，镜头缓慢向下平移扫过衣服表面，依次展示领口、背部印花、侧边拼接条纹和侧面网眼面料细节。",
+    "shot_size": "特写",
+    "camera_move": "移，镜头向下平移扫过衣物表面",
+    "aspects": {
+     "framing": {
+      "shot_size": "特写",
+      "camera_angle": "俯拍，镜头正对平铺的衣物表面",
+      "composition": "衣物印花位于画面中心，竖屏构图"
+     },
+     "camera": {
+      "camera_support": "他人手持手机拍摄",
+      "lens": "手机后置主摄，无明显透视变形",
+      "speed": "正常速度"
+     },
+     "lighting": {
+      "location": "室内桌面环境",
+      "key_light": "画面上方侧方均匀打光",
+      "light_quality": "柔光，阴影柔和不生硬",
+      "fill_light": "有环境补光，暗部细节清晰",
+      "rim_light": "无明显轮廓光",
+      "catchlight": "不适用",
+      "practicals": "无可见光源",
+      "color_temp": "中性色温，色彩还原自然",
+      "lighting_setup": "桌面柔光顶侧光均匀打亮衣物，无明显明暗差"
+     },
+     "grade": {
+      "color_grade": "自然写实，色彩还原真实，无特殊调色"
+     }
+    },
+    "style": "写实商品实拍，真实面料质感",
+    "replication": {
+     "video_prompt_en": "Slowly pan the camera down across the surface of the sports jersey, showing the collar, back print, side stripes and mesh fabric details, keep focus sharp with natural lighting"
+    }
+   }
+  },
+  {
+   "id": "shot_003",
+   "index": 3,
+   "start": 2.333,
+   "end": 4.0,
+   "duration": 1.667,
+   "keyframes": [
+    {
+     "t": 2.333,
+     "frame": 56,
+     "role": "first",
+     "by": "ai",
+     "p": 1.0
+    },
+    {
+     "t": 3.333,
+     "frame": 80,
+     "role": "extreme",
+     "by": "ai",
+     "p": 1.0
+    },
+    {
+     "t": 3.958,
+     "frame": 95,
+     "role": "move_end",
+     "by": "ai",
+     "p": 1.0
+    }
+   ],
+   "survey_look": {
+    "label_probs": {
+     "live_action": 0.0,
+     "ai_video": 0.0,
+     "avatar": 0.0,
+     "cg_3d": 0.9,
+     "code_render": 0.0,
+     "screen_capture": 0.0,
+     "still_motion": 0.0,
+     "static_hold": 0.0,
+     "anim_2d": 0.0,
+     "stop_motion": 0.0,
+     "film_footage": 0.0
+    },
+    "answer": "cg_3d",
+    "_by": "vlm",
+    "evidence": []
+   },
+   "narrative": {
+    "role": "proof",
+    "point": "The top spins and floats freely in mid-air, rotating to show all angles of its cut, neckline stitching, and side panel details."
+   },
+   "aspects": {
+    "framing": {
+     "measured": {
+      "subject": "focus",
+      "subject_share": 1.0,
+      "center_x": 0.496,
+      "center_y": 0.513,
+      "area": 0.375,
+      "shot_size": "medium close-up",
+      "shot_size_rough": true,
+      "position": "centred"
+     }
+    },
+    "camera": {
+     "measured": {
+      "support": "moving",
+      "motion": "smooth_move",
+      "move": "pull-out",
+      "shake": 0.043
+     }
+    }
+   },
+   "vlm": {
+    "description": "画面主体是一件黑银拼色的紧身长袖运动上衣，从平铺在水泥地面的状态缓缓悬浮展开，镜头缓慢环绕推近，依次展示衣服的版型、网眼纹理和胸前的星形X-07标识，场景是空旷的工业风室内，地面有窗户投下的条状自然光影，整体是服装产品动态展示效果。",
+    "shot_size": "产品特写",
+    "camera_move": "推 + 环绕，镜头平滑跟随上衣移动",
+    "aspects": {
+     "framing": {
+      "shot_size": "产品特写",
+      "camera_angle": "略俯拍",
+      "composition": "主体居中，竖屏构图，画面留白充足突出服装",
+      "aspect_ratio": "竖屏"
+     },
+     "camera": {
+      "camera_support": "稳定器模拟的平滑移动，无手持抖动",
+      "lens": "主摄，透视自然无畸变",
+      "speed": "正常速度，动作舒缓流畅"
+     },
+     "lighting": {
+      "location": "室内工业风空间，白天窗边",
+      "key_light": "侧方窗户入射的自然光，在地面形成条状阴影，主光方向偏侧上方",
+      "light_quality": "柔光，阴影边缘柔和自然",
+      "fill_light": "无明显额外补光，暗部保留自然层次",
+      "rim_light": "无明显轮廓光",
+      "catchlight": "不适用",
+      "practicals": "画面无可见人工光源",
+      "color_temp": "中性偏暖，自然日光色温",
+      "lighting_setup": "侧方窗户自然光照射，形成地面条状光影，整体柔和均匀，突出服装面料质感"
+     },
+     "grade": {
+      "color_grade": "自然写实调色，对比度适中，黑位扎实，还原面料的黑银撞色质感"
+     }
+    },
+    "style": "写实3D产品渲染，材质细腻，光影自然真实",
+    "replication": {
+     "video_prompt_en": "Camera slowly orbits and pushes in, the long-sleeve athletic top lying flat on concrete floats up and unfolds smoothly, showing the cut, chest logo and mesh side panels, natural window light casts soft striped shadows on the ground, smooth and stable motion throughout."
+    }
+   }
+  },
+  {
+   "id": "shot_004",
+   "index": 4,
+   "start": 4.0,
+   "end": 4.75,
+   "duration": 0.75,
+   "keyframes": [
+    {
+     "t": 4.0,
+     "frame": 96,
+     "role": "first",
+     "by": "tool"
+    },
+    {
+     "t": 4.667,
+     "frame": 112,
+     "role": "change",
+     "by": "tool"
+    },
+    {
+     "t": 4.708,
+     "frame": 113,
+     "role": "last",
+     "by": "tool"
+    }
+   ],
+   "survey_look": {
+    "label_probs": {
+     "live_action": 0.0,
+     "ai_video": 0.0,
+     "avatar": 0.0,
+     "cg_3d": 0.9,
+     "code_render": 0.0,
+     "screen_capture": 0.0,
+     "still_motion": 0.0,
+     "static_hold": 0.0,
+     "anim_2d": 0.0,
+     "stop_motion": 0.0,
+     "film_footage": 0.0
+    },
+    "answer": "cg_3d",
+    "_by": "vlm",
+    "evidence": []
+   },
+   "narrative": {
+    "role": "proof",
+    "point": "The top spins and floats freely in mid-air, rotating to show all angles of its cut, neckline stitching, and side panel details."
+   },
+   "aspects": {
+    "framing": {
+     "measured": {
+      "subject": "focus",
+      "subject_share": 1.0,
+      "center_x": 0.326,
+      "center_y": 0.692,
+      "area": 0.4,
+      "shot_size": "medium close-up",
+      "shot_size_rough": true,
+      "position": "left of centre"
+     }
+    },
+    "camera": {
+     "measured": {
+      "support": "moving",
+      "motion": "smooth_move",
+      "move": "pull-out",
+      "shake": 0.0
+     }
+    }
+   },
+   "vlm": {
+    "description": "特写拍摄黑白竖条纹运动T恤的圆领领口区域，镜头缓慢环绕平移，展示领口包边、缝线工艺与布料质感，背景为深灰色哑光墙面，柔和侧光在布料表面形成自然明暗过渡",
+    "shot_size": "特写",
+    "camera_move": "稳定器缓慢环绕平移",
+    "aspects": {
+     "framing": {
+      "shot_size": "特写",
+      "camera_angle": "平视略俯拍",
+      "composition": "T恤领口占据画面核心区域，竖屏构图，背景留少量深灰色墙面留白"
+     },
+     "camera": {
+      "camera_support": "稳定器固定拍摄",
+      "lens": "手机后置主摄，无明显透视变形",
+      "speed": "正常速度，镜头移动平缓"
+     },
+     "lighting": {
+      "location": "室内桌面商品拍摄场景",
+      "key_light": "侧方柔光光源，高度略高于衣物",
+      "light_quality": "柔光，阴影边缘柔和无硬边",
+      "fill_light": "有轻微补光，暗部细节保留完整",
+      "rim_light": "无明显轮廓光",
+      "catchlight": "不适用",
+      "practicals": "无可见光源",
+      "color_temp": "中性色温",
+      "lighting_setup": "侧方柔光主光+弱补光，均匀照亮衣物表面，突出布料纹理与缝线细节"
+     },
+     "grade": {
+      "color_grade": "自然写实调色，对比度适中，还原衣物真实色彩与质感"
+     }
+    },
+    "style": "写实商品实拍，质感细腻自然",
+    "replication": {
+     "video_prompt_en": "Slow orbiting close-up shot of the collar of a black and white striped sports t-shirt, soft side lighting, showing stitching and fabric texture, plain dark grey background"
+    }
+   }
+  },
+  {
+   "id": "shot_005",
+   "index": 5,
+   "start": 4.75,
+   "end": 6.417,
+   "duration": 1.667,
+   "keyframes": [
+    {
+     "t": 4.75,
+     "frame": 114,
+     "role": "first",
+     "by": "ai",
+     "p": 1.0
+    },
+    {
+     "t": 5.75,
+     "frame": 138,
+     "role": "extreme",
+     "by": "ai",
+     "p": 1.0
+    },
+    {
+     "t": 6.375,
+     "frame": 153,
+     "role": "move_end",
+     "by": "ai",
+     "p": 1.0
+    }
+   ],
+   "survey_look": {
+    "label_probs": {
+     "live_action": 0.0,
+     "ai_video": 0.0,
+     "avatar": 0.0,
+     "cg_3d": 0.9,
+     "code_render": 0.0,
+     "screen_capture": 0.0,
+     "still_motion": 0.0,
+     "static_hold": 0.0,
+     "anim_2d": 0.0,
+     "stop_motion": 0.0,
+     "film_footage": 0.0
+    },
+    "answer": "cg_3d",
+    "_by": "vlm",
+    "evidence": []
+   },
+   "narrative": {
+    "role": "proof",
+    "point": "The top spins and floats freely in mid-air, rotating to show all angles of its cut, neckline stitching, and side panel details."
+   },
+   "aspects": {
+    "framing": {
+     "measured": {
+      "subject": "focus",
+      "subject_share": 1.0,
+      "center_x": 0.527,
+      "center_y": 0.499,
+      "area": 0.283,
+      "shot_size": "medium close-up",
+      "shot_size_rough": true,
+      "position": "centred"
+     }
+    },
+    "camera": {
+     "measured": {
+      "support": "moving",
+      "motion": "smooth_move",
+      "move": "push-in",
+      "shake": 0.217
+     }
+    }
+   },
+   "vlm": {
+    "description": "暗调工业风室内场景，一件黑银拼接的运动长袖上衣悬浮在空中，周围金属质感的球体、圆环从破碎状态向四周散开，衣物自然舒展定型，镜头缓慢推近，最终上衣平稳悬浮，周围配饰、桌面的耳机、杂志、墨镜等物品同步定格，是服饰产品的动态展示动画。",
+    "shot_size": "特写",
+    "camera_move": "推",
+    "aspects": {
+     "framing": {
+      "shot_size": "特写",
+      "camera_angle": "平视",
+      "composition": "主体居中，竖屏构图，背景留暗调工业空间留白",
+      "aspect_ratio": "vertical"
+     },
+     "camera": {
+      "camera_support": "稳定器固定",
+      "lens": "标准镜头，无明显透视变形",
+      "speed": "慢动作，物体运动舒展平缓"
+     },
+     "lighting": {
+      "location": "工业风室内空间",
+      "key_light": "侧前方柔光打亮衣物主体，高度略高于衣物",
+      "light_quality": "柔光，阴影过渡自然",
+      "fill_light": "暗部轻微补光，保留暗调氛围",
+      "rim_light": "有弱轮廓光突出衣物和金属配饰边缘",
+      "catchlight": "不适用",
+      "practicals": "无可见光源",
+      "color_temp": "冷色调",
+      "lighting_setup": "侧方柔光主光打亮产品，暗部压暗突出主体质感，冷色调统一氛围"
+     },
+     "grade": {
+      "color_grade": "暗调低饱和，突出金属和布料的材质质感，画面干净高级"
+     }
+    },
+    "style": "写实3D产品渲染，暗调工业风，高质感金属与布料材质表现",
+    "replication": {
+     "video_prompt_en": "A black and silver sports top floats in mid air, surrounding metal spheres and rings disperse from a broken state, the top unfolds naturally, camera slowly pushes in, soft side lighting highlights fabric and metal texture, all objects freeze at the end, realistic 3D product animation"
+    }
+   }
+  },
+  {
+   "id": "shot_006",
+   "index": 6,
+   "start": 6.417,
+   "end": 8.042,
+   "duration": 1.625,
+   "keyframes": [
+    {
+     "t": 6.417,
+     "frame": 154,
+     "role": "first",
+     "by": "ai",
+     "p": 1.0
+    },
+    {
+     "t": 7.417,
+     "frame": 178,
+     "role": "extreme",
+     "by": "ai",
+     "p": 1.0
+    },
+    {
+     "t": 8.0,
+     "frame": 192,
+     "role": "last",
+     "by": "ai",
+     "p": 1.0
+    }
+   ],
+   "survey_look": {
+    "label_probs": {
+     "live_action": 0.0,
+     "ai_video": 0.0,
+     "avatar": 0.0,
+     "cg_3d": 0.9,
+     "code_render": 0.0,
+     "screen_capture": 0.0,
+     "still_motion": 0.0,
+     "static_hold": 0.0,
+     "anim_2d": 0.0,
+     "stop_motion": 0.0,
+     "film_footage": 0.0
+    },
+    "answer": "cg_3d",
+    "_by": "vlm",
+    "evidence": []
+   },
+   "narrative": {
+    "role": "mood",
+    "point": "The top lands gently on a metallic display tray, while matching fashion accessories float into place around it to demonstrate full styling coordination."
+   },
+   "aspects": {
+    "framing": {
+     "measured": {
+      "subject": "focus",
+      "subject_share": 1.0,
+      "center_x": 0.785,
+      "center_y": 0.667,
+      "area": 0.184,
+      "shot_size": "medium shot",
+      "shot_size_rough": true,
+      "position": "right of centre"
+     }
+    },
+    "camera": {
+     "measured": {
+      "support": "moving",
+      "motion": "smooth_move",
+      "move": "push-in",
+      "shake": 0.0
+     }
+    }
+   },
+   "vlm": {
+    "description": "科技风服饰产品展示动画，主体是一件黑银拼色带X-07标识的紧身长袖上衣，周围悬浮着猫眼墨镜、镶钻手镯、金属头戴耳机、人像封面杂志等配饰，放置在高反光金属桌面上，镜头缓慢向前推近，悬浮配饰伴随轻微旋转，整体光影柔和统一，呈现未来感穿搭氛围",
+    "shot_size": "特写",
+    "camera_move": "推",
+    "aspects": {
+     "framing": {
+      "shot_size": "特写",
+      "camera_angle": "略俯拍桌面",
+      "composition": "居中对称构图，主体服饰位于画面中心，配饰环绕分布，横屏",
+      "aspect_ratio": "横屏"
+     },
+     "camera": {
+      "camera_support": "稳定器固定，匀速推近",
+      "lens": "中焦镜头，无透视畸变",
+      "speed": "正常速度，镜头匀速推进"
+     },
+     "lighting": {
+      "location": "室内影棚环境",
+      "key_light": "侧前方柔光，打亮服饰和配饰的金属、镶钻质感",
+      "light_quality": "柔光，阴影边缘柔和",
+      "fill_light": "环境补光均匀，暗部细节保留完整",
+      "rim_light": "服饰边缘有微弱轮廓光，突出面料立体感",
+      "catchlight": "不适用",
+      "practicals": "无可见实际光源",
+      "color_temp": "冷中性色温",
+      "lighting_setup": "影棚柔光箱侧打主光 + 环境漫反射补光，突出金属和面料的反光质感"
+     },
+     "grade": {
+      "color_grade": "冷调低饱和，高对比度，金属和银色面料高光干净锐利"
+     }
+    },
+    "style": "写实3D产品渲染，未来科技风，高质感冷调",
+    "replication": {
+     "video_prompt_en": "Camera slowly pushes forward, all floating accessories rotate gently around the top, the garment stays centered, reflections on the metallic table change naturally with camera movement, lighting remains stable throughout"
+    }
+   }
+  }
+ ],
+ "survey": {
+  "rounds": 2,
+  "shots_estimate": {
+   "answer": 6,
+   "range": [
+    6,
+    6
+   ]
+  },
+  "cuts": [
+   {
+    "t": 1.167,
+    "frame": 28,
+    "kind": "cut",
+    "span": [
+     1.167,
+     1.167
+    ],
+    "p": 0.98,
+    "by": "survey",
+    "round": 1
+   },
+   {
+    "t": 2.333,
+    "frame": 56,
+    "kind": "cut",
+    "span": [
+     2.333,
+     2.333
+    ],
+    "p": 0.95,
+    "by": "survey",
+    "round": 1
+   },
+   {
+    "t": 4.0,
+    "frame": 96,
+    "kind": "cut",
+    "span": [
+     4.0,
+     4.0
+    ],
+    "p": 0.92,
+    "by": "survey",
+    "round": 1
+   },
+   {
+    "t": 4.75,
+    "frame": 114,
+    "kind": "cut",
+    "span": [
+     4.75,
+     4.75
+    ],
+    "p": 0.9,
+    "by": "survey",
+    "round": 1
+   },
+   {
+    "t": 6.417,
+    "frame": 154,
+    "kind": "morph",
+    "span": [
+     6.375,
+     6.417
+    ],
+    "p": 0.98,
+    "by": "survey",
+    "round": 3
+   }
+  ],
+  "busy": [
+   [
+    6.417,
+    6.458
+   ],
+   [
+    6.458,
+    6.5
+   ],
+   [
+    6.5,
+    6.542
+   ],
+   [
+    6.542,
+    6.583
+   ],
+   [
+    6.583,
+    6.625
+   ],
+   [
+    6.625,
+    6.667
+   ],
+   [
+    6.667,
+    6.708
+   ],
+   [
+    6.708,
+    6.75
+   ],
+   [
+    6.75,
+    6.792
+   ]
+  ],
+  "scenes": [
+   {
+    "t": 6.375,
+    "name": "floating apparel accessories"
+   },
+   {
+    "t": 6.417,
+    "name": "black athletic top tabletop product display"
+   }
+  ]
+ },
+ "rhythm": {
+  "shot_lengths": [
+   1.167,
+   1.166,
+   1.667,
+   0.75,
+   1.667,
+   1.625
+  ],
+  "mean_shot_s": 1.34,
+  "cuts_per_min": 37.3,
+  "change_step_s": 0.25,
+  "change": [
+   0.04,
+   0.04,
+   0.04,
+   0.03,
+   0.69,
+   0.13,
+   0.19,
+   0.26,
+   0.28,
+   0.75,
+   0.19,
+   0.17,
+   0.16,
+   0.17,
+   0.15,
+   0.13,
+   0.69,
+   0.08,
+   0.08,
+   0.56,
+   0.15,
+   0.2,
+   0.29,
+   0.43,
+   0.15,
+   0.71,
+   0.11,
+   0.11,
+   0.11,
+   0.12,
+   0.1,
+   0.09,
+   0.09
+  ]
+ },
+ "production_plan": {
+  "units": [
+   {
+    "id": "G1",
+    "kind": "generate",
+    "mode": "multi_shot",
+    "strategy": "remix",
+    "label": "cg_3d"
+   }
+  ]
+ }
+}
