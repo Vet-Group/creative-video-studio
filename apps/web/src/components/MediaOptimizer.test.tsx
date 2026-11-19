@@ -24,3 +24,14 @@ test('each entry shows its preview, size before and after, format and a download
   expect(html).toContain('download="b-optimized.webp"');
   expect(html).toContain('src="blob:test/1"');
 });
+
+test('a listing Run of several images is one entry: the .zip to download, its image count and the first image as its preview', () => {
+  const zip: OptimizerEntry = { id: 3, url: 'blob:test/zip', preview: 'blob:test/first', name: 'listing-2-anh.zip', before: 4096, after: 2048, width: 2048, height: 2048, format: 'image/jpeg', count: 2 };
+  const html = renderToStaticMarkup(<OptimizerHistory entries={[zip]} />);
+  expect(html).toContain('src="blob:test/first"');
+  expect(html).toContain('href="blob:test/zip"');
+  expect(html).toContain('download="listing-2-anh.zip"');
+  expect(html).toContain('2 ảnh JPG');
+  expect(html).toContain('2048 × 2048 px');
+  expect(html).toContain('Tải xuống .zip');
+});

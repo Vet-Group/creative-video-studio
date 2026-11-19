@@ -12,7 +12,7 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
-import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, itemPrompt, MAX_NAME, MOCKUP_PRODUCTS, nameOk, PET_STYLES } from '@/lib/apps';
+import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, itemPrompt, MAX_BATCH, MAX_NAME, MOCKUP_PRODUCTS, nameOk, PET_STYLES } from '@/lib/apps';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
@@ -126,7 +126,8 @@ export async function GET(request: Request) {
  * `breed_swap` (the breed swap app) takes `params.breed`, one of DOG_BREEDS, and exactly the prompt breedSwapPrompt makes of it: one job per breed, the page sends one per breed picked.
  * `pet_portrait` takes `params.style` (an id of PET_STYLES), `mockup_pack` `params.product` (an id of MOCKUP_PRODUCTS) with the design and an optional blank product photo, and `name_swap`
  * `params.name` (one name nameOk takes, already clean) and an optional `params.breed`; each takes exactly the prompt its item makes (itemPrompt), one job per item.
- * The batch apps (BATCH_FEATURES) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again.
+ * The batch apps (BATCH_FEATURES) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again. As on the pages, a Run
+ * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs, and a mockup pack Run with a blank product photo one job (400 for one more).
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
@@ -339,6 +340,19 @@ export async function POST(request: Request) {
   const refused = await withTransaction(pool, async (tx): Promise<Response | null> => {
     // One writer at a time, so two Runs cannot both take the last daily slot or the last dollars of the month.
     await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
+    // A batch app's Run is counted under the lock, so its jobs sent in parallel cannot pass the limits together; a deleted job was sent all the same.
+    // A retry or a rerun copies its job's batch id but is not a new job of that Run.
+    if (spec?.params.batch !== undefined) {
+      const sent = (
+        await tx.query(
+          `select count(*)::int as jobs, count(*) filter (where feature = 'mockup_pack' and cardinality(input_asset_ids) > 1)::int as blanks
+             from jobs where user_id = $1 and workspace_id = $2 and params->>'batch' = $3`,
+          [userId, g.workspaceId, spec.params.batch],
+        )
+      ).rows[0] as { jobs: number; blanks: number };
+      if (sent.jobs >= MAX_BATCH) return bad(`a Run (params.batch) takes at most ${MAX_BATCH} jobs`);
+      if (sent.jobs > 0 && (sent.blanks > 0 || (spec.feature === 'mockup_pack' && spec.assetIds.length > 1))) return bad('with a blank product photo the mockup pack makes one product per Run');
+    }
     // The model, preset, store and assets are read under the lock, so one disabled or hidden meanwhile is refused.
     let s = spec;
     let original: { team_id: string; provider: string; prompt: string; enhanced_prompt: string | null; retry_of: string | null } | undefined;

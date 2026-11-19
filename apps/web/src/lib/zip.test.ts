@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { crc32 } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { zipStream } from './zip';
+import { crc32 as ownCrc32, uniqueName, zipBlobs, zipStream } from './zip';
 
 const source = (...chunks: Uint8Array[]) => async () => new ReadableStream<Uint8Array>({ start: (c) => (chunks.forEach((x) => c.enqueue(x)), c.close()) });
 const bytesOf = async (s: ReadableStream<Uint8Array>) => new Uint8Array(await new Response(s).arrayBuffer());
@@ -33,6 +33,19 @@ describe('zipStream', () => {
 
   const big = new Uint8Array(70_000).map((_, i) => i % 251);
   const parts = [big.subarray(0, 30_000), big.subarray(30_000)];
+
+  it('computes the CRC-32 zlib does, in the browser too, also continued chunk by chunk', () => {
+    expect(ownCrc32(big)).toBe(crc32(big));
+    expect(ownCrc32(parts[1]!, ownCrc32(parts[0]!))).toBe(crc32(big));
+    expect(ownCrc32(new Uint8Array())).toBe(0);
+  });
+
+  it('names a repeat -2, -3 and so on before its extension', () => {
+    const taken = new Set<string>();
+    expect(['cat-listing.jpg', 'cat-listing.jpg', 'dog.jpg', 'cat-listing.jpg', 'notes', 'notes'].map((n) => uniqueName(taken, n))).toEqual([
+      'cat-listing.jpg', 'cat-listing-2.jpg', 'dog.jpg', 'cat-listing-3.jpg', 'notes', 'notes-2',
+    ]);
+  });
 
   it('writes STORE entries with data descriptors that a standard reader lists', async () => {
     const zip = await bytesOf(zipStream([{ name: 'trống.txt', bytes: 0, open: source() }, { name: '20261029-dat-abcd1234.mp4', bytes: big.length, open: source(...parts) }]));
@@ -77,6 +90,27 @@ describe('zipStream', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('zips blobs under their names, a repeat with -2 and a slash made a hyphen, with their bytes and CRCs', async () => {
+    const zip = new Uint8Array(await (await zipBlobs([{ name: 'cat-listing.jpg', blob: new Blob([big]) }, { name: 'cat-listing.jpg', blob: new Blob(['x']) }, { name: '..\\up/dog-listing.jpg', blob: new Blob([]) }])).arrayBuffer());
+    const v = new DataView(zip.buffer);
+    const eocd = zip.length - 22;
+    let p = v.getUint32(eocd + 16, true);
+    const seen = Array.from({ length: v.getUint16(eocd + 10, true) }, () => {
+      const n = v.getUint16(p + 28, true);
+      const name = new TextDecoder().decode(zip.subarray(p + 46, p + 46 + n));
+      const local = v.getUint32(p + 42, true);
+      const data = local + 30 + v.getUint16(local + 26, true);
+      const entry = { name, crcOk: crc32(zip.subarray(data, data + v.getUint32(p + 24, true))) === v.getUint32(p + 16, true), size: v.getUint32(p + 24, true) };
+      p += 46 + n;
+      return entry;
+    });
+    expect(seen).toEqual([
+      { name: 'cat-listing.jpg', crcOk: true, size: big.length },
+      { name: 'cat-listing-2.jpg', crcOk: true, size: 1 },
+      { name: '..-up-dog-listing.jpg', crcOk: true, size: 0 },
+    ]);
   });
 
   it('errors the stream when a source fails part-way', async () => {

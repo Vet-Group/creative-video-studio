@@ -6,7 +6,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { AppConfig } from '@/lib/apps';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { addHistory } from '@/lib/optimizer-history';
-import { IMAGE_FORMATS, LISTING_SIDE, decodeOptimizerImage, imageFileReason, imageSizeReason, optimizeImage, outputSizeText, resizedDimensions, type ImageFormat } from '@/lib/media-optimizer';
+import { IMAGE_FORMATS, LISTING_SIDE, MAX_LISTING_IMAGES, decodeOptimizerImage, imageFileReason, imageSizeReason, optimizeImage, outputSizeText, resizedDimensions, type ImageFormat } from '@/lib/media-optimizer';
+import { zipBlobs } from '@/lib/zip';
 import { AppAbout, AppHeader, TAB_LABEL, type Tab } from './AppPage';
 import { FormNotice, Slot, WorkTabs } from './image-tools';
 import styles from './MediaOptimizer.module.css';
@@ -22,10 +23,16 @@ export interface OptimizerEntry {
   width: number;
   height: number;
   format: ImageFormat;
+  /** A listing Run of several images: how many listing JPEGs the .zip at `url` holds, and the first one's URL for the card. */
+  count?: number;
+  preview?: string;
 }
 
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 const formatName = (f: ImageFormat) => (f === 'image/jpeg' ? 'JPG' : f.slice(6).toUpperCase());
+const revoke = (e: OptimizerEntry) => [e.url, e.preview].forEach((u) => u && URL.revokeObjectURL(u));
+/** One of the listing preset's images after the first, with its preview. */
+type More = { file: File; url: string };
 
 /** The History tab: the results made in this browser session, newest first, in the cards of the other apps' History. */
 export function OptimizerHistory({ entries }: { entries: OptimizerEntry[] }) {
@@ -38,7 +45,7 @@ export function OptimizerHistory({ entries }: { entries: OptimizerEntry[] }) {
         {entries.map((e) => (
           <li key={e.id} className="job job-card job-succeeded">
             <div className="job-media">
-              <img src={e.url} alt={`Ảnh đã tối ưu: ${e.name}`} />
+              <img src={e.preview ?? e.url} alt={`Ảnh đã tối ưu: ${e.name}`} />
             </div>
             <div className="job-body">
               <h3>{e.name}</h3>
@@ -46,14 +53,14 @@ export function OptimizerHistory({ entries }: { entries: OptimizerEntry[] }) {
                 {kb(e.before)} → {kb(e.after)} · {outputSizeText(e.before, e.after)}
               </p>
               <p className="job-chips">
-                <span>{formatName(e.format)}</span>
+                <span>{e.count ? `${e.count} ảnh ${formatName(e.format)}` : formatName(e.format)}</span>
                 <span>
                   {e.width} × {e.height} px
                 </span>
               </p>
               <div className="job-actions">
                 <a className={`job-reuse ${styles.download}`} href={e.url} download={e.name}>
-                  Tải xuống
+                  {e.count ? 'Tải xuống .zip' : 'Tải xuống'}
                 </a>
               </div>
             </div>
@@ -77,6 +84,8 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   const [preserve, setPreserve] = useState(true);
   const [format, setFormat] = useState<ImageFormat>('image/webp');
   const [listing, setListing] = useState(false); // the Etsy/Shopify preset: a square JPEG, the image fitted on white
+  const [more, setMore] = useState<More[]>([]); // the listing preset's images after `file`: a Run of them all makes one .zip
+  const moreKept = useRef<More[]>([]); // the same list as `more`, for the unmount cleanup
   const [entries, setEntries] = useState<OptimizerEntry[]>([]);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else About)
   const [busy, setBusy] = useState(false);
@@ -91,7 +100,8 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     return () => {
       alive.current = false;
       image.current?.close();
-      for (const e of kept.current) URL.revokeObjectURL(e.url);
+      for (const e of kept.current) revoke(e);
+      for (const m of moreKept.current) URL.revokeObjectURL(m.url);
     };
   }, []);
   useEffect(() => {
@@ -141,6 +151,22 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     }
   }
 
+  function keepMore(next: More[]) {
+    for (const m of moreKept.current) if (!next.includes(m)) URL.revokeObjectURL(m.url);
+    moreKept.current = next;
+    setMore(next);
+  }
+
+  /** The slot's new images: the first is read at once as before (its size fills the form); with the listing preset the others are checked by type and size here and read by the Run. */
+  function add(files: File[]) {
+    const rest = file ? files : files.slice(1);
+    if (!file) void choose(files[0]);
+    if (rest.length === 0) return;
+    const ok = rest.filter((f) => !imageFileReason(f));
+    if (ok.length < rest.length) setError(`Bỏ qua ${rest.length - ok.length} tệp: ${imageFileReason(rest.find((f) => imageFileReason(f))!)}`);
+    keepMore([...more, ...ok.map((f) => ({ file: f, url: URL.createObjectURL(f) }))]);
+  }
+
   function dimension(side: 'width' | 'height', value: number) {
     setNotice('');
     setSize(preserve && image.current ? resizedDimensions(image.current.width, image.current.height, side, value) : { ...size, [side]: value });
@@ -149,21 +175,53 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   // What a run makes: the preset's square JPEG, else the size and format picked.
   const out = listing ? { width: LISTING_SIDE, height: LISTING_SIDE, format: 'image/jpeg' as const } : { ...size, format };
 
+  const outName = (f: File) => `${f.name.replace(/\.[^.]+$/, '')}-${listing ? 'listing' : 'optimized'}.${out.format === 'image/jpeg' ? 'jpg' : out.format.split('/')[1]}`;
+
+  function keep(entry: OptimizerEntry) {
+    const made = addHistory(kept.current, entry);
+    kept.current = made.list;
+    setEntries(made.list);
+    for (const dropped of made.dropped) revoke(dropped);
+  }
+
   async function run() {
-    if (!image.current || !file) return;
+    const many = listing && more.length > 0;
+    if (!many && (!image.current || !file)) return;
     const current = generation.current;
     setBusy(true);
     setError('');
     setNotice('');
     try {
-      const blob = await optimizeImage(image.current, out.width, out.height, out.format, listing ? image.current : undefined);
-      if (current !== generation.current || !alive.current) return;
-      const name = `${file.name.replace(/\.[^.]+$/, '')}-${listing ? 'listing' : 'optimized'}.${out.format === 'image/jpeg' ? 'jpg' : out.format.split('/')[1]}`;
-      const made = addHistory(kept.current, { id: nextId.current++, url: URL.createObjectURL(blob), name, before: file.size, after: blob.size, ...out });
-      kept.current = made.list;
-      setEntries(made.list);
-      for (const dropped of made.dropped) URL.revokeObjectURL(dropped.url);
-      setNotice('Đã tối ưu xong. Xem và tải ảnh trong tab "Lịch sử".');
+      if (many) {
+        // One image at a time, so only one decoded image is held; one that cannot be read is left out and named.
+        const made: { name: string; blob: Blob; before: number }[] = [];
+        const skipped: string[] = [];
+        for (const f of [...(file ? [file] : []), ...more.map((m) => m.file)]) {
+          try {
+            const bitmap = f === file && image.current ? image.current : await decodeOptimizerImage(f);
+            try {
+              made.push({ name: outName(f), blob: await optimizeImage(bitmap, LISTING_SIDE, LISTING_SIDE, 'image/jpeg', bitmap), before: f.size });
+            } finally {
+              if (bitmap !== image.current) bitmap.close();
+            }
+          } catch {
+            skipped.push(f.name);
+          }
+          if (current !== generation.current || !alive.current) return;
+        }
+        if (made.length === 0) throw new Error('Không đọc được ảnh nào. Hãy chọn ảnh PNG, JPG hoặc WEBP hợp lệ.');
+        const zip = await zipBlobs(made);
+        if (current !== generation.current || !alive.current) return;
+        const before = made.reduce((sum, m) => sum + m.before, 0);
+        keep({ id: nextId.current++, url: URL.createObjectURL(zip), preview: URL.createObjectURL(made[0]!.blob), name: `listing-${made.length}-anh.zip`, before, after: zip.size, ...out, count: made.length });
+        setNotice(`Đã tạo ${made.length} ảnh listing trong một tệp .zip. Tải xuống trong tab "Lịch sử".`);
+        if (skipped.length > 0) setError(`Không đọc được ${skipped.length} ảnh nên đã bỏ qua: ${skipped.join(', ')}.`);
+      } else {
+        const blob = await optimizeImage(image.current!, out.width, out.height, out.format, listing ? image.current! : undefined);
+        if (current !== generation.current || !alive.current) return;
+        keep({ id: nextId.current++, url: URL.createObjectURL(blob), name: outName(file!), before: file!.size, after: blob.size, ...out });
+        setNotice('Đã tối ưu xong. Xem và tải ảnh trong tab "Lịch sử".');
+      }
       if (!narrow) setTab('history');
     } catch (err) {
       if (current === generation.current) setError(err instanceof Error ? err.message : 'Không xử lý được ảnh.');
@@ -172,9 +230,10 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     }
   }
 
-  const invalid = file ? imageSizeReason(out.width, out.height) : undefined;
-  const reason = file ? invalid : 'Thêm một ảnh để bắt đầu.';
-  const canRun = !!file && !busy && !invalid;
+  const count = (file ? 1 : 0) + more.length;
+  const invalid = count > 0 ? imageSizeReason(out.width, out.height) : undefined;
+  const reason = count > 0 ? invalid : 'Thêm một ảnh để bắt đầu.';
+  const canRun = count > 0 && !busy && !invalid;
   const tabs: Tab[] = narrow ? ['create', 'history', 'about'] : ['history', 'about'];
   const shown: Tab = narrow ? (tab ?? 'create') : tab === 'history' ? 'history' : 'about';
   const panel = shown === 'create' ? 'about' : shown;
@@ -193,31 +252,50 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
             <div className="app-slots" data-two={false}>
               <Slot
                 label="Ảnh"
-                empty="Thêm 1 ảnh PNG, JPG hoặc WEBP, tối đa 20 MB"
+                empty={listing ? `Thêm tối đa ${MAX_LISTING_IMAGES} ảnh PNG, JPG hoặc WEBP, mỗi ảnh tối đa 20 MB` : 'Thêm 1 ảnh PNG, JPG hoặc WEBP, tối đa 20 MB'}
                 inputLabel="Ảnh cần tối ưu"
-                images={file && preview ? [{ id: 'local', filename: file.name, url: preview }] : []}
-                max={1}
+                images={[...(file && preview ? [{ id: 'local', filename: file.name, url: preview }] : []), ...more.map((m) => ({ id: m.url, filename: m.file.name, url: m.url }))]}
+                max={listing ? MAX_LISTING_IMAGES : 1}
                 busy={busy}
-                onAdd={(files) => void choose(files[0])}
-                onRemove={() => void choose()}
+                onAdd={add}
+                onRemove={(id) => (id === 'local' ? void choose() : keepMore(more.filter((m) => m.url !== id)))}
               />
             </div>
             <p className="help">Ảnh được xử lý ngay trên thiết bị, không tải lên máy chủ. Chưa hỗ trợ video MP4/WEBM.</p>
             <p className="help">Tối đa 20 MB, 8000 px mỗi chiều và 16 triệu điểm ảnh. Ảnh động chỉ xuất một khung hình.</p>
-            {file && (
+            {count > 1 ? (
               <p className="help">
-                {file.name} · {kb(file.size)} · {image.current?.width} × {image.current?.height} px
+                {count} ảnh · {kb((file?.size ?? 0) + more.reduce((sum, m) => sum + m.file.size, 0))} · Chạy để tạo một tệp .zip gồm {count} ảnh listing.
               </p>
+            ) : (
+              file && (
+                <p className="help">
+                  {file.name} · {kb(file.size)} · {image.current?.width} × {image.current?.height} px
+                </p>
+              )
             )}
 
             <div className="field">
               <span className="field-label">Mẫu có sẵn</span>
               <div>
-                <button type="button" className="enhance" aria-pressed={listing} disabled={busy} onClick={() => (setListing(!listing), setNotice(''))}>
+                <button
+                  type="button"
+                  className="enhance"
+                  aria-pressed={listing}
+                  disabled={busy}
+                  onClick={() => {
+                    setListing(!listing);
+                    // Without the preset a Run makes one image again, so the others leave the slot.
+                    setNotice(listing && more.length > 0 ? `Đã bỏ ${more.length} ảnh thêm: không dùng mẫu listing thì mỗi lần chạy xử lý một ảnh.` : '');
+                    if (listing) keepMore([]);
+                  }}
+                >
                   Ảnh listing Etsy/Shopify
                 </button>
               </div>
-              <span className="help">Ảnh vuông 2048 × 2048 px, JPG: giữ trọn ảnh, thêm nền trắng xung quanh và tô trắng vùng trong suốt (Etsy hiện ảnh PNG trong suốt trên nền đen).</span>
+              <span className="help">
+                Ảnh vuông 2048 × 2048 px, JPG: giữ trọn ảnh, thêm nền trắng xung quanh và tô trắng vùng trong suốt (Etsy hiện ảnh PNG trong suốt trên nền đen). Chọn tối đa {MAX_LISTING_IMAGES} ảnh một lần để tải về một tệp .zip.
+              </span>
             </div>
 
             <div className="field">

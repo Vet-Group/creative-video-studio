@@ -11,7 +11,8 @@ const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
  * A job (an image job carries its `feature` and `resolution`, and `durationSec` 0) with what Reuse needs to prefill Create: the input images that still exist, preset, prompt, ratio, duration, model and store
  * (null when the store is hidden now, since a Run cannot take it, and `storeLost` says so), the model's label, how many input images the job had (`inputCount`, so the form can say how many no longer exist) and their ids in the job's order (`inputIds`, so each image goes back to its own slot when one before it is gone), the end frame that still exists (to everyone who gets the inputs when it is one of them, a clip that loops, since a Run takes an end frame among its own images;
  * else to its creator only, as a Run takes only the caller's own), and to its creator the reference audio that still exists. Visible to its owner and to Admins, and to everyone once it is a
- * Library clip. A deleted or purged job is 404. `batchItems` lists, to its creator, the item (view, breed, style, product, name) of every job of a batch app's Run, else null.
+ * Library clip. A deleted or purged job is 404. `batchItems` lists, to its creator, every job of a batch app's Run with its item (view, breed, style, product, name), id, status and
+ * `outputAssetId` (null once purged), so History's select-the-Run button picks the whole Run's results, however many; else null.
  */
 export async function GET(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
@@ -43,16 +44,15 @@ export async function GET(request: Request, { params }: RouteContext) {
   const endId = job.params.endAssetId;
   const looped = endId !== undefined && job.input_asset_ids.includes(endId);
   const [end, clips, video] = await Promise.all([looped ? { rows: images.rows.filter((r) => r.id === endId) } : owned(endId ? [endId] : []), owned(job.params.audioAssetIds?.split(',') ?? []), owned(job.params.videoAssetId ? [job.params.videoAssetId] : [], true)]);
-  // A job of a batch app's Run (params.batch): the item of every job of that Run, so Reuse picks them all again. Only the creator's own Run: another member reuses the one job.
+  // A job of a batch app's Run (params.batch): every job of that Run, so Reuse picks all their items again and History all their results. Only the creator's own Run: another member reuses the one job.
   const items = own && job.params.batch
     ? (
-        await pool.query(`select params from jobs where user_id = $1 and workspace_id = $2 and feature = $3 and params->>'batch' = $4 and deleted_at is null order by created_at, id`, [
-          job.user_id,
-          g.workspaceId,
-          job.feature,
-          job.params.batch,
-        ])
-      ).rows.map(({ params: p }) => ({ view: p.view ?? null, breed: p.breed ?? null, style: p.style ?? null, product: p.product ?? null, name: p.name ?? null }))
+        await pool.query(
+          `select id, status, case when purged_at is null then output_asset_id end as output_asset_id, params from jobs
+            where user_id = $1 and workspace_id = $2 and feature = $3 and params->>'batch' = $4 and deleted_at is null order by created_at, id`,
+          [job.user_id, g.workspaceId, job.feature, job.params.batch],
+        )
+      ).rows.map(({ params: p, ...r }) => ({ view: p.view ?? null, breed: p.breed ?? null, style: p.style ?? null, product: p.product ?? null, name: p.name ?? null, id: r.id, status: r.status, outputAssetId: r.output_asset_id }))
     : null;
   return Response.json({
     id: job.id, userId: job.user_id, status: job.status, error: job.error, isMock: job.is_mock, feature: job.feature, resolution: job.params.resolution ?? null, presetId: job.preset_id, prompt: job.prompt, enhance: job.enhance, enhancedPrompt: job.enhanced_prompt, audio: job.params.audio ?? null, orientation: job.params.orientation ?? null, view: job.params.view ?? null, breed: job.params.breed ?? null, style: job.params.style ?? null, product: job.params.product ?? null, name: job.params.name ?? null, ratio: job.aspect,

@@ -520,9 +520,18 @@ export function Tray({ feature }: { feature?: string }) {
   const { workerOffline, loaded, failed, refresh, queue } = all;
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature) : all.jobs;
   const zip = useZipDownload();
-  // The results of the Run a batch app's card belongs to (as many as the 20 latest jobs hold).
-  const batchOf = (j: TrayJob) => (j.batch ? jobs.filter((b) => b.batch === j.batch && b.status === 'succeeded' && b.outputAssetId).map((b) => b.id) : []);
-  const selectBatch = (ids: string[]) => (zip.pickMany(ids), all.notify(`Đã chọn ${ids.length} ảnh của lô. Tải chúng bằng nút "Tải xuống .zip" dưới danh sách.`));
+  // A batch app's card offers its Run when the list shows another result of it. The Run's results are read from the job, as a Run can hold more than the 20 latest jobs.
+  const inBatch = (j: TrayJob) => !!j.batch && jobs.some((b) => b.id !== j.id && b.batch === j.batch && b.status === 'succeeded' && b.outputAssetId);
+  async function selectBatch(j: TrayJob) {
+    try {
+      const { batchItems } = await api<{ batchItems: { id: string; status: JobStatus; outputAssetId: string | null }[] | null }>(`/api/jobs/${j.id}`);
+      const ids = (batchItems ?? []).filter((b) => b.status === 'succeeded' && b.outputAssetId).map((b) => b.id);
+      zip.pickMany(ids);
+      all.notify(`Đã chọn ${ids.length} ảnh của lô. Tải chúng bằng nút "Tải xuống .zip" dưới danh sách.`);
+    } catch (e) {
+      all.notify(errorText(e, 'Không tải được các ảnh của lô, hãy thử lại.'));
+    }
+  }
   // InvokeAI's queue count badge: the member's own jobs against the whole app's, so a wait reads as a busy queue rather than a stuck job.
   const mineQueued = all.jobs.filter((j) => j.status === 'queued').length;
   const mineRunning = all.jobs.filter((j) => j.status === 'submitting' || j.status === 'running').length;
@@ -539,7 +548,7 @@ export function Tray({ feature }: { feature?: string }) {
       {failed && <LoadError text={!navigator.onLine ? 'Mất kết nối mạng. Sẽ cập nhật lại khi có mạng.' : loaded ? 'Không cập nhật được danh sách lượt tạo.' : 'Không tải được danh sách lượt tạo.'} onRetry={refresh} />}
       {loaded && jobs.length === 0 && (feature ? <HistoryEmpty feature={feature} /> : <p className="muted">Chưa có lượt tạo nào.</p>)}
       <ul>
-        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} selectBatch={batchOf(j).length > 1 ? () => selectBatch(batchOf(j)) : undefined} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
+        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} selectBatch={inBatch(j) ? () => void selectBatch(j) : undefined} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
       </ul>
       {/* Under the cards, so turning History into a tool row does not move them. */}
       {feature && jobs.some((j) => j.status === 'succeeded' && j.outputAssetId) && (

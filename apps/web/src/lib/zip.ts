@@ -1,6 +1,26 @@
 // A STORE-only zip writer (no compression: the media is already compressed), streamed entry by entry so memory stays flat.
 // Each entry has a data descriptor (flag bit 3) because its CRC is known only after its bytes went by, and UTF-8 names (bit 11). Zip32 only.
-import { crc32 } from 'node:zlib';
+// It runs in the browser too (Media Optimizer's listing .zip), so it carries its own CRC-32; the server passes zlib's, about three times faster.
+
+const CRC_TABLE = Uint32Array.from({ length: 256 }, (_, n) => {
+  for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1;
+  return n >>> 0;
+});
+
+/** The CRC-32 of `data`, continued from `crc` (the CRC of the bytes before it), as zlib's crc32 computes it. */
+export function crc32(data: Uint8Array, crc = 0): number {
+  let c = ~crc;
+  for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]!) & 0xff]! ^ (c >>> 8);
+  return ~c >>> 0;
+}
+
+/** `base`, or with -2, -3 and so on before its extension when `taken` already holds it; the name returned is added to `taken`. */
+export function uniqueName(taken: Set<string>, base: string): string {
+  let name = base;
+  for (let n = 2; taken.has(name); n++) name = base.replace(/(\.[^.]*)?$/, `-${n}$1`);
+  taken.add(name);
+  return name;
+}
 
 export interface ZipEntry {
   name: string;
@@ -18,7 +38,7 @@ function record(size: number, fill: (v: DataView) => void): Uint8Array {
   return b;
 }
 
-async function* parts(entries: ZipEntry[], time: number, date: number): AsyncGenerator<Uint8Array> {
+async function* parts(entries: ZipEntry[], time: number, date: number, crcOf: typeof crc32): AsyncGenerator<Uint8Array> {
   const central: Uint8Array[] = [];
   let offset = 0;
   const sent = (n: number) => {
@@ -47,7 +67,7 @@ async function* parts(entries: ZipEntry[], time: number, date: number): AsyncGen
       for (;;) {
         const r = await reader.read();
         if (r.done) break;
-        crc = crc32(r.value, crc);
+        crc = crcOf(r.value, crc);
         size += r.value.length;
         yield r.value;
         sent(r.value.length);
@@ -95,15 +115,15 @@ async function* parts(entries: ZipEntry[], time: number, date: number): AsyncGen
   });
 }
 
-/** The entries as one zip stream. A source that fails part-way errors the stream, so the browser marks the download failed instead of keeping a cut zip. */
-export function zipStream(entries: ZipEntry[], now = new Date()): ReadableStream<Uint8Array> {
+/** The entries as one zip stream. A source that fails part-way errors the stream, so the browser marks the download failed instead of keeping a cut zip. `crcOf`: zlib's crc32 on the server. */
+export function zipStream(entries: ZipEntry[], now = new Date(), crcOf = crc32): ReadableStream<Uint8Array> {
   if (entries.length >= 0xffff) throw new RangeError('a zip32 holds fewer than 65535 entries');
   if (entries.reduce((sum, e) => sum + e.bytes, 0) >= ZIP32_LIMIT) throw new RangeError('a zip32 holds less than 4 GiB');
   // MS-DOS time and date are local with no zone: Vietnam time (UTC+7, no daylight saving), what the members' clocks show, whatever the server's zone.
   const ict = new Date(now.getTime() + 7 * 3600_000);
   const time = (ict.getUTCHours() << 11) | (ict.getUTCMinutes() << 5) | (ict.getUTCSeconds() >> 1);
   const date = ((Math.max(ict.getUTCFullYear(), 1980) - 1980) << 9) | ((ict.getUTCMonth() + 1) << 5) | ict.getUTCDate();
-  const it = parts(entries, time, date);
+  const it = parts(entries, time, date, crcOf);
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
@@ -118,4 +138,11 @@ export function zipStream(entries: ZipEntry[], now = new Date()): ReadableStream
       await it.return(undefined);
     },
   });
+}
+
+/** Blobs as one zip Blob (in the browser), each under its name with any slash made a hyphen, and a repeated name -2, -3 and so on. */
+export async function zipBlobs(files: { name: string; blob: Blob }[]): Promise<Blob> {
+  const taken = new Set<string>();
+  const entries = files.map((f) => ({ name: uniqueName(taken, f.name.replace(/[\\/]/g, '-')), bytes: f.blob.size, open: async () => f.blob.stream() }));
+  return new Blob([await new Response(zipStream(entries)).arrayBuffer()], { type: 'application/zip' });
 }

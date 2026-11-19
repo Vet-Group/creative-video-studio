@@ -403,7 +403,7 @@ export const breedSwapPrompt = (breed: string): string =>
 export const BATCH_FEATURES = ['multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap'];
 export const isBatchId = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s);
 
-/** The most jobs one Run of the name swap app sends: its names, or its names times its breeds. */
+/** The most jobs one Run of a batch app sends (the name swap app's names, or its names times its breeds, can reach it); POST /api/jobs holds every Run to it. */
 export const MAX_BATCH = 25;
 
 /** The print styles of the pet portrait app: the id a job keeps as `params.style`, the page's label and the English words its prompt takes. */
@@ -472,6 +472,25 @@ export function parseNames(text: string): { names: string[]; problem: string | n
           ? `Tối đa ${MAX_BATCH} tên mỗi lần chạy, đang có ${names.length}.`
           : null;
   return { names, problem };
+}
+
+/** The column of a CSV header that most likely holds the names: one of a pet's name, else one called name or tên, else the first with either in it, else the first column. */
+export function nameColumn(header: string[]): number {
+  const h = header.map((x) => x.normalize('NFC').trim().toLowerCase());
+  const tests = [(x: string) => /pet|thú cưng/.test(x) && /name|tên/.test(x), (x: string) => x === 'name' || x === 'tên', (x: string) => /name|tên/.test(x)];
+  for (const t of tests) {
+    const i = h.findIndex(t);
+    if (i >= 0) return i;
+  }
+  return 0;
+}
+
+/** The names of `column` in a CSV's rows under its header, as the name swap box takes them (parseNames: cleaned, blank and repeated ones dropped): the first MAX_BATCH
+ * that nameOk takes, the values it refuses (`invalid`), and how many good names were left out past MAX_BATCH (`over`). */
+export function csvNames(rows: string[][], column: number): { names: string[]; invalid: string[]; over: number } {
+  const all = parseNames(rows.slice(1).map((r) => cleanName(r[column] ?? '')).join('\n')).names; // cleaned first: a line break in a cell is a space
+  const ok = all.filter(nameOk);
+  return { names: ok.slice(0, MAX_BATCH), invalid: all.filter((n) => !nameOk(n)), over: Math.max(0, ok.length - MAX_BATCH) };
 }
 
 /** The prompt of one name swap job: only the personalized name changes, to `name` (one nameOk takes), and with `breed` (one of DOG_BREEDS) the dog too. POST /api/jobs takes no other. */
