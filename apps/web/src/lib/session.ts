@@ -30,7 +30,13 @@ const IMPERSONATION_MAX_MS = 60 * 60 * 1000;
 const cookieValue = (headers: Headers, name: string): string | null => {
   for (const part of (headers.get('cookie') ?? '').split(';')) {
     const at = part.indexOf('=');
-    if (at > 0 && part.slice(0, at).trim() === name) return decodeURIComponent(part.slice(at + 1).trim());
+    if (at > 0 && part.slice(0, at).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(at + 1).trim());
+      } catch {
+        return null; // a malformed value names no workspace, so the oldest membership applies
+      }
+    }
   }
   return null;
 };

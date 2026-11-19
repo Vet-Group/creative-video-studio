@@ -75,6 +75,7 @@ describe('the resolver', () => {
     expect(await resolved(req(dualCookie))).toEqual({ workspaceId: 'ws_vet', workspaceRole: 'member' });
     expect(await resolved(req(dualCookie, { ws: 'ws_partner' }))).toEqual({ workspaceId: 'ws_partner', workspaceRole: 'member' });
     expect(await resolved(req(dualCookie, { ws: 'ws_unknown' }))).toEqual({ workspaceId: 'ws_vet', workspaceRole: 'member' });
+    expect(await resolved(req(dualCookie, { ws: '%E0%A4%A' }))).toEqual({ workspaceId: 'ws_vet', workspaceRole: 'member' });
   });
 
   test('a disabled workspace counts as no membership: its cookie falls back, and a user in it alone gets 403 no_workspace', async () => {
