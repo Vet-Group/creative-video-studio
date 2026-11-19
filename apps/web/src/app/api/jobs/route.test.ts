@@ -3,6 +3,9 @@ import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 
+// Many tests create and sign in members (password hashes), which nears the 5 s default on a CI runner.
+vi.setConfig({ testTimeout: 30_000 });
+
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
 process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
@@ -740,8 +743,7 @@ describe('POST /api/jobs for an image feature', () => {
       expect([ok.status, ok.job]).toEqual([201, { feature: 'multi_angle', model: 'app-angles', prompt: FEATURE_PROMPTS.multi_angle, aspect: 'auto', params: { resolution: '1K', view: 'back' } }]);
     });
 
-    // Nine members, each created and signed in (two password hashes): near the 5 s default on a CI runner.
-    test('the breed swap app takes one picture and one known breed per job, with exactly the prompt that breed makes, kept with the job', { timeout: 30_000 }, async () => {
+    test('the breed swap app takes one picture and one known breed per job, with exactly the prompt that breed makes, kept with the job', async () => {
       const pug = { prompt: breedSwapPrompt('Pug'), params: { resolution: '1K', breed: 'Pug' } };
       expect((await app('breed_swap', 1, { prompt: breedSwapPrompt('Pug') })).error).toMatch(/^params.breed must be one of Golden Retriever, /);
       expect((await app('breed_swap', 1, { ...pug, params: { resolution: '1K', breed: 'Wolf' } })).error).toMatch(/^params.breed must be one of /);
@@ -799,7 +801,7 @@ describe('POST /api/jobs for an image feature', () => {
       expect([blank.status, blank.job]).toEqual([201, { feature: 'mockup_pack', model: 'app-mockups', prompt: mockupPrompt('mug', true), aspect: 'auto', params: { resolution: '1K', product: 'mug', batch: BATCH }, workspace_id: 'ws_vet' }]);
     });
 
-    test('the name swap app takes one clean name of letters, digits, spaces, apostrophes and hyphens per job, an optional known breed, and exactly the prompt they make', { timeout: 30_000 }, async () => {
+    test('the name swap app takes one clean name of letters, digits, spaces, apostrophes and hyphens per job, an optional known breed, and exactly the prompt they make', async () => {
       const post = await runner('name_swap');
       const named = (name: string, breed?: string) => ({ prompt: nameSwapPrompt(name, breed), params: { resolution: '1K', name, ...(breed && { breed }), batch: BATCH } });
       const refused = 'params.name must be one name of up to 20 letters, digits, spaces, apostrophes or hyphens';
