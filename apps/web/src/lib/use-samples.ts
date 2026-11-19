@@ -48,6 +48,9 @@ export const versionedSample = (src: string): string => {
   return v ? `${src}?v=${v}` : src;
 };
 
+/** A sample picture's small thumbnail, for a picker tile; picking still copies the full sample by its name. */
+export const sampleThumb = (name: string): string => `/api/samples/${name}?thumb=1`;
+
 /** Reads the list again after an upload or a failed load, for every mounted useSamples. */
 export function reloadSamples(): void {
   pending = null;

@@ -13,7 +13,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { cardSample, GALLERY_SAMPLES } from '@/lib/examples';
-import { useSamples } from '@/lib/use-samples';
+import { sampleThumb, useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
@@ -200,7 +200,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       setBusy(false);
     }
   }
-  const stockTiles = (slot: number, names: string[], label: string) => names.map((name, n) => ({ key: name, src: `/api/samples/${name}`, label: `${label} ${n + 1}`, pick: () => void pickStock(slot, name) }));
+  const stockTiles = (slot: number, names: string[], label: string) => names.map((name, n) => ({ key: name, src: sampleThumb(name), label: `${label} ${n + 1}`, pick: () => void pickStock(slot, name) }));
   const stock = picker === null ? [] : stockGroups(app.slots[picker]!, have);
 
   async function run() {

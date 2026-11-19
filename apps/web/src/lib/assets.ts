@@ -20,6 +20,9 @@ export const thumbKey = (id: string, side?: number) => (side ? `thumbs/${id}-${s
 export const THUMB_SIDE = 512;
 /** The one larger size `?w=` may ask for: the detail view's picture, a fraction of the original's megabytes. */
 export const PREVIEW_SIDE = 1600;
+/** A larger picture (a small file can hold a huge one) goes out as it is rather than taking a gigabyte of the web process to shrink. */
+export const MAX_PIXELS = 40_000_000;
+export const bytesOf = async (stream: ReadableStream<Uint8Array>) => new Uint8Array(await new Response(stream).arrayBuffer());
 
 /** The most a JSON request body may hold; the forms send a few KB. */
 export const MAX_JSON_BYTES = 1_000_000;

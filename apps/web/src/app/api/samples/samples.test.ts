@@ -2,6 +2,7 @@
 import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const testDb = await createTestDatabase();
@@ -11,8 +12,8 @@ process.env.APP_URL = 'http://localhost';
 process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 
 const { auth, pool } = await import('@/lib/auth');
-const { bucketName, ensureBucket, s3 } = await import('@/lib/storage');
-const { sampleBytesMatch, sampleType } = await import('@/lib/samples');
+const { bucketName, ensureBucket, putObject, s3 } = await import('@/lib/storage');
+const { SAMPLE_THUMB, sampleBytesMatch, sampleType } = await import('@/lib/samples');
 const { GET: LIST } = await import('./route');
 const { GET: ONE } = await import('./[name]/route');
 const { PUT, DELETE } = await import('../admin/samples/[name]/route');
@@ -135,6 +136,72 @@ describe('sample caching', () => {
     expect(replaced.status).toBe(200);
     expect(replaced.headers.get('etag')).not.toBe(etag);
     expect((await ONE(req(undefined, { headers: { 'if-none-match': etag! } }), ctx('cache-test.jpg'))).status).toBe(401); // the ETag is no way around sign-in
+  });
+});
+
+describe('GET /api/samples/:name?thumb=1', () => {
+  const thumb = (cookie: string | undefined, name: string, headers: Record<string, string> = {}) =>
+    ONE(new Request(`http://localhost/api/samples/${name}?thumb=1`, { headers: { ...(cookie ? { cookie } : {}), ...headers } }), ctx(name));
+  const put = (name: string, body: Uint8Array<ArrayBuffer>, type = 'image/jpeg') => PUT(req(admin, { method: 'PUT', body, headers: { 'content-type': type } }), ctx(name));
+  const kept = async (name: string) => ((await s3().send(new ListObjectsV2Command({ Bucket: bucketName(), Prefix: `thumbs/samples/${name}-` }))).Contents ?? []).map((o) => o.Key!);
+  /** A noisy JPEG, as large for its size as a photo. */
+  const photo = async (width: number, height: number) => new Uint8Array(await sharp({ create: { width, height, channels: 3, background: '#808080', noise: { type: 'gaussian', mean: 128, sigma: 40 } } }).jpeg({ quality: 80 }).toBuffer());
+
+  test('a picture gives a WebP of twice the tile, far smaller than the original, kept under the sample ETag and read back from there', async () => {
+    const original = await photo(SAMPLE_THUMB.width * 4, SAMPLE_THUMB.height * 4);
+    expect((await put('thumb-a.jpg', original)).ok).toBe(true);
+    const first = await thumb(member, 'thumb-a.jpg');
+    expect([first.status, first.headers.get('content-type'), first.headers.get('cache-control')]).toEqual([200, 'image/webp', 'private, max-age=3600']);
+    const body = new Uint8Array(await first.arrayBuffer());
+    expect(body.length).toBeLessThan(original.length / 10);
+    expect(await sharp(body).metadata()).toMatchObject({ format: 'webp', width: SAMPLE_THUMB.width, height: SAMPLE_THUMB.height });
+    const keys = await kept('thumb-a.jpg');
+    expect(keys).toEqual([expect.stringMatching(/^thumbs\/samples\/thumb-a\.jpg-[0-9a-f-]+$/)]);
+    // A second request is a cache hit: it serves the kept file (swapped here for a marker) instead of resizing again.
+    const marker = new Uint8Array([1, 2, 3]);
+    await putObject(keys[0]!, marker, 'image/webp');
+    expect(new Uint8Array(await (await thumb(member, 'thumb-a.jpg')).arrayBuffer())).toEqual(marker);
+    const etag = first.headers.get('etag')!;
+    expect(etag).toMatch(/^"[0-9a-f-]+-thumb"$/);
+    expect((await thumb(member, 'thumb-a.jpg', { 'if-none-match': etag })).status).toBe(304);
+    const full = await ONE(req(member), ctx('thumb-a.jpg')); // without ?thumb the original goes out as before
+    expect(new Uint8Array(await full.arrayBuffer())).toEqual(original);
+    expect(full.headers.get('etag')).not.toBe(etag);
+  });
+
+  test('replacing the sample through the admin route gives a new thumbnail, a small picture is never enlarged, and a deleted one is gone', async () => {
+    expect((await put('thumb-b.jpg', await photo(SAMPLE_THUMB.width * 4, SAMPLE_THUMB.height * 4))).ok).toBe(true);
+    const old = await thumb(member, 'thumb-b.jpg');
+    const oldTag = old.headers.get('etag')!;
+    expect(await sharp(new Uint8Array(await old.arrayBuffer())).metadata()).toMatchObject({ width: SAMPLE_THUMB.width, height: SAMPLE_THUMB.height });
+    expect((await put('thumb-b.jpg', await photo(1600, 900))).status).toBe(200);
+    const fresh = await thumb(member, 'thumb-b.jpg', { 'if-none-match': oldTag });
+    expect(fresh.status).toBe(200);
+    expect(fresh.headers.get('etag')).not.toBe(oldTag);
+    // A wide picture is made tall enough to cover the portrait tile, not squeezed inside it.
+    expect(await sharp(new Uint8Array(await fresh.arrayBuffer())).metadata()).toMatchObject({ height: SAMPLE_THUMB.height });
+    expect((await kept('thumb-b.jpg')).some((k) => k.endsWith(fresh.headers.get('etag')!.replaceAll('"', '').replace(/-thumb$/, '')))).toBe(true);
+    expect((await put('thumb-b.jpg', await photo(120, 90))).ok).toBe(true);
+    expect(await sharp(new Uint8Array(await (await thumb(member, 'thumb-b.jpg')).arrayBuffer())).metadata()).toMatchObject({ width: 120, height: 90 });
+    expect((await DELETE(req(admin, { method: 'DELETE' }), ctx('thumb-b.jpg'))).status).toBe(204);
+    expect((await thumb(member, 'thumb-b.jpg')).status).toBe(404);
+  });
+
+  test('refuses a bad name as the original does, needs sign-in, and sends a video or an unreadable picture unchanged', async () => {
+    for (const name of ['../x.jpg', 'Thumb.jpg', 'a_b.jpg', 'a.gif', 'missing.jpg']) {
+      const plain = await ONE(req(member), ctx(name));
+      const small = await thumb(member, name);
+      expect([small.status, await small.json()], name).toEqual([plain.status, await plain.json()]);
+    }
+    expect((await thumb(undefined, 'thumb-a.jpg')).status).toBe(401);
+    const clip = mp4(5000);
+    expect((await put('thumb-clip.mp4', clip, 'video/mp4')).ok).toBe(true);
+    const video = await thumb(member, 'thumb-clip.mp4');
+    expect([video.status, video.headers.get('content-type'), new Uint8Array(await video.arrayBuffer())]).toEqual([200, 'video/mp4', clip]);
+    expect((await put('thumb-broken.jpg', jpeg)).ok).toBe(true); // JPEG magic bytes, no picture sharp can read
+    const broken = await thumb(member, 'thumb-broken.jpg');
+    expect([broken.status, broken.headers.get('content-type'), new Uint8Array(await broken.arrayBuffer())]).toEqual([200, 'image/jpeg', jpeg]);
+    expect(await kept('thumb-clip.mp4')).toEqual([]);
   });
 });
 

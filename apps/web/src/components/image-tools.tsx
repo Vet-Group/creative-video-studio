@@ -12,7 +12,7 @@ import { PRODUCT_TYPES } from '@/lib/product-types';
 import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useHydrated } from '@/lib/use-hydrated';
-import { reloadSamples, samplesFailed, useSamples } from '@/lib/use-samples';
+import { reloadSamples, sampleThumb, samplesFailed, useSamples } from '@/lib/use-samples';
 import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES, MAX_VIDEO_BYTES_R2 } from '@/lib/upload-limits';
 import type { RefVideo } from './ReferenceVideo';
 import { AI_MODEL_SLOTS, slotOfLabel, UPLOAD_SLOTS, type UploadSlot } from '@/lib/upload-slots';
@@ -460,7 +460,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
             {offer.map((name, i) => (
               <li key={name}>
                 <button type="button" aria-label={`Dùng ảnh mẫu ${i + 1} cho ${label}`} disabled={!hydrated || busy} onClick={() => onSample?.(name)}>
-                  <img src={`/api/samples/${name}`} alt="" />
+                  <img src={sampleThumb(name)} alt="" />
                 </button>
               </li>
             ))}
