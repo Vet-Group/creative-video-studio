@@ -83,8 +83,8 @@ describe('the end frame', () => {
 
   test('the end frame may be another member’s photo the Run uses as its image (a company example’s), for a clip that loops, but not one it does not use', async () => {
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status)
-       select 'their-job', owner_id, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{theirs}', 'succeeded' from assets where id = 'theirs'`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, workspace_id)
+       select 'their-job', owner_id, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{theirs}', 'succeeded', workspace_id from assets where id = 'theirs'`,
     );
     const res = await run({ assetIds: ['theirs'], params: { endAssetId: 'theirs' } });
     expect(res.status).toBe(201);
@@ -95,7 +95,7 @@ describe('the end frame', () => {
 
   test('a loop on an image the Run may not use is refused as that image is: another member’s photo no job ran on, or the caller’s own from another workspace', async () => {
     await pool.query(`insert into workspaces (id, name) values ('ws_end', 'Partner') on conflict do nothing`);
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) select 'priv', owner_id, 'input', 'priv', 'p.png', 'image/png', 1 from assets where id = 'theirs'`);
+    await pool.query(`insert into assets (id, owner_id, workspace_id, kind, s3_key, filename, mime, bytes) select 'priv', owner_id, workspace_id, 'input', 'priv', 'p.png', 'image/png', 1 from assets where id = 'theirs'`);
     await pool.query(`insert into assets (id, owner_id, workspace_id, kind, s3_key, filename, mime, bytes) select 'elsewhere', owner_id, 'ws_end', 'input', 'elsewhere', 'e.png', 'image/png', 1 from assets where id = 'img'`);
     for (const id of ['priv', 'elsewhere']) expect(await errorOf(await run({ assetIds: [id], params: { endAssetId: id } })), id).toBe('one or more assets do not exist or cannot be used');
   });
