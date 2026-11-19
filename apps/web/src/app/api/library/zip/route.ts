@@ -1,3 +1,4 @@
+import { itemLabel } from '@/lib/apps';
 import { pool } from '@/lib/auth';
 import { downloadName, extensionOf, ICT_DAY, LIVE_CLIP } from '@/lib/clips';
 import { signDownloadToken, verifyDownloadToken } from '@/lib/download-token';
@@ -17,7 +18,7 @@ const bad = (error: string) => Response.json({ error }, { status: 400 });
  * ids of another workspace refuse the whole request), 413 at 4 GiB or more. */
 async function items(ids: string[], workspaceId: string) {
   const { rows } = await pool.query(
-    `select j.id, ${ICT_DAY} as day, u.name, o.s3_key, o.bytes, o.mime, o.filename
+    `select j.id, ${ICT_DAY} as day, u.name, j.params, o.s3_key, o.bytes, o.mime, o.filename
        from jobs j join users u on u.id = j.user_id join assets o on o.id = j.output_asset_id
       where j.id = any($1::text[]) and j.workspace_id = $2 and ${LIVE_CLIP} and o.deleted_at is null`,
     [ids, workspaceId],
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
   return Response.json({ downloadUrl: `/api/library/zip?ids=${list}&t=${signDownloadToken(`zip:${list}`, g.session.user.id)}` });
 }
 
-/** The zip itself, behind the token from POST; visibility is checked again. Entries are named as the Library names a download, with `-2` and so on on a clash. */
+/** The zip itself, behind the token from POST; visibility is checked again. Entries are named as the Library names a download (a batch item's breed, view and so on included), with `-2` and so on on a clash. */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
   if (found.error) return found.error;
   const taken = new Set<string>();
   const entries = found.rows.map((r) => {
-    const base = downloadName(r.day, r.name, r.id, r.mime.startsWith('image/') ? safeExtension(r.filename) : 'mp4');
+    const base = downloadName(r.day, r.name, r.id, r.mime.startsWith('image/') ? safeExtension(r.filename) : 'mp4', itemLabel(r.params));
     let name = base;
     for (let n = 2; taken.has(name); n++) name = base.replace(/(\.[^.]*)?$/, `-${n}$1`);
     taken.add(name);

@@ -135,10 +135,10 @@ export function AppHeader({ app }: { app: AppConfig }) {
   );
 }
 
-function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
+function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?: Img }) {
   const { refresh, loading, notify } = useJobs();
   const narrow = useMediaQuery(NARROW);
-  const [images, setImages] = useState<Img[][]>(() => app.slots.map(() => []));
+  const [images, setImages] = useState<Img[][]>(() => app.slots.map((_, n) => (n === 0 && image ? [image] : []))); // `image`: a photo the page opened with (?image=)
   const [prompt, setPrompt, clearDraft] = useDraftState(`app.${app.slug}`, reuse !== undefined);
   const [picker, setPicker] = useState<number | null>(null); // the slot whose stock-photo dialog is open
   const have = useSamples();
@@ -509,9 +509,9 @@ function Soon({ app, text }: { app: AppConfig; text: string }) {
   );
 }
 
-export function AppPage({ app, reuse }: { app: AppConfig; reuse?: string }) {
+export function AppPage({ app, reuse, image }: { app: AppConfig; reuse?: string; image?: Img }) {
   if (app.soon) return <Soon app={app} text={app.soon} />;
-  return <AppHistoryArt app={app}>{app.feature === 'motion_control' ? <MotionForm app={app} reuse={reuse} /> : <AppForm app={app} reuse={reuse} />}</AppHistoryArt>;
+  return <AppHistoryArt app={app}>{app.feature === 'motion_control' ? <MotionForm app={app} reuse={reuse} /> : <AppForm app={app} reuse={reuse} image={image} />}</AppHistoryArt>;
 }
 
 /** An uploaded reference video and its length. */

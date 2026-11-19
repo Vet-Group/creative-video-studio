@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { decodeOptimizerImage, imageFileReason, imageSignatureReason, imageSizeReason, MAX_IMAGE_BYTES, optimizeImage, outputSizeText, resizedDimensions } from './media-optimizer';
+import { decodeOptimizerImage, fitRect, imageFileReason, imageSignatureReason, imageSizeReason, LISTING_SIDE, MAX_IMAGE_BYTES, optimizeImage, outputSizeText, resizedDimensions } from './media-optimizer';
 
 describe('local image optimizer', () => {
   it('rejects oversized header dimensions before invoking the browser decoder', async () => {
@@ -58,6 +58,29 @@ describe('local image optimizer', () => {
       canvas.toBlob.mockImplementation((done) => done(new Blob(['fallback'], { type: 'image/png' })));
       await expect(optimizeImage({} as CanvasImageSource, 600, 400, 'image/webp')).rejects.toThrow('định dạng');
       expect(canvas.height).toBe(0);
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('fits an image whole and centred in a box, padding the rest', () => {
+    expect(fitRect(1200, 800, 2048, 2048)).toEqual({ x: 0, y: 342, width: 2048, height: 1365 });
+    expect(fitRect(800, 1200, 2048, 2048)).toEqual({ x: 342, y: 0, width: 1365, height: 2048 });
+    expect(fitRect(500, 500, 2048, 2048)).toEqual({ x: 0, y: 0, width: 2048, height: 2048 }); // a small square fills the box
+    expect(fitRect(8000, 1, 2048, 2048)).toEqual({ x: 0, y: 1024, width: 2048, height: 1 }); // a sliver keeps one pixel
+  });
+  it('the listing preset: a 2048 px square JPEG, the image fitted on white so transparency is flattened, never stretched', async () => {
+    const calls: string[] = [];
+    const ctx = {
+      set fillStyle(v: string) { calls.push(`fill ${v}`); },
+      fillRect: vi.fn((...a: number[]) => calls.push(`rect ${a.join(',')}`)),
+      drawImage: vi.fn((_: unknown, ...a: number[]) => calls.push(`draw ${a.join(',')}`)),
+    };
+    const blob = new Blob(['output'], { type: 'image/jpeg' });
+    const canvas = { width: 0, height: 0, getContext: () => ctx, toBlob: vi.fn((done: (b: Blob) => void, type: string) => (calls.push(`encode ${canvas.width}x${canvas.height} ${type}`), done(blob))) };
+    vi.stubGlobal('document', { createElement: () => canvas });
+    try {
+      const source = { width: 1200, height: 800 }; // an ImageBitmap's own size
+      expect(await optimizeImage(source as unknown as CanvasImageSource, LISTING_SIDE, LISTING_SIDE, 'image/jpeg', source)).toBe(blob);
+      // White first over the whole square, then the image on top of it: transparent pixels end up white, the bands above and below stay white.
+      expect(calls).toEqual(['fill #ffffff', 'rect 0,0,2048,2048', 'draw 0,342,2048,1365', 'encode 2048x2048 image/jpeg']);
     } finally { vi.unstubAllGlobals(); }
   });
 });

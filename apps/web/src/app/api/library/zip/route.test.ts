@@ -26,7 +26,7 @@ async function newUser(email: string, name: string) {
 }
 
 /** A job of the user with an output whose bytes are in the bucket; `status` other than succeeded makes a job with no output. */
-async function job(userId: string, id: string, content: string, status = 'succeeded') {
+async function job(userId: string, id: string, content: string, status = 'succeeded', params: Record<string, string> = {}) {
   const done = status === 'succeeded';
   if (done) {
     const bytes = new TextEncoder().encode(content);
@@ -34,9 +34,9 @@ async function job(userId: string, id: string, content: string, status = 'succee
     await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'output', $3, 'out.mp4', 'video/mp4', $4)`, [`${id}-out`, userId, `assets/${id}-out`, bytes.length]);
   }
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, created_at)
-     values ($1, $2, 'team-unassigned', 'zip-test', 'fal', 'gentle-push-in', 'a prompt', '9:16', 8, '{}', $3, $4, '2026-10-23T03:00:00Z')`,
-    [id, userId, status, done ? `${id}-out` : null],
+    `insert into jobs (id, user_id, team_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, params, created_at)
+     values ($1, $2, 'team-unassigned', 'zip-test', 'fal', 'gentle-push-in', 'a prompt', '9:16', 8, '{}', $3, $4, $5, '2026-10-23T03:00:00Z')`,
+    [id, userId, status, done ? `${id}-out` : null, params],
   );
   return id;
 }
@@ -101,6 +101,22 @@ describe('/api/library/zip', () => {
       { name: '20261023-nguyen-van-dat-abcdef12.mp4', text: 'first' },
       { name: '20261023-bob-bbbbbbbb.mp4', text: 'second' },
       { name: '20261023-bob-bbbbbbbb-2.mp4', text: 'third' },
+    ]);
+  });
+
+  test("names a batch job's entry by its breed or view, two of the same breed staying apart", async () => {
+    const golden = await job(alice.id, 'ab12cd34-golden', 'golden', 'succeeded', { breed: 'Golden Retriever', resolution: '1K' });
+    const golden2 = await job(alice.id, 'ab12cd34-again', 'again', 'succeeded', { breed: 'Golden Retriever', resolution: '1K' }); // same day, creator, breed and first 8 characters
+    const back = await job(alice.id, 'cd34ef56-back', 'back', 'succeeded', { view: 'back', resolution: '1K' });
+    const plain = await job(alice.id, 'ef56ab12-plain', 'plain', 'succeeded', { resolution: '1K' });
+    const { downloadUrl } = (await (await POST(req('/api/library/zip', alice.cookie, { ids: [golden, golden2, back, plain] }))).json()) as { downloadUrl: string };
+    const zip = await GET(req(downloadUrl, alice.cookie));
+    expect(zip.status).toBe(200);
+    expect(entries(new Uint8Array(await zip.arrayBuffer())).map((e) => e.name)).toEqual([
+      '20261023-nguyen-van-dat-golden-retriever-ab12cd34.mp4',
+      '20261023-nguyen-van-dat-golden-retriever-ab12cd34-2.mp4',
+      '20261023-nguyen-van-dat-mat-sau-cd34ef56.mp4',
+      '20261023-nguyen-van-dat-ef56ab12.mp4',
     ]);
   });
 

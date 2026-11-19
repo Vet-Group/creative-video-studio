@@ -164,6 +164,9 @@ export const USERS = {
   petsa: { email: 'petsa@e2e.test', name: 'E2E Pets A', role: 'member' },
   mockupsa: { email: 'mockupsa@e2e.test', name: 'E2E Mockups A', role: 'member' },
   namesa: { email: 'namesa@e2e.test', name: 'E2E Names A', role: 'member' },
+  // result-tools.e2e: a breed swap's ZIP named by breed, History's Background Remover button on an image result, and Media Optimizer's listing preset.
+  toolsa: { email: 'toolsa@e2e.test', name: 'E2E Tools A', role: 'member' },
+  toolsb: { email: 'toolsb@e2e.test', name: 'E2E Tools B', role: 'member' },
   // changelog.e2e: the changelog page, the sidebar dot and the once-a-day popup, one member per test.
   chga: { email: 'chga@e2e.test', name: 'E2E Changelog A', role: 'member' },
   chgb: { email: 'chgb@e2e.test', name: 'E2E Changelog B', role: 'member' },

@@ -1,5 +1,5 @@
 import { COMPANY_WORKSPACE_ID, FEATURES, IMAGE_RATIOS } from '@cvs/db';
-import { JOB_APPS } from '@/lib/apps';
+import { itemLabel, JOB_APPS } from '@/lib/apps';
 import { pool } from '@/lib/auth';
 import { downloadName, EXAMPLE_ORDER, extensionOf, ICT_DAY, LIVE_CLIP, OWN_PROMPT } from '@/lib/clips';
 import { GALLERY_SAMPLES } from '@/lib/examples';
@@ -157,7 +157,7 @@ export async function GET(request: Request) {
       prompt: r.prompt,
       canEdit: r.user_id === me.id || me.role === 'admin',
       mine: r.user_id === me.id,
-      downloadName: downloadName(r.day, r.creator_name, r.id, r.output_mime.startsWith('image/') ? extensionOf(r.output_filename) : 'mp4'),
+      downloadName: downloadName(r.day, r.creator_name, r.id, r.output_mime.startsWith('image/') ? extensionOf(r.output_filename) : 'mp4', itemLabel(r.params)),
     })),
   });
 }
