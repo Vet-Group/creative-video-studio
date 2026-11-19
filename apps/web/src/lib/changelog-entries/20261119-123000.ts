@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-19T12:30:00+07:00', kind: 'improved', title: 'Danh mục ảnh mẫu ở Thử đồ mở nhanh hơn', details: ['Khi mở hộp chọn người mẫu, tư thế, trang phục hay bối cảnh ở Thử đồ, các ô giờ chỉ tải ảnh xem trước cỡ nhỏ, nên hiện ra nhanh hơn và tốn ít dữ liệu hơn, nhất là trên điện thoại.', 'Ảnh bạn chọn vẫn là ảnh mẫu gốc đầy đủ, nên chất lượng kết quả không đổi.', 'Hộp chọn người mẫu có sẵn ở Marketing Studio và ở các ứng dụng cũng tải ảnh xem trước như vậy.'], href: '/try-on', prs: [556], audience: 'all' } satisfies ChangeEntry;

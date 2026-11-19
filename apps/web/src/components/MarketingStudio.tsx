@@ -18,7 +18,7 @@ import { confirmDialog } from './Confirm';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
-import { useSamples } from '@/lib/use-samples';
+import { sampleThumb, useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
 import { alignInputs, asExample, dropRefillQuery, lostInputs, nothingNote, nothingRefilled, placesOf, queryOf, skippedNote } from '@/lib/reuse';
 import { About } from './About';
@@ -887,7 +887,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
       <PhotoDialog
         open={picker === 'model'}
         title="Chọn người mẫu"
-        tiles={stockModels.map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Người mẫu có sẵn ${i + 1}`, pick: () => void pickStock(name) }))}
+        tiles={stockModels.map((name, i) => ({ key: name, src: sampleThumb(name), label: `Người mẫu có sẵn ${i + 1}`, pick: () => void pickStock(name) }))}
         busy={busy}
         onFile={(files) => void add(setPerson, 'model')(files)}
         onClose={() => setPicker(null)}

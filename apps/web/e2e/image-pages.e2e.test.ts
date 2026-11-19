@@ -635,16 +635,24 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
     // Each slot opens its picker once the sample list is in; until then it is an own-file upload.
     for (const slot of ['Người mẫu', 'Trang phục', 'Bối cảnh (tuỳ chọn)']) await expect(page.getByRole('button', { name: `Tải lên ${slot}` })).toHaveAttribute('aria-haspopup', 'dialog');
 
+    // The tiles show small thumbnails of the samples; a pick still copies the full sample by its name.
+    const thumbnail = page.waitForResponse((r) => r.url().endsWith('/api/samples/try-on-stock-model-10.jpg?thumb=1'));
     await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
     const models = page.getByRole('dialog', { name: 'Chọn người mẫu' });
+    await expect(models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).locator('img')).toHaveAttribute('src', '/api/samples/try-on-stock-model-10.jpg?thumb=1');
+    expect((await thumbnail).headers()['content-type']).toBe('image/webp');
     await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
     const poses = page.getByRole('dialog', { name: 'Chọn tư thế' });
+    await expect(poses.getByRole('button', { name: 'Tư thế 1' }).locator('img')).toHaveAttribute('src', '/api/samples/try-on-stock-model-10-pose-2.jpg?thumb=1');
     await poses.getByRole('button', { name: 'Quay lại' }).click(); // back to the models, as Fash's arrow
     await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
     // The photo is copied on the server as the member's own input; a note says so until it is in, so a slow copy never looks like nothing happened.
     const loadingNote = page.getByRole('region', { name: 'Thông báo' }).getByText('Đang tải ảnh...');
     await page.route('**/api/assets/samples', async (r) => (r.request().method() === 'POST' ? (await new Promise((done) => setTimeout(done, 1500)), r.continue()) : r.continue()));
+    const copied = (names: string[]) => page.waitForRequest((r) => new URL(r.url()).pathname === '/api/assets/samples' && r.method() === 'POST' && JSON.stringify(r.postDataJSON().names) === JSON.stringify(names));
+    const pose = copied(['try-on-stock-model-10-pose-2.jpg']);
     await poses.getByRole('button', { name: 'Tư thế 1' }).click();
+    await pose;
     await expect(poses).toBeHidden();
     await expect(loadingNote).toBeVisible();
     await expect(chosen('Người mẫu')).toHaveCount(1);
@@ -652,15 +660,21 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
     await page.unroute('**/api/assets/samples');
 
     await page.getByRole('button', { name: 'Tải lên Trang phục' }).click();
+    await expect(page.getByRole('dialog', { name: 'Chọn trang phục' }).getByRole('button', { name: 'Áo' }).locator('img')).toHaveAttribute('src', '/api/samples/try-on-stock-top.jpg?thumb=1');
     await page.getByRole('dialog', { name: 'Chọn trang phục' }).getByRole('button', { name: 'Áo' }).click();
+    const garment = copied(['try-on-stock-top-1.jpg']);
     await page.getByRole('dialog', { name: 'Áo' }).getByRole('button', { name: 'Áo 1' }).click();
+    await garment;
     await expect(chosen('Trang phục')).toHaveCount(1);
     await page.getByRole('button', { name: 'Tải lên Trang phục' }).click(); // a slot with room opens the picker again
     await expect(page.getByRole('dialog', { name: 'Chọn trang phục' })).toBeVisible();
     await page.keyboard.press('Escape');
 
     await page.getByRole('button', { name: 'Tải lên Bối cảnh (tuỳ chọn)' }).click();
+    await expect(page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('button', { name: 'New York Streets' }).locator('img')).toHaveAttribute('src', '/api/samples/try-on-bg-new-york.jpg?thumb=1');
+    const background = copied(['try-on-bg-new-york.jpg']);
     await page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('button', { name: 'New York Streets' }).click();
+    await background;
     await expect(chosen('Bối cảnh (tuỳ chọn)')).toHaveCount(1);
     await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Đã chọn bối cảnh')).toBeVisible();
 

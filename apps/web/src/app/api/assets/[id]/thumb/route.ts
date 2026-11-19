@@ -1,11 +1,7 @@
 import sharp from 'sharp';
-import { PREVIEW_SIDE, readableAsset, type RouteContext, streamAsset, THUMB_SIDE, thumbKey } from '@/lib/assets';
+import { bytesOf, MAX_PIXELS, PREVIEW_SIDE, readableAsset, type RouteContext, streamAsset, THUMB_SIDE, thumbKey } from '@/lib/assets';
 import { guard } from '@/lib/session';
 import { getObject, putObject } from '@/lib/storage';
-
-/** A larger picture (a small file can hold a huge one) goes out as it is rather than taking a gigabyte of the web process to shrink. */
-const MAX_PIXELS = 40_000_000;
-const bytesOf = async (stream: ReadableStream<Uint8Array>) => new Uint8Array(await new Response(stream).arrayBuffer());
 
 /** A small JPEG of an image asset for its tiles, made on first use and kept as `thumbs/<id>`, with the same access as its content.
  * `?w=1600` (the only other size) gives the detail view's preview instead: a WebP, so a transparent PNG stays transparent, kept as `thumbs/<id>-1600`; any other `w` is a 400.

@@ -12,7 +12,7 @@ import { usable } from '@/lib/fashion-models';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
-import { useSamples } from '@/lib/use-samples';
+import { sampleThumb, useSamples } from '@/lib/use-samples';
 import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, PORTRAIT_FILTERS, portraitGender, portraitName, type PortraitFilter, portraitsIn, POSES, posesOf, stockModels } from '@/lib/try-on-stock';
 import { About } from './About';
 import { copyError, copySamples, fashionTiles, FormNotice, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
@@ -48,9 +48,9 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const catalog = portraitsIn(have, {}).length > 0;
   const [pose, setPose] = useState<string | null>(null);
   const posesFor = (gender: 'woman' | 'man') => POSES.filter((p) => have.has(`try-on-pose-${gender}-${p.value}.jpg`));
-  const stockTiles = models0.map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Người mẫu có sẵn ${i + 1}`, pick: () => (posesOf(have, name).length > 0 ? setPicker({ role: 'model', of: name }) : void take({ sample: name }, 'model')) }));
+  const stockTiles = models0.map((name, i) => ({ key: name, src: sampleThumb(name), label: `Người mẫu có sẵn ${i + 1}`, pick: () => (posesOf(have, name).length > 0 ? setPicker({ role: 'model', of: name }) : void take({ sample: name }, 'model')) }));
   // A catalog model goes on to Fash's pose step, the poses shown on a model of its gender.
-  const portraitTiles = portraits.map((p) => ({ key: portraitName(p), src: `/api/samples/${portraitName(p)}`, label: `Người mẫu ${p.name[0]!.toUpperCase()}${p.name.slice(1)}`, pick: () => (posesFor(p.gender).length > 0 ? setPicker({ role: 'model', of: portraitName(p) }) : void take({ sample: portraitName(p) }, 'model')) }));
+  const portraitTiles = portraits.map((p) => ({ key: portraitName(p), src: sampleThumb(portraitName(p)), label: `Người mẫu ${p.name[0]!.toUpperCase()}${p.name.slice(1)}`, pick: () => (posesFor(p.gender).length > 0 ? setPicker({ role: 'model', of: portraitName(p) }) : void take({ sample: portraitName(p) }, 'model')) }));
   const portraitOf = picker?.role === 'model' && picker.of ? portraitGender(picker.of) : null;
   /** The member's own model photos from earlier Try On jobs (Fash's My Models); a failure leaves just the stock ones. */
   const [myModels, setMyModels] = useState<Img[]>([]);
@@ -217,11 +217,11 @@ export function TryOn({ reuse }: { reuse?: string }) {
               tiles={
                 !picker ? [] :
                 picker.role === 'model' && !picker.of ? (catalog ? portraitTiles : stockTiles) :
-                portraitOf ? posesFor(portraitOf).map((p) => ({ key: p.value, src: `/api/samples/try-on-pose-${portraitOf}-${p.value}.jpg`, label: p.label, pick: () => (setPose(p.value), void take({ sample: picker.of! }, 'model')) })) :
-                picker.role === 'model' ? posesOf(have, picker.of!).map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Tư thế ${i + 1}`, pick: () => void take({ sample: name }, 'model') })) :
-                picker.role === 'garment' && !picker.of ? categories.map((c) => ({ key: c.id, src: `/api/samples/${have.has(`try-on-stock-${c.id}.jpg`) ? `try-on-stock-${c.id}.jpg` : garmentsOf(have, c.id)[0]}`, label: c.label, pick: () => setPicker({ role: 'garment', of: c.id }) })) :
-                picker.role === 'garment' ? garmentsOf(have, picker.of!).map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `${GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label} ${i + 1}`, pick: () => void take({ sample: name }, 'garment') })) :
-                backgrounds.map((b) => ({ key: b.name, src: `/api/samples/${b.name}`, label: b.label, pick: () => void take({ sample: b.name }, 'background') }))
+                portraitOf ? posesFor(portraitOf).map((p) => ({ key: p.value, src: sampleThumb(`try-on-pose-${portraitOf}-${p.value}.jpg`), label: p.label, pick: () => (setPose(p.value), void take({ sample: picker.of! }, 'model')) })) :
+                picker.role === 'model' ? posesOf(have, picker.of!).map((name, i) => ({ key: name, src: sampleThumb(name), label: `Tư thế ${i + 1}`, pick: () => void take({ sample: name }, 'model') })) :
+                picker.role === 'garment' && !picker.of ? categories.map((c) => ({ key: c.id, src: sampleThumb(have.has(`try-on-stock-${c.id}.jpg`) ? `try-on-stock-${c.id}.jpg` : garmentsOf(have, c.id)[0]!), label: c.label, pick: () => setPicker({ role: 'garment', of: c.id }) })) :
+                picker.role === 'garment' ? garmentsOf(have, picker.of!).map((name, i) => ({ key: name, src: sampleThumb(name), label: `${GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label} ${i + 1}`, pick: () => void take({ sample: name }, 'garment') })) :
+                backgrounds.map((b) => ({ key: b.name, src: sampleThumb(b.name), label: b.label, pick: () => void take({ sample: b.name }, 'background') }))
               }
               busy={busy}
               onFile={(files) => void (picker?.role === 'model' ? add(setPerson, 'model') : picker?.role === 'background' ? add(setBackground, 'background') : add(setGarments, 'garment'))(files)}

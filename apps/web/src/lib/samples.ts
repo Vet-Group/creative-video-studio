@@ -5,6 +5,8 @@ import { bucketName, s3 } from './storage';
 
 export const SAMPLE_PREFIX = 'samples/';
 export const MAX_SAMPLE_BYTES = 50 * 1024 * 1024;
+/** The least size of a picker thumbnail (GET /api/samples/<name>?thumb=1): twice the largest photo dialog tile, 158 x 210 px at 1440 px wide (150 x 200 at 390), measured 2026-11-19. */
+export const SAMPLE_THUMB = { width: 316, height: 421 };
 const TYPES = { mp4: 'video/mp4', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', json: 'application/json' } as const;
 
 /** The content type of a valid sample name (lower-case words joined by dashes, one known extension), or null. */
