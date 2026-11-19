@@ -234,6 +234,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const fieldIds: Record<RunStopField, string> = { images: useId(), clips: useId(), end: useId(), prompt: useId() };
   const clipsId = useId();
   const anglesId = useId();
+  const modelTrigger = useId();
   const clipInput = useRef<HTMLInputElement>(null);
   const [clips, setClips] = useState<Clip[]>([]); // reference audio, sent only on a model that takes it
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples)
@@ -734,28 +735,64 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
       enhance={<EnhanceToggle on={enhance} onChange={setEnhance} />}
     />
   );
+  const first = images[0];
+  const loop = first !== undefined && endFrame?.id === first.id; // the clip ends on the picture it starts from
+  /** The model picker, opened from the end frame's hint: the member picks, since another model has another price. */
+  function openModels() {
+    const trigger = document.getElementById(modelTrigger);
+    trigger?.scrollIntoView({ block: 'center', behavior: 'instant' }); // instant: the open panel closes when the form scrolls under it
+    trigger?.click();
+  }
   // In the sections, the end frame sits in ③ Ending beside the last shot; with free writing or a preset, under the photos.
-  const endSlot = chosen?.endFrame && (
-    <Slot
-      label="Khung hình cuối"
-      optional
-      empty="Ảnh clip kết thúc ở đó"
-      inputLabel="Ảnh khung hình cuối"
-      images={endFrame ? [endFrame] : []}
-      max={1}
-      busy={busy}
-      onAdd={(files) => {
-        setError('');
-        setBusy(true);
-        uploadImages(files, 'image', storeId, 'end-frame')
-          .finally(loading('Đang tải lên…'))
-          .then(([img]) => img && setEndFrame(img), (e) => setError(uploadError(e)))
-          .finally(() => setBusy(false));
-      }}
-      onRemove={() => setEndFrame(null)}
-      onPick={setEndFrame}
-      storeId={storeId}
-    />
+  // A model without one says so in its place while another model in the list takes one.
+  const endSlot = chosen?.endFrame ? (
+    <div className="end-frame">
+      <Slot
+        label="Khung hình cuối"
+        optional
+        empty="Ảnh clip kết thúc ở đó"
+        inputLabel="Ảnh khung hình cuối"
+        images={endFrame ? [endFrame] : []}
+        max={1}
+        busy={busy}
+        onAdd={(files) => {
+          setError('');
+          setBusy(true);
+          uploadImages(files, 'image', storeId, 'end-frame')
+            .finally(loading('Đang tải lên…'))
+            .then(([img]) => img && setEndFrame(img), (e) => setError(uploadError(e)))
+            .finally(() => setBusy(false));
+        }}
+        onRemove={() => setEndFrame(null)}
+        onPick={setEndFrame}
+        storeId={storeId}
+      />
+      {first && (
+        <button type="button" className="end-loop" aria-pressed={loop} disabled={busy} onClick={() => setEndFrame(loop ? null : first)}>
+          {loop && <Icon name="check" size={12} />}
+          Dùng ảnh đầu làm khung cuối (video lặp)
+        </button>
+      )}
+      {first && endFrame && (
+        <figure className="end-path" aria-label="Đầu → Cuối">
+          <span aria-hidden="true">Đầu</span>
+          <img src={thumbUrl(first.id)} alt="" />
+          <Icon name="right" size={14} />
+          <img src={thumbUrl(endFrame.id)} alt="" />
+          <span aria-hidden="true">Cuối</span>
+        </figure>
+      )}
+    </div>
+  ) : (
+    chosen &&
+    models?.models.some((m) => m.endFrame) && (
+      <p className="help end-off">
+        Mô hình này không nhận khung hình cuối{endFrame ? ', ảnh khung cuối đã chọn sẽ không được gửi' : ''}.
+        <button type="button" className="link-button" onClick={openModels}>
+          Chọn mô hình khác
+        </button>
+      </p>
+    )
   );
 
   return (
@@ -951,6 +988,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                   models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))}
                   value={modelId}
                   onChange={setModelId}
+                  id={modelTrigger}
                 />
               )}
               {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}

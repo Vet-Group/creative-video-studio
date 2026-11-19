@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openTemplates, pickPreset, png, signIn } from './support.test';
+import { modelButton, openTemplates, pickPreset, png, signIn } from './support.test';
 
 // What Create video adds on a fal model that takes it, as Fash's Create Videos page does: an End frame slot, a Run from the prompt alone and reference
 // audio. The mock model takes none (the models API reads them from fal's request builders), so the spec gives it the flags in the models answer and
@@ -27,6 +27,22 @@ function nextRun(page: Page): Promise<{ assetIds: string[]; params: Record<strin
 }
 
 const endSlot = (page: Page) => page.getByRole('group', { name: 'Khung hình cuối' });
+const loopButton = (page: Page) => page.getByRole('button', { name: 'Dùng ảnh đầu làm khung cuối (video lặp)' });
+/** The strip under the end frame: the first image, an arrow, the end frame. */
+const endPath = (page: Page) => page.getByRole('figure', { name: 'Đầu → Cuối' });
+const photos = (page: Page) => page.getByRole('list', { name: 'Ảnh đã chọn', exact: true });
+const noEndHint = 'Mô hình này không nhận khung hình cuối.';
+
+/** The mock models plus one that takes an end frame, which the chosen Mock E2E does not. */
+async function withEndModel(page: Page): Promise<void> {
+  await page.route('**/api/models?*', async (route) => {
+    const res = await route.fetch();
+    const json = (await res.json()) as { models: Record<string, unknown>[] };
+    const mock = json.models.find((m) => m.id === 'mock-e2e')!;
+    json.models.push({ ...mock, id: 'mock-end', label: 'Mock End Frame', pairIds: [], recommended: false, endFrame: true });
+    await route.fulfill({ response: res, json });
+  });
+}
 
 // A models request still in the route when a test ends would fail it, so the routes go first.
 test.afterEach(({ page }) => page.unrouteAll({ behavior: 'ignoreErrors' }));
@@ -60,6 +76,121 @@ test('the End frame slot shows only for a model that takes one, and its image go
   const again = nextRun(page);
   await page.getByRole('button', { name: /^Tạo video/ }).click();
   expect((await again).params).toEqual({ audio: 'on' });
+});
+
+test('the loop shortcut makes the first image the end frame, the strip shows the clip going from it to the end frame, and the limits still hold', async ({ page }) => {
+  await signIn(page, 'cvxa');
+  await withExtras(page, { endFrame: true, endMaxImages: 1 });
+  await page.reload();
+  await expect(endSlot(page)).toBeVisible();
+  await expect(loopButton(page)).toHaveCount(0); // no image to loop yet
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles([
+    { name: 'start.png', mimeType: 'image/png', buffer: png() },
+    { name: 'side.png', mimeType: 'image/png', buffer: png() },
+  ]);
+  await expect(loopButton(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(endPath(page)).toHaveCount(0); // no end frame yet
+
+  await loopButton(page).click();
+  await expect(loopButton(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(endSlot(page).getByRole('img', { name: 'start.png' })).toBeVisible();
+  // The strip goes from the first image to the end frame: here the same picture.
+  const first = await photos(page).getByRole('img', { name: 'start.png' }).getAttribute('src');
+  await expect(endPath(page).locator('img')).toHaveCount(2);
+  await expect(endPath(page).locator('img').first()).toHaveAttribute('src', first!);
+  await expect(endPath(page).locator('img').last()).toHaveAttribute('src', first!);
+
+  // The model's limit on the images beside an end frame still stops Run, with its message.
+  const run = page.getByRole('button', { name: /^Tạo video/ });
+  await page.getByLabel('Mô tả chuyển động').fill('The bottle turns a full circle.');
+  await expect(page.getByText('Mô hình này chỉ nhận khung hình cuối khi có tối đa 1 ảnh. Bỏ bớt ảnh hoặc bỏ khung hình cuối.')).toBeVisible();
+  await expect(run).toBeDisabled();
+  await photos(page).getByRole('button', { name: 'Bỏ ảnh side.png' }).click();
+  const body = nextRun(page);
+  await run.click();
+  const sent = await body;
+  expect(sent.assetIds).toHaveLength(1);
+  expect(sent.params).toEqual({ audio: 'on', endAssetId: sent.assetIds[0] });
+
+  // Pressed again, it takes the end frame off.
+  await loopButton(page).click();
+  await expect(loopButton(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(endSlot(page).getByRole('img')).toHaveCount(0);
+  await expect(endPath(page)).toHaveCount(0);
+});
+
+test('an uploaded end frame shows in the strip after the first image, and the shortcut swaps it for the first image', async ({ page }) => {
+  await signIn(page, 'cvxa');
+  await withExtras(page, { endFrame: true });
+  await page.reload();
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'start.png', mimeType: 'image/png', buffer: png() });
+  await page.getByLabel('Ảnh khung hình cuối').setInputFiles({ name: 'end.png', mimeType: 'image/png', buffer: png() });
+  const end = await endSlot(page).getByRole('img', { name: 'end.png' }).getAttribute('src');
+  const first = await photos(page).getByRole('img', { name: 'start.png' }).getAttribute('src');
+  expect(end).not.toBe(first);
+  await expect(endPath(page).locator('img').first()).toHaveAttribute('src', first!);
+  await expect(endPath(page).locator('img').last()).toHaveAttribute('src', end!);
+  await expect(loopButton(page)).toHaveAttribute('aria-pressed', 'false');
+  await loopButton(page).click();
+  await expect(endSlot(page).getByRole('img', { name: 'start.png' })).toBeVisible();
+  await expect(endPath(page).locator('img').last()).toHaveAttribute('src', first!);
+});
+
+test('a model without an end frame says so where the slot goes while another model takes one, and its link opens the model picker without switching', async ({ page }) => {
+  await signIn(page, 'cvxa');
+  await expect(modelButton(page)).toContainText('Mock E2E');
+  await expect(page.getByText(noEndHint)).toHaveCount(0); // no model in the list takes one: nothing to point to
+
+  await withEndModel(page);
+  await page.reload();
+  // In ③ of the sections, beside the last shot; with free writing, under the photos.
+  await expect(page.getByRole('group', { name: '③ Kết · cảnh cuối' }).getByText(noEndHint)).toBeVisible();
+  await expect(endSlot(page)).toHaveCount(0);
+  await page.getByRole('radiogroup', { name: 'Cách viết prompt' }).getByText('Viết tự do').click();
+  await expect(page.getByText(noEndHint)).toBeVisible();
+  await page.getByRole('button', { name: 'Chọn mô hình khác' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Chọn mô hình' });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(modelButton(page)).toContainText('Mock E2E'); // the member picks: another model has another price
+});
+
+test.describe('touch phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('at 390 px the end frame fits the form, and the loop pill, the end frame’s remove button and the hint’s link take a 44 px tap', async ({ page }) => {
+    await signIn(page, 'cvxa');
+    await withEndModel(page);
+    await page.reload();
+    const link = page.getByRole('button', { name: 'Chọn mô hình khác' });
+    await link.scrollIntoViewIfNeeded();
+    expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+    await withExtras(page, { endFrame: true });
+    await page.reload();
+    await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'start.png', mimeType: 'image/png', buffer: png() });
+    await loopButton(page).click();
+    await expect(endPath(page)).toBeVisible();
+    expect((await loopButton(page).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    // The remove button draws 20 px; a tap 20 px from its middle on every side still lands on it.
+    const missed = await endSlot(page)
+      .getByRole('button', { name: 'Bỏ ảnh start.png' })
+      .evaluate(async (el) => {
+        el.scrollIntoView({ block: 'center', behavior: 'instant' });
+        await new Promise(requestAnimationFrame);
+        const r = el.getBoundingClientRect();
+        const [x, y] = [r.left + r.width / 2, r.top + r.height / 2];
+        return [[0, -20], [0, 20], [-20, 0], [20, 0]].filter(([dx, dy]) => !el.contains(document.elementFromPoint(x + dx!, y + dy!)));
+      });
+    expect(missed).toEqual([]);
+    for (const part of [loopButton(page), endPath(page), endSlot(page)]) {
+      const box = (await part.boundingBox())!;
+      expect(box.x + box.width).toBeLessThanOrEqual(390);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  });
 });
 
 test('a model that runs from the prompt alone lets Run go with no image and a written prompt, but not with a preset', async ({ page }) => {

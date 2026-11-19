@@ -318,8 +318,9 @@ export async function POST(request: Request) {
         if (problem) return bad(problem);
       }
     }
-    // The end frame is the caller's own image (whether the model takes one is checked with the model below).
-    if (given.endAssetId !== undefined) {
+    // The end frame is the caller's own image, or one of the Run's images (a clip that loops), which the check above already allowed: a company example's
+    // photo is not the member's own (whether the model takes one is checked with the model below).
+    if (given.endAssetId !== undefined && !assetIds.includes(given.endAssetId)) {
       const end = await pool.query(`select mime from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [given.endAssetId, userId, g.workspaceId]);
       if (!end.rows[0]?.mime.startsWith('image/')) return bad('params.endAssetId must be one of your own images');
     }

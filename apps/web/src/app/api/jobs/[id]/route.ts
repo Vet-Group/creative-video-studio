@@ -38,7 +38,10 @@ export async function GET(request: Request, { params }: RouteContext) {
       `select id, filename, mime${bytes ? ', bytes' : ''}, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
       [own ? ids : [], job.user_id, g.workspaceId],
     );
-  const [end, clips, video] = await Promise.all([owned(job.params.endAssetId ? [job.params.endAssetId] : []), owned(job.params.audioAssetIds?.split(',') ?? []), owned(job.params.videoAssetId ? [job.params.videoAssetId] : [], true)]);
+  // An end frame that is one of the inputs (a clip that loops) comes back with them, as a Run takes it (POST /api/jobs); any other only to its creator.
+  const endId = job.params.endAssetId;
+  const looped = endId !== undefined && job.input_asset_ids.includes(endId);
+  const [end, clips, video] = await Promise.all([looped ? { rows: images.rows.filter((r) => r.id === endId) } : owned(endId ? [endId] : []), owned(job.params.audioAssetIds?.split(',') ?? []), owned(job.params.videoAssetId ? [job.params.videoAssetId] : [], true)]);
   // A job of a batch app's Run (params.batch): the item of every job of that Run, so Reuse picks them all again. Only the creator's own Run: another member reuses the one job.
   const items = own && job.params.batch
     ? (
