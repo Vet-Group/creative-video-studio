@@ -1,0 +1,11 @@
+ALTER TABLE "jobs" DROP CONSTRAINT "jobs_feature_check";--> statement-breakpoint
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_feature_check" CHECK ("jobs"."feature" in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on', 'fashion_model', 'multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap'));--> statement-breakpoint
+-- The pet apps (owner-approved 2026-11-19): pet portrait (feature `pet_portrait`, one print-ready design per style), the mockup pack (`mockup_pack`, one product
+-- mockup per product, or the design on the member's own blank) and name swap (`name_swap`, one picture per name, optionally per breed and name). Each job carries
+-- the prompt its item makes (apps/web/src/lib/apps.ts), as breed swap does (0107). They run on the Nano Banana edit rows already here, which keep a design's
+-- colours, text and layout when they edit one part of it: Nano Banana 2.1 at its stored $0.04 for 1K and Nano Banana Pro at $0.15 (the better at text and at
+-- keeping a design exact), each with its Vertex twin (0075). No row is enabled or repriced here. Each gets a soft cap of 50 USD a month, as the owner set for breed_swap.
+INSERT INTO "feature_caps" ("feature", "monthly_usd") VALUES ('pet_portrait', 50), ('mockup_pack', 50), ('name_swap', 50) ON CONFLICT DO NOTHING;--> statement-breakpoint
+UPDATE "model_configs" SET "features" = array_append("features", 'pet_portrait') WHERE "id" IN ('nano-banana-2.1', 'nano-banana-2.1-vertex', 'nano-banana-pro', 'nano-banana-pro-vertex') AND NOT ('pet_portrait' = ANY("features"));--> statement-breakpoint
+UPDATE "model_configs" SET "features" = array_append("features", 'mockup_pack') WHERE "id" IN ('nano-banana-2.1', 'nano-banana-2.1-vertex', 'nano-banana-pro', 'nano-banana-pro-vertex') AND NOT ('mockup_pack' = ANY("features"));--> statement-breakpoint
+UPDATE "model_configs" SET "features" = array_append("features", 'name_swap') WHERE "id" IN ('nano-banana-2.1', 'nano-banana-2.1-vertex', 'nano-banana-pro', 'nano-banana-pro-vertex') AND NOT ('name_swap' = ANY("features"));

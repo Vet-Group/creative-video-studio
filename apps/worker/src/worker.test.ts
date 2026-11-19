@@ -933,6 +933,7 @@ describe('image jobs', () => {
     ['character_swap', [[500, 500], [600, 800]], 1], // new character, target
     ['jewelry_try_on', [[500, 500], [900, 400], [600, 800]], 2], // two pieces, wearer
     ['lingerie_try_on', [[500, 500], [900, 400], [600, 800]], 2], // two pieces, model
+    ['mockup_pack', [[500, 500], [600, 800]], 1], // design, the member's blank product photo
   ] as const)("a %s job at 'auto' asks the image model for the ratio of the input it keeps, not 'auto'", async (feature, sizes, kept) => {
     const asset = async ([width, height]: readonly [number, number]) => {
       const id = randomUUID();

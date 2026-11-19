@@ -160,6 +160,10 @@ export const USERS = {
   viewsa: { email: 'viewsa@e2e.test', name: 'E2E Views A', role: 'member' },
   // breed-swap.e2e: the breed swap app, one job per breed.
   breedsa: { email: 'breedsa@e2e.test', name: 'E2E Breeds A', role: 'member' },
+  // pet-apps.e2e: the pet portrait, mockup pack and name swap apps, one member each.
+  petsa: { email: 'petsa@e2e.test', name: 'E2E Pets A', role: 'member' },
+  mockupsa: { email: 'mockupsa@e2e.test', name: 'E2E Mockups A', role: 'member' },
+  namesa: { email: 'namesa@e2e.test', name: 'E2E Names A', role: 'member' },
   // changelog.e2e: the changelog page, the sidebar dot and the once-a-day popup, one member per test.
   chga: { email: 'chga@e2e.test', name: 'E2E Changelog A', role: 'member' },
   chgb: { email: 'chgb@e2e.test', name: 'E2E Changelog B', role: 'member' },

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { api, ApiError, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob, WORKSPACE_CHANGED_EVENT } from '@/lib/api';
-import { appBySlug, VIEW_LABELS } from '@/lib/apps';
+import { appBySlug, itemLabel } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
 import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
@@ -163,9 +163,9 @@ function WaitProgress({ job }: { job: TrayJob }) {
   );
 }
 
-/** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"); a multi-angle card adds its view and a breed swap card its breed, as each is its own job. */
+/** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"); a batch app's card adds its item (view, breed, style, product or name), as each is its own job. */
 const cardTitle = (job: TrayJob): string => {
-  const view = (job.view && VIEW_LABELS[job.view]) || job.breed;
+  const view = itemLabel(job);
   return job.feature === 'marketing' ? cardTitleOfFormat(job.format) : view ? `${featureLabel(job.feature)} · ${view}` : featureLabel(job.feature);
 };
 
@@ -173,7 +173,7 @@ const cardTitle = (job: TrayJob): string => {
  * One job in a page's History tab, laid out as Fash's History card: the result on the left; on the right the title, the member's own words,
  * the inputs, the ratio and length chips, the status and date, the icon actions and Dùng lại (Fash's Recreate, without the run).
  */
-function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean; select?: ReactNode }) {
+function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAdmin: boolean; select?: ReactNode; selectBatch?: () => void }) {
   const form = useForm();
   const apply = form?.apply;
   const takes = (k: 'durationSec' | 'ratio' | 'resolution') => !!apply && (!form?.settings || form.settings.includes(k));
@@ -411,6 +411,12 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
               <Icon name="download" /> Tải xuống
             </button>
           )}
+          {/* A batch app's Run: every result of it picked for the .zip under the cards. */}
+          {out && selectBatch && (
+            <button type="button" className="job-reuse" onClick={selectBatch}>
+              <Icon name="check" /> Chọn cả lô
+            </button>
+          )}
           {out && image && form?.result && (
             <button type="button" className="job-reuse job-result" onClick={() => form.result!({ asset: out })}>
               <Icon name="right" /> Dùng kết quả
@@ -490,6 +496,9 @@ export function Tray({ feature }: { feature?: string }) {
   const { workerOffline, loaded, failed, refresh, queue } = all;
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature) : all.jobs;
   const zip = useZipDownload();
+  // The results of the Run a batch app's card belongs to (as many as the 20 latest jobs hold).
+  const batchOf = (j: TrayJob) => (j.batch ? jobs.filter((b) => b.batch === j.batch && b.status === 'succeeded' && b.outputAssetId).map((b) => b.id) : []);
+  const selectBatch = (ids: string[]) => (zip.pickMany(ids), all.notify(`Đã chọn ${ids.length} ảnh của lô. Tải chúng bằng nút "Tải xuống .zip" dưới danh sách.`));
   // InvokeAI's queue count badge: the member's own jobs against the whole app's, so a wait reads as a busy queue rather than a stuck job.
   const mineQueued = all.jobs.filter((j) => j.status === 'queued').length;
   const mineRunning = all.jobs.filter((j) => j.status === 'submitting' || j.status === 'running').length;
@@ -506,7 +515,7 @@ export function Tray({ feature }: { feature?: string }) {
       {failed && <LoadError text={!navigator.onLine ? 'Mất kết nối mạng. Sẽ cập nhật lại khi có mạng.' : loaded ? 'Không cập nhật được danh sách lượt tạo.' : 'Không tải được danh sách lượt tạo.'} onRetry={refresh} />}
       {loaded && jobs.length === 0 && (feature ? <HistoryEmpty feature={feature} /> : <p className="muted">Chưa có lượt tạo nào.</p>)}
       <ul>
-        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
+        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} selectBatch={batchOf(j).length > 1 ? () => selectBatch(batchOf(j)) : undefined} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
       </ul>
       {/* Under the cards, so turning History into a tool row does not move them. */}
       {feature && jobs.some((j) => j.status === 'succeeded' && j.outputAssetId) && (

@@ -2382,6 +2382,135 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'pet-portrait': {
+    title: 'Chân dung thú cưng in sẵn từ một ảnh chụp',
+    sections: [
+      {
+        title: 'Chân dung thú cưng là gì?',
+        blocks: [
+          'Từ một ảnh chụp thú cưng của khách, ứng dụng vẽ lại con vật thành thiết kế in sẵn theo từng phong cách bạn chọn: màu nước, hoạt hình, nét mực đen, chân dung hoàng gia, pop art, vector phẳng, phác chì và sơn dầu. Mỗi phong cách là một ảnh riêng.',
+          `Mọi thiết kế đều trên nền trắng tinh, một con vật ở giữa, không chữ, không khung, để đặt lên áo, cốc, ornament hay thảm. AI giữ khuôn mặt, đốm lông, màu lông, màu mắt và dáng tai để chủ nuôi nhận ra ngay. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Tạo chân dung trong 3 bước',
+        lead: 'Tải ảnh thú cưng, chọn phong cách, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải ảnh thú cưng', text: 'Thêm một ảnh rõ nét, thấy trọn mặt và tai, chỉ có một con vật.' },
+              { title: 'Chọn phong cách', text: 'Đánh dấu các phong cách cần tạo. Mỗi phong cách tạo một ảnh riêng và tính tiền riêng; tổng tiền hiện trước khi chạy.' },
+              { title: 'Chạy', text: 'Bấm Chạy. Mỗi phong cách là một lượt trong tab Lịch sử; "Chọn cả lô" trên một thẻ chọn mọi ảnh của lần chạy đó để tải về một tệp .zip.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Giới hạn',
+        blocks: [
+          'Phong cách nét mực đen và phác chì không có màu, nên chỉ giữ được đốm và hoa văn lông, không giữ màu. Ảnh mờ, tối hay bị che một phần mặt làm AI đoán sai chi tiết: hãy so từng ảnh với ảnh gốc trước khi in.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Mỗi phong cách tốn bao nhiêu?', `${APP_COST} Mỗi phong cách là một ảnh nên tổng tiền bằng giá một ảnh nhân số phong cách đã chọn.`],
+              ['Ảnh có nền trong suốt không?', 'Không, nền là màu trắng tinh. Cần nền trong suốt thì đưa ảnh sang ứng dụng Xoá nền.'],
+              ['Ảnh có hai con vật thì sao?', 'Ứng dụng chỉ vẽ một con vật. Hãy cắt ảnh để chỉ còn con cần vẽ.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  'mockup-pack': {
+    title: 'Mockup hàng loạt từ một thiết kế',
+    sections: [
+      {
+        title: 'Mockup hàng loạt là gì?',
+        blocks: [
+          'Từ một thiết kế, ứng dụng tạo ảnh mockup sản phẩm cho từng loại bạn chọn: thảm tròn 3D trên sàn nhà, ornament kính tròn trên cây thông, áo thun cổ tròn trải phẳng, cốc sứ 11 oz, chăn lông trên sofa và tranh canvas trên tường. Mỗi sản phẩm là một ảnh riêng.',
+          `AI giữ nguyên thiết kế: màu, chữ, chính tả và bố cục, và giữ đúng hình dáng thật của sản phẩm. Có sẵn ảnh sản phẩm trơn của mình thì thêm vào ô thứ hai: AI in thiết kế lên đúng sản phẩm đó, giữ nguyên góc chụp, nền và ánh sáng. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Tạo mockup trong 3 bước',
+        lead: 'Tải thiết kế, chọn sản phẩm, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải thiết kế', text: 'Thêm thiết kế, tốt nhất là PNG nền trong hoặc nền trắng. Muốn in lên sản phẩm của mình thì thêm ảnh sản phẩm trơn vào ô thứ hai.' },
+              { title: 'Chọn sản phẩm', text: 'Đánh dấu các sản phẩm cần tạo; mỗi sản phẩm tạo một ảnh và tính tiền riêng. Có ảnh sản phẩm trơn thì chỉ chọn một sản phẩm, đúng loại trong ảnh đó.' },
+              { title: 'Chạy', text: 'Bấm Chạy. Mỗi sản phẩm là một lượt trong tab Lịch sử; "Chọn cả lô" trên một thẻ chọn mọi ảnh của lần chạy đó để tải về một tệp .zip.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Giới hạn',
+        blocks: [
+          'Chữ nhỏ trong thiết kế đôi khi bị vẽ lại khác đi một chút, nhất là trên cốc và ornament vì mặt cong. Nên chọn Nano Banana Pro nếu Admin đã bật, vì mô hình này giữ chữ và chi tiết thiết kế tốt hơn. Hãy xem lại từng ảnh trước khi đăng bán.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Mỗi sản phẩm tốn bao nhiêu?', `${APP_COST} Mỗi sản phẩm là một ảnh nên tổng tiền bằng giá một ảnh nhân số sản phẩm đã chọn.`],
+              ['Vì sao có ảnh sản phẩm trơn thì chỉ chọn được một sản phẩm?', 'Ảnh sản phẩm trơn là một sản phẩm cụ thể, nên AI in thiết kế lên đúng sản phẩm đó. Cần mockup cho loại khác thì chạy lại với ảnh trơn của loại ấy, hoặc bỏ ảnh trơn để dùng cảnh có sẵn.'],
+              ['Không thấy sản phẩm mình cần?', 'Danh sách có 6 sản phẩm bán chạy cho đồ thú cưng. Cần thêm loại nào thì gửi Góp ý, hoặc dùng ảnh sản phẩm trơn của bạn.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  'name-swap': {
+    title: 'Đổi tên hàng loạt trên một thiết kế',
+    sections: [
+      {
+        title: 'Đổi tên hàng loạt là gì?',
+        blocks: [
+          'Từ một thiết kế hay mockup có in tên (tên thú cưng, tên gia đình), ứng dụng tạo lại đúng ảnh đó với từng tên mới bạn nhập. Mỗi tên là một ảnh riêng, nên một thiết kế có đủ phiên bản để đăng bán hay gửi khách duyệt.',
+          `AI chỉ thay chữ tên, giữ phông chữ, cỡ chữ, màu, độ cong và vị trí, và giữ nguyên phần còn lại. Muốn đổi cả chú chó thì chọn thêm giống: mỗi tên ra một ảnh cho mỗi giống. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Đổi tên trong 3 bước',
+        lead: 'Tải thiết kế, nhập tên, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải thiết kế có tên', text: 'Thêm một thiết kế hoặc mockup có một tên in rõ trên đó.' },
+              { title: 'Nhập tên mới', text: 'Mỗi dòng một tên, tối đa 25 tên, mỗi tên tối đa 20 ký tự: chữ cái có dấu, chữ số, khoảng trắng, dấu nháy đơn và gạch nối. Có thể chọn thêm giống chó, tối đa 25 ảnh mỗi lần chạy.' },
+              { title: 'Chạy', text: 'Bấm Chạy. Mỗi tên là một lượt trong tab Lịch sử, thẻ ghi tên đó; "Chọn cả lô" chọn mọi ảnh của lần chạy để tải về một tệp .zip.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Giới hạn',
+        blocks: [
+          'AI vẽ lại chữ nên đôi khi viết sai một ký tự, nhất là chữ có dấu, chữ viết tay hay chữ uốn cong. Nên chọn Nano Banana Pro nếu Admin đã bật, vì mô hình này viết chữ chính xác hơn. Hãy đọc lại chính tả từng ảnh trước khi đăng bán hay in.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Mỗi tên tốn bao nhiêu?', `${APP_COST} Mỗi tên (hay mỗi cặp tên và giống) là một ảnh nên tổng tiền bằng giá một ảnh nhân số ảnh.`],
+              ['Vì sao không nhập được biểu tượng cảm xúc?', 'Tên đi thẳng vào mô tả gửi cho AI, nên chỉ nhận chữ cái, chữ số, khoảng trắng, dấu nháy đơn và gạch nối. Biểu tượng và ký hiệu khác thường bị vẽ sai.'],
+              ['Sửa một tên rồi chạy lại cả lô thế nào?', 'Bấm Dùng lại trên một thẻ của lô: ảnh, mọi tên và mọi giống của lần chạy đó quay lại biểu mẫu. Sửa tên cần đổi rồi bấm Chạy.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'ai-fashion-model': {
     title: 'Tạo người mẫu AI từ vài lựa chọn',
     sections: [

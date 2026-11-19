@@ -43,6 +43,12 @@ export interface AppConfig {
   views?: boolean;
   /** Shows the dog breeds (DOG_BREEDS) to pick (the breed swap app): Run sends one job per breed picked, each with its `params.breed` and the prompt breedSwapPrompt makes. */
   breeds?: boolean;
+  /** Shows the print styles (PET_STYLES) to pick (the pet portrait app): Run sends one job per style picked, each with its `params.style` and the prompt petPortraitPrompt makes. */
+  styles?: boolean;
+  /** Shows the products (MOCKUP_PRODUCTS) to pick (the mockup pack): Run sends one job per product picked, each with its `params.product` and the prompt mockupPrompt makes. */
+  products?: boolean;
+  /** Shows the names box and the breeds as an option (the name swap app): Run sends one job per name, or per name and breed, each with its `params.name` (and `params.breed`) and the prompt nameSwapPrompt makes. */
+  names?: boolean;
   /** An app that is not built yet: its page says so, and why. */
   soon?: string;
 }
@@ -200,6 +206,39 @@ export const APPS: AppConfig[] = [
     breeds: true,
   },
   {
+    // Ours too (the pet apps, 2026-11-19): one pet photo, one print-ready design per style, for a seller's custom pet portrait products.
+    slug: 'pet-portrait',
+    feature: 'pet_portrait',
+    name: 'Chân dung thú cưng',
+    description: 'Từ một ảnh thú cưng, tạo một thiết kế in sẵn nền trắng cho mỗi phong cách đã chọn: màu nước, hoạt hình, nét mực, chân dung hoàng gia và hơn nữa.',
+    category: 'photo',
+    slots: [{ label: 'Thú cưng', inputLabel: 'Ảnh thú cưng', empty: 'Thêm 1 ảnh chụp rõ mặt của một thú cưng' }],
+    styles: true,
+  },
+  {
+    // Ours too: one design, one product mockup per product, or the design on the seller's own blank product photo.
+    slug: 'mockup-pack',
+    feature: 'mockup_pack',
+    name: 'Mockup hàng loạt',
+    description: 'Từ một thiết kế, tạo một ảnh mockup cho mỗi sản phẩm đã chọn: thảm tròn, ornament, áo thun, cốc, chăn và tranh canvas.',
+    category: 'photo',
+    slots: [
+      { label: 'Thiết kế', inputLabel: 'Ảnh thiết kế', empty: 'Thêm 1 thiết kế, tốt nhất là PNG nền trong hoặc nền trắng' },
+      { label: 'Sản phẩm trơn (tuỳ chọn)', inputLabel: 'Ảnh sản phẩm trơn', empty: 'Thêm 1 ảnh sản phẩm trơn của bạn nếu muốn in lên đúng sản phẩm đó', optional: true },
+    ],
+    products: true,
+  },
+  {
+    // Ours too: one personalized design, one picture per customer name (and breed), so a seller lists one design for many names.
+    slug: 'name-swap',
+    feature: 'name_swap',
+    name: 'Đổi tên hàng loạt',
+    description: 'Từ một thiết kế có tên, tạo một ảnh cho mỗi tên mới, giữ nguyên phông chữ, màu và vị trí; có thể đổi cả giống chó.',
+    category: 'photo',
+    slots: [{ label: 'Thiết kế có tên', inputLabel: 'Ảnh thiết kế có tên', empty: 'Thêm 1 thiết kế hoặc mockup có một tên in trên đó' }],
+    names: true,
+  },
+  {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
     // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
     slug: 'smart-remake',
@@ -237,8 +276,14 @@ export interface AppDraft {
   failed: boolean;
   /** How many views are picked, on an app with `views`. */
   views?: number;
-  /** How many breeds are picked, on an app with `breeds`. */
+  /** How many breeds are picked, on an app with `breeds` (or `names`, where they are optional). */
   breeds?: number;
+  /** How many styles are picked, on an app with `styles`. */
+  styles?: number;
+  /** How many products are picked, on an app with `products`. */
+  products?: number;
+  /** The names box, on an app with `names`. */
+  names?: string;
 }
 
 /** The first thing that stops Run, in the order the form is filled; null when it can go. */
@@ -252,6 +297,16 @@ export function appReason(app: AppConfig, d: AppDraft): string | null {
   }
   if (app.views && !d.views) return 'Chọn ít nhất một góc.';
   if (app.breeds && !d.breeds) return 'Chọn ít nhất một giống chó.';
+  if (app.styles && !d.styles) return 'Chọn ít nhất một phong cách.';
+  if (app.products && !d.products) return 'Chọn ít nhất một sản phẩm.';
+  // The blank is one product, so its mockup is that one only.
+  if (app.products && d.images[1]!.length > 0 && d.products! > 1) return 'Có ảnh sản phẩm trơn thì chỉ chọn một sản phẩm: đúng loại trong ảnh đó.';
+  if (app.names) {
+    const { names, problem } = parseNames(d.names ?? '');
+    const jobs = names.length * Math.max(1, d.breeds ?? 0);
+    if (problem) return problem;
+    if (jobs > MAX_BATCH) return `Tối đa ${MAX_BATCH} ảnh mỗi lần chạy, đang là ${jobs}: bớt tên hoặc giống chó.`;
+  }
   if (app.prompt === 'background') {
     const reference = d.images[1]!.length > 0;
     const written = d.prompt.trim() !== '';
@@ -343,3 +398,113 @@ export const breedSwapPrompt = (breed: string): string =>
   'Keep the new dog in the same pose, at the same size and in the same position as the original dog, facing the same way. ' +
   'Keep everything else exactly unchanged: every text, name and number, the layout, the background, the product and its shape, the lighting and the art style. ' +
   'A photo stays a photo and an illustration stays an illustration in the same style. Do not add any text, logos or watermarks.';
+
+/** The batch apps: a Run sends one job per item picked, all with one `params.batch` id (a UUID), by which History's Reuse and "Chọn cả lô" find the whole Run. */
+export const BATCH_FEATURES = ['multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap'];
+export const isBatchId = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s);
+
+/** The most jobs one Run of the name swap app sends: its names, or its names times its breeds. */
+export const MAX_BATCH = 25;
+
+/** The print styles of the pet portrait app: the id a job keeps as `params.style`, the page's label and the English words its prompt takes. */
+export const PET_STYLES: { id: string; label: string; look: string }[] = [
+  { id: 'watercolor', label: 'Màu nước', look: 'a soft watercolor painting with gentle washes of color, light paper texture and loose, flowing edges' },
+  { id: 'cartoon', label: 'Hoạt hình', look: 'a cute cartoon illustration with bold clean outlines, flat bright colors and a slightly larger head' },
+  { id: 'line-art', label: 'Nét mực đen', look: 'black ink line art only: clean, confident lines, with no color, no gray and no filled shading' },
+  { id: 'royal', label: 'Chân dung hoàng gia', look: 'a royal Renaissance oil portrait, the pet wearing a red velvet cloak with an ermine collar and a gold chain, in rich classical light' },
+  { id: 'pop-art', label: 'Pop art', look: 'bold 1960s pop art screen print with flat saturated colors, strong black outlines and halftone dots' },
+  { id: 'flat-vector', label: 'Vector phẳng', look: 'a minimal flat vector illustration made of a few solid color shapes, with crisp edges and no gradients or texture' },
+  { id: 'pencil', label: 'Phác chì', look: 'a detailed graphite pencil sketch with fine hatching and soft shading, in shades of gray only' },
+  { id: 'oil', label: 'Sơn dầu', look: 'a classic oil painting with rich colors and visible, textured brushstrokes' },
+];
+
+/** The prompt of one pet portrait job: the pet of the photo in `style` (an id of PET_STYLES), as a design ready to print. POST /api/jobs takes no other. */
+export const petPortraitPrompt = (style: string): string =>
+  `Turn the pet in the photo into a print-ready design in this style: ${PET_STYLES.find((s) => s.id === style)!.look}. ` +
+  "Keep the pet's likeness exactly: its face, markings, coat colors and pattern, eye color and ear shape, as far as the style's colors allow, so its owner knows it at once. " +
+  'Show this one pet only, centered, with nothing of its head or ears cut off. ' +
+  'Use a plain pure white background with no scenery, shadow or vignette. No text, no letters, no frame, no border, no signature and no watermark. ' +
+  'Clean, sharp edges, ready to print on a product.';
+
+/** The products of the mockup pack: the id a job keeps as `params.product`, the page's label, what the product is and the scene of its mockup. */
+export const MOCKUP_PRODUCTS: { id: string; label: string; product: string; scene: string }[] = [
+  { id: 'round-rug', label: 'Thảm tròn 3D', product: 'round rug', scene: 'lying flat on a wooden floor in a cozy living room, seen from slightly above, the design covering the whole round face of the rug' },
+  { id: 'ornament', label: 'Ornament kính tròn', product: 'round glass Christmas ornament', scene: 'hanging from a ribbon on a decorated Christmas tree with warm, blurred lights behind it, the design printed on its front' },
+  { id: 'tshirt', label: 'Áo thun cổ tròn', product: 'crewneck t-shirt', scene: 'laid flat on a plain light surface and photographed from directly above, the design printed on the center of the chest' },
+  { id: 'mug', label: 'Cốc sứ 11 oz', product: 'white 11 oz ceramic mug', scene: 'standing on a wooden table in soft daylight with its handle to the right, the design printed on the side facing the camera and following its curve' },
+  { id: 'blanket', label: 'Chăn lông', product: 'fleece throw blanket', scene: 'draped over a sofa in a bright living room, the design printed across the whole blanket and following its folds' },
+  { id: 'canvas', label: 'Tranh canvas', product: 'stretched canvas print', scene: 'hanging on a plain wall above a console table in soft natural light, the design filling the whole canvas' },
+];
+
+const KEEP_DESIGN = 'Use the design exactly as it is: the same colors, text and spelling, layout and proportions, not redrawn, cropped, mirrored or added to.';
+
+/** The prompt of one mockup pack job: the design of the first image on `product` (an id of MOCKUP_PRODUCTS) in its scene, or, with `blank`, on the member's own blank product photo (the second image) kept as it is. POST /api/jobs takes no other. */
+export function mockupPrompt(product: string, blank: boolean): string {
+  const p = MOCKUP_PRODUCTS.find((m) => m.id === product)!;
+  return blank
+    ? `Put the design from the first image on the ${p.product} in the second image. Keep that product exactly as it is: its shape, size, color, material, angle, background and lighting. ${KEEP_DESIGN} ` +
+        "Fit the design to the product's printable surface, following its curves and folds, with natural shading over the print. Do not add any other text, logos or watermarks."
+    : `Make a realistic product photo of a ${p.product} ${p.scene}, using the design in the image. ${KEEP_DESIGN} ` +
+        "Keep the product's real shape and proportions, with natural light and shadows and the texture of its material showing through the print. Show one product only and do not add any other text, logos or watermarks.";
+}
+
+/** The longest name the name swap app takes, in characters. */
+export const MAX_NAME = 20;
+
+/** A name as the name swap box and POST /api/jobs take it: NFC, trimmed, inner spaces as one. */
+export const cleanName = (line: string): string => line.normalize('NFC').trim().replace(/\s+/g, ' ');
+
+/** Whether a clean name may go into the prompt: up to MAX_NAME Latin letters (Vietnamese ones too), digits, spaces, apostrophes and hyphens, with a letter or digit. No emoji, quotes or other symbols. */
+export const nameOk = (name: string): boolean => [...name].length <= MAX_NAME && /^[\p{Script=Latin}̀-ͯ0-9 '’-]+$/u.test(name) && /[\p{Script=Latin}0-9]/u.test(name);
+
+/** The names of the name swap box, one per line: cleaned, blank lines and repeats dropped, and the first thing wrong with them (null when a Run can take them). */
+export function parseNames(text: string): { names: string[]; problem: string | null } {
+  const names = [...new Set(text.split('\n').map(cleanName).filter(Boolean))];
+  const wrong = names.find((n) => !nameOk(n));
+  const problem =
+    names.length === 0
+      ? 'Nhập ít nhất một tên.'
+      : wrong !== undefined
+        ? [...wrong].length > MAX_NAME
+          ? `Tên "${wrong}" dài quá ${MAX_NAME} ký tự.`
+          : `Tên "${wrong}" chỉ được có chữ cái, chữ số, khoảng trắng, dấu nháy đơn và gạch nối.`
+        : names.length > MAX_BATCH
+          ? `Tối đa ${MAX_BATCH} tên mỗi lần chạy, đang có ${names.length}.`
+          : null;
+  return { names, problem };
+}
+
+/** The prompt of one name swap job: only the personalized name changes, to `name` (one nameOk takes), and with `breed` (one of DOG_BREEDS) the dog too. POST /api/jobs takes no other. */
+export const nameSwapPrompt = (name: string, breed?: string): string =>
+  `Replace only the personalized name in the image with the name "${name}", spelled exactly like that, letter for letter, with every accent mark. ` +
+  'Write it in exactly the same font, size, color, outline, curve and position as the old name; if it is longer or shorter, keep it centered on the same spot and shrink it only as much as needed to fit the same space. ' +
+  (breed ? `Also replace the dog with ${/^[AEIOU]/.test(breed) ? 'an' : 'a'} ${breed}, with the coat, colours and markings typical of the breed, in the same pose, at the same size and in the same position, facing the same way. ` : '') +
+  'Keep everything else exactly unchanged: the artwork, every other text and number, the layout, the background, the product and its shape, the lighting and the style. Do not add any other text, logos or watermarks.';
+
+/** One job of a batch app, as its params keep it: the view, breed, style, product or name it made. */
+export interface BatchItem {
+  view?: string | null;
+  breed?: string | null;
+  style?: string | null;
+  product?: string | null;
+  name?: string | null;
+}
+
+/** What one job of a batch app made, for its History card's title: the view's, style's or product's label, the name (with its breed) or the breed; null for any other job. */
+export const itemLabel = (p: BatchItem): string | null =>
+  (p.view && VIEW_LABELS[p.view]) ||
+  (p.style && PET_STYLES.find((s) => s.id === p.style)?.label) ||
+  (p.product && MOCKUP_PRODUCTS.find((m) => m.id === p.product)?.label) ||
+  (p.name && [p.name, p.breed].filter(Boolean).join(' · ')) ||
+  p.breed ||
+  null;
+
+/** The prompt of one job of an app that writes its own (breed swap, pet portrait, mockup pack, name swap), which POST /api/jobs holds the job to; undefined for any other app.
+ * `blank`: the mockup pack's job has the member's blank product photo. */
+export function itemPrompt(feature: string, p: BatchItem, blank = false): string | undefined {
+  if (feature === 'breed_swap') return breedSwapPrompt(p.breed!);
+  if (feature === 'pet_portrait') return petPortraitPrompt(p.style!);
+  if (feature === 'mockup_pack') return mockupPrompt(p.product!, blank);
+  if (feature === 'name_swap') return nameSwapPrompt(p.name!, p.breed ?? undefined);
+  return undefined;
+}

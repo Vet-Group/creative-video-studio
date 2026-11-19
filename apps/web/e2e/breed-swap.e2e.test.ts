@@ -11,7 +11,7 @@ const pickModel = async (page: Page, name: RegExp) => {
 };
 
 // The breed swap app: one picture with a dog in, one job per breed picked, each with its breed in the prompt and titled with it in History.
-test('picks three breeds for a picture with a dog, sees the price of one image per breed, runs one job per breed and reuses one of them', async ({ page }) => {
+test('picks three breeds for a picture with a dog, sees the price of one image per breed, runs one job per breed and reuses the whole batch from one of them', async ({ page }) => {
   await signIn(page, 'breedsa');
   await page.goto('/apps');
   await page.getByRole('list', { name: 'Danh sách ứng dụng' }).getByRole('link').filter({ hasText: 'Đổi giống chó hàng loạt' }).click();
@@ -49,10 +49,11 @@ test('picks three breeds for a picture with a dog, sees the price of one image p
   }
   for (const breed of ['Golden Retriever', 'Pug', 'Australian Shepherd']) await expect(page.getByRole('heading', { name: `Đổi giống chó · ${breed}`, level: 3 })).toBeVisible();
 
-  // Reuse one card: the picture back in its slot and only that card's breed picked.
+  // Reuse one card: the picture back in its slot and every breed of its Run picked again.
   const pug = (await mine()).find((j) => j.breed === 'Pug')!;
   await page.goto(`/apps/breed-swap?reuse=${pug.id}`);
   await expect(page.getByRole('group', { name: 'Ảnh gốc' }).getByRole('img', { name: 'rug.png' })).toBeVisible();
-  await expect(breeds(page).getByRole('checkbox', { name: 'Pug' })).toBeChecked();
-  for (const name of ['Golden Retriever', 'Australian Shepherd']) await expect(breeds(page).getByRole('checkbox', { name })).not.toBeChecked();
+  for (const name of ['Golden Retriever', 'Pug', 'Australian Shepherd']) await expect(breeds(page).getByRole('checkbox', { name })).toBeChecked();
+  await expect(breeds(page).getByRole('checkbox', { name: 'Beagle' })).not.toBeChecked();
+  await expect(cost(page)).toHaveText('3 ảnh × $0.0000 = $0.0000');
 });

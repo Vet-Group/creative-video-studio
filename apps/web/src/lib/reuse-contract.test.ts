@@ -23,7 +23,11 @@ const READERS: Record<string, string[]> = {
   audio: ['components/CreateForm.tsx', 'components/MarketingStudio.tsx'],
   orientation: ['components/AppPage.tsx'], // Motion Control
   view: ['components/AppPage.tsx'], // the multi-angle app
-  breed: ['components/AppPage.tsx'], // the breed swap app
+  breed: ['components/AppPage.tsx'], // the breed swap and name swap apps
+  style: ['components/AppPage.tsx'], // the pet portrait app
+  product: ['components/AppPage.tsx'], // the mockup pack
+  name: ['components/AppPage.tsx'], // the name swap app
+  batchItems: ['components/AppPage.tsx'], // every item of a batch app's Run
   ratio: ['components/image-tools.tsx', 'components/CreateForm.tsx', 'components/MarketingStudio.tsx'],
   garments: ['components/TryOn.tsx'],
   pose: ['components/TryOn.tsx'],

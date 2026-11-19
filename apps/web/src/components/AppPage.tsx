@@ -5,7 +5,7 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, type AppCategory, breedSwapPrompt, DEFAULT_VIEWS, DOG_BREEDS, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, type AppCategory, BATCH_FEATURES, type BatchItem, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MOCKUP_PRODUCTS, motionReason, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { alignInputs, placesOf, type Skipped, skippedNote } from '@/lib/reuse';
 import { confirmRun, sendRun } from '@/lib/run-guard';
@@ -31,6 +31,34 @@ import { Templates } from './Templates';
 export type Tab = 'create' | 'history' | 'examples' | 'about';
 export const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 const CATEGORY_ICON: Record<AppCategory, IconName> = { fashion: 'tryon', photo: 'image', video: 'create', utility: 'library' };
+/** Under the prompt preview of an app that writes one prompt per item: what the other items' prompts change. */
+const REST_NOTE: Record<string, string> = {
+  breed_swap: 'giống còn lại dùng prompt như trên, chỉ khác tên giống.',
+  pet_portrait: 'phong cách còn lại dùng prompt như trên, chỉ khác phần mô tả phong cách.',
+  mockup_pack: 'sản phẩm còn lại dùng prompt như trên, chỉ khác phần mô tả sản phẩm.',
+  name_swap: 'ảnh còn lại dùng prompt như trên, chỉ khác tên (và giống chó).',
+};
+
+/** A batch app's items to pick (the pet portrait's styles, the mockup pack's products) as a row of checkbox chips, as the views and breeds are; `children` add the help and the price under them. */
+function ItemChecks({ label, items, picked, onChange, children }: { label: string; items: { id: string; label: string }[]; picked: string[]; onChange: (ids: string[]) => void; children: ReactNode }) {
+  const id = useId();
+  return (
+    <div className="field">
+      <span id={id} className="field-label">
+        {label}
+      </span>
+      <div className="segmented theme-choice angle-choice" role="group" aria-labelledby={id}>
+        {items.map((it) => (
+          <label key={it.id}>
+            <input type="checkbox" checked={picked.includes(it.id)} onChange={() => onChange(picked.includes(it.id) ? picked.filter((x) => x !== it.id) : [...picked, it.id])} />
+            {it.label}
+          </label>
+        ))}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 /** The picture of an app on a card and in the page header: its sample loop or still, else a tinted tile with the icon of its category. The loop plays under reduced motion too, as on the reference site's Apps pages. */
 export function AppArt({ app, page }: { app: AppConfig; page?: boolean }) {
@@ -119,11 +147,16 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [views, setViews] = useState(DEFAULT_VIEWS); // the multi-angle app: one job per view
-  const [breeds, setBreeds] = useState<string[]>([]); // the breed swap app: one job per breed, none until the member picks (each costs a job)
+  const [breeds, setBreeds] = useState<string[]>([]); // the breed swap app: one job per breed, none until the member picks (each costs a job); optional on name swap
+  const [styles, setStyles] = useState<string[]>([]); // the pet portrait app: one job per style, none until picked
+  const [products, setProducts] = useState<string[]>([]); // the mockup pack: one job per product, none until picked
+  const [names, setNames] = useState(''); // the name swap app's box: one job per name (or per name and breed)
   const promptId = useId();
   const reasonId = useId();
   const viewsId = useId();
   const breedsId = useId();
+  const namesId = useId();
+  const namesHelpId = useId();
   const { models, failed } = useImageModels(app.feature);
   const count = images.reduce((n, list) => n + list.length, 0);
   const pick = useImageChoice(models, Math.max(1, count));
@@ -157,8 +190,14 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       if (placed) setImages(placed);
       const extra = j.images && placed ? j.images.length - placed.flat().length : 0;
       setPrompt(j.brief ?? '');
-      if (j.view) setViews([j.view]);
-      if (j.breed) setBreeds([j.breed]);
+      // A batch app's job brings back every item of its Run, so the member changes one thing and runs the batch again (another member's job, only its own).
+      const items: BatchItem[] = j.batchItems ?? [j];
+      const all = (k: keyof BatchItem) => [...new Set(items.map((i) => i[k]).filter((v): v is string => !!v))];
+      if (j.view) setViews(all('view'));
+      if (j.breed || j.name) setBreeds(all('breed'));
+      if (j.style) setStyles(all('style'));
+      if (j.product) setProducts(all('product'));
+      if (j.name) setNames(all('name').join('\n'));
       pick.refill({ ...j, ...(extra > 0 && { extra: { count: extra, max: slots!.flat().length } }) });
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
@@ -166,20 +205,30 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   // The swaps add the member's text to their fixed instruction, so it shares the model's limit with it.
   const fixed = app.prompt === 'optional' ? FEATURE_PROMPTS[app.feature]!.length + 2 : 0;
   const room = chosen && chosen.maxPromptChars - fixed;
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
   /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
   const sent = basePrompt(app.feature, appInputs(app, { images, prompt }).prompt);
-  // The multi-angle app sends one job per view picked, in the order of PRODUCT_VIEWS, and the breed swap app one per breed picked, in the order of DOG_BREEDS,
-  // each with its breed's prompt; every other app one job with neither.
-  const runs: { view?: string; breed?: string }[] = app.views
+  const blank = app.products === true && images[1]!.length > 0; // the mockup pack's own blank product photo
+  const pickedBreeds = DOG_BREEDS.filter((b) => breeds.includes(b));
+  // A batch app sends one job per item picked, in the order of its list (PRODUCT_VIEWS, DOG_BREEDS, PET_STYLES, MOCKUP_PRODUCTS), and the name swap app one per name, or per name and breed,
+  // each with the prompt its item makes (itemPrompt) but the multi-angle app's; every other app one job with none.
+  const runs: BatchItem[] = app.views
     ? PRODUCT_VIEWS.filter((v) => views.includes(v.id)).map((v) => ({ view: v.id }))
     : app.breeds
-      ? DOG_BREEDS.filter((b) => breeds.includes(b)).map((breed) => ({ breed }))
-      : [{}];
-  const estimate = app.views || app.breeds ? runTotal(pick.estimate, runs.length) : pick.estimate;
-  // The breed prompts differ only in the breed, so the preview shows the first one.
-  const prompts = app.breeds ? runs.slice(0, 1).map((r) => breedSwapPrompt(r.breed!)) : sent ? [sent] : [];
+      ? pickedBreeds.map((breed) => ({ breed }))
+      : app.styles
+        ? PET_STYLES.filter((s) => styles.includes(s.id)).map((s) => ({ style: s.id }))
+        : app.products
+          ? MOCKUP_PRODUCTS.filter((p) => products.includes(p.id)).map((p) => ({ product: p.id }))
+          : app.names
+            ? parseNames(names).names.flatMap((name) => (pickedBreeds.length > 0 ? pickedBreeds.map((breed) => ({ name, breed })) : [{ name }]))
+            : [{}];
+  const batchApp = BATCH_FEATURES.includes(app.feature);
+  const estimate = batchApp ? runTotal(pick.estimate, runs.length) : pick.estimate;
+  // The item prompts differ only in their item, so the preview shows the first one.
+  const first = runs[0] && itemPrompt(app.feature, runs[0], blank);
+  const prompts = first ? [first] : sent ? [sent] : [];
   const runCost = runs.length > 0 && pick.estimate !== undefined && (
     <p className="help" role="status">
       {runs.length} ảnh × ${pick.estimate} = ${estimate}
@@ -224,15 +273,17 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     setError('');
     setNotice('');
     let done = 0;
+    const batch = batchApp ? crypto.randomUUID() : undefined; // one id on every job of this Run, by which History's Reuse and "Chọn cả lô" find it again
     try {
       for (const one of runs) {
+        const own = itemPrompt(app.feature, one, blank);
         const body = {
           feature: app.feature,
           modelId: pick.modelId,
           ...appInputs(app, { images, prompt }),
-          ...(one.breed && { prompt: breedSwapPrompt(one.breed) }),
+          ...(own && { prompt: own }),
           ratio: pick.ratio,
-          params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }), ...one }, // the member's own text, kept for reuse
+          params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }), ...one, ...(batch && { batch }) }, // the member's own text, kept for reuse
         };
         // As on Create's angles, the first job stands for the batch: a batch the same as the last one asks before anything is sent.
         if (done > 0) await api('/api/jobs', sendJson('POST', body));
@@ -314,10 +365,36 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
               </div>
             )}
 
-            {app.breeds && (
+            {app.styles && (
+              <ItemChecks label="Phong cách cần tạo" items={PET_STYLES} picked={styles} onChange={setStyles}>
+                <p className="help">Mỗi phong cách tạo một thiết kế riêng trên nền trắng và tính tiền riêng. AI giữ khuôn mặt, đốm lông và màu mắt của thú cưng; hãy xem lại từng ảnh trước khi in.</p>
+                {runCost}
+              </ItemChecks>
+            )}
+
+            {app.products && (
+              <ItemChecks label="Sản phẩm cần tạo" items={MOCKUP_PRODUCTS} picked={products} onChange={setProducts}>
+                <p className="help">Mỗi sản phẩm tạo một ảnh mockup riêng và tính tiền riêng. Có ảnh sản phẩm trơn thì chỉ chọn một sản phẩm, đúng loại trong ảnh đó: AI in thiết kế lên chính sản phẩm ấy.</p>
+                {runCost}
+              </ItemChecks>
+            )}
+
+            {app.names && (
+              <div className="field">
+                <label htmlFor={namesId} className="field-label">
+                  Tên mới, mỗi dòng một tên
+                </label>
+                <textarea id={namesId} className="names-box" rows={5} value={names} placeholder={'Max\nBella\nCharlie'} aria-describedby={namesHelpId} onChange={(e) => setNames(e.target.value)} />
+                <p id={namesHelpId} className="help">
+                  Tối đa {MAX_BATCH} tên, mỗi tên tối đa {MAX_NAME} ký tự: chữ cái (có dấu), chữ số, khoảng trắng, dấu nháy đơn và gạch nối. Tên trùng chỉ tạo một lần.
+                </p>
+              </div>
+            )}
+
+            {(app.breeds || app.names) && (
               <div className="field">
                 <span id={breedsId} className="field-label">
-                  Giống chó cần tạo
+                  {app.names ? 'Đổi cả giống chó (tuỳ chọn)' : 'Giống chó cần tạo'}
                 </span>
                 <div className="segmented theme-choice angle-choice" role="group" aria-labelledby={breedsId}>
                   {DOG_BREEDS.map((b) => (
@@ -327,7 +404,11 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                     </label>
                   ))}
                 </div>
-                <p className="help">Mỗi giống tạo một ảnh riêng và tính tiền riêng. AI chỉ đổi chú chó, giữ nguyên chữ, tên và bố cục; hãy xem lại từng ảnh trước khi đăng bán.</p>
+                <p className="help">
+                  {app.names
+                    ? `Không chọn giống nào thì chỉ đổi tên. Chọn giống thì mỗi tên ra một ảnh cho mỗi giống, tối đa ${MAX_BATCH} ảnh mỗi lần chạy; mỗi ảnh tính tiền riêng. Hãy xem lại chính tả từng tên trước khi đăng bán.`
+                    : 'Mỗi giống tạo một ảnh riêng và tính tiền riêng. AI chỉ đổi chú chó, giữ nguyên chữ, tên và bố cục; hãy xem lại từng ảnh trước khi đăng bán.'}
+                </p>
                 {runCost}
               </div>
             )}
@@ -350,9 +431,9 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
               <PromptPreview
                 feature={app.feature}
                 prompts={prompts}
-                labels={app.breeds ? [runs[0]!.breed!] : undefined}
+                labels={first ? [itemLabel(runs[0]!)] : undefined}
                 limit={chosen?.maxPromptChars}
-                note={app.breeds && runs.length > 1 ? `${runs.length - 1} giống còn lại dùng prompt như trên, chỉ khác tên giống.` : undefined}
+                note={first && runs.length > 1 ? `${runs.length - 1} ${REST_NOTE[app.feature]}` : undefined}
               />
             )}
 
