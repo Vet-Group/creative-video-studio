@@ -46,7 +46,17 @@ export const VERDICTS = ['pass', 'fail'] as const;
 /** The id of the "unassigned" team that migration 0002 seeds; users.team_id defaults to it. */
 export const DEFAULT_TEAM_ID = 'team-unassigned';
 
+export const WORKSPACE_ROLES = ['owner', 'member'] as const;
+/** The company's workspace, which migration 0107 seeds and files every earlier row under (docs/WORKSPACES.md). */
+export const COMPANY_WORKSPACE_ID = 'ws_vet';
+
 const tstz = (name: string) => timestamp(name, { withTimezone: true });
+// The workspace a root row belongs to (docs/WORKSPACES.md §2). The default fills the rows from before workspaces; phase 2b drops it.
+const workspaceId = () =>
+  text('workspace_id')
+    .notNull()
+    .default(COMPANY_WORKSPACE_ID)
+    .references((): AnyPgColumn => workspaces.id, { onDelete: 'restrict' });
 
 export const teams = pgTable(
   'teams',
@@ -77,8 +87,9 @@ export const stores = pgTable('stores', {
   brandVoice: text('brand_voice'),
   brandColors: text('brand_colors').array().notNull().default(sql`'{}'`),
   brandTagline: text('brand_tagline'),
+  workspaceId: workspaceId(),
   createdAt: tstz('created_at').notNull().defaultNow(),
-});
+}, (t) => [index('stores_workspace_id_idx').on(t.workspaceId)]);
 
 // Property names follow better-auth's models; apps/web/src/lib/auth.ts maps its drizzle adapter onto these tables.
 export const users = pgTable(
@@ -120,6 +131,39 @@ export const users = pgTable(
     uniqueIndex('users_email_key').on(sql`lower(${t.email})`),
     index('users_team_id_idx').on(t.teamId),
     check('users_role_check', sql`${t.role} in ('member', 'admin')`),
+  ],
+);
+
+// A tenant (docs/WORKSPACES.md): its members see only its rows. Disabled (disabled_at set): it refuses its members' requests and keeps its data.
+export const workspaces = pgTable(
+  'workspaces',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    disabledAt: tstz('disabled_at'),
+  },
+  (t) => [uniqueIndex('workspaces_name_key').on(sql`lower(${t.name})`)],
+);
+
+export const workspaceMembers = pgTable(
+  'workspace_members',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: WORKSPACE_ROLES }).notNull(),
+    addedBy: text('added_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.userId] }),
+    index('workspace_members_user_id_idx').on(t.userId),
+    check('workspace_members_role_check', sql`${t.role} in ('owner', 'member')`),
   ],
 );
 
@@ -239,11 +283,13 @@ export const assets = pgTable(
     sha256: text('sha256'),
     /** The form slot an input was uploaded or first used for (lib/upload-slots.ts: garment, model, product...), for the uploaded-photos picker's tabs; null when unknown. */
     slot: text('slot'),
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
     deletedAt: tstz('deleted_at'),
   },
   (t) => [
     index('assets_owner_id_idx').on(t.ownerId),
+    index('assets_workspace_id_created_at_idx').on(t.workspaceId, t.createdAt.desc().nullsFirst()),
     index('assets_owner_id_sha256_idx').on(t.ownerId, t.sha256),
     index('assets_owner_id_store_id_created_at_idx').on(t.ownerId, t.storeId, t.createdAt),
     check('assets_kind_check', sql`${t.kind} in ('input', 'output')`),
@@ -298,6 +344,7 @@ export const presetProposals = pgTable(
     status: text('status', { enum: PROPOSAL_STATUSES }).notNull().default('pending'),
     decidedBy: text('decided_by').references(() => users.id, { onDelete: 'restrict' }),
     decidedAt: tstz('decided_at'),
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
   (t) => [
@@ -459,6 +506,7 @@ export const jobs = pgTable(
     isMock: boolean('is_mock').notNull().default(false),
     outputAssetId: text('output_asset_id').references(() => assets.id, { onDelete: 'restrict' }),
     posterAssetId: text('poster_asset_id').references(() => assets.id, { onDelete: 'restrict' }),
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
     /** When the job entered running; queue wait does not count. */
     startedAt: tstz('started_at'),
@@ -468,6 +516,7 @@ export const jobs = pgTable(
   },
   (t) => [
     index('jobs_user_id_created_at_idx').on(t.userId, t.createdAt),
+    index('jobs_workspace_id_created_at_idx').on(t.workspaceId, t.createdAt.desc().nullsFirst()),
     index('jobs_status_idx').on(t.status),
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
     check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9', '4:1', '1:4', '8:1', '1:8')`),
@@ -505,6 +554,8 @@ export const costEntries = pgTable(
     isFinal: boolean('is_final').notNull().default(false),
     ref: text('ref').unique(),
     note: text('note'),
+    /** Never updated (append-only): rows from before workspaces got the column's constant default, which rewrites nothing and fires no row trigger. */
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
   (t) => [
@@ -594,9 +645,11 @@ export const analyses = pgTable(
     finishedAt: tstz('finished_at'),
     sharedTitle: text('shared_title'),
     sharedAt: tstz('shared_at'),
+    workspaceId: workspaceId(),
   },
   (t) => [
     check('analyses_shared_check', sql`(${t.sharedTitle} is null) = (${t.sharedAt} is null)`),
+    index('analyses_workspace_id_idx').on(t.workspaceId),
     index('analyses_shared_at_idx')
       .on(t.sharedAt)
       .where(sql`${t.sharedAt} is not null`),
@@ -631,6 +684,7 @@ export const remakes = pgTable(
     outputAssetId: text('output_asset_id').references(() => assets.id, { onDelete: 'set null' }),
     costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
     error: text('error'),
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
     startedAt: tstz('started_at'),
     finishedAt: tstz('finished_at'),
@@ -689,11 +743,13 @@ export const userTemplates = pgTable(
     data: jsonb('data').notNull(),
     isCompany: boolean('is_company').notNull().default(false),
     storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
   (t) => [
     index('user_templates_user_id_idx').on(t.userId),
     index('user_templates_store_id_idx').on(t.storeId),
+    index('user_templates_workspace_id_idx').on(t.workspaceId),
     check('user_templates_name_check', sql`char_length(${t.name}) between 1 and 60`),
     check('user_templates_scope_check', sql`not (${t.isCompany} and ${t.storeId} is not null)`),
   ],
@@ -719,11 +775,13 @@ export const userChoices = pgTable(
     storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
     niche: text('niche'),
     imageAssetId: text('image_asset_id').references(() => assets.id, { onDelete: 'set null' }),
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
   (t) => [
     index('user_choices_user_id_idx').on(t.userId),
     index('user_choices_store_id_kind_idx').on(t.storeId, t.kind),
+    index('user_choices_workspace_id_idx').on(t.workspaceId),
     check('user_choices_kind_check', sql`${t.kind} in ('hook', 'location', 'ending')`),
     check('user_choices_niche_check', sql`${t.niche} is null or char_length(${t.niche}) between 1 and 30`),
     check('user_choices_scope_check', sql`not (${t.isCompany} and ${t.storeId} is not null)`),
@@ -745,6 +803,7 @@ export const suggestionRuns = pgTable(
     output: jsonb('output'),
     costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
     status: text('status', { enum: ['queued', 'succeeded', 'failed'] }).notNull().default('queued'),
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
   (t) => [index('suggestion_runs_user_created_idx').on(t.userId, t.createdAt)],
@@ -820,12 +879,14 @@ export const feedback = pgTable(
     imageAssetIds: text('image_asset_ids').array().notNull(),
     status: text('status', { enum: FEEDBACK_STATUSES }).notNull().default('new'),
     adminNote: text('admin_note'),
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
   (t) => [
     index('feedback_created_idx').on(t.createdAt),
     index('feedback_status_idx').on(t.status),
+    index('feedback_workspace_id_idx').on(t.workspaceId),
     check('feedback_kind_check', sql`${t.kind} in ('feedback', 'bug', 'feature')`),
     check('feedback_status_check', sql`${t.status} in ('new', 'reviewing', 'done', 'rejected')`),
     check('feedback_title_check', sql`char_length(${t.title}) between 1 and 120`),
@@ -944,12 +1005,14 @@ export const fashionModels = pgTable(
     traits: jsonb('traits').notNull().default({}),
     shared: boolean('shared').notNull().default(false),
     sharedLocked: boolean('shared_locked').notNull().default(false),
+    workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
     deletedAt: tstz('deleted_at'),
   },
   (t) => [
     index('fashion_models_user_id_idx').on(t.userId),
     index('fashion_models_asset_id_idx').on(t.assetId),
+    index('fashion_models_workspace_id_idx').on(t.workspaceId),
     check('fashion_models_name_check', sql`char_length(${t.name}) between 1 and 60`),
   ],
 );

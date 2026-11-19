@@ -18,8 +18,12 @@ export function staleTestDatabases(names: string[], now = Date.now()): string[] 
   });
 }
 
-/** A random database name, or `fixedName` (replacing any database of that name left behind) when the caller must know the URL up front. */
-export async function createTestDatabase(fixedName?: string): Promise<{ url: string; drop: () => Promise<void> }> {
+/** A random database name, or `fixedName` (replacing any database of that name left behind) when the caller must know the URL up front.
+ * `migrationsFolder` lets a migration test start from the schema before its migration. */
+export async function createTestDatabase(
+  fixedName?: string,
+  migrationsFolder = fileURLToPath(new URL('../migrations', import.meta.url)),
+): Promise<{ url: string; drop: () => Promise<void> }> {
   const base = new URL(databaseUrl());
   const name = fixedName ?? `cvs_test_${Math.floor(Date.now() / 1000).toString(36)}_${randomBytes(6).toString('hex')}`;
   const run = async (q: string) => {
@@ -45,7 +49,7 @@ export async function createTestDatabase(fixedName?: string): Promise<{ url: str
   const pool = new pg.Pool({ connectionString: url.toString(), max: 1 });
   try {
     try {
-      await migrate(drizzle(pool), { migrationsFolder: fileURLToPath(new URL('../migrations', import.meta.url)) });
+      await migrate(drizzle(pool), { migrationsFolder });
     } finally {
       await pool.end();
     }

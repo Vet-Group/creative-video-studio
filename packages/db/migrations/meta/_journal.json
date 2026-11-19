@@ -736,6 +736,13 @@
 			"when": 1795700000000,
 			"tag": "0105_multi_angle",
 			"breakpoints": true
+		},
+		{
+			"idx": 105,
+			"version": "7",
+			"when": 1795900000000,
+			"tag": "0107_workspaces",
+			"breakpoints": true
 		}
 	]
 }
