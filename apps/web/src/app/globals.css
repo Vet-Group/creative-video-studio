@@ -1101,6 +1101,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .portrait-no-pose { min-height: 32px; margin: 0 0 16px; }
 /* Try On's own-model form in the model picker (OwnModel.tsx): the free-text box as the choice form's, the price beside the button's words. */
 .own-model textarea { display: block; width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: vertical; }
+.names-box { display: block; width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: inherit; font-size: 14px; line-height: 21px; resize: vertical; } /* the name swap app's names, as the own-model box */
 .own-model > button.primary { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; }
 /* The model just made, with Fash's Use This Model and Create Another under it. */
 .own-model-made { display: grid; justify-items: center; gap: 12px; }

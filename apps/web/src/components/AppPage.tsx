@@ -384,7 +384,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 <label htmlFor={namesId} className="field-label">
                   Tên mới, mỗi dòng một tên
                 </label>
-                <textarea id={namesId} rows={5} value={names} placeholder={'Max\nBella\nCharlie'} aria-describedby={namesHelpId} onChange={(e) => setNames(e.target.value)} />
+                <textarea id={namesId} className="names-box" rows={5} value={names} placeholder={'Max\nBella\nCharlie'} aria-describedby={namesHelpId} onChange={(e) => setNames(e.target.value)} />
                 <p id={namesHelpId} className="help">
                   Tối đa {MAX_BATCH} tên, mỗi tên tối đa {MAX_NAME} ký tự: chữ cái (có dấu), chữ số, khoảng trắng, dấu nháy đơn và gạch nối. Tên trùng chỉ tạo một lần.
                 </p>
