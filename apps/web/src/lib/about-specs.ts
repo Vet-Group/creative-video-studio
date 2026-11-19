@@ -100,5 +100,7 @@ export interface AboutSection {
 export interface AboutPage {
   title: string;
   lead?: string;
+  /** The page's tutorial video, a sample name without `.mp4` (its `.jpg` is the poster): shown under the lead with sound and controls once an Admin uploads it, and listed on /tutorials. */
+  video?: string;
   sections: AboutSection[];
 }

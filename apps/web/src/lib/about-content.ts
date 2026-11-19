@@ -15,6 +15,7 @@ const RIGHTS = 'Chỉ dùng ảnh mà công ty có quyền sử dụng, và ch�
 const create: AboutPage = {
   title: 'Tạo video sản phẩm từ ảnh',
   lead: 'Đưa vào một ảnh sản phẩm và một câu tả điều sẽ xảy ra, bạn nhận lại một video. Trang này biến ảnh sản phẩm thành video mà không cần quay. Phần dưới giải thích cách tạo video hoạt động, mỗi họ mô hình mạnh ở đâu và cách viết mô tả chuyển động để ra đúng clip bạn hình dung.',
+  video: 'tutorial-create',
   sections: [
     {
       kicker: 'Vì sao quan trọng',
@@ -384,6 +385,7 @@ const create: AboutPage = {
 const tryOn: AboutPage = {
   title: 'Thử đồ trên người mẫu',
   lead: 'Tải ảnh trang phục, chọn người mặc, và bạn nhận lại một bức ảnh. Phần dưới giải thích thử đồ bằng AI thực sự hoạt động ra sao, và kết quả thường hỏng ở đâu.',
+  video: 'tutorial-try-on',
   sections: [
     {
       kicker: 'Vì sao quan trọng',
@@ -677,6 +679,7 @@ const tryOn: AboutPage = {
 const image: AboutPage = {
   title: 'Tạo ảnh thời trang bằng AI cho thương hiệu bán online',
   lead: 'Tải lên một ảnh và nói điều cần đổi, AI dựng phần còn lại. Không cần buổi chụp, không studio, không ê-kíp. Phần dưới giải thích cách làm, từng thiết lập để làm gì và cách viết mô tả để ra gần đúng điều bạn hình dung.',
+  video: 'tutorial-image',
   sections: [
     {
       kicker: 'Vì sao quan trọng',

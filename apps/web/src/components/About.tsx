@@ -7,8 +7,19 @@ import { useEffect, useState } from 'react';
 import type { ABOUT } from '@/lib/about-content';
 import { type AboutBlock, type AboutCard, type SpecModel, withLiveSpecs } from '@/lib/about-specs';
 import { cardSample } from '@/lib/examples';
-import { useSamples } from '@/lib/use-samples';
+import { useSamples, versionedSample } from '@/lib/use-samples';
 import { CardMedia } from './CardMedia';
+
+/** A page's tutorial video with sound and controls, as the reference site's How to Use clips; nothing until its `<name>.mp4` sample is uploaded. */
+export function Tutorial({ name, title }: { name: string; title: string }) {
+  const { video, poster } = cardSample(useSamples(), name);
+  if (!video) return null;
+  return (
+    <figure className="about-video">
+      <video src={versionedSample(video)} poster={poster ? versionedSample(poster) : undefined} controls playsInline preload="none" aria-label={`Video hướng dẫn: ${title}`} />
+    </figure>
+  );
+}
 
 /** A sample's loop or still; the empty stripes while it is not uploaded, so the slot keeps its place.
  * About clips play under reduced motion too (owner, 2026-11-02): they show what a result looks like, and a still poster hid that. */
@@ -183,6 +194,7 @@ export function About({ page: key, app, long = false, models }: { page?: keyof t
     <article className={long ? 'about about-long' : 'about'}>
       <h2>{page.title}</h2>
       {page.lead && <p className="about-intro">{page.lead}</p>}
+      {page.video && <Tutorial name={page.video} title={page.title} />}
       {page.sections.map((s) => (
         <section key={s.title}>
           {s.kicker && <p className="about-kicker">{s.kicker}</p>}
