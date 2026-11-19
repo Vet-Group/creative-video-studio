@@ -315,6 +315,21 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 @keyframes nav-progress { 0% { transform: scaleX(.3); } 12.5% { transform: scaleX(.55); } 25% { transform: scaleX(.7); } 100% { transform: scaleX(.9); } } /* 30% at once, 70% by 2 s, then slower; linear so the stops set the curve */
 /* The live sidebar's red "New" pill beside Marketing Studio. */
 .nav-badge { flex: none; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--badge-new); color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .01em; }
+/* The Apps row's chevron and its sub-list of app shortcuts (Shell.tsx AppsNav): small text indented to the labels above, no icons. */
+.nav-parent { display: flex; align-items: center; gap: 2px; }
+.nav-parent > :first-child { flex: 1; min-width: 0; }
+.nav-toggle { display: grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--text-subtle); cursor: pointer; transition: background-color .15s; }
+.nav-toggle:hover { background: var(--fill); color: var(--ink); }
+.nav-toggle .icon { transition: transform .15s; }
+.nav-toggle[aria-expanded='true'] .icon { transform: rotate(180deg); }
+.nav-sub { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.nav-sub[hidden] { display: none; }
+.sidebar nav .nav-sub a { height: 32px; padding: 4px 12px 4px 44px; font-size: 13px; line-height: 20px; }
+@media (pointer: coarse) {
+  .nav-toggle { width: 44px; height: 44px; }
+  .sidebar nav .nav-sub a { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .nav-toggle, .nav-toggle .icon { transition: none; } }
 .sidebar nav a:hover, .sidebar nav a[aria-current='page'] { background: var(--fill); }
 .sidebar nav a[aria-current='page'] { color: var(--ink); }
 .sidebar nav a[aria-current='page'] .nav-icon { color: var(--ink); }
@@ -397,6 +412,7 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
   .app[data-collapsed='true'] .content { margin-left: 64px; }
   .app[data-collapsed='true'] .brand { flex-direction: column; padding: 0; }
   .app[data-collapsed='true'] .nav-badge { display: none; }
+  .app[data-collapsed='true'] :is(.nav-toggle, .nav-sub) { display: none; } /* the rail has no room for a sub-list: expand it to see the apps */
   .app[data-collapsed='true'] :is(.brand strong, .nav-label, .nav-group-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .app[data-collapsed='true'] .sidebar nav a { justify-content: center; padding: 8px 0; }
   .app[data-collapsed='true'] .nav-icon { margin-right: 0; }

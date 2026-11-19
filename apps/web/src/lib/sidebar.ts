@@ -1,4 +1,5 @@
 import type { IconName } from '@/components/Icon';
+import { type AppConfig, appBySlug, visibleApps } from './apps';
 import { toolGuide } from './tool-guide';
 
 /** A cookie, so the server renders the rail already collapsed and the page does not jump on load. Shared by the layout and the Shell. */
@@ -64,6 +65,18 @@ export const navGroups = (isAdmin: boolean, feedbackNew = 0, analyzeEnabled = fa
   const base = manage.length ? [...groups, { label: 'Quản lý', items: manage }] : groups;
   if (feedbackNew <= 0) return base;
   return base.map((g) => ({ ...g, items: g.items.map((it) => (it.href === '/feedback' ? { ...it, badge: String(feedbackNew) } : it)) }));
+};
+
+/** The sidebar's open/closed choice for the Apps sub-list, kept in this browser only. */
+export const APPS_OPEN_KEY = 'cvs.sidebar.apps.open';
+
+/** The apps listed under the Apps item, in the order of the reference site (Jewelry, Lingerie, Model Generator, Media Optimizer, Background Changer). */
+const APP_SHORTCUT_SLUGS = ['jewelry-try-on', 'lingerie-try-on', 'ai-fashion-model', 'media-optimizer', 'background-changer'];
+
+/** The shortcuts the member is offered: the Apps index's own visibility rule applies, so an app it hides is not listed here either. */
+export const appShortcuts = (smartRemake: boolean): AppConfig[] => {
+  const offered = new Set(visibleApps(smartRemake));
+  return APP_SHORTCUT_SLUGS.map((s) => appBySlug(s)).filter((a): a is AppConfig => a !== undefined && offered.has(a));
 };
 
 /** Ctrl+, (Cmd+, on a Mac) opens Settings from anywhere, even while typing: Windows and Linux browsers leave it free. */

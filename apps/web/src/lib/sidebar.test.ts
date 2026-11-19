@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { isSettingsShortcut, navGroups } from './sidebar';
+import { filterApps } from './apps';
+import { appShortcuts, isSettingsShortcut, navGroups } from './sidebar';
 
 const key = (k: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey', boolean>> = {}) => ({ key: k, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
 
@@ -49,4 +50,11 @@ test('the feedback item shows its count as a badge (new items for an Admin, upda
   expect(feedback(true, 0)?.badge).toBeUndefined();
   expect(feedback(false, 2)?.badge).toBe('2');
   expect(feedback(false, 0)?.badge).toBeUndefined();
+});
+
+test('the Apps shortcuts are the five apps of the reference site, in its order, each an app the Apps index shows', () => {
+  const slugs = appShortcuts(false).map((a) => a.slug);
+  expect(slugs).toEqual(['jewelry-try-on', 'lingerie-try-on', 'ai-fashion-model', 'media-optimizer', 'background-changer']);
+  expect(appShortcuts(true).map((a) => a.slug)).toEqual(slugs);
+  expect(slugs.every((s) => filterApps('all', '', false).some((a) => a.slug === s))).toBe(true);
 });

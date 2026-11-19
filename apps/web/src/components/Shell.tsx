@@ -14,7 +14,7 @@ import { featureLabel } from '@/lib/features';
 import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
 import { userAvatarColor } from '@/lib/profile';
-import { COLLAPSED_COOKIE, isMac, isSettingsShortcut, navGroups } from '@/lib/sidebar';
+import { APPS_OPEN_KEY, appShortcuts, COLLAPSED_COOKIE, isMac, isSettingsShortcut, navGroups } from '@/lib/sidebar';
 import { confirmRerun, confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
@@ -28,6 +28,7 @@ import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { RatingPrompt } from './Rating';
 import { Select } from './Select';
+import { useSmartRemakeEnabled } from './SmartRemakeGate';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
 import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, InputThumb, JobPrompt, JobsProvider, photoDrag, Recreate, resultHref, roleOf, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
@@ -682,6 +683,48 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
 ];
 
 /**
+ * The "Ứng dụng" row with a chevron that opens a sub-list of the apps behind it (Jewelry Try-On to Background Changer, as on the reference site), under the
+ * "Tất cả ứng dụng" link. The choice is kept in localStorage (closed until chosen, and always when storage is unavailable); the icon rail hides both.
+ */
+function AppsNav({ row, pathname }: { row: ReactNode; pathname: string }) {
+  const listId = useId();
+  const apps = appShortcuts(useSmartRemakeEnabled());
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setOpen(localStorage.getItem(APPS_OPEN_KEY) === '1');
+    } catch {}
+  }, []);
+  function toggle() {
+    try {
+      localStorage.setItem(APPS_OPEN_KEY, open ? '0' : '1');
+    } catch {}
+    setOpen(!open);
+  }
+  const item = (href: string, text: string, current: boolean) => (
+    <li key={href}>
+      <Link href={href} aria-current={current ? 'page' : undefined}>
+        {text}
+      </Link>
+    </li>
+  );
+  return (
+    <>
+      <div className="nav-parent">
+        {row}
+        <button type="button" className="nav-toggle" aria-expanded={open} aria-controls={listId} aria-label="Ứng dụng nhanh" onClick={toggle}>
+          <Icon name="down" size={16} />
+        </button>
+      </div>
+      <ul id={listId} className="nav-sub" aria-label="Ứng dụng nhanh" hidden={!open}>
+        {item('/apps', 'Tất cả ứng dụng', pathname === '/apps')}
+        {apps.map((a) => item(`/apps/${a.slug}`, a.name, pathname === `/apps/${a.slug}`))}
+      </ul>
+    </>
+  );
+}
+
+/**
  * The workspace switcher under the brand, for a user in two or more active workspaces (docs/WORKSPACES.md phase 3): marks the one this page acts in, and a
  * pick sets the browser's workspace (POST /api/me/workspace, which checks the membership) and reloads the page in it.
  */
@@ -857,7 +900,10 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
                         {g.items.some((n) => n.hint) && <ToolGuideButton className="nav-guide">Chọn công cụ nào?</ToolGuideButton>}
                       </div>
                     )}
-                    {g.items.map((n) => link(n.href, n.text, n.icon, current(n.href), n.badge, n.hint, n.href === '/changelog' && changelogDot))}
+                    {g.items.map((n) => {
+                      const row = link(n.href, n.text, n.icon, current(n.href), n.badge, n.hint, n.href === '/changelog' && changelogDot);
+                      return n.href === '/apps' ? <AppsNav key={n.href} row={row} pathname={pathname} /> : row;
+                    })}
                   </div>
                 ))}
               </nav>
