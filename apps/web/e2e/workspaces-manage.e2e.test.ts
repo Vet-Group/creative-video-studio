@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { createPool } from '@cvs/db/client';
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { loginReady, newAddress, openSettings, signIn } from './support.test';
@@ -31,6 +32,9 @@ async function phone(browser: Browser, from: BrowserContext): Promise<Page> {
   const context = await browser.newContext({ storageState: await from.storageState(), viewport: { width: 390, height: 844 }, colorScheme: 'dark' });
   return context.newPage();
 }
+/** Serious or critical axe violations on the page, as a11y.e2e counts them. */
+const blocking = async (page: Page) =>
+  (await new AxeBuilder({ page }).exclude('nextjs-portal').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(' | ')}`);
 const switcher = (page: Page) => page.getByRole('combobox', { name: 'Không gian làm việc', exact: true });
 
 test('an Admin creates a partner workspace, its owner adds a member, who switches workspaces; a stale tab is told to reload', async ({ browser }) => {
@@ -113,6 +117,8 @@ test('an Admin creates a partner workspace, its owner adds a member, who switche
   await ownerPhone.goto('/members');
   await expect(ownerPhone.getByRole('table').getByRole('row').filter({ hasText: USERS.wsboth.email })).toBeVisible();
   await shot(ownerPhone, 'members-390-dark', true);
+  expect.soft(await blocking(ownerPhone), '/members dark').toEqual([]);
+  expect.soft(await blocking(owner), '/members light').toEqual([]);
   await ownerPhone.context().close();
   await db.query(`insert into feedback (id, user_id, team_id, kind, title, body, image_asset_ids, workspace_id) select $1, id, team_id, 'feature', $2, 'b', '{}', $3 from users where email = $4`, [
     `wsm-${run}`,
@@ -142,6 +148,7 @@ test('an Admin creates a partner workspace, its owner adds a member, who switche
   await switcher(bothPhone).click();
   await expect(bothPhone.getByRole('listbox', { name: 'Không gian làm việc' }).getByRole('option')).toHaveCount(2);
   await shot(bothPhone, 'switcher-390-dark');
+  expect.soft(await blocking(bothPhone), 'switcher dark').toEqual([]);
   await bothPhone.context().close();
 
   // 5. A second tab still shows the partner workspace while the first switches back: its next write is refused and it offers the reload.
