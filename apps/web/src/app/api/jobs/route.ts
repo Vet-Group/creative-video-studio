@@ -3,7 +3,7 @@ import { checkCaps, dailyClips } from '@cvs/core/limits';
 import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, MOTION_IMAGE_MAX_SEC, PRODUCT_VIEWS, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { videoInputs, videoRefProblem } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
-import { ASPECTS, FEATURES } from '@cvs/db';
+import { ASPECTS, COMPANY_WORKSPACE_ID, FEATURES } from '@cvs/db';
 import { fillInputSlots } from '@cvs/db/assets';
 import { pool } from '@/lib/auth';
 import { CAP_MESSAGES } from '@/lib/caps';
@@ -66,8 +66,8 @@ export async function GET(request: Request) {
               exists (select 1 from favorites f where f.user_id = $1 and f.job_id = j.id) as favorite,
               (select c.usd::text from cost_entries c where c.job_id = j.id and c.kind = 'estimate') as estimate_usd,
               coalesce((select bool_or(c.is_final) and sum(c.usd) = 0 from cost_entries c where c.job_id = j.id), false) as unbilled
-         from jobs j where j.user_id = $1 and j.deleted_at is null order by j.created_at desc, j.id desc limit 20`,
-      [g.session.user.id],
+         from jobs j where j.user_id = $1 and j.workspace_id = $2 and j.deleted_at is null order by j.created_at desc, j.id desc limit 20`,
+      [g.session.user.id, g.workspaceId],
     ),
     pool.query(`select not exists (select 1 from worker_heartbeat where beat_at > now() - interval '60 seconds') as offline`),
     dailyClips(pool, g.session.user.id),
@@ -210,7 +210,7 @@ export async function POST(request: Request) {
     if (given.quality !== undefined && !QUALITIES.includes(given.quality)) return bad(`params.quality must be one of ${QUALITIES.join(', ')}`);
     // A built-in hook or location, or the member's own or a company one (lib/choices.ts).
     for (const key of ['hook', 'location'] as const) {
-      if (given[key] !== undefined && !(await findChoice(userId, key, given[key]))) return bad(`params.${key} must be one of the built-in ${key}s, your own or the company's`);
+      if (given[key] !== undefined && !(await findChoice(userId, g.workspaceId, key, given[key]))) return bad(`params.${key} must be one of the built-in ${key}s, your own or the company's`);
     }
     // The member's text kept for reuse: the brief, the own hook and the last shot are part of the prompt, which the model's limit holds below; the script is held
     // to what a clip can say, and the end text to what fits on the last frame.
@@ -251,10 +251,11 @@ export async function POST(request: Request) {
     if (prompt !== null && ((prompt === '' && !motion) || prompt.length > PROMPT_CEILING)) return bad(`the prompt must have 1 to ${PROMPT_CEILING} characters`);
     const usable = await pool.query(
       `select a.id, a.mime, a.duration_ms from assets a
-        where a.id = any($1::text[]) and a.deleted_at is null and a.kind = 'input'
-          and (a.owner_id = $2 or exists (select 1 from jobs j where a.id = any(j.input_asset_ids) and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null)
-               or exists (select 1 from fashion_models f where f.asset_id = a.id and f.deleted_at is null and (f.user_id = $2 or f.shared)))`,
-      [assetIds, userId],
+        where a.id = any($1::text[]) and a.workspace_id = $3 and a.deleted_at is null and a.kind = 'input'
+          and (a.owner_id = $2
+               or exists (select 1 from jobs j where a.id = any(j.input_asset_ids) and j.workspace_id = $3 and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null)
+               or exists (select 1 from fashion_models f where f.asset_id = a.id and f.workspace_id = $3 and f.deleted_at is null and (f.user_id = $2 or f.shared)))`,
+      [assetIds, userId, g.workspaceId],
     );
     if (usable.rowCount !== assetIds.length) return bad('one or more assets do not exist or cannot be used');
     const byId = new Map(usable.rows.map((r: { id: string; mime: string; duration_ms: number | null }) => [r.id, r]));
@@ -267,14 +268,22 @@ export async function POST(request: Request) {
     // total length are checked with the model below.
     if (given.audioAssetIds !== undefined) {
       const clips = given.audioAssetIds.split(',');
-      const own = await pool.query(`select mime, duration_ms from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null`, [clips, userId]);
+      const own = await pool.query(`select mime, duration_ms from assets where id = any($1::text[]) and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [
+        clips,
+        userId,
+        g.workspaceId,
+      ]);
       if (new Set(clips).size !== clips.length || own.rowCount !== clips.length || own.rows.some((r) => !r.mime.startsWith('audio/'))) return bad('params.audioAssetIds must list your own audio clips, separated by commas');
       if (own.rows.some((r) => r.duration_ms < MIN_AUDIO_MS)) return bad('each audio clip must last at least 2 seconds');
     }
     // The reference video is the caller's own MP4 or MOV clip, on Advanced only (whether the model takes one, and its length and size, are checked with the model below).
     if (given.videoAssetId !== undefined) {
       if (!advanced) return bad('params.videoAssetId is for Advanced only');
-      const clip = await pool.query(`select mime, s3_key from assets where id = $1 and owner_id = $2 and kind = 'input' and deleted_at is null`, [given.videoAssetId, userId]);
+      const clip = await pool.query(`select mime, s3_key from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [
+        given.videoAssetId,
+        userId,
+        g.workspaceId,
+      ]);
       if (!clip.rows[0]?.mime.startsWith('video/')) return bad('params.videoAssetId must be one of your own videos');
       // Its picture size and frame rate against the model's limits (videoRefProblem), read from the file's header here, outside the lock. A file or a header that cannot
       // be read passes (as does a frame rate the header does not give): fal then decides.
@@ -295,7 +304,7 @@ export async function POST(request: Request) {
     }
     // The end frame is the caller's own image (whether the model takes one is checked with the model below).
     if (given.endAssetId !== undefined) {
-      const end = await pool.query(`select mime from assets where id = $1 and owner_id = $2 and kind = 'input' and deleted_at is null`, [given.endAssetId, userId]);
+      const end = await pool.query(`select mime from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [given.endAssetId, userId, g.workspaceId]);
       if (!end.rows[0]?.mime.startsWith('image/')) return bad('params.endAssetId must be one of your own images');
     }
     const length = motion ? Math.ceil(byId.get(assetIds[1] as string)!.duration_ms! / 1000) : (durationSec as number);
@@ -315,7 +324,7 @@ export async function POST(request: Request) {
     let s = spec;
     let original: { team_id: string; provider: string; prompt: string; enhanced_prompt: string | null; retry_of: string | null } | undefined;
     if (retryOf !== null || rerunOf !== null) {
-      const o = (await tx.query('select user_id, team_id, store_id, status, error, retry_of, input_asset_ids, model, provider, preset_id, prompt, enhance, enhanced_prompt, aspect, duration_s, feature, params, deleted_at from jobs where id = $1', [retryOf ?? rerunOf])).rows[0];
+      const o = (await tx.query('select user_id, team_id, store_id, status, error, retry_of, input_asset_ids, model, provider, preset_id, prompt, enhance, enhanced_prompt, aspect, duration_s, feature, params, deleted_at from jobs where id = $1 and workspace_id = $2', [retryOf ?? rerunOf, g.workspaceId])).rows[0];
       if (rerunOf !== null) {
         // Someone else's job, or one in the trash, is not found; the rest is a new Run like any other, so the caps, the estimate and the ledger below apply in full.
         if (!o || o.user_id !== userId || o.deleted_at !== null) return Response.json({ error: 'the job to rerun does not exist' }, { status: 404 });
@@ -324,7 +333,7 @@ export async function POST(request: Request) {
         if (!o) return Response.json({ error: 'the job to retry does not exist' }, { status: 404 });
         if (o.user_id !== userId) return Response.json({ error: 'only the owner of a job may retry it' }, { status: 403 });
         if (!['failed', 'timed_out', 'failed_unknown'].includes(o.status)) return Response.json({ error: 'only a failed job can be retried' }, { status: 409 });
-        if (o.retry_of !== null || (await tx.query('select 1 from jobs where retry_of = $1', [retryOf])).rowCount) {
+        if (o.retry_of !== null || (await tx.query('select 1 from jobs where retry_of = $1 and workspace_id = $2', [retryOf, g.workspaceId])).rowCount) {
           return Response.json({ error: 'a job can be retried only once, and a retry cannot be retried' }, { status: 409 });
         }
       }
@@ -337,7 +346,7 @@ export async function POST(request: Request) {
       }
       // A rerun is a new Run: it names the cheaper row of a pair (the job may have run on the dearer one), and a store hidden since is dropped, as Reuse does.
       if (rerunOf !== null && o.retry_of === null) modelId = (await tx.query('select coalesce(twin_of, id) as id from model_configs where id = $1', [o.model])).rows[0]?.id ?? o.model;
-      const storeId = rerunOf !== null && o.store_id !== null && !(await tx.query('select 1 from stores where id = $1 and not hidden', [o.store_id])).rowCount ? null : o.store_id;
+      const storeId = rerunOf !== null && o.store_id !== null && !(await tx.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [o.store_id, g.workspaceId])).rowCount ? null : o.store_id;
       s = { assetIds: o.input_asset_ids, modelId, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId, feature: o.feature, params: o.params, enhance: o.enhance, useBrand: false };
       original = o;
     }
@@ -355,7 +364,7 @@ export async function POST(request: Request) {
     const clips = params.audioAssetIds?.split(',') ?? [];
     // A Set: the end frame may be the first image again, for a clip that loops.
     const inputs = [...new Set([...assetIds, ...(params.endAssetId ? [params.endAssetId] : []), ...(params.videoAssetId ? [params.videoAssetId] : []), ...clips])];
-    const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [inputs]);
+    const live = await tx.query('select 1 from assets where id = any($1::text[]) and workspace_id = $2 and deleted_at is null', [inputs, g.workspaceId]);
     if (live.rowCount !== inputs.length) {
       return rerunOf !== null ? Response.json({ error: 'Không chạy lại được: ảnh hoặc video đầu vào của lượt này đã bị xoá.' }, { status: 409 }) : bad('one or more assets were deleted');
     }
@@ -375,7 +384,7 @@ export async function POST(request: Request) {
     if (params.endAssetId !== undefined && endImages !== null && assetIds.length > endImages) return bad(`the model takes an end frame with at most ${endImages} images`);
     if (clips.length > 0) {
       const takes = takesNow.audioClips;
-      const ms = (await tx.query('select coalesce(sum(duration_ms), 0)::int as ms from assets where id = any($1::text[])', [clips])).rows[0].ms as number;
+      const ms = (await tx.query('select coalesce(sum(duration_ms), 0)::int as ms from assets where id = any($1::text[]) and workspace_id = $2', [clips, g.workspaceId])).rows[0].ms as number;
       if (!takes || clips.length > takes.max || ms > takes.seconds * 1000) return bad(takes ? `the model takes at most ${takes.max} audio clips, ${takes.seconds} seconds in all` : 'the model does not take reference audio');
     }
     // The reference video: the model must take one, the clip must fit its length and size, and the images fit with it (Kling O3 allows 4 in all); its seconds, rounded up, price the Run.
@@ -384,7 +393,7 @@ export async function POST(request: Request) {
       const takes = videoInputs(model.endpoint).videoRefs;
       if (!takes) return bad('the model does not take a reference video');
       if (takes.silent && params.audio === 'on') return bad('the model makes no sound with a reference video; send params.audio off');
-      const clip = (await tx.query('select duration_ms, bytes from assets where id = $1', [params.videoAssetId])).rows[0] as { duration_ms: number | null; bytes: number };
+      const clip = (await tx.query('select duration_ms, bytes from assets where id = $1 and workspace_id = $2', [params.videoAssetId, g.workspaceId])).rows[0] as { duration_ms: number | null; bytes: number };
       if (clip.duration_ms === null || clip.duration_ms < takes.minSec * 1000 || clip.duration_ms > takes.maxSec * 1000) return bad(`the reference video must last ${takes.minSec} to ${takes.maxSec} seconds on this model`);
       if (takes.maxMb !== null && clip.bytes > takes.maxMb * 1024 * 1024) return bad(`the reference video may be at most ${takes.maxMb} MB on this model`);
       if (takes.maxImages !== null && assetIds.length > takes.maxImages) return bad(`the model takes at most ${takes.maxImages} images with a reference video`);
@@ -409,7 +418,7 @@ export async function POST(request: Request) {
         if (preset === undefined) return bad('the preset does not exist or is not enabled');
         prompt = isImage ? `${freePrompt}\n\n${preset}` : preset;
       }
-      const store = storeId === null ? null : (await tx.query(`select brand_voice as "brandVoice", brand_colors as "brandColors", brand_tagline as "brandTagline" from stores where id = $1 and not hidden`, [storeId])).rows[0];
+      const store = storeId === null ? null : (await tx.query(`select brand_voice as "brandVoice", brand_colors as "brandColors", brand_tagline as "brandTagline" from stores where id = $1 and workspace_id = $2 and not hidden`, [storeId, g.workspaceId])).rows[0];
       if (storeId !== null && !store) return bad('the store does not exist or is hidden');
       // The brand kit goes after the member's words and the style, into the stored prompt, so History, Retry and the worker all see what the provider got;
       // `params.brand` marks it for the switch's memory, and on Image Generation the member's own words stay the one brief (a style already set it).
@@ -443,13 +452,16 @@ export async function POST(request: Request) {
     const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimate, undefined, feature);
     if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });
     if (overCredit(provider, estimate, credit)) {
-      return Response.json({ error: `fal.ai chỉ còn $${Math.max(0, Number(credit)).toFixed(2)}, không đủ cho lần chạy này (khoảng $${Number(estimate).toFixed(2)}). Hãy chọn model rẻ hơn hoặc báo Admin nạp thêm credits.` }, { status: 429 });
+      // The fal balance is the company's figure: another workspace is told only that it does not suffice.
+      const left = g.workspaceId === COMPANY_WORKSPACE_ID ? `chỉ còn $${Math.max(0, Number(credit)).toFixed(2)}, không đủ` : 'không đủ credits';
+      return Response.json({ error: `fal.ai ${left} cho lần chạy này (khoảng $${Number(estimate).toFixed(2)}). Hãy chọn model rẻ hơn hoặc báo Admin nạp thêm credits.` }, { status: 429 });
     }
     await tx.query(
       // A retry keeps the original's brief, so it is not rewritten (and paid for) again.
-      `insert into jobs (id, user_id, team_id, store_id, retry_of, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, is_mock, enhance, enhanced_prompt)
-       values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17)`,
-      [id, userId, (rerunOf === null && original?.team_id) || null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock', enhance, original?.enhanced_prompt ?? null],
+      // A retry or rerun is of a job of this workspace (it is not found in another), so it keeps the original's workspace.
+      `insert into jobs (id, user_id, team_id, store_id, retry_of, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, is_mock, enhance, enhanced_prompt, workspace_id)
+       values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17, $18)`,
+      [id, userId, (rerunOf === null && original?.team_id) || null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock', enhance, original?.enhanced_prompt ?? null, g.workspaceId],
     );
     // Remember this as the caller's most recently used store, so it leads their picker next time and is the default choice.
     if (storeId !== null)

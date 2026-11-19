@@ -20,7 +20,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   if (typeof approve !== 'boolean') return bad('approve must be true or false');
   const actorId = g.session.user.id;
   return withTransaction(pool, async (tx): Promise<Response> => {
-    const p = (await tx.query('select preset_id, label, prompt, enabled, sort_order, feature, proposed_by, status from preset_proposals where id = $1 for update', [id])).rows[0];
+    const p = (await tx.query('select preset_id, label, prompt, enabled, sort_order, feature, proposed_by, status from preset_proposals where id = $1 and workspace_id = $2 for update', [id, g.workspaceId])).rows[0];
     if (!p) return bad('not found', 404);
     if (p.status !== 'pending') return bad('Đề xuất này đã được duyệt hoặc từ chối.', 409);
     // Compared in SQL, at the microseconds a JS Date drops; the preset row is locked, so no edit lands between this check and the change.

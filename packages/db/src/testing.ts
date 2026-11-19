@@ -19,7 +19,9 @@ export function staleTestDatabases(names: string[], now = Date.now()): string[] 
 }
 
 /** A random database name, or `fixedName` (replacing any database of that name left behind) when the caller must know the URL up front.
- * `migrationsFolder` lets a migration test start from the schema before its migration. */
+ * `migrationsFolder` lets a migration test start from the schema before its migration.
+ * Once the workspaces exist, every user the test creates joins the company workspace (trigger `test_company_member`), as every company user is in
+ * production; a test of a sign-up path, or of a user in another workspace, drops the trigger or the membership. */
 export async function createTestDatabase(
   fixedName?: string,
   migrationsFolder = fileURLToPath(new URL('../migrations', import.meta.url)),
@@ -50,6 +52,15 @@ export async function createTestDatabase(
   try {
     try {
       await migrate(drizzle(pool), { migrationsFolder });
+      if ((await pool.query(`select to_regclass('public.workspace_members') is not null as ok`)).rows[0].ok)
+        await pool.query(`
+          create function test_company_member() returns trigger language plpgsql as $$
+          begin
+            insert into workspace_members (workspace_id, user_id, role) values ('ws_vet', new.id, case when new.role = 'admin' then 'owner' else 'member' end)
+              on conflict do nothing;
+            return new;
+          end $$;
+          create trigger test_company_member after insert on users for each row execute function test_company_member();`);
     } finally {
       await pool.end();
     }

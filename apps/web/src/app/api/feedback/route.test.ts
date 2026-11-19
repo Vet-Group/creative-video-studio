@@ -197,7 +197,7 @@ describe('PATCH /api/admin/feedback/:id', () => {
 describe('updated for me', () => {
   const unreadOf = async (cookie: string, id: string) =>
     ((await (await getList(cookie)).json()) as { items: { id: string; unread: boolean }[] }).items.find((i) => i.id === id)!.unread;
-  const countFor = async (userId: string) => (await pool.query(FEEDBACK_UNREAD_COUNT, [userId])).rows[0].n as number;
+  const countFor = async (userId: string) => (await pool.query(FEEDBACK_UNREAD_COUNT, [userId, 'ws_vet'])).rows[0].n as number;
   const open = (cookie: string, id: string) => detail.GET(new Request('http://localhost/x', { headers: headers(cookie) }), ctx(id));
   const patch = (cookie: string, id: string, body: unknown) =>
     adminRoute.PATCH(new Request('http://localhost/x', { method: 'PATCH', headers: headers(cookie), body: JSON.stringify(body) }), ctx(id));

@@ -81,7 +81,8 @@ interface Model {
 interface ModelsResponse {
   models: Model[];
   defaultModelId: string | null;
-  monthToDate: { usd: string; provisional: boolean };
+  /** Null outside the company workspace, which alone sees spend. */
+  monthToDate: { usd: string; provisional: boolean } | null;
   remainingBudgetUsd?: string;
 }
 interface Image {
@@ -980,7 +981,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
             )}
             <StorePicker label="Cửa hàng/Thương hiệu" heading="Chọn cửa hàng hoặc thương hiệu" value={storeId} stores={stores} noneLabel="Không chọn" onChange={setStoreId} onPin={togglePin} />
 
-            {models && (
+            {models?.monthToDate && (
               <p className="help">
                 Tháng này bạn đã dùng: ${models.monthToDate.usd}
                 {models.monthToDate.provisional && <span className="tag">Tạm tính</span>}

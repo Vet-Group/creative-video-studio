@@ -14,9 +14,9 @@ export async function GET(request: Request, { params }: RouteContext) {
   if (!token || !verifyDownloadToken(token, id, g.session.user.id)) {
     return Response.json({ error: 'the download link is invalid or expired' }, { status: 403 });
   }
-  const found = await readableAsset(g.session, id);
+  const found = await readableAsset(g.session, g.workspaceId, id);
   if (found.error) return found.error;
-  const filename = (await clipDownloadName(id)) ?? found.asset.filename;
+  const filename = (await clipDownloadName(id, g.workspaceId)) ?? found.asset.filename;
   // `variant=compressed`: the video's compressed copy (POST /api/assets/[id]/compress), under the same access and token as the original, named with `-nen`.
   if (new URL(request.url).searchParams.get('variant') === 'compressed') {
     const stored = await headObject(compressedKey(id)).catch(() => null);

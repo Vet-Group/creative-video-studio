@@ -186,6 +186,10 @@ export const USERS = {
   motion: { email: 'motion@e2e.test', name: 'E2E Motion', role: 'member' }, // motion.e2e: the dialog entrance, the Run button's grey and ready colours, the press scale
   tutor: { email: 'tutor@e2e.test', name: 'E2E Tutor', role: 'member' }, // tutorials.e2e: the tutorial videos on the About tabs and the tutorials page
   ownmodel: { email: 'ownmodel@e2e.test', name: 'E2E Own Model', role: 'member' }, // own-model.e2e: Try On's model creator inside the model picker (owns its only AI model)
+  // workspaces-isolation.e2e: a company member, a partner seller in ws_partner only, and a user in both (the spec moves the last two there itself).
+  wscomp: { email: 'wscomp@e2e.test', name: 'E2E WS Company', role: 'member' },
+  wspart: { email: 'wspart@e2e.test', name: 'E2E WS Partner', role: 'member' },
+  wsdual: { email: 'wsdual@e2e.test', name: 'E2E WS Dual', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;

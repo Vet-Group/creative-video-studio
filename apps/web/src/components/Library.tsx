@@ -386,11 +386,16 @@ export function ClipCard({ clip, view, select, selecting = false, onChange, onDe
             {clip.creator.name}
             {clip.storeName && ` · ${clip.storeName}`}
           </span>
-          <span className="lib-when">{fmtShort(clip.createdAt)} ·</span>
-          <span title={clip.costFinal ? 'Chi phí thật' : 'Chi phí thật, tạm tính'}>
-            ${clip.costUsd}
-            {!clip.costFinal && '*'}
+          <span className="lib-when">
+            {fmtShort(clip.createdAt)}
+            {clip.costUsd !== null && ' ·'}
           </span>
+          {clip.costUsd !== null && (
+            <span title={clip.costFinal ? 'Chi phí thật' : 'Chi phí thật, tạm tính'}>
+              ${clip.costUsd}
+              {!clip.costFinal && '*'}
+            </span>
+          )}
         </p>
       </div>
       {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} describedBy={labelId} />}
@@ -526,7 +531,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
   const rerun = async () => {
     setRerunning(true); // from the click on, so a double click cannot send two paid jobs
     await act(async () => {
-      if (await confirmRerun(clip.costUsd, (usd) => `Chạy lại với giá khoảng $${usd}?`, (maxUsd) => api('/api/jobs', sendJson('POST', { rerunOf: clip.id, maxUsd })))) setNote('Đã gửi lượt chạy lại. Theo dõi trong Lịch sử của ứng dụng.');
+      if (await confirmRerun(clip.costUsd, (usd) => (usd ? `Chạy lại với giá khoảng $${usd}?` : 'Chạy lại?'), (maxUsd) => api('/api/jobs', sendJson('POST', { rerunOf: clip.id, maxUsd })))) setNote('Đã gửi lượt chạy lại. Theo dõi trong Lịch sử của ứng dụng.');
     }, 'Không chạy lại được.');
     setRerunning(false);
   };
@@ -670,7 +675,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
           {row('AI cải thiện', job?.enhance ? 'Có' : null)}
           {row('Người tạo', `${clip.creator.name} · ${fmtTime(clip.createdAt)}`)}
           {!stores && row('Cửa hàng', clip.storeName)}
-          {row('Chi phí thật', `$${clip.costUsd}${clip.costFinal ? '' : ' (tạm tính)'}`)}
+          {row('Chi phí thật', clip.costUsd === null ? null : `$${clip.costUsd}${clip.costFinal ? '' : ' (tạm tính)'}`)}
         </dl>
         {stores && (
           <label className="recipe-store">

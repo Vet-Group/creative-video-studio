@@ -254,11 +254,11 @@ describe('/api/choices by store, niche, photo and ending', { timeout: 30_000 }, 
     expect((await lists(b, `?storeId=${s1}`)).hooks.find((c) => c.id === shared.id)).toMatchObject({ group: 'store', mine: false, storeName: `Shop ${s1}` });
     expect((await lists(b)).hooks.find((c) => c.id === company.id)!.group).toBe('company');
     // A store hidden since takes its entries out of every list and out of what a job may use.
-    expect(await findChoice(b.id, 'hook', shared.id)).toMatchObject({ id: shared.id, builtIn: false, isCompany: false });
+    expect(await findChoice(b.id, 'ws_vet', 'hook', shared.id)).toMatchObject({ id: shared.id, builtIn: false, isCompany: false });
     await pool.query('update stores set hidden = true where id = $1', [s1]);
     expect(ids((await lists(b)).hooks)).not.toContain(shared.id);
     expect(ids((await lists(a)).hooks)).not.toContain(shared.id);
-    expect(await findChoice(b.id, 'hook', shared.id)).toBeUndefined();
+    expect(await findChoice(b.id, 'ws_vet', 'hook', shared.id)).toBeUndefined();
   });
 
   test('only an editor or an Admin shares with the company; a member may share to a store, never to a hidden or unknown one, nor to a store and the company at once', async () => {
@@ -320,12 +320,12 @@ describe('/api/choices by store, niche, photo and ending', { timeout: 30_000 }, 
     const spot = await created(await add(a, { ...hook, kind: 'location', imageAssetId: photo }));
     expect(spot.imageAssetId).toBe(photo);
     const session = (u: User) => ({ user: { id: u.id, role: 'user' } }) as Parameters<typeof readableAsset>[0];
-    expect((await readableAsset(session(b), photo)).error?.status).toBe(403); // private: the owner only
+    expect((await readableAsset(session(b), 'ws_vet', photo)).error?.status).toBe(403); // private: the owner only
     await change(a, spot.id, { storeId: s });
-    expect((await readableAsset(session(b), photo)).asset?.id).toBe(photo);
+    expect((await readableAsset(session(b), 'ws_vet', photo)).asset?.id).toBe(photo);
     expect((await change(b, spot.id, { imageAssetId: other })).status).toBe(404);
     expect(await (await change(a, spot.id, { imageAssetId: null })).json()).toMatchObject({ imageAssetId: null });
-    expect((await readableAsset(session(b), photo)).error?.status).toBe(403);
+    expect((await readableAsset(session(b), 'ws_vet', photo)).error?.status).toBe(403);
     // A photo deleted since is left out of the list.
     await change(a, spot.id, { imageAssetId: photo });
     await pool.query('update assets set deleted_at = now() where id = $1', [photo]);
@@ -345,9 +345,9 @@ describe('/api/choices by store, niche, photo and ending', { timeout: 30_000 }, 
     const niche = await all(u, `?niche=${encodeURIComponent('Túi xách')}`);
     expect([ids(niche.hooks), ids(niche.endings), ids(niche.locations)]).toEqual([[tagged.id], [ending.id], []]);
     expect((await GET(req(u, '/api/choices?kind=music'))).status).toBe(400);
-    expect(await findChoice(u.id, 'ending', ending.id)).toMatchObject({ id: ending.id, phrase: 'The clip ends with a smile.' });
-    expect(await findChoice(u.id, 'ending', ENDINGS[0]!.id)).toMatchObject({ builtIn: true });
-    expect(await findChoice(u.id, 'hook', ending.id)).toBeUndefined();
+    expect(await findChoice(u.id, 'ws_vet', 'ending', ending.id)).toMatchObject({ id: ending.id, phrase: 'The clip ends with a smile.' });
+    expect(await findChoice(u.id, 'ws_vet', 'ending', ENDINGS[0]!.id)).toMatchObject({ builtIn: true });
+    expect(await findChoice(u.id, 'ws_vet', 'hook', ending.id)).toBeUndefined();
   });
 
   test('the 50 a member keeps count store ones too, company ones do not; taking a company one back needs room', async () => {

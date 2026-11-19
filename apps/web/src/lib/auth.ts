@@ -9,7 +9,7 @@ import { admin, lastLoginMethod, twoFactor } from 'better-auth/plugins';
 import { adminAc, userAc } from 'better-auth/plugins/admin/access';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 import { accountAuditHooks, authAuditHook } from './account-audit';
-import { larkOAuth, refuseLikelyDuplicate } from './lark';
+import { joinCompanyWorkspace, larkOAuth, refuseLikelyDuplicate } from './lark';
 
 // One pool per server process; dev reloads keep it on globalThis.
 const g = globalThis as unknown as { cvsPool?: ReturnType<typeof createPool> };
@@ -104,7 +104,8 @@ export const auth = betterAuth({
     accountLinking: { enabled: true, trustedProviders: ['lark'], allowDifferentEmails: true, allowUnlinkingAll: false },
   },
   // user.create.before refuses a Lark auto-provision that would duplicate a staff member who has an account under another email (lib/lark.ts).
-  databaseHooks: { account: accountAuditHooks(pool), user: { create: { before: refuseLikelyDuplicate(pool) } } },
+  // user.create.after files a Lark-provisioned user under the company workspace (lib/lark.ts); an Admin-created one joins in POST /api/admin/users.
+  databaseHooks: { account: accountAuditHooks(pool), user: { create: { before: refuseLikelyDuplicate(pool), after: joinCompanyWorkspace(pool) } } },
   // The team is changed only by an Admin, so input: false keeps /api/auth/update-user from setting it. The column default is the seeded team.
   // mustChangePassword is set with an Admin's temporary password and cleared by /change-password (account-audit.ts); no client sets it.
   // canEditTemplates (template editor, lib/session.ts), system (an automation account) and outsideLark (not in the company's Lark organisation) and canImpersonate (a developer Admin who may sign in as another user) are set by an Admin only (PATCH /api/admin/users/[id]).

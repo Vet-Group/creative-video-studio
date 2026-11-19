@@ -38,12 +38,12 @@ export interface Account {
 export const supportMail = (to: string, account: string, page: string) =>
   `mailto:${to}?subject=${encodeURIComponent('Cần hỗ trợ Creative Video Studio')}&body=${encodeURIComponent(`Trang: ${page}\nTài khoản: ${account}\n\nMô tả vấn đề (kèm ảnh chụp màn hình nếu có):\n`)}`;
 
-/** GET /api/me/limits: the caller's use of each Run cap; USD amounts are numeric text. */
+/** GET /api/me/limits: the caller's use of each Run cap; USD amounts are numeric text, and null outside the company's workspace (spend stays with the company). */
 export interface Usage {
   clips: { used: number; cap: number };
-  dayUsd: { used: string; cap: string };
-  monthUsd: { used: string; cap: string };
-  monthToDate: { usd: string; provisional: boolean };
+  dayUsd: { used: string; cap: string } | null;
+  monthUsd: { used: string; cap: string } | null;
+  monthToDate: { usd: string; provisional: boolean } | null;
 }
 
 export type Section = 'profile' | 'limits' | 'security' | 'preferences' | 'methods' | 'support';
@@ -108,33 +108,39 @@ function Limits({ usage }: { usage: Usage | null | 'failed' }) {
   return (
     <>
       <div className="settings-card meters">
-        <div className="meter">
-          <div className="meter-head">
-            <span>Tổng chi phí tháng này của bạn</span>
-            <strong>
-              {usd(monthToDate.usd)}
-              {monthToDate.provisional && <span className="tag">Tạm tính</span>}
-            </strong>
+        {monthToDate && (
+          <div className="meter">
+            <div className="meter-head">
+              <span>Tổng chi phí tháng này của bạn</span>
+              <strong>
+                {usd(monthToDate.usd)}
+                {monthToDate.provisional && <span className="tag">Tạm tính</span>}
+              </strong>
+            </div>
+            <p className="meter-left">Gồm video, ảnh, ứng dụng và cải thiện prompt, kể cả phần không tính vào hạn mức</p>
           </div>
-          <p className="meter-left">Gồm video, ảnh, ứng dụng và cải thiện prompt, kể cả phần không tính vào hạn mức</p>
-        </div>
+        )}
         <Meter label="Clip video hôm nay" used={clips.used} cap={clips.cap} text={`${clips.used} / ${clips.cap} clip`} left={`Còn ${clips.cap - clips.used} clip`} alone={`${clips.used} clip`} />
-        <Meter
-          label="Ảnh và ứng dụng hôm nay"
-          used={Number(dayUsd.used)}
-          cap={Number(dayUsd.cap)}
-          text={`${usd(dayUsd.used)} / ${usd(dayUsd.cap)}`}
-          left={`Còn ${usd(Number(dayUsd.cap) - Number(dayUsd.used))}`}
-          alone={usd(dayUsd.used)}
-        />
-        <Meter
-          label="Ảnh và ứng dụng tháng này"
-          used={Number(monthUsd.used)}
-          cap={Number(monthUsd.cap)}
-          text={`${usd(monthUsd.used)} / ${usd(monthUsd.cap)}`}
-          left={`Còn ${usd(Number(monthUsd.cap) - Number(monthUsd.used))}`}
-          alone={usd(monthUsd.used)}
-        />
+        {dayUsd && (
+          <Meter
+            label="Ảnh và ứng dụng hôm nay"
+            used={Number(dayUsd.used)}
+            cap={Number(dayUsd.cap)}
+            text={`${usd(dayUsd.used)} / ${usd(dayUsd.cap)}`}
+            left={`Còn ${usd(Number(dayUsd.cap) - Number(dayUsd.used))}`}
+            alone={usd(dayUsd.used)}
+          />
+        )}
+        {monthUsd && (
+          <Meter
+            label="Ảnh và ứng dụng tháng này"
+            used={Number(monthUsd.used)}
+            cap={Number(monthUsd.cap)}
+            text={`${usd(monthUsd.used)} / ${usd(monthUsd.cap)}`}
+            left={`Còn ${usd(Number(monthUsd.cap) - Number(monthUsd.used))}`}
+            alone={usd(monthUsd.used)}
+          />
+        )}
       </div>
       <p className="settings-note">Hạn mức ngày đặt lại lúc 0:00 giờ Việt Nam, hạn mức tháng vào ngày 1. Admin đặt các hạn mức này. Khi ngân sách chung của công ty đã hết, việc tạo cũng tạm dừng dù thanh của bạn còn trống.</p>
     </>
@@ -146,7 +152,9 @@ function Today({ usage, onMore }: { usage: Usage | null | 'failed'; onMore: () =
   if (usage === 'failed') return LIMITS_FAILED;
   const cells = usage && [
     ['Clip video', usage.clips.used, usage.clips.cap, usage.clips.cap >= NO_CAP ? `${usage.clips.used}` : `${usage.clips.used} / ${usage.clips.cap}`],
-    ['Ảnh và ứng dụng', Number(usage.dayUsd.used), Number(usage.dayUsd.cap), Number(usage.dayUsd.cap) >= NO_CAP ? usd(usage.dayUsd.used) : `${usd(usage.dayUsd.used)} / ${usd(usage.dayUsd.cap)}`],
+    ...(usage.dayUsd
+      ? ([['Ảnh và ứng dụng', Number(usage.dayUsd.used), Number(usage.dayUsd.cap), Number(usage.dayUsd.cap) >= NO_CAP ? usd(usage.dayUsd.used) : `${usd(usage.dayUsd.used)} / ${usd(usage.dayUsd.cap)}`]] as const)
+      : []),
   ] as const;
   return (
     <div className="today">

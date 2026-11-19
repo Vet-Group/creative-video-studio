@@ -7,7 +7,8 @@ import { MAX_NAME, visibleFashionModels } from '@/lib/fashion-models';
 import { guard } from '@/lib/session';
 
 type Row = { user_id: string; name: string; shared: boolean; shared_locked: boolean };
-const LOAD = 'select user_id, name, shared, shared_locked from fashion_models where id = $1 and deleted_at is null for update';
+// $2 is the active workspace: a model of another workspace is not found.
+const LOAD = 'select user_id, name, shared, shared_locked from fashion_models where id = $1 and workspace_id = $2 and deleted_at is null for update';
 
 /**
  * Change a saved model: `{ name?, shared?, sharedLocked? }`. The owner renames it and shares or unshares it with every member unless an Admin decided
@@ -26,7 +27,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const user = g.session.user;
   const admin = user.role === 'admin';
   return withTransaction(pool, async (tx): Promise<Response> => {
-    const old = (await tx.query(LOAD, [id])).rows[0] as Row | undefined;
+    const old = (await tx.query(LOAD, [id, g.workspaceId])).rows[0] as Row | undefined;
     if (!old || (!admin && old.user_id !== user.id && !old.shared)) return bad('not found', 404);
     const owner = old.user_id === user.id;
     if (name !== undefined && !owner) return bad('only the owner renames a model', 403);
@@ -40,7 +41,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     };
     await tx.query('update fashion_models set name = $2, shared = $3, shared_locked = $4 where id = $1', [id, next.name, next.shared, next.sharedLocked]);
     await audit(tx, { actorId: user.id, action: 'fashion_model.update', target: `fashion_model:${id}`, oldValue: { name: old.name, shared: old.shared, sharedLocked: old.shared_locked }, newValue: next });
-    return Response.json((await visibleFashionModels(tx, user, id))[0]);
+    return Response.json((await visibleFashionModels(tx, user, g.workspaceId, id))[0]);
   });
 }
 
@@ -51,7 +52,7 @@ export async function DELETE(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const user = g.session.user;
   return withTransaction(pool, async (tx): Promise<Response> => {
-    const old = (await tx.query(LOAD, [id])).rows[0] as Row | undefined;
+    const old = (await tx.query(LOAD, [id, g.workspaceId])).rows[0] as Row | undefined;
     if (!old || (user.role !== 'admin' && old.user_id !== user.id && !old.shared)) return bad('not found', 404);
     if (user.role !== 'admin' && old.user_id !== user.id) return bad('only the owner or an Admin deletes a model', 403);
     // An Admin's decision to share a model is final, so the owner cannot delete it out from under the company until an Admin releases or deletes it.

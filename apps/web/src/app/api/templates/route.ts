@@ -20,33 +20,33 @@ export async function GET(request: Request) {
   if (!canReuse(feature)) return bad('feature must be a page that takes templates');
   const { rows } = await pool.query(
     `select t.id, t.name, t.is_company, t.store_id, s.name as store_name, t.user_id = $1 as mine from user_templates t left join stores s on s.id = t.store_id
-      where t.feature = $2 and (t.user_id = $1 or t.is_company or (t.store_id = $3 and not s.hidden))
+      where t.feature = $2 and t.workspace_id = $4 and (t.user_id = $1 or t.is_company or (t.store_id = $3 and not s.hidden))
       order by (t.user_id = $1) desc, t.created_at desc`,
-    [g.session.user.id, feature, params.get('storeId') ?? ''],
+    [g.session.user.id, feature, params.get('storeId') ?? '', g.workspaceId],
   );
   return Response.json({
     templates: rows.map((r) => ({ id: r.id, name: r.name, isCompany: r.is_company, storeId: r.store_id, storeName: r.store_name, mine: r.mine })),
-    canShare: isEditor(g.session.user),
+    canShare: isEditor(g.session.user, g.workspaceId),
   });
 }
 
 /**
- * What a job of the caller gives a template (`fromJob`), in the shape GET /api/jobs/:id exposes it; null when it is not the caller's live job. `images` keeps
+ * What a job of the caller gives a template (`fromJob`), in the shape GET /api/jobs/:id exposes it; null when it is not the caller's live job in workspace `workspaceId`. `images` keeps
  * one entry per input in the order sent, '' (an empty slot) where it is no longer the caller's live upload, so the photos after it keep their roles.
  */
-async function jobData(jobId: string, userId: string): Promise<{ feature: string; data: Record<string, unknown> } | null> {
+async function jobData(jobId: string, userId: string, workspaceId: string): Promise<{ feature: string; data: Record<string, unknown> } | null> {
   const j = (
     await pool.query(
       `select j.feature, j.params, j.preset_id, j.prompt, j.enhance, j.aspect, j.duration_s, j.model,
               (select array_agg(coalesce(a.id, '') order by i.n) from unnest(j.input_asset_ids) with ordinality as i(id, n)
-                left join assets a on a.id = i.id and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as images,
-              (select a.id from assets a where a.id = j.params->>'endAssetId' and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as end_frame,
-              (select a.id from assets a where a.id = j.params->>'videoAssetId' and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as video_ref,
+                left join assets a on a.id = i.id and a.owner_id = $2 and a.workspace_id = $3 and a.kind = 'input' and a.deleted_at is null) as images,
+              (select a.id from assets a where a.id = j.params->>'endAssetId' and a.owner_id = $2 and a.workspace_id = $3 and a.kind = 'input' and a.deleted_at is null) as end_frame,
+              (select a.id from assets a where a.id = j.params->>'videoAssetId' and a.owner_id = $2 and a.workspace_id = $3 and a.kind = 'input' and a.deleted_at is null) as video_ref,
               (select array_agg(a.id order by array_position(string_to_array(j.params->>'audioAssetIds', ','), a.id)) from assets a
-                where a.id = any(string_to_array(j.params->>'audioAssetIds', ',')) and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as clips,
-              (select s.id from stores s where s.id = j.store_id and not s.hidden) as store_id
-         from jobs j where j.id = $1 and j.user_id = $2 and j.deleted_at is null and j.purged_at is null`,
-      [jobId, userId],
+                where a.id = any(string_to_array(j.params->>'audioAssetIds', ',')) and a.owner_id = $2 and a.workspace_id = $3 and a.kind = 'input' and a.deleted_at is null) as clips,
+              (select s.id from stores s where s.id = j.store_id and s.workspace_id = $3 and not s.hidden) as store_id
+         from jobs j where j.id = $1 and j.user_id = $2 and j.workspace_id = $3 and j.deleted_at is null and j.purged_at is null`,
+      [jobId, userId, workspaceId],
     )
   ).rows[0];
   if (!j) return null;
@@ -86,12 +86,12 @@ export async function POST(request: Request) {
   if (name.length < 1 || name.length > MAX_TEMPLATE_NAME) return bad(`name must have 1 to ${MAX_TEMPLATE_NAME} characters`);
   if (body?.isCompany !== undefined && typeof body.isCompany !== 'boolean') return bad('isCompany must be true or false');
   const isCompany = body?.isCompany === true;
-  if (isCompany && !isEditor(g.session.user)) return bad('only an Admin or a template editor shares a template with the company', 403);
+  if (isCompany && !isEditor(g.session.user, g.workspaceId)) return bad('only an Admin or a template editor shares a template with the company', 403);
   const storeId = body?.storeId ?? null;
   if (storeId !== null && (typeof storeId !== 'string' || isCompany)) return bad('storeId is a store id, given without isCompany');
-  if (storeId !== null && !(await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount) return bad('storeId is not a store');
+  if (storeId !== null && !(await pool.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [storeId, g.workspaceId])).rowCount) return bad('storeId is not a store');
   const userId = g.session.user.id;
-  const job = typeof fromJob === 'string' ? await jobData(fromJob, userId) : null;
+  const job = typeof fromJob === 'string' ? await jobData(fromJob, userId, g.workspaceId) : null;
   if (typeof fromJob === 'string' && !job) return bad('the job does not exist', 404);
   const feature = job ? job.feature : (body?.feature as string);
   if (!canReuse(feature)) return bad('the job is of a page that takes no templates');
@@ -99,14 +99,18 @@ export async function POST(request: Request) {
   if (typeof data === 'string') return bad(data);
   for (const key of ['hook', 'location'] as const) {
     if (data[key] === undefined) continue;
-    const choice = await findChoice(userId, key, data[key]);
+    const choice = await findChoice(userId, g.workspaceId, key, data[key]);
     if (!choice && job) delete data[key]; // a choice deleted since the job ran
     else if (!choice) return bad(`data.${key} is not a ${key}`);
     else if ((isCompany || storeId) && !choice.builtIn && !choice.isCompany) return bad('a company or store template may use only built-in or company hooks and locations');
   }
   for (const [key, ids] of [['images', data.images.filter((i) => i !== '')], ['endFrame', data.endFrame ? [data.endFrame] : []], ['videoRef', data.videoRef ? [data.videoRef] : []], ['clips', data.clips ?? []]] as const) {
     if (ids.length === 0) continue;
-    const own = await pool.query(`select count(*)::int as n from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null`, [ids, userId]);
+    const own = await pool.query(`select count(*)::int as n from assets where id = any($1::text[]) and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [
+      ids,
+      userId,
+      g.workspaceId,
+    ]);
     if (own.rows[0].n !== ids.length) return bad(`data.${key} may hold only your own uploads`);
   }
   const id = randomUUID();
@@ -115,12 +119,21 @@ export async function POST(request: Request) {
   try {
     await client.query('begin');
     await client.query(`select pg_advisory_xact_lock(hashtext('templates:' || $1))`, [userId]);
-    const count = (await client.query('select count(*)::int as n from user_templates where user_id = $1', [userId])).rows[0].n;
+    const count = (await client.query('select count(*)::int as n from user_templates where user_id = $1', [userId])).rows[0].n; // one limit across workspaces
     if (count >= MAX_TEMPLATES) {
       await client.query('rollback');
       return bad(`you can keep at most ${MAX_TEMPLATES} templates; delete one first`, 409);
     }
-    await client.query('insert into user_templates (id, user_id, feature, name, data, is_company, store_id) values ($1, $2, $3, $4, $5, $6, $7)', [id, userId, feature, name, JSON.stringify(data), isCompany, storeId]);
+    await client.query('insert into user_templates (id, user_id, feature, name, data, is_company, store_id, workspace_id) values ($1, $2, $3, $4, $5, $6, $7, $8)', [
+      id,
+      userId,
+      feature,
+      name,
+      JSON.stringify(data),
+      isCompany,
+      storeId,
+      g.workspaceId,
+    ]);
     await client.query('commit');
   } catch (e) {
     await client.query('rollback');

@@ -15,7 +15,8 @@ export async function POST(request: Request, { params }: RouteContext) {
   const b = (await readJson(request)) as Record<string, unknown> | null;
   const body = typeof b?.body === 'string' ? b.body.trim() : '';
   if (body.length < 1 || body.length > COMMENT_MAX) return bad(`body must be 1-${COMMENT_MAX} characters`);
-  if (!(await pool.query('select 1 from feedback where id = $1', [id])).rowCount) return bad('not found', 404);
+  // An Admin answers any workspace's item (the feedback exception, docs/WORKSPACES.md); a member only their workspace's.
+  if (!(await pool.query('select 1 from feedback where id = $1 and (workspace_id = $2 or $3)', [id, g.workspaceId, g.session.user.role === 'admin'])).rowCount) return bad('not found', 404);
   const commentId = randomUUID();
   await pool.query('insert into feedback_comments (id, feedback_id, user_id, body) values ($1, $2, $3, $4)', [commentId, id, g.session.user.id, body]);
   const comment: FeedbackComment = { id: commentId, authorName: g.session.user.name, authorAdmin: g.session.user.role === 'admin', body, mine: true, createdAt: new Date().toISOString() };

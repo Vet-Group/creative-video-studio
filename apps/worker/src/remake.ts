@@ -168,13 +168,13 @@ interface ShotResult {
   error?: string;
 }
 
-/** Stores an MP4 as the member's output asset, as a job's clip is stored. */
-async function storeVideo(pool: Pool, write: Write, ownerId: string, file: string, filename: string): Promise<string> {
+/** Stores an MP4 as the member's output asset in the remake's workspace, as a job's clip is stored. */
+async function storeVideo(pool: Pool, write: Write, remake: { user_id: string; workspace_id: string }, file: string, filename: string): Promise<string> {
   const bytes = await readFile(file);
   const { width, height } = await probeSize(file);
   const id = randomUUID();
   await write(`assets/${id}`, bytes, 'video/mp4');
-  await insertAssets(createDb(pool), [{ id, ownerId, kind: 'output', s3Key: `assets/${id}`, filename, mime: 'video/mp4', bytes: bytes.length, width, height }]);
+  await insertAssets(createDb(pool), [{ id, ownerId: remake.user_id, workspaceId: remake.workspace_id, kind: 'output', s3Key: `assets/${id}`, filename, mime: 'video/mp4', bytes: bytes.length, width, height }]);
   return id;
 }
 
@@ -228,8 +228,9 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
     dir = await mkdtemp(join(tmpdir(), 'cvs-remake-'));
     const r = (
       await pool.query(
-        `select r.user_id, r.shots, a.source_key, a.result, p.s3_key as product_key, p.mime as product_mime
-           from remakes r join analyses a on a.id = r.analysis_id left join assets p on p.id = r.product_asset_id and p.deleted_at is null
+        `select r.user_id, r.workspace_id, r.shots, a.source_key, a.result, p.s3_key as product_key, p.mime as product_mime
+           from remakes r join analyses a on a.id = r.analysis_id and a.workspace_id = r.workspace_id
+           left join assets p on p.id = r.product_asset_id and p.workspace_id = r.workspace_id and p.deleted_at is null
           where r.id = $1`,
         [remakeId],
       )
@@ -286,7 +287,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
           const raw = join(dir, `edited-${index}.mp4`);
           await writeFile(raw, edited.video);
           await trimClip(raw, keep, clip);
-          entry.clipAssetId = await storeVideo(pool, write, r.user_id, clip, `remake-${remakeId.slice(0, 8)}-shot-${index}.mp4`);
+          entry.clipAssetId = await storeVideo(pool, write, r, clip, `remake-${remakeId.slice(0, 8)}-shot-${index}.mp4`);
           entry.status = 'succeeded';
         }
         made.push({ clip, sent, start: shot.start, seconds: keep });
@@ -308,7 +309,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
       try {
         const joined = join(dir, 'remake.mp4');
         await concatClips(made.map((m) => m.clip), joined);
-        outputAssetId = await storeVideo(pool, write, r.user_id, joined, `remake-${remakeId.slice(0, 8)}.mp4`);
+        outputAssetId = await storeVideo(pool, write, r, joined, `remake-${remakeId.slice(0, 8)}.mp4`);
         // The before/after costs nothing more, so a failure here leaves the remake as it is.
         try {
           // Each source cut is trimmed to its remade clip's own length, so the two sides stay in step shot after shot.
@@ -321,7 +322,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
           const compare = join(dir, 'compare.mp4');
           await concatClips(befores, before);
           await sideBySide(before, joined, compare);
-          compareAssetId = await storeVideo(pool, write, r.user_id, compare, `remake-${remakeId.slice(0, 8)}-before-after.mp4`);
+          compareAssetId = await storeVideo(pool, write, r, compare, `remake-${remakeId.slice(0, 8)}-before-after.mp4`);
         } catch (e) {
           console.error(`worker: remake ${remakeId}: no before/after video:`, e);
         }
@@ -329,7 +330,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
         try {
           const full = join(dir, 'full.mp4');
           await spliceClips(video, made.map(({ start, seconds, clip }) => ({ start, seconds, clip })).sort((a, b) => a.start - b.start), full);
-          fullAssetId = await storeVideo(pool, write, r.user_id, full, `remake-${remakeId.slice(0, 8)}-full.mp4`);
+          fullAssetId = await storeVideo(pool, write, r, full, `remake-${remakeId.slice(0, 8)}-full.mp4`);
         } catch (e) {
           console.error(`worker: remake ${remakeId}: no full-length video:`, e);
         }

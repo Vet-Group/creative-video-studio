@@ -4,13 +4,13 @@ import { guard } from '@/lib/session';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** One item with its comments (oldest first), each comment's author (and whether they are an Admin) and a `mine` flag. Opening it marks it read for the caller. */
+/** One item of the active workspace's board (an Admin, who triages every workspace's, any item) with its comments (oldest first), each comment's author (and whether they are an Admin) and a `mine` flag. Opening it marks it read for the caller. */
 export async function GET(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
   const userId = g.session.user.id;
-  const item = (await pool.query(`${FEEDBACK_SELECT} where f.id = $2`, [userId, id])).rows[0];
+  const item = (await pool.query(`${FEEDBACK_SELECT} where f.id = $2 and (f.workspace_id = $3 or $4)`, [userId, id, g.workspaceId, g.session.user.role === 'admin'])).rows[0];
   if (!item) return Response.json({ error: 'not found' }, { status: 404 });
   await pool.query(FEEDBACK_MARK_READ, [id, userId]); // after the read, so `unread` still says what changed since the last visit
   const comments = (
@@ -23,5 +23,5 @@ export async function GET(request: Request, { params }: RouteContext) {
   ).rows.map(
     (r): FeedbackComment => ({ id: r.id, authorName: r.author_name, authorAdmin: r.author_admin === true, body: r.body, mine: r.mine === true, createdAt: new Date(r.created_at).toISOString() }),
   );
-  return Response.json({ item: toListed(item), comments });
+  return Response.json({ item: toListed(item, g.workspaceId), comments });
 }

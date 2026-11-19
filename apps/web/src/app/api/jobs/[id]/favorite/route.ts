@@ -14,7 +14,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   const body = (await readJson(request)) as { favorite?: unknown } | null;
   if (typeof body?.favorite !== 'boolean') return Response.json({ error: 'favorite must be true or false' }, { status: 400 });
   const userId = g.session.user.id;
-  if ((await pool.query(`select 1 from jobs j where j.id = $1 and ${LIVE_CLIP}`, [id])).rowCount === 0) return Response.json({ error: 'not found' }, { status: 404 });
+  if ((await pool.query(`select 1 from jobs j where j.id = $1 and j.workspace_id = $2 and ${LIVE_CLIP}`, [id, g.workspaceId])).rowCount === 0) return Response.json({ error: 'not found' }, { status: 404 });
   if (body.favorite) await pool.query('insert into favorites (user_id, job_id) values ($1, $2) on conflict do nothing', [userId, id]);
   else await pool.query('delete from favorites where user_id = $1 and job_id = $2', [userId, id]);
   return Response.json({ favorite: body.favorite });

@@ -6,7 +6,8 @@ import { assets } from './schema';
 export type Asset = typeof assets.$inferSelect;
 export type NewAsset = typeof assets.$inferInsert;
 
-export async function insertAssets(db: Db, rows: NewAsset[]): Promise<void> {
+/** Every row names its workspace (docs/WORKSPACES.md §3): the column's default is for the rows from before workspaces only. */
+export async function insertAssets(db: Db, rows: (NewAsset & { workspaceId: string })[]): Promise<void> {
   if (rows.length > 0) await db.insert(assets).values(rows); // every file of an upload can be one the caller already has
 }
 
@@ -21,20 +22,27 @@ const NAMES = `(c.id = any(j.input_asset_ids) or strpos(j.params::text, c.id) > 
 export type KeptInput = { id: string; filename: string; mime: string; bytes: number; durationMs: number | null };
 
 /**
- * The owner's live input of each file hash (the newest copy): an upload or sample copy of a file they already have returns it instead of storing it again
+ * The owner's live input of each file hash (the newest copy) in workspace `workspaceId`: an upload or sample copy of a file they already have returns it instead of storing it again
  * (owner decision 2026-11-06). A kept input without a slot or store takes the ones given, as a new upload would have recorded them. A copy only deleted jobs
- * name is not returned: the purge removes it with them.
+ * name is not returned: the purge removes it with them. A copy in another workspace is never returned, so a file is stored once per workspace.
  */
-export async function keptInputs(q: Queryable, ownerId: string, hashes: string[], slot: string | null, storeId: string | null = null): Promise<Map<string, KeptInput>> {
+export async function keptInputs(
+  q: Queryable,
+  ownerId: string,
+  workspaceId: string,
+  hashes: string[],
+  slot: string | null,
+  storeId: string | null = null,
+): Promise<Map<string, KeptInput>> {
   if (hashes.length === 0) return new Map();
   const { rows } = await q.query(
     `update assets a set slot = coalesce(a.slot, $3), store_id = coalesce(a.store_id, $4)
-       from (select distinct on (c.sha256) c.id from assets c where c.owner_id = $1 and c.kind = 'input' and c.deleted_at is null and c.sha256 = any($2)
+       from (select distinct on (c.sha256) c.id from assets c where c.owner_id = $1 and c.workspace_id = $5 and c.kind = 'input' and c.deleted_at is null and c.sha256 = any($2)
                and not (exists (select 1 from jobs j where j.deleted_at is not null and ${NAMES}) and not exists (select 1 from jobs j where j.deleted_at is null and ${NAMES}))
              order by c.sha256, c.created_at desc, c.id) k
       where a.id = k.id
       returning a.id, a.filename, a.mime, a.bytes, a.duration_ms as "durationMs", a.sha256`,
-    [ownerId, hashes, slot, storeId],
+    [ownerId, hashes, slot, storeId, workspaceId],
   );
   return new Map(rows.map(({ sha256, ...kept }) => [sha256 as string, kept as KeptInput]));
 }
@@ -53,16 +61,16 @@ export async function fillInputSlots(q: Queryable, jobId: string): Promise<void>
          when j.feature = 'marketing' and j.params->>'roles' is not null then nullif(split_part(j.params->>'roles', ',', i.n::int), '')
          when j.feature = 'marketing' then case i.n when 1 then 'model' when 2 then 'product' end
          when j.feature = 'video' then 'video'
-         when j.feature = 'image' then 'image' end as slot
+         when j.feature = 'image' then 'image' end as slot, j.workspace_id
          from jobs j cross join lateral unnest(j.input_asset_ids) with ordinality as i(id, n) where j.id = $1
-       union all select j.params->>'endAssetId', 'end-frame' from jobs j where j.id = $1 and j.params->>'endAssetId' is not null) u
-      where a.id = u.id and a.kind = 'input' and a.slot is null and u.slot is not null`,
+       union all select j.params->>'endAssetId', 'end-frame', j.workspace_id from jobs j where j.id = $1 and j.params->>'endAssetId' is not null) u
+      where a.id = u.id and a.workspace_id = u.workspace_id and a.kind = 'input' and a.slot is null and u.slot is not null`,
     [jobId],
   );
 }
 
-/** A live (not soft-deleted) asset, or undefined. */
-export async function findAsset(db: Db, id: string): Promise<Asset | undefined> {
-  const [row] = await db.select().from(assets).where(and(eq(assets.id, id), isNull(assets.deletedAt)));
+/** A live (not soft-deleted) asset of workspace `workspaceId`, or undefined. */
+export async function findAsset(db: Db, id: string, workspaceId: string): Promise<Asset | undefined> {
+  const [row] = await db.select().from(assets).where(and(eq(assets.id, id), eq(assets.workspaceId, workspaceId), isNull(assets.deletedAt)));
   return row;
 }

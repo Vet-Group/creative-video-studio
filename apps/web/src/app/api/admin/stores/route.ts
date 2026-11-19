@@ -5,7 +5,7 @@ import { pool } from '@/lib/auth';
 import { guard } from '@/lib/session';
 
 /**
- * Admin: the stores, each with its brand kit, whether the ledger already holds rows for it (`hasCost`: a code change asks first) and whether
+ * Admin: the active workspace's stores (a store belongs to one workspace, docs/WORKSPACES.md §2), each with its brand kit, whether the ledger already holds rows for it (`hasCost`: a code change asks first) and whether
  * anything points at it (`inUse`: it can be closed but not deleted). Hidden (closed) ones only with `?includeHidden=1`.
  */
 export async function GET(request: Request) {
@@ -17,13 +17,13 @@ export async function GET(request: Request) {
             exists (select 1 from cost_entries c where c.store_id = s.id) as "hasCost",
             exists (select 1 from jobs where store_id = s.id union all select 1 from cost_entries where store_id = s.id union all select 1 from assets where store_id = s.id
                     union all select 1 from user_templates where store_id = s.id union all select 1 from user_choices where store_id = s.id) as "inUse"
-       from stores s where $1 or not s.hidden order by s.hidden, s.paused, s.name, s.id`,
-    [all],
+       from stores s where s.workspace_id = $2 and ($1 or not s.hidden) order by s.hidden, s.paused, s.name, s.id`,
+    [all, g.workspaceId],
   );
   return Response.json({ stores: rows });
 }
 
-/** Admin: create a store (`name` and a unique `code`, equal to POD Studio's store_id). A taken code is 409. Audited. */
+/** Admin: create a store in the active workspace (`name` and a unique `code`, equal to POD Studio's store_id). A taken code is 409. Audited. */
 export async function POST(request: Request) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const store = { id: crypto.randomUUID(), name: name.trim(), code: code.trim(), hidden: false };
   try {
     await withTransaction(pool, async (tx) => {
-      await tx.query('insert into stores (id, name, code) values ($1, $2, $3)', [store.id, store.name, store.code]);
+      await tx.query('insert into stores (id, name, code, workspace_id) values ($1, $2, $3, $4)', [store.id, store.name, store.code, g.workspaceId]);
       await audit(tx, { actorId: g.session.user.id, action: 'store.create', target: `store:${store.id}`, newValue: { name: store.name, code: store.code } });
     });
   } catch (e) {

@@ -31,9 +31,9 @@ async function set(request: Request, { params }: RouteContext, on: boolean): Pro
   return withTransaction(pool, async (tx): Promise<Response> => {
     const row = (
       await tx.query(
-        `select status, shared_title as "sharedTitle", exists (select 1 from assets a where a.s3_key = analyses.source_key and a.deleted_at is null) as "hasSource"
-           from analyses where id = $1 for update`,
-        [id],
+        `select status, shared_title as "sharedTitle", exists (select 1 from assets a where a.s3_key = analyses.source_key and a.workspace_id = $2 and a.deleted_at is null) as "hasSource"
+           from analyses where id = $1 and workspace_id = $2 for update`,
+        [id, g.workspaceId],
       )
     ).rows[0];
     if (!row) return Response.json({ error: 'not found' }, { status: 404 });

@@ -26,9 +26,9 @@ export async function GET(request: Request) {
     `select j.model, j.aspect, j.duration_s, j.params, j.preset_id, j.enhance, j.store_id, s.id is not null and not s.hidden as store_ok,
             m.enabled and j.feature = any(m.features) as usable, m.endpoint, m.usd_per_second, m.ratios, m.durations_sec, m.image_prices
        from jobs j left join model_configs m on m.id = j.model left join stores s on s.id = j.store_id
-      where j.user_id = $1 and j.feature = $2 and j.deleted_at is null and j.params->>'format' is not distinct from $3::text
+      where j.user_id = $1 and j.workspace_id = $4 and j.feature = $2 and j.deleted_at is null and j.params->>'format' is not distinct from $3::text
       order by j.created_at desc, j.id desc limit 1`,
-    [g.session.user.id, feature, format],
+    [g.session.user.id, feature, format, g.workspaceId],
   );
   const r = rows[0];
   if (!r?.usable) return Response.json({ settings: null });

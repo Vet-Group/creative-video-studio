@@ -53,5 +53,6 @@ export interface AdminRatings {
   average: number | null;
   highShare: number | null;
   teams: { team: string; average: number; count: number }[];
-  comments: { score: number; comment: string; team: string; createdAt: string }[];
+  /** `workspace`: the rater's workspaces by name when they are in any but the company's (ratings reach the company from every workspace, docs/WORKSPACES.md), else null. */
+  comments: { score: number; comment: string; team: string; workspace: string | null; createdAt: string }[];
 }

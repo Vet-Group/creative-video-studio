@@ -6,14 +6,14 @@ import type { Db } from '@cvs/db/client';
 import { imagePreview } from './media';
 import { deleteObject, getObject, putObject } from './storage';
 
-/** Stores the preview of an image output for its owner; returns the new asset id. Nothing is left behind when it throws. */
-export async function storePreview(db: Db, ownerId: string, jobId: string, bytes: Uint8Array): Promise<string> {
+/** Stores the preview of an image output for its owner, in the job's workspace; returns the new asset id. Nothing is left behind when it throws. */
+export async function storePreview(db: Db, ownerId: string, workspaceId: string, jobId: string, bytes: Uint8Array): Promise<string> {
   const preview = await imagePreview(bytes);
   const id = randomUUID();
   const key = `assets/${id}`;
   await putObject(key, preview.data, 'image/jpeg');
   try {
-    await insertAssets(db, [{ id, ownerId, kind: 'output', s3Key: key, filename: `preview-${jobId.slice(0, 8)}.jpg`, mime: 'image/jpeg', bytes: preview.data.length, width: preview.width, height: preview.height }]);
+    await insertAssets(db, [{ id, ownerId, workspaceId, kind: 'output', s3Key: key, filename: `preview-${jobId.slice(0, 8)}.jpg`, mime: 'image/jpeg', bytes: preview.data.length, width: preview.width, height: preview.height }]);
   } catch (e) {
     await deleteObject(key).catch(() => undefined);
     throw e;
@@ -33,7 +33,7 @@ export async function dropPreview(pool: LedgerPool, id: string): Promise<void> {
  */
 export async function backfillPreviews(pool: LedgerPool, db: Db, apply: boolean, log: (line: string) => void = console.log): Promise<{ found: number; made: number; failed: number }> {
   const { rows } = await pool.query(
-    `select j.id, j.user_id, o.s3_key from jobs j join assets o on o.id = j.output_asset_id
+    `select j.id, j.user_id, j.workspace_id, o.s3_key from jobs j join assets o on o.id = j.output_asset_id
       where j.status = 'succeeded' and j.poster_asset_id is null and j.deleted_at is null and j.purged_at is null and o.deleted_at is null and o.mime like 'image/%'
       order by j.created_at, j.id`,
   );
@@ -42,7 +42,7 @@ export async function backfillPreviews(pool: LedgerPool, db: Db, apply: boolean,
   if (apply) {
     for (const r of rows) {
       try {
-        const id = await storePreview(db, r.user_id, r.id, await getObject(r.s3_key));
+        const id = await storePreview(db, r.user_id, r.workspace_id, r.id, await getObject(r.s3_key));
         const set = await pool.query('update jobs set poster_asset_id = $2 where id = $1 and poster_asset_id is null and deleted_at is null and purged_at is null', [r.id, id]);
         if (set.rowCount) made++;
         else await dropPreview(pool, id);

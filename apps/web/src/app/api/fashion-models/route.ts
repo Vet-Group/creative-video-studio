@@ -14,7 +14,7 @@ import { COPY_HOURLY_LIMIT } from '../assets/samples/route';
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  return Response.json({ models: await visibleFashionModels(pool, g.session.user) });
+  return Response.json({ models: await visibleFashionModels(pool, g.session.user, g.workspaceId) });
 }
 
 /**
@@ -34,9 +34,9 @@ export async function POST(request: Request) {
   const found = (
     await pool.query(
       `select a.s3_key, j.params->>'traits' as traits from assets a join jobs j on j.output_asset_id = a.id
-        where a.id = $1 and a.owner_id = $2 and a.kind = 'output' and a.mime like 'image/%' and a.deleted_at is null
+        where a.id = $1 and a.owner_id = $2 and a.workspace_id = $3 and j.workspace_id = $3 and a.kind = 'output' and a.mime like 'image/%' and a.deleted_at is null
           and j.feature = 'fashion_model' and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null`,
-      [body.assetId, user.id],
+      [body.assetId, user.id, g.workspaceId],
     )
   ).rows[0] as { s3_key: string; traits: string | null } | undefined;
   if (!found) return bad('the result does not exist or is not yours', 404);
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   const assetId = crypto.randomUUID();
   const modelId = crypto.randomUUID();
   const shared = body.shared === true;
-  const row = { id: assetId, ownerId: user.id, kind: 'input' as const, s3Key: `assets/${assetId}`, filename: `ai-model-${assetId.slice(0, 8)}.${mime === 'image/jpeg' ? 'jpg' : mime.slice(6)}`, mime, bytes: bytes.length };
+  const row = { id: assetId, ownerId: user.id, workspaceId: g.workspaceId, kind: 'input' as const, s3Key: `assets/${assetId}`, filename: `ai-model-${assetId.slice(0, 8)}.${mime === 'image/jpeg' ? 'jpg' : mime.slice(6)}`, mime, bytes: bytes.length };
   let traits: unknown = null;
   try {
     traits = parseFashionTraits(JSON.parse(found.traits ?? 'null'));
@@ -59,7 +59,15 @@ export async function POST(request: Request) {
     await putObject(row.s3Key, bytes, mime);
     await insertAssets(db, [row]);
     await withTransaction(pool, async (tx) => {
-      await tx.query('insert into fashion_models (id, user_id, name, asset_id, traits, shared) values ($1, $2, $3, $4, $5::jsonb, $6)', [modelId, user.id, name, assetId, JSON.stringify(traits ?? {}), shared]);
+      await tx.query('insert into fashion_models (id, user_id, name, asset_id, traits, shared, workspace_id) values ($1, $2, $3, $4, $5::jsonb, $6, $7)', [
+        modelId,
+        user.id,
+        name,
+        assetId,
+        JSON.stringify(traits ?? {}),
+        shared,
+        g.workspaceId,
+      ]);
       await audit(tx, { actorId: user.id, action: 'fashion_model.create', target: `fashion_model:${modelId}`, newValue: { name, shared, assetId } });
     });
   } catch (e) {
@@ -68,5 +76,5 @@ export async function POST(request: Request) {
     await Promise.allSettled([deleteObject(row.s3Key)]);
     throw e;
   }
-  return Response.json((await visibleFashionModels(pool, user, modelId))[0], { status: 201 });
+  return Response.json((await visibleFashionModels(pool, user, g.workspaceId, modelId))[0], { status: 201 });
 }

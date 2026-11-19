@@ -23,7 +23,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
   try {
     return await withTransaction(pool, async (tx): Promise<Response> => {
-      const old = (await tx.query('select name, code, hidden, paused from stores where id = $1 for update', [id])).rows[0];
+      const old = (await tx.query('select name, code, hidden, paused from stores where id = $1 and workspace_id = $2 for update', [id, g.workspaceId])).rows[0];
       if (!old) return bad('not found', 404);
       const next = {
         name: nonEmpty(name) ? name.trim() : old.name,
@@ -54,7 +54,7 @@ export async function DELETE(request: Request, { params }: RouteContext) {
   if (g.error) return g.error;
   const { id } = await params;
   return withTransaction(pool, async (tx): Promise<Response> => {
-    const old = (await tx.query('select name, code from stores where id = $1 for update', [id])).rows[0];
+    const old = (await tx.query('select name, code from stores where id = $1 and workspace_id = $2 for update', [id, g.workspaceId])).rows[0];
     if (!old) return bad('not found', 404);
     const used = await tx.query(
       `select 1 from jobs where store_id = $1 union all select 1 from cost_entries where store_id = $1 union all select 1 from assets where store_id = $1

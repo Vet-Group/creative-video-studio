@@ -19,6 +19,7 @@ type JobCostKind = 'estimate' | 'actual_adjustment' | 'release' | 'late_bill' | 
 interface JobRow {
   id: string;
   status: string;
+  workspace_id: string;
   user_id: string;
   team_id: string;
   store_id: string | null;
@@ -58,7 +59,7 @@ export async function withTransaction<T>(pool: LedgerPool, fn: (tx: Queryable) =
 
 async function lockJob(tx: Queryable, jobId: string): Promise<JobRow> {
   const { rows } = await tx.query(
-    `select id, status, user_id, team_id, store_id, provider, model, is_mock,
+    `select id, status, workspace_id, user_id, team_id, store_id, provider, model, is_mock,
             coalesce(finished_at <= now() - interval '24 hours', false) as stale,
             to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as month,
             (created_at at time zone 'Asia/Ho_Chi_Minh')::date::text as day
@@ -83,9 +84,9 @@ async function balance(tx: Queryable, jobId: string): Promise<{ total: number; e
 
 async function append(tx: Queryable, job: JobRow, row: { kind: JobCostKind; usd: number; isFinal: boolean; storeId?: string | null }): Promise<void> {
   await tx.query(
-    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [row.kind, job.is_mock ? fmt(0) : fmt(row.usd), job.month, job.day, job.user_id, job.team_id, row.storeId === undefined ? job.store_id : row.storeId, job.id, job.provider, job.model, row.isFinal],
+    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final, workspace_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [row.kind, job.is_mock ? fmt(0) : fmt(row.usd), job.month, job.day, job.user_id, job.team_id, row.storeId === undefined ? job.store_id : row.storeId, job.id, job.provider, job.model, row.isFinal, job.workspace_id],
   );
 }
 
@@ -147,10 +148,11 @@ export async function release(pool: LedgerPool, jobId: string, error: string): P
 export const CANCELED_ERROR = 'canceled by the member';
 
 /** The member cancels their own job before the worker has claimed it: the estimate is released to 0 and the job becomes failed with CANCELED_ERROR. The row lock makes it race the worker's
- * queued -> submitting claim (an update that also checks the status), so exactly one wins. `started` when the job is no longer queued, `not_found` when it is missing or not the member's. */
-export async function cancelQueued(pool: LedgerPool, jobId: string, userId: string): Promise<'canceled' | 'started' | 'not_found'> {
+ * queued -> submitting claim (an update that also checks the status), so exactly one wins. `started` when the job is no longer queued, `not_found` when it is missing, not the member's
+ * or not in their workspace `workspaceId`. */
+export async function cancelQueued(pool: LedgerPool, jobId: string, userId: string, workspaceId: string): Promise<'canceled' | 'started' | 'not_found'> {
   return withTransaction(pool, async (tx) => {
-    if ((await tx.query('select 1 from jobs where id = $1 and user_id = $2', [jobId, userId])).rowCount === 0) return 'not_found';
+    if ((await tx.query('select 1 from jobs where id = $1 and user_id = $2 and workspace_id = $3', [jobId, userId, workspaceId])).rowCount === 0) return 'not_found';
     const job = await lockJob(tx, jobId);
     if (job.status !== 'queued') return 'started';
     const bal = await balance(tx, jobId);
@@ -200,6 +202,9 @@ export async function reassignStore(pool: LedgerPool, jobId: string, storeId: st
   });
 }
 
+/** The company's workspace (packages/db COMPANY_WORKSPACE_ID): the company pays the rows that belong to no job, so they are filed under it. */
+const COMPANY_WORKSPACE = 'ws_vet';
+
 /** A row with no job: one bake-off row per provider, or an Admin's correction (the note is required). The required `ref` makes it idempotent. False when the ref was booked before. */
 export async function bookShared(
   db: Queryable,
@@ -207,8 +212,8 @@ export async function bookShared(
 ): Promise<boolean> {
   if (!e.ref?.trim()) throw new Error('a shared cost row needs a ref');
   const { rowCount } = await db.query(
-    `insert into cost_entries (kind, usd, month, provider, model, is_final, ref, note) values ($1, $2, $3, $4, $5, true, $6, $7) on conflict (ref) do nothing`,
-    [e.kind, fmt(units(e.usd)), e.month, e.provider ?? null, e.model ?? null, e.ref, e.note ?? null],
+    `insert into cost_entries (kind, usd, month, provider, model, is_final, ref, note, workspace_id) values ($1, $2, $3, $4, $5, true, $6, $7, $8) on conflict (ref) do nothing`,
+    [e.kind, fmt(units(e.usd)), e.month, e.provider ?? null, e.model ?? null, e.ref, e.note ?? null, COMPANY_WORKSPACE],
   );
   return rowCount === 1;
 }
@@ -227,17 +232,17 @@ export async function bookLlm(
   const usd = call.costUsd === null ? 0 : units(call.costUsd);
   if (usd === 0) return false;
   const [from, id, ref] = 'enhance' in source
-    ? [`select created_at, user_id, team_id, store_id, id as job_id, false as is_final from jobs where id = $4`, source.enhance, `llm:enhance:${source.enhance}`]
+    ? [`select created_at, workspace_id, user_id, team_id, store_id, id as job_id, false as is_final from jobs where id = $4`, source.enhance, `llm:enhance:${source.enhance}`]
     : 'suggestion' in source
-      ? [`select r.created_at, r.user_id, u.team_id, null::text as store_id, null::text as job_id, true as is_final
+      ? [`select r.created_at, r.workspace_id, r.user_id, u.team_id, null::text as store_id, null::text as job_id, true as is_final
             from suggestion_runs r join users u on u.id = r.user_id where r.id = $4`, source.suggestion, `llm:suggestion:${source.suggestion}`]
       : 'analysis' in source
-        ? [`select created_at, user_id, team_id, store_id, null::text as job_id, true as is_final from analyses where id = $4`, source.analysis, `llm:analysis:${source.analysis}${source.step ? `:${source.step}` : ''}`]
-        : [`select created_at, user_id, team_id, store_id, null::text as job_id, true as is_final from remakes where id = $4`, source.remake, `llm:remake:${source.remake}:${source.step}`];
+        ? [`select created_at, workspace_id, user_id, team_id, store_id, null::text as job_id, true as is_final from analyses where id = $4`, source.analysis, `llm:analysis:${source.analysis}${source.step ? `:${source.step}` : ''}`]
+        : [`select created_at, workspace_id, user_id, team_id, store_id, null::text as job_id, true as is_final from remakes where id = $4`, source.remake, `llm:remake:${source.remake}:${source.step}`];
   const { rowCount } = await db.query(
-    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final, ref)
+    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final, ref, workspace_id)
      select 'llm', $1, to_char(s.created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (s.created_at at time zone 'Asia/Ho_Chi_Minh')::date,
-            s.user_id, s.team_id, s.store_id, s.job_id, $5, $2, s.is_final, $3
+            s.user_id, s.team_id, s.store_id, s.job_id, $5, $2, s.is_final, $3, s.workspace_id
        from (${from}) s
      on conflict (ref) do nothing`,
     [fmt(usd), call.model, ref, id, call.provider],
@@ -268,8 +273,8 @@ export async function bookInvoice(pool: LedgerPool, i: { month: string; provider
     const diff = units(i.totalUsd) - units(rows[0].booked);
     if (diff !== 0) {
       await tx.query(
-        `insert into cost_entries (kind, usd, month, provider, is_final, ref) values ('invoice_diff', $1, $2, $3, true, $4)`,
-        [fmt(diff), i.month, i.provider, `invoice-${i.month}-${i.provider}-${rows[0].diffs + 1}`],
+        `insert into cost_entries (kind, usd, month, provider, is_final, ref, workspace_id) values ('invoice_diff', $1, $2, $3, true, $4, $5)`,
+        [fmt(diff), i.month, i.provider, `invoice-${i.month}-${i.provider}-${rows[0].diffs + 1}`, COMPANY_WORKSPACE],
       );
     }
     if (actorId !== undefined && (before !== fmt(units(i.totalUsd)) || diff !== 0)) {

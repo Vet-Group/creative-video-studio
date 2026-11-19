@@ -8,7 +8,7 @@ import { readableAsset, readJson } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { CAP_MESSAGES } from '@/lib/caps';
 import { boss } from '@/lib/queue';
-import { REMAKE_COLUMNS, reaRemakeEnabled } from '@/lib/remake';
+import { REMAKE_COLUMNS, reaRemakeEnabled, spendOf } from '@/lib/remake';
 import { guard } from '@/lib/session';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
@@ -19,11 +19,11 @@ export async function GET(request: Request) {
   if (!reaRemakeEnabled()) return notHere();
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const rows = (await pool.query(`select ${REMAKE_COLUMNS} from remakes where user_id = $1 order by created_at desc limit 50`, [g.session.user.id])).rows;
-  return Response.json({ remakes: rows });
+  const rows = (await pool.query(`select ${REMAKE_COLUMNS} from remakes where user_id = $1 and workspace_id = $2 order by created_at desc limit 50`, [g.session.user.id, g.workspaceId])).rows;
+  return Response.json({ remakes: rows.map((r) => spendOf(r, g.workspaceId)) });
 }
 
-/** Queues a Smart Remake: one of the caller's own images put into chosen shots of one of their finished analyses, or of one an Admin shared, on the worker.
+/** Queues a Smart Remake: one of the caller's own images put into chosen shots of one of their finished analyses, or of one an Admin shared in their workspace, on the worker.
  * A remake of their own analysis takes its store; one of a shared analysis has none, as the sharer's store is not the caller's. Answers with the new remake id to poll. */
 export async function POST(request: Request) {
   if (!reaRemakeEnabled()) return notHere();
@@ -35,7 +35,13 @@ export async function POST(request: Request) {
   if (typeof analysisId !== 'string' || typeof productAssetId !== 'string') return bad('analysisId, productAssetId and shots are required');
 
   const userId = g.session.user.id;
-  const analysis = (await pool.query('select status, result, store_id, user_id = $2 as own from analyses where id = $1 and (user_id = $2 or shared_at is not null)', [analysisId, userId])).rows[0];
+  const analysis = (
+    await pool.query('select status, result, store_id, user_id = $2 as own from analyses where id = $1 and workspace_id = $3 and (user_id = $2 or shared_at is not null)', [
+      analysisId,
+      userId,
+      g.workspaceId,
+    ])
+  ).rows[0];
   if (!analysis) return bad('the analysis does not exist', 404);
   if (analysis.status !== 'succeeded') return bad('the analysis has not finished');
   // A remake takes whole scenes, as the result list and the picker show them: each is chosen by its first stored shot (mergeShots).
@@ -43,7 +49,7 @@ export async function POST(request: Request) {
   const problem = remakeShotsProblem(b?.shots, mergeShots(result).first);
   if (problem) return bad(problem);
 
-  const found = await readableAsset(g.session, productAssetId);
+  const found = await readableAsset(g.session, g.workspaceId, productAssetId);
   if (found.error) return found.error;
   if (found.asset.ownerId !== userId) return bad('productAssetId must be one of your own images', 403);
   if (!found.asset.mime.startsWith('image/')) return bad('productAssetId must be an image');
@@ -68,9 +74,9 @@ export async function POST(request: Request) {
     const refused = await checkCaps(tx, userId, estimate, undefined, 'video');
     if (refused) return refused;
     await tx.query(
-      `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots)
-         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6)`,
-      [id, userId, analysis.own ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots)],
+      `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots, workspace_id)
+         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6, $7)`,
+      [id, userId, analysis.own ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots), g.workspaceId],
     );
     return null;
   });

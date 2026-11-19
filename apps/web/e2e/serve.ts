@@ -82,6 +82,8 @@ await pool.query(`insert into stores (id, name, code) values ('store-brand', 'E2
 await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1');
 // Straight through better-auth, not POST /api/admin/users, so must_change_password stays false and the specs sign in to the app itself.
 for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email: u.email, name: u.name, password: PASSWORD, role: u.role, data: { emailVerified: true } } });
+// Those joined ws_vet through the test database's trigger, as migration 0108 files existing users; from here only the app's own paths (Admin > Users) add a membership.
+await pool.query('drop trigger test_company_member on users');
 // An Admin made these members template editors (Admin > Users), for preset-edit.e2e, store-brand.e2e and choices-store.e2e.
 await pool.query('update users set can_edit_templates = true where email = any($1)', [[USERS.tpled.email, USERS.branded.email, USERS.chsed.email]]);
 // The developer Admin of impersonation.e2e, as an existing developer Admin would have made them (the migration grants the flag to no one).

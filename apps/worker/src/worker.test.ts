@@ -830,7 +830,7 @@ describe('restarts', () => {
     counting.submits = 0;
     const id = await newJob('u1');
     await send(id, 'u1');
-    expect(await cancelQueued(pool, id, 'u1')).toBe('canceled');
+    expect(await cancelQueued(pool, id, 'u1', 'ws_vet')).toBe('canceled');
     await start(counting(300));
     await new Promise((r) => setTimeout(r, 1_500)); // the claim is `update ... where status = 'queued'`, so the canceled row is gone for it
     expect(counting.submits).toBe(0);

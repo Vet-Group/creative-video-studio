@@ -30,13 +30,13 @@ export async function hashInputs(pool: Pool, read: (key: string) => Promise<Uint
 const names = (j: string) => `(a.id = any(${j}.input_asset_ids) or strpos(${j}.params::text, a.id) > 0)`;
 
 /**
- * Soft-deletes the extra copies of a file (same owner and hash) that nothing refers to, keeping the newest copy the purge will not take (one that only
+ * Soft-deletes the extra copies of a file (same owner, workspace and hash: a copy in another workspace is that workspace's own) that nothing refers to, keeping the newest copy the purge will not take (one that only
  * deleted jobs name goes with them), so the file stays in the uploaded-photos picker; returns the ids it deleted.
  */
 export async function removeDuplicateInputs(pool: Pool): Promise<string[]> {
   const { rows } = await pool.query(
     `with copies as (
-       select a.id, row_number() over (partition by a.owner_id, a.sha256 order by
+       select a.id, row_number() over (partition by a.owner_id, a.workspace_id, a.sha256 order by
            exists (select 1 from jobs j where j.deleted_at is not null and ${names('j')}) and not exists (select 1 from jobs j where j.deleted_at is null and ${names('j')}),
            a.created_at desc, a.id) as n
          from assets a where a.kind = 'input' and a.deleted_at is null and a.sha256 ~ '^[0-9a-f]{64}$')

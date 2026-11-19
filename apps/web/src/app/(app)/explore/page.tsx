@@ -72,6 +72,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const user = await currentUser();
   if (user?.mustChangePassword) redirect('/account/password');
   const now = new Date();
+  const workspaceId = user?.workspaceId ?? ''; // the layout shows a notice instead of the page to a user in no workspace
   const [models, presets, samples, videoStats, imageStats, clips, jobs, today, made, stripRows] = await Promise.all([
     // Video models open Create Videos and image models open Image Generation, as the live page features both.
     pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null; twin_of: string | null }>(
@@ -82,26 +83,27 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     // The same scores as the pickers: every mark for a video model, the Image Generation marks for an image model.
     modelStats(null),
     modelStats('image'),
-    bestClips(),
+    bestClips(workspaceId),
     // shortcut: a running job older than the latest 20 is left out, as the jobs tray leaves it; widen if members queue that many.
     pool.query<{ id: string; status: string; error: string | null; feature: string; poster_asset_id: string | null; output_asset_id: string | null; input_id: string | null; resolution: string | null; finished_at: Date | null; started_at: Date | null; created_at: Date; prompt: string | null; model_label: string | null }>(
       `select j.id, j.status, j.error, j.feature, j.poster_asset_id, j.output_asset_id, j.input_asset_ids[1] as input_id, j.params->>'resolution' as resolution, j.finished_at, j.started_at, j.created_at, case when j.feature in ('image', 'video') and j.preset_id is null then j.prompt when j.feature = 'image' then j.params->>'brief' end as prompt, m.label as model_label
          from jobs j left join model_configs m on m.id = j.model
-        where j.user_id = $1 and j.deleted_at is null and j.purged_at is null order by j.created_at desc, j.id desc limit 20`,
-      [user?.id],
+        where j.user_id = $1 and j.workspace_id = $2 and j.deleted_at is null and j.purged_at is null order by j.created_at desc, j.id desc limit 20`,
+      [user?.id, workspaceId],
     ),
     dailyClips(pool, user?.id ?? ''),
     // What the member made today, by kind: a video-output feature is a clip, every other one an image (the daily clip cap counts only video and marketing, in dailyClips).
     pool.query<{ clips: number; images: number }>(
       `select (count(*) filter (where feature in ('video', 'marketing', 'motion_control')))::int as clips, (count(*) filter (where feature not in ('video', 'marketing', 'motion_control')))::int as images
-         from jobs where user_id = $1 and deleted_at is null and status in ('queued', 'submitting', 'running', 'succeeded')
+         from jobs where user_id = $1 and workspace_id = $2 and deleted_at is null and status in ('queued', 'submitting', 'running', 'succeeded')
           and (created_at at time zone 'Asia/Ho_Chi_Minh')::date = (now() at time zone 'Asia/Ho_Chi_Minh')::date`,
-      [user?.id],
+      [user?.id, workspaceId],
     ),
-    // The hero strip: only results an Admin put on the Examples tabs, which every member sees there; never a member's other outputs.
+    // The hero strip: only results an Admin put on the workspace's Examples tabs, which every member sees there; never a member's other outputs.
     pool.query<{ id: string }>(
       `select coalesce(j.poster_asset_id, j.output_asset_id) as id from examples e join jobs j on j.id = e.job_id join assets o on o.id = j.output_asset_id
-        where ${LIVE_CLIP} and (j.poster_asset_id is not null or o.mime like 'image/%') order by ${EXAMPLE_ORDER} limit 12`,
+        where j.workspace_id = $1 and ${LIVE_CLIP} and (j.poster_asset_id is not null or o.mime like 'image/%') order by ${EXAMPLE_ORDER} limit 12`,
+      [workspaceId],
     ),
   ]);
   // One model of each duplicate pair (lib/model-twins.ts); fal's balance lock is not read here, as the cards name no price to lock.

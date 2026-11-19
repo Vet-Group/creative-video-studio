@@ -30,11 +30,11 @@ export async function GET(request: Request) {
        select distinct on (p) p, created_at, id from (
          select nullif(btrim(${field ? FIELD_WORDS[field] : BRIEF_WORDS}), '') as p, j.created_at, j.id
            from jobs j
-          where j.user_id = $1 and j.feature = $2 and j.deleted_at is null and j.params->>'format' is not distinct from $3
+          where j.user_id = $1 and j.workspace_id = $4 and j.feature = $2 and j.deleted_at is null and j.params->>'format' is not distinct from $3
           order by j.created_at desc, j.id desc limit 200
        ) latest where p is not null order by p, created_at desc, id desc
      ) words order by created_at desc, id desc limit 10`,
-    [g.session.user.id, feature, format],
+    [g.session.user.id, feature, format, g.workspaceId],
   );
   return Response.json({ prompts: rows.map((r) => r.p as string) });
 }

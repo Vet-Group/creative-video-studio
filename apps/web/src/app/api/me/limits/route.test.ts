@@ -53,4 +53,12 @@ test('401 without a session; a member reads only their own usage beside the Admi
     monthUsd: { used: '0.0000', cap: '80.0000' },
     monthToDate: { usd: '2.5000', provisional: false },
   });
+
+  // In a partner's workspace the same member gets the clip count only: spend stays with the company.
+  await pool.query(`insert into workspaces (id, name) values ('ws_partner', 'Partner')`);
+  await pool.query(`delete from workspace_members where user_id = $1`, [me]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_partner', $1, 'member')`, [me]);
+  const p = await GET(new Request('http://localhost/api/me/limits', { headers: { cookie } }));
+  expect(p.status).toBe(200);
+  expect(await p.json()).toEqual({ clips: { used: 1, cap: 7 }, dayUsd: null, monthUsd: null, monthToDate: null });
 });

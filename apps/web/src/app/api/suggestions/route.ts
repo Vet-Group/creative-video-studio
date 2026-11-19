@@ -37,21 +37,21 @@ export async function POST(request: Request) {
   if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'ending' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video' && b?.field !== 'scenes' && b?.field !== 'check') {
     return bad('field must be brief, script, hook, location, ending, prompt, translate, video, scenes or check');
   }
-  if (b.field === 'scenes') return scenes(g.session, b);
+  if (b.field === 'scenes') return scenes(g.session, g.workspaceId, b);
   if (b.field === 'video') {
     // The prompt-from-video button in the preset edit form: a vision call on the preset's saved clip, for the people who edit presets.
-    if (!isEditor(g.session.user)) return bad('forbidden', 403);
+    if (!isEditor(g.session.user, g.workspaceId)) return bad('forbidden', 403);
     const preset = typeof b.preset === 'string' ? (await pool.query('select id from presets where id = $1', [b.preset])).rows[0] : undefined;
     if (!preset) return bad('preset is not a preset');
     const clip = `preset-${preset.id}.mp4`;
     if (!(await headSample(clip))) return bad('the preset has no clip');
-    return queue(g.session.user.id, { field: 'video', text: '', context: '', max: PROMPT_CEILING, clip });
+    return queue(g.session.user.id, g.workspaceId, { field: 'video', text: '', context: '', max: PROMPT_CEILING, clip });
   }
   if (b.field === 'translate') {
     // The Translate button: a Vietnamese reading of an English prompt, for the member to read; it counts as a run like any other.
     const text = typeof b.text === 'string' ? b.text.trim() : '';
     if (!text || text.length > PROMPT_CEILING) return bad(`text must be 1 to ${PROMPT_CEILING} characters`);
-    return queue(g.session.user.id, { field: 'translate', text, context: '', max: PROMPT_CEILING * 2 });
+    return queue(g.session.user.id, g.workspaceId, { field: 'translate', text, context: '', max: PROMPT_CEILING * 2 });
   }
   if (b.field === 'prompt') {
     // Any other page's prompt: the tool's task is the server's own text, so the member's words only ever reach the model as their notes.
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     if (text === null || text.length > PROMPT_CEILING) return bad(`text may be at most ${PROMPT_CEILING} characters`);
     const extra = await modelAndPace(b);
     if (typeof extra === 'string') return bad(extra);
-    return queue(g.session.user.id, { field: 'prompt', task, text, context: '', max: Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING), ...extra });
+    return queue(g.session.user.id, g.workspaceId, { field: 'prompt', task, text, context: '', max: Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING), ...extra });
   }
   // Unboxing and Review tell the model what their clip is, so the options fit it.
   const note = b.format === 'unboxing' || b.format === 'review' ? { format: b.format as 'unboxing' | 'review' } : {};
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     if (!text || text.length > PROMPT_CEILING) return bad(`text must be 1 to ${PROMPT_CEILING} characters`);
     const extra = await modelAndPace(b, false);
     if (typeof extra === 'string') return bad(extra);
-    return queue(g.session.user.id, { field: 'check', text, context: '', max: PROMPT_CEILING, ...extra, ...note });
+    return queue(g.session.user.id, g.workspaceId, { field: 'check', text, context: '', max: PROMPT_CEILING, ...extra, ...note });
   }
   if ((b.field === 'hook' || b.field === 'ending') && b.rest !== undefined) {
     // A sectioned prompt's Hook or Ending section: the member's words so far, as long as the section takes, and the other sections as the context.
@@ -82,13 +82,13 @@ export async function POST(request: Request) {
     if (typeof b.rest !== 'string' || b.rest.length > PROMPT_CEILING) return bad(`rest must be text of at most ${PROMPT_CEILING} characters`);
     const extra = await modelAndPace(b);
     if (typeof extra === 'string') return bad(extra);
-    return queue(g.session.user.id, { field: b.field, text, context: b.rest.trim(), max, ...extra, ...note });
+    return queue(g.session.user.id, g.workspaceId, { field: b.field, text, context: b.rest.trim(), max, ...extra, ...note });
   }
   if (b.field === 'hook' || b.field === 'location' || b.field === 'ending') {
     // The add form's AI help: the English scene of a new hook, location or ending from its Vietnamese name and description, as long as the field takes.
     const text = typeof b.text === 'string' ? b.text.trim() : '';
     if (!text || text.length > MAX_CHOICE_NAME + MAX_CHOICE_DESC + 3) return bad(`text must be the name and description, 1 to ${MAX_CHOICE_NAME + MAX_CHOICE_DESC + 3} characters`);
-    return queue(g.session.user.id, { field: b.field, text, context: '', max: b.field === 'ending' ? MAX_ENDING : MAX_CHOICE_PHRASE });
+    return queue(g.session.user.id, g.workspaceId, { field: b.field, text, context: '', max: b.field === 'ending' ? MAX_ENDING : MAX_CHOICE_PHRASE });
   }
   if (b.format !== undefined && !isParamFormat(b.format)) return bad('format must be advanced, unboxing, review or left out');
   if (b.field === 'script' && b.format !== 'advanced' && b.format !== 'review') return bad('a script is for Advanced and Review only');
@@ -99,31 +99,33 @@ export async function POST(request: Request) {
   if (text === null || text.length > PROMPT_CEILING) return bad(`text may be at most ${PROMPT_CEILING} characters`);
   const userId = g.session.user.id;
   // A built-in hook or location, or the member's own or a company one (lib/choices.ts).
-  const hook = typeof b.hook === 'string' ? await findChoice(userId, 'hook', b.hook) : undefined;
+  const hook = typeof b.hook === 'string' ? await findChoice(userId, g.workspaceId, 'hook', b.hook) : undefined;
   if (b.hook !== undefined && !hook) return bad('hook is not a hook');
-  const location = typeof b.location === 'string' ? await findChoice(userId, 'location', b.location) : undefined;
+  const location = typeof b.location === 'string' ? await findChoice(userId, g.workspaceId, 'location', b.location) : undefined;
   if (b.location !== undefined && !location) return bad('location is not a location');
   const extra = await modelAndPace(b);
   if (typeof extra === 'string') return bad(extra);
   const input: SuggestInput = { field: b.field, text, context: [hook?.phrase, location && `Set in ${location.phrase}.`].filter(Boolean).join(' '), max, ...extra, ...note };
 
-  return queue(userId, input);
+  return queue(userId, g.workspaceId, input);
 }
 
-/** Smart Remake's scene pick: a vision call on one still per scene of the member's finished analysis (or a shared one), with their product image. The server chooses every key it sends. */
-async function scenes(session: Session, b: { analysisId?: unknown; productAssetId?: unknown }): Promise<Response> {
+/** Smart Remake's scene pick: a vision call on one still per scene of the member's finished analysis (or one shared in their workspace), with their product image. The server chooses every key it sends. */
+async function scenes(session: Session, workspaceId: string, b: { analysisId?: unknown; productAssetId?: unknown }): Promise<Response> {
   if (!smartRemakeAppEnabled()) return bad('not found', 404);
   if (typeof b.analysisId !== 'string' || typeof b.productAssetId !== 'string') return bad('analysisId and productAssetId are required');
-  const analysis = (await pool.query('select status, result, source_key from analyses where id = $1 and (user_id = $2 or shared_at is not null)', [b.analysisId, session.user.id])).rows[0];
+  const analysis = (
+    await pool.query('select status, result, source_key from analyses where id = $1 and workspace_id = $3 and (user_id = $2 or shared_at is not null)', [b.analysisId, session.user.id, workspaceId])
+  ).rows[0];
   if (!analysis) return bad('the analysis does not exist', 404);
   if (analysis.status !== 'succeeded') return bad('the analysis has not finished');
-  const found = await readableAsset(session, b.productAssetId);
+  const found = await readableAsset(session, workspaceId, b.productAssetId);
   if (found.error) return found.error;
   if (found.asset.ownerId !== session.user.id) return bad('productAssetId must be one of your own images', 403);
   if (!found.asset.mime.startsWith('image/')) return bad('productAssetId must be an image');
   const times = mergeShots(analysis.result as Analysis).shots.map((s) => frameTime(s.start, s.end));
   if (times.length === 0 || times.length > MAX_PICK_SCENES) return bad(`the analysis must have 1 to ${MAX_PICK_SCENES} scenes`);
-  return queue(session.user.id, { field: 'scenes', text: '', context: '', max: 0, sourceKey: analysis.source_key, productKey: found.asset.s3Key, times });
+  return queue(session.user.id, workspaceId, { field: 'scenes', text: '', context: '', max: 0, sourceKey: analysis.source_key, productKey: found.asset.s3Key, times });
 }
 
 /**
@@ -139,8 +141,8 @@ async function modelAndPace(b: { model?: unknown; audio?: unknown; seconds?: unk
   return { model: modelNote(model, b.audio === true, writing), ...(b.seconds !== undefined && { seconds: b.seconds as number }) };
 }
 
-/** Counts the run against the member's daily limit, stores it and hands it to the worker. */
-async function queue(userId: string, input: SuggestInput): Promise<Response> {
+/** Counts the run against the member's daily limit (one limit across workspaces, as caps are), stores it in the workspace and hands it to the worker. */
+async function queue(userId: string, workspaceId: string, input: SuggestInput): Promise<Response> {
   const id = randomUUID();
   const client = await pool.connect();
   try {
@@ -157,7 +159,7 @@ async function queue(userId: string, input: SuggestInput): Promise<Response> {
       await client.query('rollback');
       return bad(`Bạn đã dùng hết ${SUGGEST_DAILY_LIMIT} lượt gợi ý hôm nay. Mai hãy thử lại.`, 429); // shown to the member as written
     }
-    await client.query('insert into suggestion_runs (id, user_id, input) values ($1, $2, $3)', [id, userId, JSON.stringify(input)]);
+    await client.query('insert into suggestion_runs (id, user_id, input, workspace_id) values ($1, $2, $3, $4)', [id, userId, JSON.stringify(input), workspaceId]);
     await client.query('commit');
   } catch (e) {
     await client.query('rollback');

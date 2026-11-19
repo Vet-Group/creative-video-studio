@@ -25,6 +25,8 @@ try {
     console.log(`${email} already has an account; nothing changed`);
   } else {
     const { user } = await auth.api.createUser({ body: { email, name, password, role, data: { emailVerified: true, ...(teamId ? { teamId } : {}) } } });
+    // Every account this script makes is the company's (docs/WORKSPACES.md §4), as POST /api/admin/users files it.
+    await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_vet', $1, $2) on conflict do nothing`, [user.id, role === 'admin' ? 'owner' : 'member']);
     console.log(`created ${user.id} (${role}, team ${(user as typeof user & { teamId: string }).teamId})`);
   }
 } finally {
