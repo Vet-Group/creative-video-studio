@@ -8,7 +8,7 @@ import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/a
 import { admin, lastLoginMethod, twoFactor } from 'better-auth/plugins';
 import { adminAc, userAc } from 'better-auth/plugins/admin/access';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
-import { accountAuditHooks, authAuditHook } from './account-audit';
+import { accountAuditHooks, authAuditHook, ownerMade } from './account-audit';
 import { joinCompanyWorkspace, larkOAuth, refuseLikelyDuplicate } from './lark';
 
 // One pool per server process; dev reloads keep it on globalThis.
@@ -75,6 +75,11 @@ export const auth = betterAuth({
       if (ctx.path === '/sign-out') {
         const leaving = await getSessionFromCtx(ctx);
         if (leaving?.session.impersonatedBy) await audit(pool, { actorId: leaving.session.impersonatedBy, action: 'user.impersonate_stop', target: `user:${leaving.user.id}`, newValue: { signOut: true } });
+      }
+      // Lark never links into an account a workspace owner created (lib/account-audit.ts): refused here, before the trip to Lark, so the page can say so.
+      if (ctx.path === '/link-social' && (ctx.body as { provider?: unknown } | undefined)?.provider === 'lark') {
+        const current = await getSessionFromCtx(ctx);
+        if (current && (await ownerMade(pool, current.user.id))) throw new APIError('FORBIDDEN', { message: 'Lark cannot be linked to this account', code: 'unable_to_link_account' });
       }
       const credentialPath = FORCED_CHANGE_CLOSED.has(ctx.path) || ctx.path.startsWith('/two-factor/');
       if (credentialPath || IMPERSONATION_CLOSED.has(ctx.path)) {

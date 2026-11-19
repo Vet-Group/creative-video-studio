@@ -173,6 +173,33 @@ describe('Lark sign-in', () => {
     expect(await accountsOf(id)).toEqual([]);
   });
 
+  test('never links Lark into an account a workspace owner created, at a first sign-in or from the account page; an Admin-made one still links', async () => {
+    const mark = (id: string, byOwner: boolean) =>
+      pool.query(`insert into audit_entries (actor_id, action, target, new_value) values (null, 'workspace.account_create', $1, $2)`, [`user:${id}`, { workspaceId: 'ws_partner', byOwner }]);
+    // Verified, as after an Admin edited its email, so the marker alone refuses: no accounts row and no account.link audit row.
+    const id = await user('owner-made@example.test', { password: true });
+    await mark(id, true);
+    const first = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'owner-made@example.test' }) });
+    expect(first.error).toBe('unable_to_link_account');
+    expect(first.cookie).toBe('');
+    const cookie = await cookieOf('owner-made@example.test');
+    const linking = await route.POST(
+      new Request('http://localhost/api/auth/link-social', {
+        method: 'POST',
+        headers: { cookie, origin: 'http://localhost', 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: 'lark', callbackURL: '/account/sign-in-methods' }),
+      }),
+    );
+    expect([linking.status, ((await linking.json()) as { code: string }).code]).toEqual([403, 'unable_to_link_account']);
+    expect((await accountsOf(id)).map((a) => a.provider_id)).toEqual(['credential']);
+    expect((await auditsOf(id)).map((a) => a.action)).not.toContain('account.link');
+
+    const adminMade = await user('admin-made@example.test');
+    await mark(adminMade, false);
+    expect((await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'admin-made@example.test' }) })).error).toBeNull();
+    expect((await accountsOf(adminMade)).map((a) => a.provider_id)).toEqual(['lark']);
+  });
+
   test('writes the email of the Lark account that was unlinked when a user linked two', async () => {
     const id = await user('two-lark@example.test', { password: true });
     const cookie = await cookieOf('two-lark@example.test');
