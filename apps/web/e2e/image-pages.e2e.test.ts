@@ -740,6 +740,7 @@ test("Try On, as Fash's model catalog: the filters narrow the portraits, a portr
     await page.getByRole('button', { name: 'Bỏ tư thế' }).click();
     await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', '');
     await expect(select(page, 'Tư thế')).toHaveText('Chọn tư thế');
+    await expect(select(page, 'Tư thế')).toBeFocused();
     await selectValue(page, 'Tư thế', 'hand-on-hip');
     await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', 'hand-on-hip');
 

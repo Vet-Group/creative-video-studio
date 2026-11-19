@@ -30,13 +30,13 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
   const [error, setError] = useState('');
   const [made, setMade] = useState<Img | null>(null); // the model just made, waiting for Use this model or Create another
   const use = useRef<HTMLButtonElement>(null);
-  useEffect(() => void (made && use.current?.focus()), [made]);
-  const ids = { extra: useId(), reason: useId() };
+  const ids = { extra: useId(), reason: useId(), made: useId() };
   const box = useRef<HTMLDivElement>(null);
+  // Focus follows the step: the first trait on opening (the tile that opened this form is gone) and after Create another, Use this model once made.
+  useEffect(() => void (made ? use.current : box.current?.querySelector('button'))?.focus(), [made]);
   const shown = useRef(true); // false once the member goes back or closes the picker: the run still saves the model and says so in a note, filling nothing
   useEffect(() => {
     shown.current = true;
-    box.current?.querySelector('button')?.focus(); // the tile that opened this form is gone
     return () => void (shown.current = false);
   }, []);
   const { notify } = useJobs();
@@ -81,11 +81,11 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
     return (
       <div ref={box} className="own-model own-model-made">
         <img src={thumbUrl(made.id)} alt={made.filename} />
-        <p className="help" role="status">
+        <p id={ids.made} className="help" role="status">
           Đã lưu vào mục Người mẫu AI.
         </p>
         <div className="own-model-actions">
-          <button ref={use} type="button" className="primary" onClick={() => onPick(made)}>
+          <button ref={use} type="button" className="primary" aria-describedby={ids.made} onClick={() => onPick(made)}>
             Dùng người mẫu này
           </button>
           <button type="button" onClick={() => setMade(null)}>

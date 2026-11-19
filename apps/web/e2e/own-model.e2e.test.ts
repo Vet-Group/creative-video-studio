@@ -39,6 +39,7 @@ test('creates a model inside the Try On model picker, fills the slot and lists i
   const use = form.getByRole('button', { name: 'Dùng người mẫu này' });
   await expect(use).toBeFocused({ timeout: 90_000 });
   await expect(form.getByRole('img', { name })).toBeVisible();
+  expect((await new AxeBuilder({ page }).include('dialog[open]').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
   await use.click();
   await expect(form).toBeHidden();
   await expect(page.getByRole('list', { name: 'Người mẫu: ảnh đã chọn' }).getByRole('img', { name })).toBeVisible();
@@ -75,6 +76,7 @@ test('creates a model inside the Try On model picker, fills the slot and lists i
   await run.click();
   await form.getByRole('button', { name: 'Tạo người mẫu khác' }).click({ timeout: 90_000 });
   await expect(select(page, 'Tóc')).toHaveAttribute('data-value', 'short');
+  await expect(select(page, 'Giới tính')).toBeFocused();
   await expect(run).toBeEnabled();
   await page.keyboard.press('Escape');
   await expect(form).toBeHidden();

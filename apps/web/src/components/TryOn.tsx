@@ -217,7 +217,17 @@ export function TryOn({ reuse }: { reuse?: string }) {
               <span className="pose-chip">
                 <Select chip label="Tư thế" icon="model" heading="Chọn tư thế" value={pose ?? ''} options={[{ value: '', label: 'Giữ tư thế trong ảnh', short: 'Chọn tư thế' }, ...POSES.map((p) => ({ value: p.value, label: p.label }))]} onChange={(v) => setPose(v || null)} />
                 {pose && (
-                  <button type="button" className="pose-clear" aria-label="Bỏ tư thế" onClick={() => setPose(null)}>
+                  <button
+                    type="button"
+                    className="pose-clear"
+                    aria-label="Bỏ tư thế"
+                    onClick={(e) => {
+                      const slot = e.currentTarget.closest('.slot');
+                      setPose(null);
+                      // This button goes: focus the chip, or the slot's upload button when the chip goes too (no photo).
+                      requestAnimationFrame(() => (slot?.querySelector<HTMLElement>('.select-trigger') ?? slot?.querySelector<HTMLElement>('.slot-add'))?.focus());
+                    }}
+                  >
                     <Icon name="x" size={12} />
                   </button>
                 )}

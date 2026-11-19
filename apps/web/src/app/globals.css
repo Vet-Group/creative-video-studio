@@ -1883,14 +1883,15 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .clips li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
 .clips button { display: grid; flex: none; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
 .slot-icon { display: grid; place-items: center; }
-/* Try On's pose beside the model photo (TryOn.tsx, Fash's "Hand on Hip x" chip): the pose select drawn as a pill over the slot's upload button, its clear button inside the pill. */
-.pose-chip { position: relative; z-index: 1; display: flex; align-items: center; }
+/* Try On's pose beside the model photo (TryOn.tsx, Fash's "Hand on Hip x" chip): a pill holding the pose select and its clear button, both over the slot's
+   upload button. The pill itself makes no stacking context, so the open list stays above the slots below. */
+.pose-chip { position: relative; display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); }
+.pose-chip:hover { border-color: var(--border-strong); }
 .select-chip { margin: 0; }
-.select-chip .select-trigger { width: auto; max-width: 220px; height: 32px; padding: 4px 10px; border-color: var(--border); border-radius: 999px; background: var(--surface); font-size: 13px; line-height: 18px; }
+.select-chip .select-trigger { position: relative; z-index: 1; width: auto; max-width: 200px; height: 32px; padding: 4px 10px; border: 0; border-radius: 999px; background: transparent; font-size: 13px; line-height: 18px; }
 .select-chip .select-pop { right: auto; min-width: 220px; }
-.pose-chip:has(.pose-clear) .select-trigger { padding-right: 34px; }
-.pose-clear { position: absolute; right: 6px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--fill); color: var(--ink); }
-@media (pointer: coarse) { .select-chip .select-trigger { height: 44px; } .pose-clear::after { content: ''; position: absolute; inset: -11px; } }
+.pose-clear { position: relative; z-index: 1; display: grid; flex: none; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: var(--fill); color: var(--ink); }
+@media (pointer: coarse) { .select-chip .select-trigger { height: 44px; } .pose-clear { width: 44px; height: 44px; } }
 .slot-name { display: none; color: var(--text-muted); font-size: 14px; line-height: 20px; }
 .app-slots[data-two='true'] .slot-add .slot-hint { display: none; } /* not the video slot's own line */
 .app-slots[data-two='true'] .slot-name { display: block; }
