@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoadError } from '@/components/LoadError';
-import { AUDIT_ACTIONS, auditChanges, auditLabel } from '@/lib/admin-ui';
+import { AUDIT_ACTIONS, auditChanges, auditLabel, auditNewValue } from '@/lib/admin-ui';
 import { api } from '@/lib/api';
 import { useTabReturn } from '@/lib/use-tab-return';
 import { Empty, PageHead } from './PageHead';
@@ -22,7 +22,7 @@ const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: '
 
 function AuditRow({ e }: { e: Entry }) {
   // Changed fields (old → new) first, so the cut to a few lines keeps what changed.
-  const changes = auditChanges(e.oldValue, e.newValue).sort((a, b) => Number(b.text.includes(' → ')) - Number(a.text.includes(' → ')));
+  const changes = auditChanges(e.oldValue, auditNewValue(e.action, e.newValue)).sort((a, b) => Number(b.text.includes(' → ')) - Number(a.text.includes(' → ')));
   // The raw JSON is rendered only while open, so a closed row carries no braces.
   const [open, setOpen] = useState(false);
   return (

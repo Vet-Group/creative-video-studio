@@ -5,7 +5,8 @@ import { loginReady, newAddress, openSettings, signIn } from './support.test';
 import { USERS } from './users';
 
 // Workspaces, phase 3 (docs/WORKSPACES.md): an Admin creates a partner workspace with a new owner account and adds a company member to it, the owner
-// signs in with the temporary password and creates a member's account (company staff and addresses stay out of reach), the company member switches
+// signs in with the temporary password and creates a member's account (company staff and addresses stay out of reach, each refusal in the Admin's
+// audit log), the company member switches
 // between the two (the company's carries a fixed badge), a stale tab's write gets the reload dialog, and the partner shows no company-only surface. CVS_E2E_SHOTS=<folder> saves the screenshots there (390 px dark, 1440 px light), else in the test output.
 const url = new URL(process.env.DATABASE_URL!);
 url.pathname = `/${process.env.CVS_E2E_DB ?? 'cvs_e2e'}`;
@@ -137,6 +138,21 @@ test('an Admin creates a partner workspace and adds a company member, its owner 
   expect.soft(await blocking(ownerPhone), '/members dark').toEqual([]);
   expect.soft(await blocking(owner), '/members light').toEqual([]);
   await ownerPhone.context().close();
+  // The owner is not throttled, but each refusal is logged: the Admin reads both in the audit log, the reason in words.
+  await admin.goto('/admin/audit');
+  await admin.getByLabel('Loại sự kiện').selectOption('workspace.member_refused');
+  const refusals = admin.getByRole('row').filter({ hasText: `workspace:${workspaceId}` });
+  await expect(refusals).toHaveCount(2);
+  await expect(refusals.filter({ hasText: 'x.staff@vetgroup.net' })).toContainText('Bị từ chối thêm thành viên');
+  await expect(refusals.filter({ hasText: 'x.staff@vetgroup.net' })).toContainText('reason: email thuộc tên miền công ty');
+  await expect(refusals.filter({ hasText: USERS.wsadm.email })).toContainText('reason: chưa có tài khoản hoặc là nhân viên');
+  await shot(admin, 'audit-refused-1440-light');
+  const auditPhone = await phone(browser, adminContext);
+  await auditPhone.goto('/admin/audit');
+  await auditPhone.getByLabel('Loại sự kiện').selectOption('workspace.member_refused');
+  await expect(auditPhone.getByRole('row').filter({ hasText: 'x.staff@vetgroup.net' })).toBeVisible();
+  await shot(auditPhone, 'audit-refused-390-dark', true);
+  await auditPhone.context().close();
   await db.query(`insert into feedback (id, user_id, team_id, kind, title, body, image_asset_ids, workspace_id) select $1, id, team_id, 'feature', $2, 'b', '{}', $3 from users where email = $4`, [
     `wsm-${run}`,
     BOARD_ITEM,
