@@ -275,9 +275,9 @@ test('a failed read of the job list says so with Thử lại instead of a blank 
   await history.getByRole('button', { name: 'Bắt đầu ngay' }).click();
   await expect(page.getByRole('region', { name: 'Thanh tạo ảnh' }).getByRole('textbox', { name: 'Mô tả', exact: true })).toBeFocused();
 
-  // The next poll fails: what was read stays, with a short notice.
+  // The next poll fails (with nothing in flight the tray polls every 30 s): what was read stays, with a short notice.
   fail = true;
-  await expect(history.getByText('Không cập nhật được danh sách lượt tạo.')).toBeVisible({ timeout: 15_000 });
+  await expect(history.getByText('Không cập nhật được danh sách lượt tạo.')).toBeVisible({ timeout: 40_000 });
   await expect(history.getByText('Chưa có lượt tạo nào.')).toBeVisible();
   fail = false;
   await history.getByRole('button', { name: 'Thử lại' }).click();

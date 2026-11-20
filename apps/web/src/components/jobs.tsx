@@ -429,13 +429,17 @@ export function JobsProvider({ userId, page, children }: { userId: string; page?
   const [news, setNews] = useState(false);
   const nextId = useRef(0);
   const pathname = usePathname();
-  /** Whether the last read found one of the user's jobs in flight: the poll then comes back in 5 s rather than 30. */
+  /** Whether the last read found one of the user's jobs in flight, or failed: the poll then comes back in 5 s rather than 30. */
   const inFlight = useRef(false);
   const poll = useRef<ReturnType<typeof pollTray>>(null);
 
   const load = useCallback(async () => {
-    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number }; queue?: JobsState['queue'] }>('/api/jobs?mine').catch(() => null);
-    if (!r) return setData((cur) => (cur.failed ? cur : { ...cur, failed: true }));
+    // A read that hangs is given up, so the poll goes on; a failed read is tried again in 5 s, as while a job is in flight.
+    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number }; queue?: JobsState['queue'] }>('/api/jobs?mine', { signal: AbortSignal.timeout(20_000) }).catch(() => null);
+    if (!r) {
+      inFlight.current = true;
+      return setData((cur) => (cur.failed ? cur : { ...cur, failed: true }));
+    }
     inFlight.current = r.jobs.some((j) => !FINISHED.includes(j.status));
     const finished = r.jobs.filter((j) => FINISHED.includes(j.status) && j.finishedAt);
     const times = finished.map((j) => Date.parse(j.finishedAt!));
