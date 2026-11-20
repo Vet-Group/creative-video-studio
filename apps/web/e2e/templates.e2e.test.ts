@@ -258,8 +258,9 @@ test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Ge
   await use(ids.marketing).click();
   await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio' && u.search === '');
   await withExamplePhotos('use-person.png', 'use-garment.png');
-  // The Examples tab lists every format: an Advanced example used from the UGC page opens the Advanced page, with its words and photos.
+  // The Examples tab shows this format's results first; with every format shown, an Advanced example used from the UGC page opens the Advanced page, with its words and photos.
   await other.goto('/marketing-studio');
+  await other.getByRole('group', { name: 'Lọc theo định dạng' }).getByRole('button', { name: 'Tất cả định dạng' }).click();
   await use(ids.advanced).click();
   await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === '');
   await withExamplePhotos('use-garment.png');
