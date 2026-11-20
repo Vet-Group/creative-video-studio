@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 
-vi.setConfig({ testTimeout: 30_000 });
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 60_000 }); // the setup writes 60,000 jobs
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;

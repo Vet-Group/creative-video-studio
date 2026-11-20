@@ -435,7 +435,7 @@ export function JobsProvider({ userId, page, children }: { userId: string; page?
 
   const load = useCallback(async () => {
     // A read that hangs is given up, so the poll goes on; a failed read is tried again in 5 s, as while a job is in flight.
-    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number }; queue?: JobsState['queue'] }>('/api/jobs?mine', { signal: AbortSignal.timeout(20_000) }).catch(() => null);
+    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number }; queue?: JobsState['queue'] }>('/api/jobs?mine', { signal: AbortSignal.timeout?.(20_000) }).catch(() => null);
     if (!r) {
       inFlight.current = true;
       return setData((cur) => (cur.failed ? cur : { ...cur, failed: true }));

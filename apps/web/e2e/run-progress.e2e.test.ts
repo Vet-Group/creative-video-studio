@@ -21,11 +21,12 @@ async function holdRunning(page: Page) {
   // Three earlier runs of the same model, 2 minutes each, give the usual time.
   const past = [1, 2, 3].map((n) => ({ ...base, id: `past-${n}`, status: 'succeeded', outputAssetId: asset, createdAt: iso(-n * 3_600_000), startedAt: iso(-n * 3_600_000), finishedAt: iso(-n * 3_600_000 + 120_000) }));
   let finished = false;
+  let reads = 0;
   const current = () => ({ ...base, id: 'waiting-job-1', status: finished ? 'succeeded' : 'running', outputAssetId: finished ? asset : null, createdAt: iso(-40_000), startedAt: iso(-40_000), finishedAt: finished ? iso(0) : null });
-  await page.route(/\/api\/jobs\?mine/, (r) => r.fulfill({ json: { workerOffline: false, clips: { today: 0, cap: 20 }, jobs: [current(), ...past] } }));
+  await page.route(/\/api\/jobs\?mine/, (r) => (reads++, r.fulfill({ json: { workerOffline: false, clips: { today: 0, cap: 20 }, jobs: [current(), ...past] } })));
   await page.goto('/image-generation');
   await openTab(page, 'Lịch sử');
-  return { card: page.locator('.job-card').filter({ hasText: 'a slow pan over the shirt' }).first(), finish: () => (finished = true) };
+  return { card: page.locator('.job-card').filter({ hasText: 'a slow pan over the shirt' }).first(), finish: () => (finished = true), reads: () => reads };
 }
 
 const box = async (media: Locator) => (await media.boundingBox())!;
@@ -68,6 +69,13 @@ for (const scheme of ['light', 'dark'] as const) {
     expect(serious.map((v) => v.id)).toEqual([]);
   });
 }
+
+test('while a job runs the tray reads the list every 5 s, so its result shows up promptly', async ({ page }) => {
+  const { card, reads } = await holdRunning(page);
+  await expect(card.locator('.job-media-wait')).toBeVisible();
+  const start = reads();
+  await expect.poll(reads, { timeout: 12_000 }).toBeGreaterThanOrEqual(start + 2); // an idle tray reads once in 30 s
+});
 
 test('under reduced motion the result simply shows and the bar does not animate', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });

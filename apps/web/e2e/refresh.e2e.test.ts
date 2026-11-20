@@ -29,7 +29,8 @@ test("the Library shows the user's own clip once the tray hears it finished, and
   const b = await other(browser);
   const theirs = await runViaApi(b);
   await finished(b, theirs);
-  await page.waitForResponse((r) => r.url().endsWith('/api/jobs?mine'), { timeout: 40_000 }); // the next tray poll (every 30 s while idle): nothing of this user's finished, so the page stays as it was
+  await page.waitForResponse((r) => r.url().endsWith('/api/jobs?mine'), { timeout: 40_000 }); // the next tray poll (every 30 s while idle): nothing of this user's finished,
+  await page.waitForTimeout(2_000); // so the page stays as it was; a wrong reload would have drawn the card by now
   await expect(card(page, theirs)).toHaveCount(0);
   await tabReturn(page);
   await expect(card(page, theirs)).toBeVisible();
