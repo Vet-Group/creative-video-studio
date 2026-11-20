@@ -67,7 +67,7 @@ export async function GET(request: Request) {
   const [jobs, worker, clips, queue] = await Promise.all([
     pool.query(
       `select j.id, j.status, j.error, j.is_mock, j.feature, j.aspect, j.duration_s, j.params, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.started_at, j.finished_at, j.provider_queue_position,
-              j.prompt, j.preset_id, j.input_asset_ids, exists (select 1 from jobs r where r.retry_of = j.id) as retried,
+              j.prompt, j.preset_id, j.input_asset_ids, exists (select 1 from jobs r where r.retry_of = j.id and r.retry_of is not null) as retried,
               exists (select 1 from favorites f where f.user_id = $1 and f.job_id = j.id) as favorite,
               (select c.usd::text from cost_entries c where c.job_id = j.id and c.kind = 'estimate') as estimate_usd,
               coalesce((select bool_or(c.is_final) and sum(c.usd) = 0 from cost_entries c where c.job_id = j.id), false) as unbilled

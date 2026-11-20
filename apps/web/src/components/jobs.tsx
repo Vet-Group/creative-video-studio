@@ -1,5 +1,5 @@
 'use client';
-// The "My jobs" state: polls the server every 5 s, raises a toast and changes the tab title when a job finishes (and, if switched on in Settings, a system notification and a chime).
+// The "My jobs" state: polls the server (every 5 s while a job is in flight, every 30 s otherwise: lib/tray-poll), raises a toast and changes the tab title when a job finishes (and, if switched on in Settings, a system notification and a chime).
 // What counts as news is kept in localStorage (the newest finish time already shown), so a job that ended while the tab was closed
 // is announced when the user returns, and old results are not announced again.
 import Link from 'next/link';
@@ -10,6 +10,7 @@ import { api, ApiError, sendJson, type TrayJob } from '@/lib/api';
 import { featureLabel } from '@/lib/features';
 import { announce } from '@/lib/preferences';
 import { pageOf } from '@/lib/reuse';
+import { pollTray } from '@/lib/tray-poll';
 import { useTabReturn } from '@/lib/use-tab-return';
 import type { UploadSlot } from '@/lib/upload-slots';
 import { confirmDialog } from './Confirm';
@@ -17,7 +18,6 @@ import { Icon } from './Icon';
 import { Modal } from './Modal';
 import { BusyNote, isVietnamese, useTranslate } from './Suggestions';
 
-const POLL_MS = 5_000;
 const SEEN_KEY = 'cvs.tray.seenUntil';
 /** How long the tab title keeps announcing a result in a tab the user is looking at. */
 const TITLE_NEWS_MS = 8_000;
@@ -429,10 +429,18 @@ export function JobsProvider({ userId, page, children }: { userId: string; page?
   const [news, setNews] = useState(false);
   const nextId = useRef(0);
   const pathname = usePathname();
+  /** Whether the last read found one of the user's jobs in flight, or failed: the poll then comes back in 5 s rather than 30. */
+  const inFlight = useRef(false);
+  const poll = useRef<ReturnType<typeof pollTray>>(null);
 
-  const refresh = useCallback(async () => {
-    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number }; queue?: JobsState['queue'] }>('/api/jobs?mine').catch(() => null);
-    if (!r) return setData((cur) => (cur.failed ? cur : { ...cur, failed: true }));
+  const load = useCallback(async () => {
+    // A read that hangs is given up, so the poll goes on; a failed read is tried again in 5 s, as while a job is in flight.
+    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number }; queue?: JobsState['queue'] }>('/api/jobs?mine', { signal: AbortSignal.timeout?.(20_000) }).catch(() => null);
+    if (!r) {
+      inFlight.current = true;
+      return setData((cur) => (cur.failed ? cur : { ...cur, failed: true }));
+    }
+    inFlight.current = r.jobs.some((j) => !FINISHED.includes(j.status));
     const finished = r.jobs.filter((j) => FINISHED.includes(j.status) && j.finishedAt);
     const times = finished.map((j) => Date.parse(j.finishedAt!));
     setData({ jobs: r.jobs, workerOffline: r.workerOffline, clips: r.clips, queue: r.queue ?? null, loaded: true, failed: false, lastFinished: Math.max(0, ...times) });
@@ -458,15 +466,18 @@ export function JobsProvider({ userId, page, children }: { userId: string; page?
   }, [userId]);
 
   useEffect(() => {
-    void refresh();
-    const t = setInterval(() => void refresh(), POLL_MS);
-    const back = () => void refresh(); // the network is back: do not wait for the next poll
+    const p = pollTray(async () => (await load(), inFlight.current));
+    poll.current = p;
+    const back = () => void p.now(); // the network is back: do not wait for the next poll
     window.addEventListener('online', back);
     return () => {
-      clearInterval(t);
+      p.stop();
       window.removeEventListener('online', back);
     };
-  }, [refresh]);
+  }, [load]);
+  // A form that started a job refreshes through the poll, so the new job is watched every 5 s at once; a tab brought back to the front reads at once too.
+  const refresh = useCallback(() => poll.current?.now() ?? load(), [load]);
+  useTabReturn(() => void refresh());
 
   // A tab brought back to the front has delivered its news.
   useEffect(() => {

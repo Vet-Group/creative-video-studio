@@ -527,6 +527,8 @@ export const jobs = pgTable(
     index('jobs_output_asset_id_idx').on(t.outputAssetId),
     index('jobs_poster_asset_id_idx').on(t.posterAssetId),
     index('jobs_input_asset_ids_idx').using('gin', t.inputAssetIds),
+    // "Has this job been retried" is asked for every row of the tray on every poll (GET /api/jobs?mine), and under the caps lock on a retry.
+    index('jobs_retry_of_idx').on(t.retryOf).where(sql`${t.retryOf} is not null`),
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
     check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9', '4:1', '1:4', '8:1', '1:8')`),
     check('jobs_provider_check', sql`${t.provider} in ('fal', 'vertex', 'byteplus', 'mock')`),

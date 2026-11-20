@@ -66,7 +66,7 @@ Layout [proposed]: a pnpm workspace with `apps/web`, `apps/worker` and `packages
    - fal reports `requestCancellationEnabled: false` for Kling o3 Pro reference-to-video (model page read 2026-10-22). A timed-out job can therefore still finish and be billed. The worker keeps polling quietly, for up to 24 h, so the cost is recorded, but it does not deliver the late result.
 4. Retry creates a new job with `retry_of` set. It is allowed only once per original job, and never happens automatically.
 5. The UI polls `GET /api/jobs/:id` every few seconds. Pushing updates over SSE is not needed for the MVP.
-   - A "My jobs" tray on every page polls `GET /api/jobs?mine` every 5 s. Completion raises a toast and changes the tab title.
+   - A "My jobs" tray on every page polls `GET /api/jobs?mine` every 5 s while one of the user's jobs is in flight and every 30 s otherwise (`apps/web/src/lib/tray-poll.ts`). Completion raises a toast and changes the tab title.
    - Results persist when the tab is closed. There is no email, Lark or browser notification.
 
 ### Provider adapter

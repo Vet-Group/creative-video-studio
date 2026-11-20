@@ -39,7 +39,7 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
     shown.current = true;
     return () => void (shown.current = false);
   }, []);
-  const { notify } = useJobs();
+  const { notify, refresh } = useJobs();
   const { models, failed } = useImageModels('fashion_model');
   // No input image, so the model must make a picture from words, as on the app's page.
   const offered = models?.filter((m) => m.textToImage) ?? (models === null ? null : []);
@@ -57,6 +57,7 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
     setError('');
     try {
       const { id } = await api<{ id: string }>('/api/jobs', sendJson('POST', { feature: 'fashion_model', modelId: pick.modelId, assetIds: [], ratio, prompt, params: { resolution: pick.resolution, traits: JSON.stringify(traits) } }));
+      void refresh(); // the tray watches the new job at once
       for (;;) {
         await new Promise((go) => setTimeout(go, POLL_MS));
         const job = await api<{ status: JobStatus; error: string | null; outputAssetId: string | null }>(`/api/jobs/${id}`);

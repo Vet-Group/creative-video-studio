@@ -16,11 +16,13 @@ export const capRowOf = (alias: string) => `(${alias}.kind <> 'llm' or ${alias}.
 const capRow = capRowOf('cost_entries');
 
 /** The video clips (features in parameter `features`) the user in parameter `user` made on the ICT day of `t.at`, as the daily clip cap counts them:
- * `failed` jobs with no provider cost booked (an Enhance llm row aside) do not count. */
+ * `failed` jobs with no provider cost booked (an Enhance llm row aside) do not count. The day is a range on the bare `created_at`, so the tray's poll reads it
+ * through jobs_user_id_created_at_idx instead of every job the user ever ran. */
 const dayClips = (user: string, features: string) => `select count(*) from jobs j
            where j.user_id = ${user} and j.feature = any(${features}::text[])
              and not (j.status = 'failed' and coalesce((select sum(usd) from cost_entries where cost_entries.job_id = j.id and ${capRow}), 0) = 0)
-             and (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date = (t.at at time zone 'Asia/Ho_Chi_Minh')::date`;
+             and j.created_at >= (date_trunc('day', t.at at time zone 'Asia/Ho_Chi_Minh') at time zone 'Asia/Ho_Chi_Minh')
+             and j.created_at < ((date_trunc('day', t.at at time zone 'Asia/Ho_Chi_Minh') + interval '1 day') at time zone 'Asia/Ho_Chi_Minh')`;
 
 /** The video clips `userId` made today and the daily clip cap, for the page to say how many a Run would use before it is sent. */
 export async function dailyClips(q: Queryable, userId: string): Promise<{ today: number; cap: number }> {

@@ -1,6 +1,6 @@
 // The Run caps against a disposable database (needs the compose Postgres: `pnpm services:up`). The clock is the `at` argument; nothing sleeps.
 import { bookLlm, bookShared, lateBill, release, reserve, withTransaction } from '@cvs/core/ledger';
-import { checkCaps, memberUsage } from '@cvs/core/limits';
+import { checkCaps, dailyClips, memberUsage } from '@cvs/core/limits';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -61,6 +61,22 @@ describe('daily clips per Member (ICT day)', () => {
     expect(await checkCaps(pool, u, '1.0000', at('2026-10-31T05:00:00Z'))).toBeNull(); // 4 today
     await newJob(u, '2026-10-31T01:00:00Z');
     expect(await checkCaps(pool, u, '1.0000', at('2026-10-31T05:00:00Z'))).toBe('daily_clips');
+  });
+
+  test('reads the day through the (user_id, created_at) index, not every job the Member ever ran (the tray asks on every poll)', async () => {
+    const u = await member();
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      await client.query('set local enable_seqscan = off'); // this file's few jobs would be read whole anyway: the question is whether the index can bound the day
+      let plan = '';
+      // The statement dailyClips sends, explained instead of run.
+      await dailyClips({ query: async (text, values) => { const r = await client.query(`explain (format json) ${text}`, values); plan = JSON.stringify(r.rows); return r; } }, u);
+      expect(plan).toMatch(/"Index Cond":"[^"]*created_at/);
+    } finally {
+      await client.query('rollback');
+      client.release();
+    }
   });
 
   test('counts only the Member own clips, and frees the slot of a failed job that cost nothing', async () => {
