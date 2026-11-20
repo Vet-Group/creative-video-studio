@@ -3119,10 +3119,10 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
   .imagebar .slot:not(dialog *) { max-width: 162px; }
   .imagebar .field-head:not(dialog *) { min-height: 18px; }
   .imagebar-count { line-height: 18px; }
-  /* One row, Run at its end: on a narrow column the model's and the style's names give way, cut with an ellipsis. */
+  /* One row, Run at its end: on a narrow column the model's name and a chosen style's give way, cut with an ellipsis (the plain style pill keeps its one word). */
   .imagebar-chips { flex-wrap: nowrap; }
   .imagebar-chips > * { flex-shrink: 0; }
-  .imagebar-chips > :is(.field:has([aria-haspopup='dialog']), .style-pill) { flex-shrink: 1; min-width: 0; }
+  .imagebar-chips > :is(.field:has([aria-haspopup='dialog']), .style-pill[data-on='true']) { flex-shrink: 1; min-width: 0; }
   .imagebar-chips > .field:has([aria-haspopup='dialog']) :is(.select, .select-trigger) { min-width: 0; max-width: 100%; }
   /* Toasts at the top of the screen, clear of Run at the foot. */
   body:has(.imagebar) .toasts { top: 1rem; bottom: auto; }

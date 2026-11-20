@@ -259,8 +259,30 @@ test('the bar stays compact with a long prompt and 3 photos: Run on the chip row
     // The model's name may be cut, never hidden.
     expect((await modelButton(page).locator('.select-value-text').boundingBox())!.width, `model name at ${width}`).toBeGreaterThan(40);
   }
-  // A screen shorter than the bar: the bar leaves the foot for the page's flow, so its top can be scrolled to.
+  // A chosen style with a long name gives way too, so Run still ends inside the bar on the narrowest wide screen.
+  await page.route(/\/api\/presets\?feature=image$/, async (route) => {
+    const res = await route.fetch();
+    const json = (await res.json()) as { presets: unknown[] };
+    json.presets.push({ id: 'e2e-long-style', label: 'Ánh sáng studio mềm trên nền xám nhạt với bóng đổ dài', group: 'product', enabled: true });
+    await route.fulfill({ response: res, json });
+  });
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto('/image-generation');
   const bar = barOf(page);
+  await expect(modelButton(page)).toContainText('Mock image');
+  await bar.getByRole('button', { name: 'Phong cách', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Chọn phong cách' }).getByRole('button', { name: 'Ánh sáng studio mềm trên nền xám nhạt với bóng đổ dài', exact: true }).click();
+  const pill = bar.locator('.style-pill');
+  await expect(pill).toContainText('Ánh sáng studio');
+  const [b, run] = [(await bar.boundingBox())!, (await bar.getByRole('button', { name: /^Tạo ảnh/ }).boundingBox())!];
+  expect(run.x + run.width, 'Run inside the bar with a long style').toBeLessThanOrEqual(b.x + b.width - 16);
+  expect(await pill.locator('span').first().evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true); // cut with an ellipsis
+  await page.unroute(/\/api\/presets\?feature=image$/);
+
+  // A screen shorter than the bar: the bar leaves the foot for the page's flow, so its top can be scrolled to.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fill(bar);
+  await page.locator('.imagegen > .side').click({ position: { x: 4, y: 4 } });
   const h = (await bar.boundingBox())!.height;
   await page.setViewportSize({ width: 1440, height: Math.round(h + 40) });
   await expect(bar).toHaveAttribute('data-tall');
