@@ -619,14 +619,17 @@ for (const [width, height, columns] of [[390, 844, 2], [1024, 768, 2], [1440, 10
     expect(lefts).toBe(columns);
     expect(await fits(page)).toBe(true);
 
-    for (const slug of ['character-swap', 'background-changer', 'reframe', 'motion-control']) {
+    const heads = new Set<number>(); // the banner keeps one height across apps, whatever the name
+    for (const slug of ['character-swap', 'model-swap', 'background-changer', 'reframe', 'motion-control']) {
       await page.goto(`/apps/${slug}`);
       await expect(page.getByRole('tab').first()).toBeVisible();
+      heads.add(Math.round((await page.locator('.app-head').boundingBox())!.height));
       for (const tab of await page.getByRole('tab').all()) {
         await tab.click();
         expect(await fits(page), `${slug} ${await tab.textContent()}`).toBe(true);
       }
     }
+    expect([...heads]).toHaveLength(1);
 
     // On a phone the form says what the app does, as About is a tab away; beside About it is not repeated.
     await page.goto('/apps/character-swap');
