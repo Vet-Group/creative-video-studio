@@ -251,7 +251,7 @@ ${style.prompt}` : prompt.trim();
             value={prompt}
             onChange={setPrompt}
             maxLength={chosen?.maxPromptChars}
-            onRun={() => canRun && void run()}
+            onRun={() => (canRun ? void run() : (reason ?? false))}
             placeholder="Mô tả cảnh bạn muốn tạo…"
             ask={chosen ? () => ({ field: 'prompt', feature: 'image', text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}
             enhance={<EnhanceToggle on={enhance} onChange={(v) => (recall.touch(), setEnhance(v))} />}
@@ -286,7 +286,7 @@ ${style.prompt}` : prompt.trim();
             <>
               <Select chip label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={(v) => (recall.touch(), pick.setRatio(v))} />
               <Select chip label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={(v) => (recall.touch(), pick.setResolution(v))} />
-              {pick.thinking && <Select chip label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t }))} onChange={pick.setThinking} />}
+              {pick.thinking && <Select chip label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t, short: `Suy luận: ${THINKING_LABEL[t] ?? t}` }))} onChange={pick.setThinking} />}
             </>
           )}
           {!narrow && (

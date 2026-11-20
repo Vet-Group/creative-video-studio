@@ -969,7 +969,7 @@ export function TileSkeleton() {
 }
 
 /** A tile's picture, which fades in over the tile's own fill once it has loaded (see `.tile-img`). */
-function TileImg(props: ImgHTMLAttributes<HTMLImageElement> & { alt: string }) {
+export function TileImg(props: ImgHTMLAttributes<HTMLImageElement> & { alt: string }) {
   const [loaded, setLoaded] = useState(false);
   return <img {...props} className={loaded ? 'tile-img loaded' : 'tile-img'} onLoad={() => setLoaded(true)} onError={() => setLoaded(true)} />;
 }
@@ -1056,12 +1056,12 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               typeof it === 'string' ? (
                 <li key={it} className="gallery-item">
                   {video ? (
-                    <a href={`/api/samples/${it}`} aria-label={detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Xem video mẫu'} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
+                    <a href={`/api/samples/${it}`} aria-label={`${detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Xem video mẫu'} ${sampleTiles.indexOf(it) + 1}`} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
                       <Preview src={`/api/samples/${it}`} poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} width={9} height={16} title="Video mẫu" onHover />
                     </a>
                   ) : (
                     // A picture opens in place as a clip does, with its details when it has a file.
-                    <a href={`/api/samples/${it}`} aria-label={detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Xem ảnh mẫu'} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
+                    <a href={`/api/samples/${it}`} aria-label={`${detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Xem ảnh mẫu'} ${sampleTiles.indexOf(it) + 1}`} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
                       <TileImg src={`/api/samples/${it}`} alt={`Ảnh mẫu ${sampleTiles.indexOf(it) + 1}`} loading="lazy" {...photoDrag(form?.result && form.photo ? (to) => form.photo!({ sample: it }, to) : undefined)} />
                     </a>
                   )}

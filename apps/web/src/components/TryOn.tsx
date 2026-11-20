@@ -345,7 +345,7 @@ export function TryOn({ reuse, model }: { reuse?: string; model?: Img }) {
               value={prompt}
               onChange={setPrompt}
               maxLength={room}
-              onRun={() => canRun && void run()}
+              onRun={() => (canRun ? void run() : (reason ?? false))}
               placeholder="Ví dụ: người mẫu đứng trong studio sáng, toàn thân"
               ask={chosen ? () => ({ field: 'prompt', feature: 'try_on', text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
             />

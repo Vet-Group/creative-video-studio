@@ -730,7 +730,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
       value={sec ? prompt : freeText}
       onChange={sec ? setPrompt : setFreeText}
       maxLength={room}
-      onRun={() => canRun && void run()}
+      onRun={() => (canRun ? void run() : (reason?.text ?? false))}
       disabled={presetId !== ''}
       placeholder={presetId === '' ? 'Ví dụ: The camera orbits slowly around the product in soft light (nên viết bằng tiếng Anh)' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'}
       ask={chosen ? () => ({ field: 'prompt', feature: 'video', text: sec ? prompt : freeText, seconds: durationSec, audio, room: room!, model: chosen.id }) : null}
@@ -954,7 +954,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                 templates={PROMPT_TEMPLATES.video}
                 onTemplate={(t) => (sec ? (setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
                 filled={(sec ? hookText + prompt + ending : freeText).trim() !== ''}
-                onRun={() => canRun && void run()}
+                onRun={() => (canRun ? void run() : (reason?.text ?? false))}
               >
                 {body}
               </PromptSections>

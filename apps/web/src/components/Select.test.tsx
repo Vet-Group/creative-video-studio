@@ -18,6 +18,13 @@ test('a closed select is a labelled combobox showing the chosen option, with no 
   expect(html).not.toContain('role="listbox"');
 });
 
+test('a chip, whose label is for screen readers only, names the setting in its hover title; a field keeps the value alone', () => {
+  const opts = [{ value: 'minimal', label: 'Tối thiểu' }];
+  const props = { label: 'Mức suy luận', icon: 'sliders' as const, heading: 'Chọn', value: 'minimal', options: opts, onChange: () => undefined };
+  expect(renderToStaticMarkup(<Select chip {...props} />)).toContain('title="Mức suy luận: Tối thiểu"');
+  expect(renderToStaticMarkup(<Select {...props} />)).toContain('title="Tối thiểu"');
+});
+
 test('a ratio select draws its icon in the chosen shape: tall for 9:16, square for 1:1, wide otherwise', () => {
   const shape = (value: string) => renderToStaticMarkup(<Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={value} options={[{ value, label: value }]} onChange={() => undefined} />).match(/<path d="([^"]+)"/)![1];
   expect(shape('9:16')).toBe('M4.5 2h7v12h-7z');

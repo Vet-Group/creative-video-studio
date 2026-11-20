@@ -116,7 +116,8 @@ export function Select({ label, icon, heading, value, options, onChange, chip = 
           onBlur={() => setOpen(false)}
         >
           <Icon name={icon === 'ratio' ? ratioIcon(value) : icon} />
-          <span className="select-value" title={options[selected]?.label}>
+          {/* A chip hides its label, so the hover title names the setting too. */}
+          <span className="select-value" title={chip ? `${label}: ${options[selected]?.label ?? value}` : options[selected]?.label}>
             {options[selected]?.short ?? options[selected]?.label ?? value}
           </span>
           {options[selected]?.tag && (

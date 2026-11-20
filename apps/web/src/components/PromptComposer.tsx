@@ -77,7 +77,7 @@ interface Props {
   value: string;
   onChange: (text: string) => void;
   maxLength?: number;
-  onRun: () => boolean | void;
+  onRun: () => boolean | string | void;
   placeholder: string;
   /** Read-only with this placeholder (Create while a preset is in use). */
   disabled?: boolean;
