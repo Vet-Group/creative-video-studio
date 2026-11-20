@@ -14,7 +14,7 @@ import sharp from 'sharp';
 import type { SendLark } from '@cvs/core/lark';
 import { falNext } from './fal-next';
 import { failoverOnBilling } from './vertex-accounts';
-import type { WorkerDeps } from './worker';
+import { DEFAULT_OPTIONS, type WorkerDeps } from './worker';
 import { deleteObject, getObject, putObject } from './storage';
 
 // Inputs are inlined as base64 in the JSON body. In the bake-off a provider reset a 3.8 MB body while 3.7 MB passed, so with up to 4 images
@@ -75,13 +75,15 @@ export function realProviders(
   let enhance: WorkerDeps['enhance'];
   let suggest: WorkerDeps['suggest'];
   if (env.FAL_KEY) {
-    providers.fal = createFalProvider({ apiKey: env.FAL_KEY, readImage });
-    imageProviders.fal = createFalImageProvider({ apiKey: env.FAL_KEY, readImage });
+    // fal drops a request no runner started by the time the worker times the job out, so a long fal queue is never run and billed after that.
+    const startTimeoutSec = DEFAULT_OPTIONS.runTimeoutMs / 1000;
+    providers.fal = createFalProvider({ apiKey: env.FAL_KEY, readImage, startTimeoutSec });
+    imageProviders.fal = createFalImageProvider({ apiKey: env.FAL_KEY, readImage, startTimeoutSec });
     // A second fal account (FAL_KEY_NEXT, the team) takes the new jobs once FAL_KEY's account runs out (fal-next.ts).
     if (env.FAL_KEY_NEXT) {
       const o = { pool, readPersonal: () => readFalBalance({ key: env.FAL_KEY }), send };
-      providers.fal = falNext(providers.fal, createFalProvider({ apiKey: env.FAL_KEY_NEXT, readImage }), o);
-      imageProviders.fal = falNext(imageProviders.fal, createFalImageProvider({ apiKey: env.FAL_KEY_NEXT, readImage }), o);
+      providers.fal = falNext(providers.fal, createFalProvider({ apiKey: env.FAL_KEY_NEXT, readImage, startTimeoutSec }), o);
+      imageProviders.fal = falNext(imageProviders.fal, createFalImageProvider({ apiKey: env.FAL_KEY_NEXT, readImage, startTimeoutSec }), o);
     }
     enhance = createFalEnhancer({ apiKey: env.FAL_KEY });
     suggest = createFalSuggester({ apiKey: env.FAL_KEY });

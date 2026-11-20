@@ -483,9 +483,11 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
   },
 };
 
-export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage; pause?: (ms: number) => Promise<void> }): ImageProvider {
+export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage; startTimeoutSec?: number; pause?: (ms: number) => Promise<void> }): ImageProvider {
   const f = opts.fetch ?? fetch;
   const headers = falHeaders(opts.apiKey);
+  // As in createFalProvider: a request not started by then is dropped, neither run nor billed.
+  const submitHeaders = opts.startTimeoutSec ? { ...headers, 'X-Fal-Request-Start-Timeout': String(opts.startTimeoutSec) } : headers;
   return {
     async submit(req) {
       const build = IMAGE_BODIES[req.model.endpoint];
@@ -501,7 +503,7 @@ export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; re
         // Nano Banana's text endpoint has no 'auto' ratio; without one each takes its own default.
         if (body.aspect_ratio === 'auto') delete body.aspect_ratio;
       }
-      const res = (await sendJson(retrySubmit(f, opts.pause), 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
+      const res = (await sendJson(retrySubmit(f, opts.pause), 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers: submitHeaders, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
       return { providerJobId: res.request_id };
     },

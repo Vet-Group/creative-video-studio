@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_URL } from './enhance';
 import {
   CHECK_SYSTEM, createFalSuggester, FORMAT_NOTES, createOpenAiSuggester, cutTo, DIRECTIONS, lengthenPrompt, modelNote, parseOption, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM,
-  frameTimes, parseCheck, parseScenes, parseVideoAnswer, PERSON_KEEP, SCENES_SYSTEM, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_FRAMES, VIDEO_SYSTEM, videoPrompt,
+  frameTimes, PaidSuggestError, parseCheck, parseScenes, parseVideoAnswer, PERSON_KEEP, SCENES_SYSTEM, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_FRAMES, VIDEO_SYSTEM, videoPrompt,
 } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -126,6 +126,22 @@ test('an over-long text is cut at its last sentence end, or its last word when n
 test('an error field or an HTTP error fails the run', async () => {
   await expect(createFalSuggester({ apiKey: 'k', fetch: () => answer({ output: '{"text": "a"}', error: 'rate limited' }) })(input)).rejects.toThrow('rate limited');
   await expect(createFalSuggester({ apiKey: 'k', fetch: () => answer({ detail: 'no' }, 401) })(input)).rejects.toThrow('HTTP 401');
+});
+
+test('a failed direction fails the run only once the others settle, with the cost of every call that answered, so it can be booked', async () => {
+  const failed = async (third: () => Promise<Response>) => {
+    let n = 0;
+    const suggest = createFalSuggester({ apiKey: 'k', fetch: () => (++n === 3 ? third() : falText('Câu số 1 cho video linen mùa hè', 0.0002)) });
+    return suggest(input).then(() => null, (e: unknown) => e as PaidSuggestError);
+  };
+  const refused = await failed(() => answer({ detail: 'down' }, 500));
+  expect(refused).toBeInstanceOf(PaidSuggestError);
+  expect(refused!.message).toContain('HTTP 500');
+  expect(refused!.call).toEqual({ costUsd: expect.closeTo(0.0004), provider: 'fal', model: ENHANCE_MODEL });
+  // An answer that cannot be read was billed all the same.
+  const unreadable = await failed(() => answer({ output: 'Here are some ideas', usage: { cost: 0.0001 } }));
+  expect(unreadable!.message).toBe('suggest: the answer is not JSON');
+  expect(unreadable!.call.costUsd).toBeCloseTo(0.0005);
 });
 
 test("a tool's prompt asks for English under its own system prompt, naming the server's task and keeping the member's notes", async () => {

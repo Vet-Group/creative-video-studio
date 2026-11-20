@@ -1,7 +1,7 @@
 // Marketing Studio suggestions (packages/core/src/suggest.ts): one run per queue job, written back to suggestion_runs for the page to poll.
 import { bookLlm, withTransaction } from '@cvs/core/ledger';
 import { SUGGEST_EXPIRY_SECONDS } from '@cvs/core/queue';
-import { type SuggestInput, type Suggester, VIDEO_FRAMES, videoPrompt } from '@cvs/core/suggest';
+import { PaidSuggestError, type SuggestInput, type Suggester, VIDEO_FRAMES, videoPrompt } from '@cvs/core/suggest';
 import sharp from 'sharp';
 import { extractFrames } from './media';
 import { downloadObject, getObject } from './storage';
@@ -42,6 +42,8 @@ export async function runSuggestion(
       await bookLlm(tx, { suggestion: runId }, call);
     });
   } catch (e) {
+    // The calls that answered before the run failed were billed all the same.
+    if (e instanceof PaidSuggestError) await bookLlm(pool, { suggestion: runId }, e.call);
     await pool.query(`update suggestion_runs set status = 'failed' where id = $1 and status = 'queued'`, [runId]);
     throw e;
   }

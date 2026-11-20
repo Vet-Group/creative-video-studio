@@ -2,7 +2,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
-import { frameTimes, type Suggester, VIDEO_FRAMES } from '@cvs/core/suggest';
+import { ENHANCE_MODEL } from '@cvs/core/enhance';
+import { createFalSuggester, frameTimes, type Suggester, VIDEO_FRAMES } from '@cvs/core/suggest';
 import sharp from 'sharp';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { extractFrames } from './media';
@@ -53,6 +54,16 @@ test('books no ledger row for a run without a cost or a failed call', async () =
   const failing = await queued();
   await expect(runSuggestion(pool, async () => Promise.reject(new Error('down')), failing)).rejects.toThrow('down');
   for (const id of [free, unknown, failing]) expect(await ledger(id)).toEqual([]);
+});
+
+test('a run that fails after two of its three directions answered still books what those two cost', async () => {
+  let n = 0;
+  // Two answers long enough for the range (no second call), and a third refused.
+  const fetch = async () => (++n === 3 ? new Response('down', { status: 500 }) : Response.json({ output: JSON.stringify({ text: 'x'.repeat(900) }), usage: { cost: 0.0003 } }));
+  const id = await queued();
+  await expect(runSuggestion(pool, createFalSuggester({ apiKey: 'k', fetch }), id)).rejects.toThrow('HTTP 500');
+  expect((await row(id)).status).toBe('failed');
+  expect(await ledger(id)).toEqual([{ kind: 'llm', usd: '0.0006', user_id: 'u1', team_id: 'team-unassigned', job_id: null, model: ENHANCE_MODEL, is_final: true }]);
 });
 
 test("a failed call or a missing suggester marks the run failed; a run past the page's wait (90 s) is not sent at all", async () => {

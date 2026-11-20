@@ -12,6 +12,9 @@ import { type AnalyzeSeams, backfillScenePrompts, closeStaleAnalyses, defaultVlm
 // rea-video never runs here: the one test without a decompose seam reads the options the real one hands execFile, which fails as a killed run would.
 const execFile = vi.hoisted(() => vi.fn((_file: string, _args: string[], _opts: object, done: (e: Error) => void) => done(new Error('Command failed: rea-video decompose'))));
 vi.mock('node:child_process', async (importOriginal) => ({ ...(await importOriginal<typeof import('node:child_process')>()), execFile }));
+// The object store, for the one test without a read seam.
+const storage = vi.hoisted(() => ({ getObject: vi.fn(), downloadObject: vi.fn(async () => undefined) }));
+vi.mock('./storage', async (importOriginal) => ({ ...(await importOriginal<typeof import('./storage')>()), ...storage }));
 
 const testDb = await createTestDatabase();
 const pool = createPool(testDb.url, 2);
@@ -156,6 +159,15 @@ test('the default translator reads its key when an analysis runs, not when the m
     if (saved.fal === undefined) delete process.env.FAL_KEY;
     else process.env.FAL_KEY = saved.fal;
   }
+});
+
+test('streams the source video to disk without reading it into memory, under the queue job signal', async () => {
+  const id = await queued();
+  const expiry = new AbortController();
+  await runReaAnalyze(pool, id, seams({ read: undefined }), expiry.signal);
+  expect(storage.getObject).not.toHaveBeenCalled();
+  expect(storage.downloadObject).toHaveBeenCalledWith(`sources/${id}.mp4`, expect.stringMatching(/source\.mp4$/), expiry.signal);
+  expect((await row(id)).status).toBe('succeeded');
 });
 
 test('does nothing on a repeated run once the analysis is no longer queued', async () => {
