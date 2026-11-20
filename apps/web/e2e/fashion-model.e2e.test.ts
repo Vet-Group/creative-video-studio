@@ -5,7 +5,7 @@ import { gotoTryOn, openTab, select, selectValue, signIn } from './support.test'
 test('picks traits and two images, runs, saves a result as a model and finds it in the list and in the Try On picker', async ({ page }) => {
   await signIn(page, 'fashiona');
   await page.goto('/apps/ai-fashion-model');
-  const run = page.getByRole('button', { name: /^Chạy/ });
+  const run = page.getByRole('button', { name: /^Chạy(?! lại)/ }); // not a History card's Chạy lại
   await expect(run).toBeEnabled();
 
   // A niche pre-selects its traits, which stay editable; one image by default, and the cost line follows the number of images.
