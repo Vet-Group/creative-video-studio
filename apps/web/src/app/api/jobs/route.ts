@@ -96,9 +96,9 @@ export async function GET(request: Request) {
     jobs: jobs.rows.map((r) => ({
       id: r.id, status: r.status, error: r.error, failureReason: providerRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
       retried: r.retried, twin: twins.get(r.id) ?? null, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, providerQueue: r.provider_queue_position,
-      // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
+      // For the History card: the member's own words (a free prompt on Create video and Image Generation, the pose generator's own pose; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite; `traits` is a Fashion Model Generator job's own traits (JSON), which its save dialog starts from.
-      text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
+      text: r.params.brief ?? r.params.poseText ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
       traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, style: r.params.style ?? null, product: r.params.product ?? null, name: r.params.name ?? null,
       // The pose generator's pose (Try On keeps its own pose too, which its card does not name) or its own words.
       pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,

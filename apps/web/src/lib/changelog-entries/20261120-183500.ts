@@ -1,3 +1,0 @@
-import type { ChangeEntry } from '../changelog';
-
-export default { at: '2026-11-20T18:35:00+07:00', kind: 'improved', title: 'Nút Chạy luôn nói lý do khi bị tắt, mỗi trang có tên riêng trên tab', details: ['Khi nút Chạy hoặc "Tạo video với sản phẩm" đang tắt, ngay dưới nút có một dòng nói thiếu gì; Phân tích video hiện giá, thanh chờ có số giây và lý do khi phân tích hỏng.', 'Tab trình duyệt và thanh trên cùng ghi tên trang đang mở; prompt tự viết không mất khi chuyển qua lại giữa các chế độ.', 'Thử đồ, Tạo ảnh và Tạo video gọn hơn: một bộ đếm prompt, độ phân giải chỉ có một lựa chọn thì hiện dạng ô chỉ đọc, các nút trên điện thoại to và dễ bấm hơn.'], href: '/create', prs: [589], audience: 'all' } satisfies ChangeEntry;

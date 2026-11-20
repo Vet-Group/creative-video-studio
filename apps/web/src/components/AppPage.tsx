@@ -187,7 +187,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const person = images[0]?.[0];
   const aiGender = parseFashionTraits(aiModels.find((m) => m.assetId === person?.id)?.traits)?.gender;
   const gender = poseGender ?? portraitGender(person?.filename ?? '') ?? (aiGender === 'male' ? 'man' : aiGender === 'female' ? 'woman' : null) ?? (pictured('woman') ? 'woman' : 'man');
-  const ownPose = cleanName(poseText); // the box's words as a job takes them: trimmed, one space between words, as a name is
+  const ownPose = cleanName(poseText.replace(/\p{Cc}/gu, ' ')); // the box's words as a job takes them: control characters (pasted) as spaces, trimmed, one space between words
   const posesPicked = poses.length + (ownPose ? 1 : 0);
   const togglePose = (v: string) => (poses.includes(v) ? setPoses(poses.filter((x) => x !== v)) : posesPicked >= MAX_POSES ? notify(`Tối đa ${MAX_POSES} tư thế mỗi lần chạy`) : setPoses([...poses, v]));
   // The member's last model and settings, unless a refill opens the page.

@@ -923,8 +923,9 @@ describe('POST /api/jobs for an image feature', () => {
       await insertAsset(`${m.id}-g1`, m.id);
       expect((await runImage(m, { feature: 'try_on', prompt: undefined, assetIds: [m.asset, `${m.id}-g1`], params: { resolution: '1K', garments: '1', pose: 'kneel' } })).status).toBe(201);
       expect(await error(await runImage(m, { feature: 'try_on', prompt: undefined, assetIds: [m.asset, `${m.id}-g1`], params: { resolution: '1K', garments: '1', poseText: 'ngồi' } }))).toMatch(/^params may hold only resolution, quality, thinking, brief, garments and pose,/); // own pose words are the pose generator's
-      const mine = (await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: m.cookie } }))).json()) as { jobs: { feature: string; pose: string | null; poseText: string | null }[] };
-      expect(mine.jobs.map((j) => [j.feature, j.pose, j.poseText])).toEqual([['try_on', null, null], ['pose_generator', null, 'ngồi trên ghế'], ['pose_generator', 'front', null]]);
+      const mine = (await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: m.cookie } }))).json()) as { jobs: { feature: string; pose: string | null; poseText: string | null; text: string | null }[] };
+      // The own words are the card's text too, so two own-pose Runs read apart.
+      expect(mine.jobs.map((j) => [j.feature, j.pose, j.poseText, j.text])).toEqual([['try_on', null, null, null], ['pose_generator', null, 'ngồi trên ghế', 'ngồi trên ghế'], ['pose_generator', 'front', null, null]]);
     });
 
     test('the multi-angle app keeps the batch id of its Run too, and an app that is not a batch app takes none', async () => {
