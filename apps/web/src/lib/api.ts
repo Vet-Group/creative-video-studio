@@ -136,7 +136,8 @@ export interface TrayJob {
 
 export interface Clip {
   id: string;
-  creator: { id: string; name: string };
+  /** `system`: a system account made it, set only while an Admin shows those (`?system=1`). */
+  creator: { id: string; name: string; system?: boolean };
   createdAt: string;
   modelId: string;
   modelLabel: string;

@@ -310,7 +310,8 @@ export function ClipCard({ clip, view, select, selecting = false, onChange, onDe
             {prompt ?? featureLabel(clip.feature)}
           </p>
           <p className="lib-row-meta">
-            {clip.creator.name} · {clip.storeName && `${clip.storeName} · `}{fmtTime(clip.createdAt)} · {clip.ratio} · {image ? clip.resolution : `${clip.lengthSec ?? clip.durationSec} giây`}
+            {clip.creator.name}
+            {clip.creator.system && <span className="tag">Hệ thống</span>} · {clip.storeName && `${clip.storeName} · `}{fmtTime(clip.createdAt)} · {clip.ratio} · {image ? clip.resolution : `${clip.lengthSec ?? clip.durationSec} giây`}
           </p>
         </div>
         <div className="actions">
@@ -387,6 +388,7 @@ export function ClipCard({ clip, view, select, selecting = false, onChange, onDe
             {clip.creator.name}
             {clip.storeName && ` · ${clip.storeName}`}
           </span>
+          {clip.creator.system && <span className="tag">Hệ thống</span>}
           <span className="lib-when">
             {fmtShort(clip.createdAt)}
             {clip.costUsd !== null && ' ·'}
@@ -1220,7 +1222,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   function clearFilters() {
     setSearch('');
     setPickDay(false);
-    setFilters((cur) => ({ ...NO_FILTERS, sort: cur.sort }));
+    setFilters((cur) => ({ ...NO_FILTERS, sort: cur.sort, showSystem: cur.showSystem }));
   }
   function clearOne(key: ChipKey) {
     if (key === 'q') setSearch('');
@@ -1391,6 +1393,12 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           <label className="library-toggle" title="Các kết quả được đánh dấu Nổi bật mà chưa ở tab Ví dụ">
             <input type="checkbox" checked={filters.suggestedOnly} onChange={(e) => set({ suggestedOnly: e.target.checked, examplesOnly: false })} />
             Gợi ý làm ví dụ
+          </label>
+        )}
+        {isAdmin && (
+          <label className="library-toggle" title="Kết quả của tài khoản hệ thống (Admin triển khai, tài khoản thử, demo) mặc định không hiện trong Thư viện">
+            <input type="checkbox" checked={filters.showSystem} onChange={(e) => set({ showSystem: e.target.checked })} />
+            Hiện tài khoản hệ thống
           </label>
         )}
         {active > 0 && (

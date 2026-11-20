@@ -201,7 +201,7 @@ describe('GET /api/library', () => {
     expect(ids).not.toContain(deleted);
     expect(ids.indexOf(a)).toBeLessThan(ids.indexOf(b)); // newest first
     expect(body.clips.find((c) => c.id === a)).toEqual({
-      id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8, lengthSec: null,
+      id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt', system: false }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8, lengthSec: null,
       feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, storeName: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', featured: false, markedBy: alice.id },
       favorite: false, example: false, productType: null, prompt: null, canEdit: false, mine: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
@@ -1133,5 +1133,71 @@ describe('bestClips', () => {
     expect(best.has('best-none')).toBe(false);
     await pool.query('update jobs set poster_asset_id = null where id = $1', [image]); // an image from before previews shows itself
     expect((await bestClips('ws_vet')).get('best-image')).toEqual({ video: null, poster: `/api/assets/${image}-video/thumb` });
+  });
+});
+
+describe('system accounts in the Library (owner decision 2026-11-20)', () => {
+  type Body = { clips: { id: string; creator: { id: string; name: string; system: boolean } }[]; creators: { id: string }[]; stores: { id: string }[]; ratios: string[]; unmarked: number };
+  const library = async (cookie: string, query = '') => (await (await GET_LIBRARY(req(`/api/library${query}`, cookie))).json()) as Body;
+  const sysIds = async (cookie: string, query = '') => (await libraryIds(cookie, query)).filter((id) => id.startsWith('sys-')).sort();
+  let sys: Awaited<ReturnType<typeof newUser>>;
+  let sysEx: Awaited<ReturnType<typeof newUser>>;
+
+  beforeAll(async () => {
+    sys = await newUser('system@example.test', 'Test Account');
+    sysEx = await newUser('system-example@example.test', 'Demo Account');
+    await pool.query('update users set system = true where id = any($1)', [[sys.id, sysEx.id]]);
+    await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('store-sys', 'System store', 'SYS-LIB', false, 'ws_vet')`);
+    // A switched-off model of their own, so these clips leave the model scores alone.
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('sys-model', 'fal', 'x', 'System accounts', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false)`,
+    );
+  });
+
+  test("leaves a system account's live clip out for a member and, by default, for an Admin; an Admin's ?system=1 shows it marked, a member's does not", async () => {
+    const hidden = await clip(sys.id, { id: 'sys-live', model: 'sys-model' });
+    const staff = await clip(alice.id, { id: 'sys-staff', model: 'sys-model' });
+    expect(await sysIds(bob.cookie)).toEqual([staff]);
+    expect(await sysIds(admin.cookie)).toEqual([staff]);
+    expect(await sysIds(bob.cookie, '?system=1')).toEqual([staff]);
+    expect(await sysIds(sys.cookie)).toEqual([staff]); // nor in its own Library: only its History lists it
+    expect(await sysIds(admin.cookie, '?system=1')).toEqual([hidden, staff].sort());
+    const shown = (await library(admin.cookie, '?system=1')).clips;
+    expect(shown.find((c) => c.id === hidden)?.creator).toEqual({ id: sys.id, name: 'Test Account', system: true });
+    expect(shown.find((c) => c.id === staff)?.creator.system).toBe(false);
+    expect((await library(admin.cookie)).clips.every((c) => c.creator.system === false)).toBe(true);
+    expect((await GET_LIBRARY(req('/api/library?system=0', admin.cookie))).status).toBe(400);
+  });
+
+  test('the creator, store and ratio filters and the unmarked count leave out a system account with no example', async () => {
+    const before = await library(admin.cookie);
+    await clip(sys.id, { id: 'sys-filters', model: 'sys-model', storeId: 'store-sys' });
+    await pool.query(`update jobs set aspect = '8:1' where id = 'sys-filters'`); // a shape no other live item has
+    for (const cookie of [admin.cookie, bob.cookie]) {
+      const body = await library(cookie);
+      expect(body.creators.map((c) => c.id)).not.toContain(sys.id);
+      expect(body.stores.map((s) => s.id)).not.toContain('store-sys');
+      expect(body.ratios).not.toContain('8:1');
+    }
+    expect((await library(admin.cookie)).unmarked).toBe(before.unmarked);
+    const all = await library(admin.cookie, '?system=1');
+    expect(all.creators.map((c) => c.id)).toContain(sys.id);
+    expect(all.stores.map((s) => s.id)).toContain('store-sys');
+    expect(all.ratios).toContain('8:1');
+    expect(all.unmarked).toBeGreaterThan(before.unmarked);
+    expect(await sysIds(admin.cookie, `?creator=${sys.id}`)).toEqual([]);
+  });
+
+  test("shows a system account's clip that an Admin put on an Examples tab to everyone, and lists that account as a creator", async () => {
+    const example = await clip(sysEx.id, { id: 'sys-example', model: 'sys-model' });
+    const other = await clip(sysEx.id, { id: 'sys-not-example', model: 'sys-model' });
+    expect(await sysIds(bob.cookie, `?creator=${sysEx.id}`)).toEqual([]);
+    await pool.query('insert into examples (job_id, added_by) values ($1, $2)', [example, admin.id]);
+    for (const cookie of [bob.cookie, admin.cookie]) {
+      expect(await sysIds(cookie, `?creator=${sysEx.id}`)).toEqual([example]);
+      expect((await library(cookie)).creators.map((c) => c.id)).toContain(sysEx.id);
+    }
+    expect(await sysIds(bob.cookie, '?example=1')).toEqual([example]);
+    expect(await sysIds(admin.cookie, `?creator=${sysEx.id}&system=1`)).toEqual([example, other].sort());
   });
 });

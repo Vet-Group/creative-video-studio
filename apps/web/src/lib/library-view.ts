@@ -19,10 +19,12 @@ export interface LibraryFilters {
   examplesOnly: boolean;
   /** Only the featured results not yet on an Examples tab, which an Admin may put there. */
   suggestedOnly: boolean;
+  /** Also the results of system accounts, which the Library otherwise leaves out; the server honours it for an Admin only. It widens the list, so it is no filter to count or clear. */
+  showSystem: boolean;
   sort: 'newest' | 'oldest';
 }
 
-export const NO_FILTERS: LibraryFilters = { q: '', creator: '', store: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, examplesOnly: false, suggestedOnly: false, sort: 'newest' };
+export const NO_FILTERS: LibraryFilters = { q: '', creator: '', store: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, examplesOnly: false, suggestedOnly: false, showSystem: false, sort: 'newest' };
 
 /** A refresh of the first page onto the list shown: the items not yet there go on top (newest first), so pages loaded since and the scroll position stay;
  * an item shown that is on the fresh page takes its fresh copy (a mark or a final cost set meanwhile). */
@@ -54,6 +56,7 @@ export function libraryQuery(f: LibraryFilters, offset: number): string {
   if (f.favoritesOnly) q.set('favorites', '1');
   if (f.examplesOnly) q.set('example', '1');
   if (f.suggestedOnly) q.set('suggested', '1');
+  if (f.showSystem) q.set('system', '1');
   if (f.sort !== 'newest') q.set('sort', f.sort);
   if (offset > 0) q.set('offset', String(offset));
   return q.toString();
@@ -75,6 +78,7 @@ export function filtersFromParams(p: URLSearchParams): LibraryFilters {
     favoritesOnly: p.get('favorites') === '1',
     examplesOnly: p.get('example') === '1',
     suggestedOnly: p.get('suggested') === '1',
+    showSystem: p.get('system') === '1',
     sort: p.get('sort') === 'oldest' ? 'oldest' : 'newest',
   };
 }

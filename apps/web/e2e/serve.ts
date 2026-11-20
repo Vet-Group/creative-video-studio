@@ -97,6 +97,8 @@ await pool.query('drop trigger test_company_member on users');
 await pool.query('update users set can_edit_templates = true where email = any($1)', [[USERS.tpled.email, USERS.branded.email, USERS.chsed.email, USERS.pbared.email]]);
 // The developer Admin of impersonation.e2e, as an existing developer Admin would have made them (the migration grants the flag to no one).
 await pool.query('update users set can_impersonate = true where email = $1', [USERS.impdev.email]);
+// The test account of library.e2e's system accounts test, as an Admin marks one on Admin > Users.
+await pool.query('update users set system = true where email = $1', [USERS.syslib.email]);
 // The satisfaction prompt asks after three succeeded real jobs (mock jobs never count and the specs run on the mock provider), so rating.e2e's members get them
 // seeded here, dated long ago so no page's "today" figure or weekly report moves.
 await pool.query(

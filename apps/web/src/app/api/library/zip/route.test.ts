@@ -19,8 +19,8 @@ const PASSWORD = 'correct-horse-battery';
 const req = (path: string, cookie?: string, body?: unknown) =>
   new Request(`http://localhost${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { ...(cookie ? { cookie } : {}), 'content-type': 'application/json' }, ...(body !== undefined && { body: JSON.stringify(body) }) });
 
-async function newUser(email: string, name: string) {
-  const id = (await auth.api.createUser({ body: { email, name, password: PASSWORD, role: 'member' } })).user.id;
+async function newUser(email: string, name: string, role: 'member' | 'admin' = 'member') {
+  const id = (await auth.api.createUser({ body: { email, name, password: PASSWORD, role } })).user.id;
   const res = await auth.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true });
   return { id, cookie: res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ') };
 }
@@ -130,6 +130,20 @@ describe('/api/library/zip', () => {
       expect(res.status).toBe(403);
       expect(await res.json()).toEqual({ error: 'one or more items cannot be downloaded' });
     }
+  });
+
+  test("refuses a system account's item to other members, unless it is on an Examples tab; its creator and an Admin may zip it (owner decision 2026-11-20)", async () => {
+    const sys = await newUser('system@example.test', 'Test Account');
+    const admin = await newUser('admin@example.test', 'Admin', 'admin');
+    await pool.query('update users set system = true where id = $1', [sys.id]);
+    const ok = await job(alice.id, 'sys-ok', 'x');
+    const hidden = await job(sys.id, 'sys-hidden', 'y');
+    const zip = async (cookie: string) => (await POST(req('/api/library/zip', cookie, { ids: [ok, hidden] }))).status;
+    expect(await zip(bob.cookie)).toBe(403);
+    expect(await zip(sys.cookie)).toBe(200); // from its own History
+    expect(await zip(admin.cookie)).toBe(200);
+    await pool.query('insert into examples (job_id, added_by) values ($1, $2)', [hidden, admin.id]);
+    expect(await zip(bob.cookie)).toBe(200);
   });
 
   test('takes 1 to 50 distinct job ids', async () => {

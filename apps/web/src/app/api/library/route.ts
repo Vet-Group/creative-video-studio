@@ -1,7 +1,7 @@
 import { COMPANY_WORKSPACE_ID, FEATURES, IMAGE_RATIOS } from '@cvs/db';
 import { itemLabel, JOB_APPS } from '@/lib/apps';
 import { pool } from '@/lib/auth';
-import { downloadName, EXAMPLE_ORDER, extensionOf, ICT_DAY, LIVE_CLIP, OWN_PROMPT } from '@/lib/clips';
+import { downloadName, EXAMPLE_ORDER, extensionOf, ICT_DAY, LIBRARY_LISTED, LIVE_CLIP, OWN_PROMPT } from '@/lib/clips';
 import { GALLERY_SAMPLES } from '@/lib/examples';
 import { guard } from '@/lib/session';
 
@@ -44,7 +44,7 @@ const VERDICTS: Record<string, string> = {
 /**
  * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` (the real shape of the output, one of the `ratios` listed; an unknown value is ignored), `store` (a store id from the `stores` listed, or `none` for items with no store; the id of a closed store matches nothing unless the caller is an Admin) and
  * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc`, `marketing_advanced`, `marketing_unboxing` and `marketing_review`), or `apps` for every app feature, or the feature of one app such as `background_changer`),
- * `verdict` (`none` for unmarked items, `pass`, `featured` or `fail`), `favorites=1` (only the caller's favourites), `example=1` (only the results an Admin put on an Examples tab; with the `kind` of one such tab, in its order unless `sort=oldest`), `suggested=1` (only the featured results of a page with an Examples tab that are not on it yet), `q` (words in the model name, the creator's own prompt or the brief, or the store name, ignoring case and diacritics, up to 200 characters) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item, `example` whether it is on its page's Examples tab and `productType` the product an Admin tagged it with there (lib/product-types.ts; else null). Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
+ * `verdict` (`none` for unmarked items, `pass`, `featured` or `fail`), `favorites=1` (only the caller's favourites), `example=1` (only the results an Admin put on an Examples tab; with the `kind` of one such tab, in its order unless `sort=oldest`), `suggested=1` (only the featured results of a page with an Examples tab that are not on it yet), `system=1` (an Admin's only: also the results of system accounts, which the list, its counts and filters otherwise leave out unless on an Examples tab, LIBRARY_LISTED), `q` (words in the model name, the creator's own prompt or the brief, or the store name, ignoring case and diacritics, up to 200 characters) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item, `example` whether it is on its page's Examples tab, `creator.system` whether a system account made it (false unless `system=1` is honoured) and `productType` the product an Admin tagged it with there (lib/product-types.ts; else null). Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
  * either way, and an image item has `durationSec` 0 and its `resolution`; `lengthSec` is a video's own length once recorded (else null), `durationSec` the length asked. `creators`, `stores` (the stores that have a live item) and `ratios` fill the creator, store and ratio filters; `storeName` is the item's store (null for none, or a closed store the caller may not see). `ratio` is the output's real shape. `unmarked` counts the live items the caller may mark (their own, or all for an Admin) that have no mark yet. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
  */
 export async function GET(request: Request) {
@@ -61,6 +61,7 @@ export async function GET(request: Request) {
   const favorites = q.get('favorites');
   const example = q.get('example');
   const suggested = q.get('suggested');
+  const system = q.get('system');
   const verdict = q.get('verdict');
   const sort = q.get('sort') ?? 'newest';
   const text = q.get('q')?.trim() || null;
@@ -74,14 +75,18 @@ export async function GET(request: Request) {
   if (favorites !== null && favorites !== '1') return bad('favorites must be 1 when given');
   if (example !== null && example !== '1') return bad('example must be 1 when given');
   if (suggested !== null && suggested !== '1') return bad('suggested must be 1 when given');
+  if (system !== null && system !== '1') return bad('system must be 1 when given');
   if (sort !== 'newest' && sort !== 'oldest') return bad('sort must be newest or oldest');
   if (text !== null && text.length > 200) return bad('q must be at most 200 characters');
   const me = g.session.user;
   const company = g.workspaceId === COMPANY_WORKSPACE_ID;
+  // A member who sends system=1 still gets the list everyone gets.
+  const showSystem = system === '1' && me.role === 'admin';
+  const listed = (p: string) => `(${LIBRARY_LISTED} or ${p}::boolean)`;
 
   const [clips, creators, stores, shapes, unmarked] = await Promise.all([
     pool.query(
-      `select j.id, j.user_id, u.name as creator_name, j.created_at, ${ICT_DAY} as day, j.model, m.label as model_label, ${SHAPE} as shape, j.duration_s, o.duration_ms as output_ms, j.is_mock, j.feature, j.params, o.mime as output_mime, o.filename as output_filename,
+      `select j.id, j.user_id, u.name as creator_name, u.system as creator_system, j.created_at, ${ICT_DAY} as day, j.model, m.label as model_label, ${SHAPE} as shape, j.duration_s, o.duration_ms as output_ms, j.is_mock, j.feature, j.params, o.mime as output_mime, o.filename as output_filename,
               j.output_asset_id, j.poster_asset_id, j.store_id, case when not s.hidden or $12::boolean then s.name end as store_name, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.featured, v.marked_by, ${OWN_PROMPT} as prompt,
               exists (select 1 from favorites f where f.job_id = j.id and f.user_id = $6) as favorite,
               e.job_id is not null as example, e.product_type
@@ -94,7 +99,7 @@ export async function GET(request: Request) {
          left join job_costs c on c.job_id = j.id
          left join verdicts v on v.job_id = j.id
          left join examples e on e.job_id = j.id
-        where j.workspace_id = $15 and ${LIVE_CLIP}
+        where j.workspace_id = $15 and ${LIVE_CLIP} and ${listed('$16')}
           and ($1::text is null or j.user_id = $1)
           and ($11::text is null or case when $11 = 'none' then j.store_id is null else j.store_id = $11 and (not s.hidden or $12::boolean) end)
           and ($2::date is null or (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date = $2::date)
@@ -108,19 +113,20 @@ export async function GET(request: Request) {
           and ($8::text is null or ${SEARCHED.map((c) => `unaccent(${c}) ilike unaccent($8)`).join(' or ')})
         order by ${example === '1' && sort === 'newest' && Object.hasOwn(GALLERY_SAMPLES, kind) ? EXAMPLE_ORDER : `j.created_at ${sort === 'oldest' ? 'asc' : 'desc'}, j.id ${sort === 'oldest' ? 'asc' : 'desc'}`} limit $4 offset $5`,
       // The words match literally: LIKE's own wildcards and escape are escaped.
-      [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`, days === null ? null : Number(days), example === '1', store, me.role === 'admin', suggested === '1', Object.keys(GALLERY_SAMPLES), g.workspaceId],
+      [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`, days === null ? null : Number(days), example === '1', store, me.role === 'admin', suggested === '1', Object.keys(GALLERY_SAMPLES), g.workspaceId, showSystem],
     ),
-    pool.query(`select distinct u.id, u.name from jobs j join users u on u.id = j.user_id where j.workspace_id = $1 and ${LIVE_CLIP} order by u.name, u.id`, [g.workspaceId]),
+    pool.query(`select distinct u.id, u.name from jobs j join users u on u.id = j.user_id where j.workspace_id = $1 and ${LIVE_CLIP} and ${listed('$2')} order by u.name, u.id`, [g.workspaceId, showSystem]),
     // A closed store is the Admin's to see, as in the store picker.
     pool.query(
-      `select s.id, s.name from stores s where s.workspace_id = $2 and (not s.hidden or $1::boolean) and exists (select 1 from jobs j where j.store_id = s.id and j.workspace_id = $2 and ${LIVE_CLIP}) order by s.name, s.id`,
-      [me.role === 'admin', g.workspaceId],
+      `select s.id, s.name from stores s where s.workspace_id = $2 and (not s.hidden or $1::boolean) and exists (select 1 from jobs j where j.store_id = s.id and j.workspace_id = $2 and ${LIVE_CLIP} and ${listed('$3')}) order by s.name, s.id`,
+      [me.role === 'admin', g.workspaceId, showSystem],
     ),
-    pool.query(`select distinct ${SHAPE} as shape from jobs j join assets o on o.id = j.output_asset_id ${SHAPE_JOIN} where j.workspace_id = $1 and ${LIVE_CLIP}`, [g.workspaceId]),
-    pool.query(`select count(*)::int as n from jobs j where j.workspace_id = $3 and ${LIVE_CLIP} and ($1::boolean or j.user_id = $2) and not exists (select 1 from verdicts v where v.job_id = j.id)`, [
+    pool.query(`select distinct ${SHAPE} as shape from jobs j join assets o on o.id = j.output_asset_id ${SHAPE_JOIN} where j.workspace_id = $1 and ${LIVE_CLIP} and ${listed('$2')}`, [g.workspaceId, showSystem]),
+    pool.query(`select count(*)::int as n from jobs j where j.workspace_id = $3 and ${LIVE_CLIP} and ${listed('$4')} and ($1::boolean or j.user_id = $2) and not exists (select 1 from verdicts v where v.job_id = j.id)`, [
       me.role === 'admin',
       me.id,
       g.workspaceId,
+      showSystem,
     ]),
   ]);
   return Response.json({
@@ -132,7 +138,7 @@ export async function GET(request: Request) {
     unmarked: unmarked.rows[0].n,
     clips: clips.rows.slice(0, PAGE).map((r) => ({
       id: r.id,
-      creator: { id: r.user_id, name: r.creator_name },
+      creator: { id: r.user_id, name: r.creator_name, system: showSystem && r.creator_system },
       createdAt: r.created_at,
       modelId: r.model,
       modelLabel: r.model_label,
