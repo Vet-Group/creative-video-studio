@@ -1,6 +1,7 @@
 // A billing team's month against its free allowance (docs/BILLING.md), on the Admin's costs-by-team view and in a member's Limits section.
 // The bar is neutral below 75% of the allowance, a warning from 75%, and past 100% the part over the allowance is its own segment, billed to
-// the team; the line under it says the same in words, so nothing rests on colour alone.
+// the team; the line under it says the same in words, so nothing rests on colour alone. With `forecastUsd` (this month only) one more line says where
+// the month is heading at its pace so far and what that would bill: an estimate, never charged and never a block.
 
 const usd = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -10,13 +11,14 @@ export function allowanceLevel(total: number, free: number): 'ok' | 'warn' | 'ov
   return free > 0 && total >= free * 0.75 ? 'warn' : 'ok';
 }
 
-export function AllowanceBar({ totalUsd, freeUsd, label }: { totalUsd: string; freeUsd: string; label: string }) {
+export function AllowanceBar({ totalUsd, freeUsd, label, forecastUsd }: { totalUsd: string; freeUsd: string; label: string; forecastUsd?: string }) {
   const total = Math.max(0, Number(totalUsd));
   const free = Number(freeUsd);
   const used = Math.min(total, free);
   const over = Math.max(0, total - free);
   const scale = Math.max(total, free) || 1;
   const level = allowanceLevel(total, free);
+  const forecast = Number(forecastUsd ?? 0);
   const pct = free > 0 ? Math.round((used / free) * 100) : 100;
   const text = `Đã dùng ${usd(used)} / ${usd(free)} miễn phí (${pct}%)${over > 0 ? `; vượt ${usd(over)}, tính cho team` : `; còn ${usd(free - used)}`}`;
   return (
@@ -35,6 +37,12 @@ export function AllowanceBar({ totalUsd, freeUsd, label }: { totalUsd: string; f
           </span>
         )}
       </div>
+      {forecast > 0 && (
+        <p className="allowance-forecast" title="Ước tính theo tốc độ dùng từ đầu tháng. Không tính tiền và không chặn việc tạo.">
+          Dự báo cuối tháng (ước tính): ~{usd(forecast)}
+          {forecast > free && <>; tính cho team ~{usd(forecast - free)}</>}
+        </p>
+      )}
     </div>
   );
 }

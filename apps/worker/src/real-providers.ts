@@ -11,7 +11,7 @@ import { createVertexOmniProvider, VERTEX_OMNI_MODEL } from '@cvs/core/providers
 import { createVertexVideoProvider } from '@cvs/core/providers/vertex-video';
 import { readFalBalance } from '@cvs/core/providers/balances';
 import sharp from 'sharp';
-import type { SendLark } from './fal-alert';
+import type { SendLark } from '@cvs/core/lark';
 import { falNext } from './fal-next';
 import { failoverOnBilling } from './vertex-accounts';
 import type { WorkerDeps } from './worker';

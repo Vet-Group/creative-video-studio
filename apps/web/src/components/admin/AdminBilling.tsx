@@ -21,6 +21,7 @@ interface Billing {
   provisional: boolean;
   closed: { at: string; by: string | null } | null;
   canClose: boolean;
+  forecast: { ledgerUsd: string; teams: Record<string, string> } | null;
   teams: Team[];
   partners: Bucket[];
   company: { totalUsd: string; reasons: Bucket[] };
@@ -36,6 +37,15 @@ const usd = (v: string | number) => {
 /** Whole 1/10000 USD, so sums of the 4-decimal lines are exact. */
 const units = (v: string) => Math.round(Number(v) * 10_000);
 const day = (iso: string) => new Date(iso).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+type Mail = { sent: number; failed: string[] } | 'off';
+
+/** What closing a month sent to accounting on Lark (POST /api/admin/billing/close `lark`), as one line; the CSV buttons stay for sending it by hand. */
+export function closeMailText(lark: Mail): string {
+  if (lark === 'off') return 'Đã chốt tháng. Gửi qua Lark đang tắt: hãy tải CSV và gửi cho kế toán.';
+  if (lark.failed.length === 0) return `Đã chốt tháng và gửi bản tóm tắt cùng CSV qua Lark cho ${lark.sent} người.`;
+  return `Đã chốt tháng, nhưng gửi qua Lark ${lark.sent === 0 ? 'không được' : `chỉ tới ${lark.sent} người, lỗi ${lark.failed.length}`}: hãy tải CSV và gửi cho kế toán.`;
+}
 
 /** A bucket's lines summed per user, store and model, largest first. */
 function drill(lines: Line[], bucket: string) {
@@ -80,7 +90,7 @@ function Drill({ lines, bucket, label }: { lines: Line[]; bucket: string; label:
   );
 }
 
-function TeamCard({ team, lines }: { team: Team; lines: Line[] }) {
+function TeamCard({ team, lines, forecastUsd }: { team: Team; lines: Line[]; forecastUsd?: string }) {
   const [open, setOpen] = useState(false);
   const over = Number(team.payableUsd) > 0;
   const id = `billing-drill-${team.id}`;
@@ -96,7 +106,7 @@ function TeamCard({ team, lines }: { team: Team; lines: Line[] }) {
       <p className="billing-total">
         Tổng <strong title={`$${team.totalUsd}`}>{usd(team.totalUsd)}</strong>
       </p>
-      <AllowanceBar totalUsd={team.totalUsd} freeUsd={team.freeUsd} label={team.name} />
+      <AllowanceBar totalUsd={team.totalUsd} freeUsd={team.freeUsd} label={team.name} forecastUsd={forecastUsd} />
       <dl className="billing-who">
         <dt>Thành viên</dt>
         <dd>{team.members.length > 0 ? team.members.join(', ') : '—'}</dd>
@@ -167,7 +177,7 @@ function BucketTable({ title, rows, lines, total, nameHead }: { title: string; r
   );
 }
 
-function BillingBody({ data, reload }: { data: Billing; reload: () => void }) {
+function BillingBody({ data, reload, mailed, onMailed }: { data: Billing; reload: () => void; mailed: string; onMailed: (text: string) => void }) {
   const { problem, pending, run } = useAction(reload);
   const t = data.totals;
   const overTeams = data.teams.filter((x) => Number(x.payableUsd) > 0).length;
@@ -175,11 +185,14 @@ function BillingBody({ data, reload }: { data: Billing; reload: () => void }) {
 
   async function close() {
     if (!(await confirmDialog({ title: `Chốt tháng ${data.month}?`, body: 'Số liệu của tháng được giữ nguyên dù sau này đổi nhóm hay cửa hàng. Mở lại được.', confirmLabel: 'Chốt tháng' }))) return;
-    void run(() => api('/api/admin/billing/close', sendJson('POST', { month: data.month })), 'Không chốt được tháng.');
+    void run(async () => onMailed(closeMailText((await api<{ lark: Mail }>('/api/admin/billing/close', sendJson('POST', { month: data.month }))).lark)), 'Không chốt được tháng.');
   }
   async function reopen() {
     if (!(await confirmDialog({ title: `Mở lại tháng ${data.month}?`, body: 'Số liệu sẽ tính lại theo nhóm và cửa hàng hiện tại.', confirmLabel: 'Mở lại' }))) return;
-    void run(() => api(`/api/admin/billing/close?month=${data.month}`, { method: 'DELETE' }), 'Không mở lại được tháng.');
+    void run(async () => {
+      await api(`/api/admin/billing/close?month=${data.month}`, { method: 'DELETE' });
+      onMailed('');
+    }, 'Không mở lại được tháng.');
   }
 
   return (
@@ -215,6 +228,7 @@ function BillingBody({ data, reload }: { data: Billing; reload: () => void }) {
           {problem}
         </p>
       )}
+      {mailed && <p role="status">{mailed}</p>}
       <div className="kpis" role="group" aria-label="Tổng tháng">
         <div className="kpi" role="group" aria-label="Sổ cái tháng">
           <p className="kpi-label">Sổ cái tháng {data.month}</p>
@@ -224,6 +238,7 @@ function BillingBody({ data, reload }: { data: Billing; reload: () => void }) {
           <p className="kpi-sub">
             Team {usd(t.teamsUsd)} · Đối tác {usd(t.partnersUsd)} · Công ty {usd(t.companyUsd)}
           </p>
+          {data.forecast && <p className="kpi-sub" title="Ước tính theo tốc độ dùng từ đầu tháng">Dự báo cuối tháng ~{usd(data.forecast.ledgerUsd)}</p>}
         </div>
         <div className="kpi" role="group" aria-label="Team phải trả">
           <p className="kpi-label">Team phải trả</p>
@@ -250,7 +265,7 @@ function BillingBody({ data, reload }: { data: Billing; reload: () => void }) {
       ) : (
         <div className="billing-teams">
           {data.teams.map((x) => (
-            <TeamCard key={x.id} team={x} lines={data.lines} />
+            <TeamCard key={x.id} team={x} lines={data.lines} forecastUsd={data.forecast?.teams[x.id]} />
           ))}
         </div>
       )}
@@ -272,6 +287,8 @@ function BillingBody({ data, reload }: { data: Billing; reload: () => void }) {
 
 export function AdminBilling() {
   const [month, setMonth] = useState('');
+  // Kept here, not in BillingBody: the reload after a close remounts the body.
+  const [mailed, setMailed] = useState('');
   const { data, failed, reload } = useFetch<Billing>(`/api/admin/billing${month ? `?month=${month}` : ''}`, { onTabReturn: true });
   return (
     <section aria-labelledby="billing-title">
@@ -281,7 +298,7 @@ export function AdminBilling() {
           <>
             <label>
               Tháng
-              <input type="month" value={month || data.month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+              <input type="month" value={month || data.month} onChange={(e) => e.target.value && (setMonth(e.target.value), setMailed(''))} />
             </label>
             <a className="button" href={`/api/admin/billing/csv?month=${data.month}`} download>
               <Icon name="download" />
@@ -297,7 +314,7 @@ export function AdminBilling() {
       {!data ? (
         failed ? <LoadError text="Không tải được chi phí theo team." onRetry={reload} /> : <p role="status">Đang tải...</p>
       ) : (
-        <BillingBody key={`${data.month}-${data.asOf}-${data.closed?.at ?? ''}`} data={data} reload={reload} />
+        <BillingBody key={`${data.month}-${data.asOf}-${data.closed?.at ?? ''}`} data={data} reload={reload} mailed={mailed} onMailed={setMailed} />
       )}
     </section>
   );

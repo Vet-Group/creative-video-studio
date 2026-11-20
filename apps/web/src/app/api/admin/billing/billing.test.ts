@@ -1,8 +1,8 @@
 // Billing (docs/BILLING.md): the attribution of each ledger row to a team, a partner or the company, the month's figures and their reconciliation with
-// the ledger, the CSV, and closing a month. Against a disposable database on the compose Postgres (`pnpm services:up`).
+// the ledger, the CSV, closing a month and mailing it to accounting on Lark (a fake fetch, never a real call). Against a disposable database on the compose Postgres (`pnpm services:up`).
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -229,6 +229,137 @@ describe('closing a month', () => {
     expect((await REOPEN(req(admin, '/api/admin/billing/close?month=2026-10', 'DELETE'))).status).toBe(404);
     expect((await billingMonth('2026-10')).totals.ledgerUsd).toBe((Number(before.totals.ledgerUsd) + 5).toFixed(4)); // live again, with the late row
     const audits = (await pool.query(`select action from audit_entries where target = 'billing:2026-10' order by id`)).rows.map((r) => r.action);
-    expect(audits).toEqual(['billing.close', 'billing.reopen']);
+    expect(audits).toEqual(['billing.close', 'billing.send', 'billing.reopen']); // the close mail is off here: no Lark app
+    expect((await pool.query(`select new_value from audit_entries where action = 'billing.send' and target = 'billing:2026-10'`)).rows[0].new_value).toBe('off');
+  });
+});
+
+describe('mailing a closed month to accounting', () => {
+  /** What the fake Lark saw. A message to `refuse` is answered with a Lark error code; `down` makes every call fail like a network error. */
+  let seen: { url: string; body: unknown }[];
+  const lark = (opts: { refuse?: string; down?: boolean } = {}) => {
+    seen = [];
+    vi.stubGlobal('fetch', async (url: string | URL | Request, init?: RequestInit) => {
+      const u = String(url);
+      expect(u).toMatch(/^https:\/\/open\.larksuite\.com\/open-apis\//);
+      seen.push({ url: u.replace('https://open.larksuite.com/open-apis', ''), body: typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body });
+      if (opts.down) throw new TypeError('fetch failed');
+      const body = seen.at(-1)!.body as { receive_id?: string };
+      const code = u.includes('/im/v1/messages') && body.receive_id === opts.refuse ? 230002 : 0;
+      return new Response(JSON.stringify({ code, msg: code ? 'bot not in chat' : 'ok', tenant_access_token: 't-1', data: { file_key: 'file_v2_x' } }));
+    });
+  };
+  const configure = (to: string | undefined, app = true) => {
+    for (const [k, v] of Object.entries({ LARK_APP_ID: app ? 'cli_x' : undefined, LARK_APP_SECRET: app ? 's' : undefined, FAL_ALERT_LARK_TO: to })) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  };
+  const close = (month: string) => CLOSE(req(admin, '/api/admin/billing/close', 'POST', { month }));
+  const reopen = (month: string) => REOPEN(req(admin, `/api/admin/billing/close?month=${month}`, 'DELETE'));
+  const sendAudit = async (month: string) => (await pool.query(`select new_value from audit_entries where action = 'billing.send' and target = $1 order by id desc limit 1`, [`billing:${month}`])).rows[0]?.new_value;
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    configure(undefined, false);
+  });
+
+  test('sends each recipient the summary and the month’s CSV as a file, and says how many it reached', async () => {
+    configure('a@vet.test, ou_b');
+    lark();
+    const res = await close('2026-08');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ month: '2026-08', closed: true, lark: { sent: 2, failed: [] } });
+    // Per receiver: the token, the text, the token again, the upload, the file message.
+    const token = '/auth/v3/tenant_access_token/internal';
+    expect(seen.map((c) => c.url)).toEqual([
+      ...[token, '/im/v1/messages?receive_id_type=email', token, '/im/v1/files', '/im/v1/messages?receive_id_type=email'],
+      ...[token, '/im/v1/messages?receive_id_type=open_id', token, '/im/v1/files', '/im/v1/messages?receive_id_type=open_id'],
+    ]);
+    const closed = await billingMonth('2026-08');
+    const text = JSON.parse((seen[1]!.body as { content: string }).content).text as string;
+    expect(text).toBe(
+      [
+        'Creative Video Studio: đã chốt chi phí tháng 2026-08.',
+        `Tổng sổ cái: $${Number(closed.totals.ledgerUsd).toFixed(2)}`,
+        'Team phải trả: $0.00',
+        'Đối tác phải trả: $0.00',
+        `Phần của công ty: $${Number(closed.totals.companyUsd).toFixed(2)}`,
+        'Chi tiết trong tệp CSV gửi kèm.',
+      ].join('\n'),
+    );
+    const upload = seen[3]!.body as FormData;
+    expect(upload.get('file_name')).toBe('cvs-chi-phi-2026-08.csv');
+    expect(await (upload.get('file') as File).text()).toBe(await (await CSV(req(admin, '/api/admin/billing/csv?month=2026-08'))).text()); // the CSV route's content
+    expect([...new Uint8Array(await (upload.get('file') as File).arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]); // the BOM Excel needs for UTF-8
+    expect(seen[4]!.body).toEqual({ receive_id: 'a@vet.test', msg_type: 'file', content: '{"file_key":"file_v2_x"}' });
+    expect(await sendAudit('2026-08')).toEqual({ sent: 2, failed: [] });
+    await reopen('2026-08');
+  });
+
+  test('a recipient Lark refuses is listed and the others are still sent; the month stays closed', async () => {
+    configure('a@vet.test,ou_b');
+    lark({ refuse: 'ou_b' });
+    const res = await close('2026-07');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ month: '2026-07', closed: true, lark: { sent: 1, failed: ['lark /im/v1/messages: HTTP 200 code 230002 bot not in chat'] } });
+    expect((await billingMonth('2026-07')).closed).not.toBeNull();
+    expect(await sendAudit('2026-07')).toMatchObject({ sent: 1, failed: [expect.stringContaining('230002')] });
+    await reopen('2026-07');
+  });
+
+  test('with Lark down the close still commits, and the outcome says nobody was reached', async () => {
+    configure('a@vet.test,b@vet.test');
+    lark({ down: true });
+    const res = await close('2026-06');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ month: '2026-06', closed: true, lark: { sent: 0, failed: ['a@vet.test: fetch failed', 'b@vet.test: fetch failed'] } });
+    expect((await billingMonth('2026-06')).closed).not.toBeNull();
+    expect((await close('2026-06')).status).toBe(409); // closed, and not closed twice
+    await reopen('2026-06');
+  });
+
+  test('is off, and calls nothing, without the Lark app or without recipients', async () => {
+    for (const [to, app] of [['a@vet.test', false], [undefined, true], ['', true]] as const) {
+      configure(to, app);
+      lark();
+      expect(await (await close('2026-04')).json()).toEqual({ month: '2026-04', closed: true, lark: 'off' });
+      expect(seen).toEqual([]);
+      expect(await sendAudit('2026-04')).toBe('off');
+      await reopen('2026-04');
+    }
+  });
+
+  test('closing again after a reopen sends again', async () => {
+    configure('ou_b');
+    lark();
+    await close('2026-03');
+    await reopen('2026-03');
+    await close('2026-03');
+    expect(seen.filter((c) => c.url.startsWith('/im/v1/files'))).toHaveLength(2);
+    await reopen('2026-03');
+  });
+});
+
+describe('the forecast of the open month', () => {
+  test('is the open month’s alone, for the ledger and each billing team, and never reaches a closed or past month', async () => {
+    const thisMonth = (await pool.query(`select to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as m`)).rows[0].m as string;
+    await row('fc-a', thisMonth, '3.0000', { user: sellerA.id }); // the ledger is append-only: the row stays, so this describe runs last
+    const m = await billingMonth(thisMonth);
+    expect(m.canClose).toBe(false);
+    expect(Object.keys(m.forecast!.teams)).toEqual(['sales-a', 'sales-b']);
+    // At least the total so far: the month cannot be shorter than its elapsed part (the maths itself is in lib/forecast.test.ts).
+    expect(Number(m.forecast!.teams['sales-a'])).toBeGreaterThanOrEqual(Number(m.teams.find((t) => t.id === 'sales-a')!.totalUsd));
+    expect(Number(m.forecast!.ledgerUsd)).toBeGreaterThanOrEqual(Number(m.totals.ledgerUsd));
+    expect((await billingMonth('2026-09')).forecast).toBeNull(); // a past month, open
+    expect((await billingMonth('2099-01')).forecast).toBeNull(); // a later month
+  });
+
+  test('a closed month carries none', async () => {
+    expect((await CLOSE(req(admin, '/api/admin/billing/close', 'POST', { month: '2026-05' }))).status).toBe(200);
+    try {
+      expect((await billingMonth('2026-05')).forecast).toBeNull();
+    } finally {
+      await REOPEN(req(admin, '/api/admin/billing/close?month=2026-05', 'DELETE'));
+    }
   });
 });

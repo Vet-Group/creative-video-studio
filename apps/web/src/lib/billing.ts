@@ -1,10 +1,13 @@
 // Billing teams (docs/BILLING.md, owner decisions 2026-11-20): a member of a billing team runs company jobs only for that team's stores, and each
 // ledger row of a month is billed to a team, a partner workspace or the company. Money stays numeric text, summed in whole 1/10000 USD as BigInt.
 import { audit } from '@cvs/core/audit';
+import { larkApp, larkFileSender, larkRecipients, larkSender, sendEach } from '@cvs/core/lark';
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
+import type { Fetch } from '@cvs/core/providers/http';
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { csvResponse, text } from '@/lib/csv';
+import { forecastUsd } from '@/lib/forecast';
 
 /** The `code` of the API's refusal of another team's store; lib/api.ts errorText shows it to the member in Vietnamese. */
 export const STORE_TEAM_CODE = 'store_not_in_team';
@@ -113,6 +116,8 @@ export interface BillingMonth {
   closed: { at: string; by: string | null } | null;
   /** A past month that is not closed yet. */
   canClose: boolean;
+  /** This month at its pace so far (lib/forecast.ts), the ledger's and each billing team's by team id; null for any other month. An estimate, never billed. */
+  forecast: { ledgerUsd: string; teams: Record<string, string> } | null;
   teams: BillingTeam[];
   partners: BillingPartner[];
   company: { totalUsd: string; reasons: CompanyReason[] };
@@ -136,7 +141,7 @@ const max0 = (n: bigint) => (n > 0n ? n : 0n);
  * The month's figures from the live ledger and today's mapping, up to the ledger id it reads first. Run it inside a transaction that set its
  * isolation first (REPEATABLE READ), so every query reads one set of rows.
  */
-async function liveMonth(db: Queryable, month: string): Promise<Omit<BillingMonth, 'closed' | 'canClose'>> {
+async function liveMonth(db: Queryable, month: string): Promise<Omit<BillingMonth, 'closed' | 'canClose' | 'forecast'>> {
   const asOf = (await db.query('select coalesce(max(id), 0)::int as n from cost_entries')).rows[0].n as number;
   const rows = (
     await db.query(
@@ -215,6 +220,7 @@ function fromClose(c: CloseRow): BillingMonth {
     provisional: false,
     closed: { at: c.closed_at.toISOString(), by: c.closed_by },
     canClose: false,
+    forecast: null,
     teams: kind('team') as BillingTeam[],
     partners: kind('partner') as BillingPartner[],
     company: { totalUsd: c.totals.companyUsd, reasons: kind('company') as CompanyReason[] },
@@ -227,13 +233,15 @@ function fromClose(c: CloseRow): BillingMonth {
 export async function billingMonth(requested: string | null): Promise<BillingMonth> {
   return withTransaction(pool, async (tx) => {
     await tx.query('set transaction isolation level repeatable read read only');
-    const now = (await tx.query(`select ${THIS_MONTH} as m`)).rows[0].m as string;
+    const { m: now, t } = (await tx.query(`select ${THIS_MONTH} as m, now() as t`)).rows[0] as { m: string; t: Date };
     const month = requested ?? now;
     const closed = (
       await tx.query(`select c.month, c.as_of, c.buckets, c.lines, c.totals, c.closed_at, u.name as closed_by from billing_month_closes c left join users u on u.id = c.closed_by where c.month = $1`, [month])
     ).rows[0] as CloseRow | undefined;
     if (closed) return fromClose(closed);
-    return { ...(await liveMonth(tx, month)), closed: null, canClose: month < now };
+    const live = await liveMonth(tx, month);
+    const forecast = month === now ? { ledgerUsd: forecastUsd(live.totals.ledgerUsd, month, t), teams: Object.fromEntries(live.teams.map((x) => [x.id, forecastUsd(x.totalUsd, month, t)])) } : null;
+    return { ...live, closed: null, canClose: month < now, forecast };
   });
 }
 
@@ -266,12 +274,16 @@ export async function reopenMonth(month: string, actorId: string): Promise<boole
 
 /**
  * This ICT month for the user's team when it is a billing team (null otherwise): its name, its month total so far by the attribution, its free
- * allowance, what is billed past it, and whether a job of it is still unsettled. The team's figure only, never another team's.
+ * allowance, what is billed past it, its forecast for the month's end (lib/forecast.ts), and whether a job of it is still unsettled. The team's figure only, never another team's.
  */
-export async function teamMonth(db: Queryable, userId: string): Promise<{ name: string; monthUsd: string; freeUsd: string; payableUsd: string; provisional: boolean } | null> {
+export async function teamMonth(
+  db: Queryable,
+  userId: string,
+): Promise<{ name: string; monthUsd: string; freeUsd: string; payableUsd: string; forecastUsd: string; provisional: boolean } | null> {
   const { rows } = await db.query(
     `select t.name, coalesce(x.usd, 0)::numeric(14, 4)::text as "monthUsd", t.free_monthly_usd::text as "freeUsd",
-            greatest(coalesce(x.usd, 0) - t.free_monthly_usd, 0)::numeric(14, 4)::text as "payableUsd", coalesce(x.provisional, false) as provisional
+            greatest(coalesce(x.usd, 0) - t.free_monthly_usd, 0)::numeric(14, 4)::text as "payableUsd", coalesce(x.provisional, false) as provisional,
+            ${THIS_MONTH} as month, now() as now
        from users u join teams t on t.id = u.team_id
        left join lateral (
          select sum(b.usd) as usd, bool_or(not jc.is_final) as provisional
@@ -281,7 +293,9 @@ export async function teamMonth(db: Queryable, userId: string): Promise<{ name: 
       where u.id = $1 and t.billable`,
     [userId],
   );
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  const { month, now, ...team } = rows[0] as { month: string; now: Date; name: string; monthUsd: string; freeUsd: string; payableUsd: string; provisional: boolean };
+  return { ...team, forecastUsd: forecastUsd(team.monthUsd, month, now) };
 }
 
 /** The bucket's name for the CSV: its team's or partner's name, or the company reason's words. */
@@ -315,4 +329,47 @@ export async function billingCsv(requested: string | null, summary: boolean): Pr
     ['month', 'bucket', 'team or partner', 'user', 'store', 'kind', 'USD'],
     [...sums.values()].map(({ line: l, usd }) => [m.month, l.bucket, text(bucketName(m, l.bucket)), text(l.userName), text(l.storeName), l.kind, fmt(usd)]),
   );
+}
+
+/** What the close mail reached: how many people got both messages and why the others did not, or `off` without the Lark app or recipients. */
+export type CloseMail = { sent: number; failed: string[] } | 'off';
+
+const dollars = (usd: string) => `$${Number(usd).toFixed(2)}`;
+
+/** The short text of the close mail, for accounting to read before the CSV. */
+function closeSummary(m: BillingMonth): string {
+  const teamsPayable = fmt(sum(m.teams.map((t) => units(t.payableUsd))));
+  return [
+    `Creative Video Studio: đã chốt chi phí tháng ${m.month}.`,
+    `Tổng sổ cái: ${dollars(m.totals.ledgerUsd)}`,
+    `Team phải trả: ${dollars(teamsPayable)}`,
+    `Đối tác phải trả: ${dollars(m.totals.partnersUsd)}`,
+    `Phần của công ty: ${dollars(m.totals.companyUsd)}`,
+    'Chi tiết trong tệp CSV gửi kèm.',
+  ].join('\n');
+}
+
+/**
+ * After a close has committed: sends the people in FAL_ALERT_LARK_TO, from the CVS Lark bot, the summary and the month's CSV (the same content as
+ * `billingCsv`), and audits the outcome (`billing.send`). Best effort: nothing here throws, so the close stays whatever Lark does.
+ */
+export async function mailClose(month: string, actorId: string, env: NodeJS.ProcessEnv = process.env, f: Fetch = fetch): Promise<CloseMail> {
+  const app = larkApp(env);
+  const to = larkRecipients(env);
+  let outcome: CloseMail = 'off';
+  if (app && to.length > 0) {
+    try {
+      const summary = closeSummary(await billingMonth(month));
+      const csv = `﻿${await (await billingCsv(month, false)).text()}`; // text() drops the route's BOM, which Excel needs to read UTF-8
+      const [sendText, sendFile] = [larkSender(app, f), larkFileSender(app, f)];
+      outcome = await sendEach(to, async (r) => {
+        await sendText(r, summary);
+        await sendFile(r, `cvs-chi-phi-${month}.csv`, csv);
+      });
+    } catch (e) {
+      outcome = { sent: 0, failed: [e instanceof Error ? e.message : String(e)] };
+    }
+  }
+  await audit(pool, { actorId, action: 'billing.send', target: `billing:${month}`, newValue: outcome }).catch((e) => console.error('billing: close mail audit:', e instanceof Error ? e.message : e));
+  return outcome;
 }

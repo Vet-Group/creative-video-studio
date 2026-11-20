@@ -75,7 +75,7 @@ test('the costs by team view shows the team with its member and store and closes
   // The member's limits carry the team's month (the mock models cost nothing, so it is $0; the amounts are unit-tested in billing.test.ts).
   const member = await as(browser, 'billa');
   const limits = (await (await member.request.get('/api/me/limits')).json()) as { team: unknown };
-  expect(limits.team).toMatchObject({ name: TEAM, monthUsd: '0.0000', freeUsd: '20.0000', payableUsd: '0.0000' });
+  expect(limits.team).toMatchObject({ name: TEAM, monthUsd: '0.0000', freeUsd: '20.0000', payableUsd: '0.0000', forecastUsd: '0.0000' });
 
   // The Limits section of Settings shows the team's month against its allowance, in words as well as the bar.
   const settings = await openSettings(member);
@@ -103,9 +103,12 @@ test('the costs by team view shows the team with its member and store and closes
   await admin.getByRole('button', { name: 'Chốt tháng' }).click();
   await admin.getByRole('dialog', { name: 'Chốt tháng 2026-10?' }).getByRole('button', { name: 'Chốt tháng' }).click();
   await expect(admin.getByText(/^Đã chốt \d{1,2}\/\d{1,2}\/\d{4}$/)).toBeVisible();
+  // CI has no Lark app, so sending to accounting is off: the page says so and leaves the CSV buttons for sending it by hand.
+  await expect(admin.getByRole('status').filter({ hasText: 'Đã chốt tháng. Gửi qua Lark đang tắt: hãy tải CSV và gửi cho kế toán.' })).toBeVisible();
   await admin.getByRole('button', { name: 'Mở lại tháng' }).click();
   await admin.getByRole('dialog', { name: 'Mở lại tháng 2026-10?' }).getByRole('button', { name: 'Mở lại' }).click();
   await expect(admin.getByText('Đang mở', { exact: true })).toBeVisible();
+  await expect(admin.getByText('Gửi qua Lark đang tắt', { exact: false })).toHaveCount(0);
   await admin.context().close();
   await member.context().close();
 });
