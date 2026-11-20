@@ -39,7 +39,10 @@ export async function removeDuplicateInputs(pool: Pool): Promise<string[]> {
        select a.id, row_number() over (partition by a.owner_id, a.workspace_id, a.sha256 order by
            exists (select 1 from jobs j where j.deleted_at is not null and ${names('j')}) and not exists (select 1 from jobs j where j.deleted_at is null and ${names('j')}),
            a.created_at desc, a.id) as n
-         from assets a where a.kind = 'input' and a.deleted_at is null and a.sha256 ~ '^[0-9a-f]{64}$')
+         from assets a where a.kind = 'input' and a.deleted_at is null and a.sha256 ~ '^[0-9a-f]{64}$'
+           -- Only a file with another live copy is ranked: the order above reads jobs for every row, and nearly every input has no copy.
+           and exists (select 1 from assets d where d.owner_id = a.owner_id and d.sha256 = a.sha256 and d.workspace_id = a.workspace_id and d.id <> a.id
+                          and d.kind = 'input' and d.deleted_at is null))
      update assets a set deleted_at = now()
        from copies c
       where a.id = c.id and c.n > 1
