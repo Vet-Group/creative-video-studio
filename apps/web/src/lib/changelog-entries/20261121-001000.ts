@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-21T00:10:00+07:00', kind: 'improved', title: 'Ô ảnh ở các ứng dụng hiện trọn ảnh đã chọn', details: ['Ở trang ứng dụng (Tạo tư thế, Tăng độ phân giải, Đổi khuôn mặt...), ô một ảnh sau khi tải lên hiện cả tấm ảnh thay vì ảnh nhỏ 56 px kèm nhãn bị cắt, giống Marketing Studio.', 'Ô nửa khổ giữ tên ở góc dưới; nút "Ảnh đã tải" chuyển lên góc trên để không đè lên tên.', 'Thẻ Tạo tư thế người mẫu ở trang Ứng dụng có ảnh động minh hoạ 4 tư thế.'], href: '/apps/pose-generator', prs: [], audience: 'all' } satisfies ChangeEntry;

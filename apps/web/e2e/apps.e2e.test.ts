@@ -273,6 +273,11 @@ test('Face Swap (two slots): each required slot has its reason, and a mock job t
   await page.getByLabel('Ảnh khuôn mặt nguồn').setInputFiles(file('source.png'));
   await expect(page.getByRole('img', { name: 'source.png' })).toBeVisible();
   await expect(runButton(page)).toBeDisabled();
+  // Filled, a half tile shows its photo whole with its name bottom left, and the uploads link moves to the top left, off the name.
+  const filled = page.locator('.app-slots > .field').first();
+  const [chip, link] = await Promise.all([filled.locator('.slot-chip').boundingBox(), filled.locator('.uploads-link').boundingBox()]);
+  expect(link!.y + link!.height).toBeLessThan(chip!.y);
+  expect((await page.getByRole('img', { name: 'source.png' }).boundingBox())!.height).toBeGreaterThan(150);
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Ảnh cần đổi khuôn mặt.');
 
   await page.locator('input[type=file][aria-label="Ảnh cần đổi khuôn mặt"]').setInputFiles(file('target.png'));
