@@ -110,7 +110,7 @@ test('worker unit launches tsx directly so pnpm cannot turn a clean shutdown int
   const unit = readFileSync(join(root, 'deploy/linux/cvs-worker.service'), 'utf8');
   expect(unit).toContain('ExecStart=@APP@/node/bin/node @APP@/apps/worker/node_modules/tsx/dist/cli.mjs @APP@/apps/worker/src/index.ts');
   expect(unit).toContain('WorkingDirectory=@APP@');
-  expect(unit).toContain('TimeoutStopSec=30');
+  expect(unit).toContain('TimeoutStopSec=1500'); // above the worker's drainMs
   expect(unit).not.toContain('SuccessExitStatus=');
 });
 
