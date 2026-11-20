@@ -13,10 +13,11 @@ try {
   // No .env file; the settings come from the environment.
 }
 
-// CVS_E2E_DB lets a second checkout run its specs beside another's on the same Postgres.
-const db = await createTestDatabase(process.env.CVS_E2E_DB ?? 'cvs_e2e');
+// CVS_E2E_DB lets a second checkout run its specs beside another's on the same Postgres, and on the same MinIO with a bucket of the same name.
+const dbName = process.env.CVS_E2E_DB ?? 'cvs_e2e';
+const db = await createTestDatabase(dbName);
 process.env.DATABASE_URL = db.url;
-process.env.S3_BUCKET = 'cvs-e2e';
+process.env.S3_BUCKET = dbName.replaceAll('_', '-'); // bucket names take no underscores
 process.env.CVS_MOCK_RUN_MS = '4000';
 process.env.CVS_FAKE_SUGGEST = '1'; // the worker's suggestions come from a stand-in (apps/worker/src/suggest.ts), never fal
 // The specs run with no social login (no login buttons), whatever the developer's .env holds, and with a known support email on /privacy.
@@ -26,6 +27,12 @@ for (const name of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'LARK_APP_ID', '
 process.env.CVS_SUPPORT_EMAIL = 'support@e2e.test';
 
 const { auth, pool } = await import('../src/lib/auth');
+// The specs expect no samples, as on CI's fresh MinIO, but the bucket outlives the database: a sample a run left behind (example-12.mp4 since
+// 2026-11-13) added a tile to Create's Examples, so V01's last sample still had a Next. Like the database, every run starts empty.
+const { deleteObject, ensureBucket } = await import('../src/lib/storage');
+const { listSamples, SAMPLE_PREFIX } = await import('../src/lib/samples');
+await ensureBucket();
+for (const { name } of await listSamples()) await deleteObject(SAMPLE_PREFIX + name);
 // Migration 0013 enables Kling; the specs run on the mock models only.
 await pool.query(`update model_configs set enabled = false where id = 'kling-o3-pro'`);
 await pool.query(`update model_configs set enabled = false where id in ('veo-3.1', 'veo-3.1-vertex')`); // migration 0075 enables them; the specs list only the models seeded here
