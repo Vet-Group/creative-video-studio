@@ -598,7 +598,7 @@ test('Run is disabled with a reason when the app has no enabled model, and "Đ�
     await expect(change).toHaveAttribute('aria-expanded', 'true', { timeout: 1_000 });
   }).toPass();
   const list = page.getByRole('list', { name: 'Ứng dụng' });
-  await expect(list.getByRole('link')).toHaveCount(17);
+  await expect(list.getByRole('link')).toHaveCount(18);
   await expect(list.getByRole('link', { name: 'Đổi người mẫu' })).toHaveAttribute('aria-current', 'page');
   await page.keyboard.press('Escape');
   await expect(list).toBeHidden();
@@ -614,7 +614,7 @@ for (const [width, height, columns] of [[390, 844, 2], [1024, 768, 2], [1440, 10
     await page.setViewportSize({ width, height });
     await signIn(page, 'appsb');
     await page.goto('/apps');
-    await expect(cards(page)).toHaveCount(17);
+    await expect(cards(page)).toHaveCount(18);
     const lefts = await cards(page).evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().left))).size);
     expect(lefts).toBe(columns);
     expect(await fits(page)).toBe(true);
