@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-20T15:18:17+07:00', kind: 'improved', title: 'Gợi ý nhanh gọn trong một hàng, và Dịch, Gợi ý AI hiện tiến độ', details: ['Ở Tạo ảnh, các gợi ý nhanh dưới ô prompt nằm gọn trong một hàng, kèm nút "+N" để mở hết và "Thu gọn" để gấp lại, không còn phải giữ Shift và lăn chuột để xem.', 'Khi bấm Dịch, Gợi ý AI hay Kiểm tra prompt, ô kết quả hiện ngay thanh chạy và số giây đã chờ, nên biết là đang làm chứ không phải bị lỗi. Dịch lỗi thì có nút "Thử lại".', 'Trang Ứng dụng: các nhóm lọc xuống dòng thay vì phải cuộn ngang.'], href: '/image-generation', prs: [582], audience: 'all' } satisfies ChangeEntry;

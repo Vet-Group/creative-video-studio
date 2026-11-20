@@ -22,8 +22,11 @@ export default async function AppRoute({ params, searchParams }: { params: Promi
     return <SmartRemakeApp key={`${initialId ?? ''}:${initialProductId ?? ''}`} app={app} initialId={initialId} initialProductId={initialProductId} />;
   }
   if (app.slug === 'media-optimizer') return <MediaOptimizer app={app} />;
-  if (app.slug === 'ai-fashion-model') return <FashionModelApp app={app} isAdmin={(await currentUser())?.role === 'admin'} />;
   const q = await searchParams;
+  if (app.slug === 'ai-fashion-model') {
+    const from = refillFrom(q); // History's or the Library's Dùng lại: the job's traits back on the form
+    return <FashionModelApp key={from} app={app} reuse={from} isAdmin={(await currentUser())?.role === 'admin'} />;
+  }
   const from = refillFrom(q) ?? exampleFrom(q);
   // A photo for the first slot (History's Background Remover and Image Upscale buttons copy a result into a new input first): only the member's own image input in the active workspace.
   const user = typeof q.image === 'string' && !from ? await currentUser() : null;

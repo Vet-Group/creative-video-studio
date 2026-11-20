@@ -5,10 +5,11 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, type AppCategory, BATCH_FEATURES, type BatchItem, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MOCKUP_PRODUCTS, motionReason, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, type AppCategory, BATCH_FEATURES, type BatchItem, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MOCKUP_PRODUCTS, motionReason, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { waitLabel } from '@/lib/explore';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { alignInputs, placesOf, type Skipped, skippedNote } from '@/lib/reuse';
-import { confirmRun, sendRun } from '@/lib/run-guard';
+import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
@@ -18,8 +19,8 @@ import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { CsvNames } from './CsvNames';
 import { Icon, type IconName } from './Icon';
-import { copyError, copySamples, FormNotice, Gallery, type Img, PhotoDialog, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
-import { FormContext, useApplier, useJobs } from './jobs';
+import { copyError, copySamples, FormNotice, Gallery, type Img, PhotoDialog, photoImg, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { FormContext, type Photo, useApplier, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
 import { PromptPreview } from './PromptSections';
@@ -123,16 +124,21 @@ function ChangeMenu({ current }: { current: string }) {
 export function AppHeader({ app }: { app: AppConfig }) {
   const photo = `app-${app.slug}.jpg`;
   const have = useSamples();
+  const narrow = useMediaQuery(NARROW);
   return (
-    <div className="app-head" data-category={app.category} data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
-      {have.has(`app-${app.slug}.mp4`) && (
-        <span className="head-loop">
-          <LoopVideo src={`/api/samples/app-${app.slug}.mp4`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
-        </span>
-      )}
-      <strong>{app.name}</strong>
-      <ChangeMenu current={app.slug} />
-    </div>
+    <>
+      <div className="app-head" data-category={app.category} data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
+        {have.has(`app-${app.slug}.mp4`) && (
+          <span className="head-loop">
+            <LoopVideo src={`/api/samples/app-${app.slug}.mp4`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
+          </span>
+        )}
+        <strong>{app.name}</strong>
+        <ChangeMenu current={app.slug} />
+      </div>
+      {/* On a phone the About tab is not beside the form, so the form says in one line what the app does. */}
+      {narrow && <p className="help app-lede">{app.description}</p>}
+    </>
   );
 }
 
@@ -158,6 +164,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const breedsId = useId();
   const namesId = useId();
   const namesHelpId = useId();
+  const namesErrorId = useId();
   const { models, failed } = useImageModels(app.feature);
   const count = images.reduce((n, list) => n + list.length, 0);
   const pick = useImageChoice(models, Math.max(1, count));
@@ -226,13 +233,17 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
             ? parseNames(names).names.flatMap((name) => (pickedBreeds.length > 0 ? pickedBreeds.map((breed) => ({ name, breed })) : [{ name }]))
             : [{}];
   const batchApp = BATCH_FEATURES.includes(app.feature);
-  const estimate = batchApp ? runTotal(pick.estimate, runs.length) : pick.estimate;
+  // What is wrong with the typed names, said under the box; an empty box only waits, as the reason under Run says.
+  const namesProblem = app.names && names.trim() ? parseNames(names).problem : null;
+  // Nothing picked yet on a batch app, or names it cannot run, show no price rather than a free-looking $0.00 or one that counts the bad names.
+  const priced = runs.length > 0 && !namesProblem;
+  const estimate = batchApp ? (priced ? runTotal(pick.estimate, runs.length) : undefined) : pick.estimate;
   // The item prompts differ only in their item, so the preview shows the first one.
   const first = runs[0] && itemPrompt(app.feature, runs[0], blank);
   const prompts = first ? [first] : sent ? [sent] : [];
-  const runCost = runs.length > 0 && pick.estimate !== undefined && (
+  const runCost = priced && pick.estimate !== undefined && (
     <p className="help" role="status">
-      {runs.length} ảnh × ${pick.estimate} = ${estimate}
+      {runs.length} ảnh × {usd(pick.estimate)} = {usd(estimate!)}
     </p>
   );
 
@@ -252,6 +263,21 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     };
   }
 
+  /** History's Dùng kết quả: the result, copied as the member's own input, in the last required slot (the picture the app works on: the swaps' target,
+   * the try-ons' wearer, a one-slot app's photo), so it goes through this app again. */
+  async function takeResult(p: Photo) {
+    const into = app.slots.map((s) => !s.optional).lastIndexOf(true);
+    setError('');
+    try {
+      const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
+      setImages((cur) => cur.map((list, i) => (i === into ? (slotMax(app, i, chosen?.maxImages ?? 1) === 1 ? [img] : [...list, img]) : list)));
+      notify(`Đã dùng kết quả cho ô ${app.slots[into]!.label}`);
+      if (narrow) setTab('create');
+    } catch (e) {
+      setError(copyError(e, UPLOAD_ERROR));
+    }
+  }
+
   /** A stock photo is copied on the server as the member's own picture, so the job only ever holds the member's own assets. */
   async function pickStock(slot: number, name: string) {
     setError('');
@@ -269,7 +295,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const stock = picker === null ? [] : stockGroups(app.slots[picker]!, have);
 
   async function run() {
-    if (!(await confirmRun(estimate))) return;
+    if (!(await confirmRun(estimate, `Tạo lượt này với giá ${usd(estimate ?? 0)}?`))) return; // the price as the button shows it
     setBusy(true);
     setError('');
     setNotice('');
@@ -296,7 +322,18 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
       if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
-      setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${done > 0 ? ` Đã gửi ${done}/${runs.length} ảnh.` : ''}`);
+      let sent = '';
+      if (done > 0) {
+        // What was sent is unticked, so Run again sends only the rest instead of every item a second time.
+        const p = unsentPicks(runs, done);
+        if (app.views) setViews(p.view);
+        if (app.breeds || app.names) setBreeds(p.breed);
+        if (app.styles) setStyles(p.style);
+        if (app.products) setProducts(p.product);
+        if (app.names) setNames(p.name.join('\n'));
+        sent = ` Đã gửi ${done}/${runs.length} ảnh và bỏ chọn các mục đã gửi.${p.left.length > 0 ? ` Chưa gửi: ${p.left.map(itemLabel).join(', ')}.` : ''}`;
+      }
+      setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${sent}`);
       if (done > 0) await refresh();
     } finally {
       setBusy(false);
@@ -321,26 +358,49 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
           <div className="form-scroll">
             <AppHeader app={app} />
             <div className="app-slots" data-two={two}>
-              {app.slots.map((s, i) => (
-                <Slot
-                  key={s.inputLabel}
-                  label={s.label}
-                  empty={s.empty}
-                  inputLabel={s.inputLabel}
-                  images={images[i]!}
-                  max={slotMax(app, i, chosen?.maxImages ?? 1)}
-                  busy={busy}
-                  onAdd={add(i)}
-                  onRemove={(id) => setImages((cur) => cur.map((list, j) => (j === i ? list.filter((x) => x.id !== id) : list)))}
-                  onBrowse={stockGroups(s, have).length > 0 ? () => setPicker(i) : undefined}
-                />
-              ))}
+              {app.slots.map((s, i) => {
+                const max = slotMax(app, i, chosen?.maxImages ?? 1);
+                const templates = stockGroups(s, have).length > 0;
+                return (
+                  <Slot
+                    key={s.inputLabel}
+                    label={s.label}
+                    // A slot whose tile opens stock photos says so, as it looks like any other upload tile.
+                    empty={templates ? `${s.empty}, hoặc ${s.stock!.title.toLowerCase()} có sẵn` : s.empty}
+                    inputLabel={s.inputLabel}
+                    images={images[i]!}
+                    max={max}
+                    count={s.many}
+                    busy={busy}
+                    onAdd={add(i)}
+                    onRemove={(id) => setImages((cur) => cur.map((list, j) => (j === i ? list.filter((x) => x.id !== id) : list)))}
+                    onPick={(img) => setImages((cur) => cur.map((list, j) => (j === i ? (max === 1 ? [img] : [...list, img]) : list)))}
+                    onBrowse={templates ? () => setPicker(i) : undefined}
+                  />
+                );
+              })}
             </div>
             <PhotoDialog
               open={picker !== null}
               title={picker === null ? '' : app.slots[picker]!.stock!.title}
               tiles={stock.filter((g) => !g.label).flatMap((g) => stockTiles(picker!, g.names, 'Người mẫu có sẵn'))}
               groups={stock.filter((g) => g.label).map((g) => ({ title: g.label!, tiles: stockTiles(picker!, g.names, g.label!) }))}
+              // Many groups make a long dialog (Jewelry's 7), so their names at the top jump to each one.
+              filter={
+                stock.filter((g) => g.label).length > 1 && (
+                  <nav className="photo-jump" aria-label="Nhóm ảnh mẫu">
+                    {stock.flatMap((g) =>
+                      g.label
+                        ? [
+                            <button key={g.label} type="button" onClick={(e) => [...(e.currentTarget.closest('dialog')?.querySelectorAll('section') ?? [])].find((el) => el.getAttribute('aria-label') === g.label)?.scrollIntoView({ block: 'start' })}>
+                              {g.label}
+                            </button>,
+                          ]
+                        : [],
+                    )}
+                  </nav>
+                )
+              }
               busy={busy}
               onFile={(files) => void add(picker!)(files)}
               onClose={() => setPicker(null)}
@@ -385,7 +445,12 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                 <label htmlFor={namesId} className="field-label">
                   Tên mới, mỗi dòng một tên
                 </label>
-                <textarea id={namesId} className="names-box" rows={5} value={names} placeholder={'Max\nBella\nCharlie'} aria-describedby={namesHelpId} onChange={(e) => setNames(e.target.value)} />
+                <textarea id={namesId} className="names-box" rows={5} value={names} placeholder={'Max\nBella\nCharlie'} aria-invalid={namesProblem ? true : undefined} aria-describedby={namesProblem ? `${namesErrorId} ${namesHelpId}` : namesHelpId} onChange={(e) => setNames(e.target.value)} />
+                {namesProblem && (
+                  <p id={namesErrorId} className="error">
+                    {namesProblem}
+                  </p>
+                )}
                 <p id={namesHelpId} className="help">
                   Tối đa {MAX_BATCH} tên, mỗi tên tối đa {MAX_NAME} ký tự: chữ cái (có dấu), chữ số, khoảng trắng, dấu nháy đơn và gạch nối. Tên trùng chỉ tạo một lần.
                 </p>
@@ -395,9 +460,20 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
 
             {(app.breeds || app.names) && (
               <div className="field">
-                <span id={breedsId} className="field-label">
-                  {app.names ? 'Đổi cả giống chó (tuỳ chọn)' : 'Giống chó cần tạo'}
-                </span>
+                {/* 25 chips: how many are picked and a way to untick them all, by the label rather than in a long scroll. */}
+                <div className="field-head">
+                  <span id={breedsId} className="field-label">
+                    {app.names ? 'Đổi cả giống chó (tuỳ chọn)' : 'Giống chó cần tạo'}
+                  </span>
+                  {breeds.length > 0 && (
+                    <span className="pick-count">
+                      {breeds.length} đã chọn ·{' '}
+                      <button type="button" className="link-button" onClick={() => setBreeds([])}>
+                        Bỏ chọn hết
+                      </button>
+                    </span>
+                  )}
+                </div>
                 <div className="segmented theme-choice angle-choice" role="group" aria-labelledby={breedsId}>
                   {DOG_BREEDS.map((b) => (
                     <label key={b}>
@@ -464,7 +540,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {busy ? <span className="run-cost">· Đang gửi…</span> : estimate !== undefined && <span className="run-cost">· ${estimate}</span>}
+              {/* The usual wait of the model beside its price, from the company's recent runs, so a first Run is not a guess. */}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : estimate !== undefined && <span className="run-cost">· {usd(estimate)}{chosen?.typicalSec && ` · ${waitLabel(chosen.typicalSec)}`}</span>}
             </button>
           </div>
         </div>
@@ -476,6 +553,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
               // As on Try On, a card's chips and words go on the form; only the settings this app has.
               ...(settings.length > 0 && { apply, settings }),
               ...(app.prompt && { prompt: (text: string) => (setPrompt(text), notify('Đã chép mô tả')) }),
+              result: (p) => void takeResult(p),
             }}
           >
             {shown === 'history' ? (
@@ -526,7 +604,7 @@ const ORIENTATIONS = [
   { id: 'video', label: 'Theo video (tối đa 30 giây)' },
   { id: 'image', label: 'Theo ảnh (tối đa 10 giây)' },
 ] as const;
-type MotionModel = ModelOption & { durationsSec: number[]; maxPromptChars: number };
+type MotionModel = ModelOption & { durationsSec: number[]; maxPromptChars: number; typicalSec?: { p50: number; p75: number } | null };
 type Uploaded = Img & { durationMs: number | null };
 
 /** Motion Control: a character image and a reference video, a model of the feature, an optional prompt. The cost follows the video's length. */
@@ -612,7 +690,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   }
 
   async function run() {
-    if (!(await confirmRun(chosen?.estimateUsd))) return;
+    if (!(await confirmRun(chosen?.estimateUsd, `Tạo lượt này với giá ${usd(chosen?.estimateUsd ?? 0)}?`))) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -718,7 +796,8 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {busy ? <span className="run-cost">· Đang gửi…</span> : video && chosen && <span className="run-cost">· ${chosen.estimateUsd}</span>}
+              {/* Before a video the price is per second (the 5 s estimate over 5), so the member knows what a clip will cost; then the video's total. */}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : chosen && <span className="run-cost">· {video ? usd(chosen.estimateUsd) : `${usd(Number(chosen.estimateUsd) / seconds)}/giây`}{chosen.typicalSec && ` · ${waitLabel(chosen.typicalSec)}`}</span>}
             </button>
           </div>
         </div>

@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { confirmDialog } from '@/components/Confirm';
 import { api, ApiError } from '@/lib/api';
-import { confirmRerun, confirmRun, runKey, sendRun } from './run-guard';
+import { confirmRerun, confirmRun, runKey, sendRun, usd } from './run-guard';
 
 vi.mock('@/components/Confirm', () => ({ confirmDialog: vi.fn() }));
 vi.mock('@/lib/api', async (actual) => ({ ...(await actual<typeof import('@/lib/api')>()), api: vi.fn() }));
+
+describe('usd', () => {
+  it('shows cents with thousands separators from a dollar up, and under a dollar up to 4 decimals with no trailing zeros', () => {
+    expect([usd('0.7000'), usd(0.134), usd('0.0000'), usd(1.206), usd('99841.8080'), usd('-0.1161')]).toEqual(['$0.70', '$0.134', '$0.00', '$1.21', '$99,841.81', '-$0.1161']);
+    expect([usd('0.0035'), usd(0.005), usd('-0.0012')]).toEqual(['$0.0035', '$0.005', '-$0.0012']);
+  });
+});
 
 describe('confirmRun', () => {
   it('asks only from 1 USD, with the price in the question, and returns the answer', async () => {

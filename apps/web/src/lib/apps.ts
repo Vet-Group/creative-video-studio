@@ -31,6 +31,8 @@ export interface AppConfig {
   feature: string;
   name: string;
   description: string;
+  /** Other words the Apps search finds it by: the English names staff use (Face Swap, Try-On, Upscale). */
+  keywords?: string;
   category: AppCategory;
   slots: AppSlot[];
   /** A prompt box. `background` (Background Changer) excludes the reference image; `optional` (the two swaps) adds the member's text to the fixed instruction. The other apps send their fixed prompt. */
@@ -64,10 +66,11 @@ export const APPS: AppConfig[] = [
     feature: 'character_swap',
     name: 'Đổi nhân vật',
     description: 'Thay toàn bộ người trong ảnh bằng một người khác.',
+    keywords: 'character swap',
     category: 'fashion',
     slots: [
       { label: 'Nhân vật mới', inputLabel: 'Ảnh nhân vật mới', empty: 'Thêm 1 ảnh người sẽ xuất hiện trong kết quả' },
-      { label: 'Ảnh đích', inputLabel: 'Ảnh đích', empty: 'Thêm 1 ảnh có người cần thay' },
+      { label: 'Ảnh cần thay người', inputLabel: 'Ảnh cần thay người', empty: 'Thêm 1 ảnh có người cần thay' },
     ],
     prompt: 'optional',
   },
@@ -76,10 +79,11 @@ export const APPS: AppConfig[] = [
     feature: 'model_swap',
     name: 'Đổi người mẫu',
     description: 'Thay người trong ảnh bằng một người mẫu khác. Trang phục và bối cảnh giữ nguyên.',
+    keywords: 'model swap',
     category: 'fashion',
     slots: [
       { label: 'Người mẫu mới', inputLabel: 'Ảnh người mẫu mới', empty: 'Thêm 1 ảnh người mẫu mới' },
-      { label: 'Ảnh đích', inputLabel: 'Ảnh đích', empty: 'Thêm 1 ảnh sản phẩm có người mẫu cần thay' },
+      { label: 'Ảnh cần thay người mẫu', inputLabel: 'Ảnh cần thay người mẫu', empty: 'Thêm 1 ảnh sản phẩm có người mẫu cần thay' },
     ],
     prompt: 'optional',
   },
@@ -88,6 +92,7 @@ export const APPS: AppConfig[] = [
     feature: 'background_changer',
     name: 'Đổi nền',
     description: 'Nền mới từ một mô tả hoặc một ảnh tham chiếu.',
+    keywords: 'background changer, change background',
     category: 'photo',
     slots: [
       { label: 'Ảnh', inputLabel: 'Ảnh cần đổi nền', empty: 'Thêm 1 ảnh' },
@@ -100,6 +105,7 @@ export const APPS: AppConfig[] = [
     feature: 'reframe',
     name: 'Đổi khung hình',
     description: 'Mở rộng mọi ảnh sang tỉ lệ khung hình mới bằng AI.',
+    keywords: 'reframe, aspect ratio, outpaint',
     category: 'photo',
     slots: [{ label: 'Ảnh', inputLabel: 'Ảnh cần đổi khung', empty: 'Thêm 1 ảnh' }],
     ratio: true,
@@ -109,6 +115,7 @@ export const APPS: AppConfig[] = [
     feature: 'image_upscale',
     name: 'Tăng độ phân giải',
     description: 'Phóng mọi ảnh lên tới 4K mà không mất chi tiết.',
+    keywords: 'image upscale, upscaler, 4K',
     category: 'photo',
     slots: [{ label: 'Ảnh', inputLabel: 'Ảnh cần tăng độ phân giải', empty: 'Thêm 1 ảnh' }],
     resolution: true,
@@ -118,10 +125,11 @@ export const APPS: AppConfig[] = [
     feature: 'face_swap',
     name: 'Đổi khuôn mặt',
     description: 'Chỉ đổi khuôn mặt. Mọi thứ khác giữ nguyên.',
+    keywords: 'face swap',
     category: 'fashion',
     slots: [
       { label: 'Khuôn mặt nguồn', inputLabel: 'Ảnh khuôn mặt nguồn', empty: 'Thêm 1 ảnh có khuôn mặt muốn dùng' },
-      { label: 'Ảnh đích', inputLabel: 'Ảnh đích', empty: 'Thêm 1 ảnh cần đổi khuôn mặt' },
+      { label: 'Ảnh cần đổi khuôn mặt', inputLabel: 'Ảnh cần đổi khuôn mặt', empty: 'Thêm 1 ảnh có khuôn mặt cần thay' },
     ],
   },
   {
@@ -129,6 +137,7 @@ export const APPS: AppConfig[] = [
     feature: 'background_remover',
     name: 'Xoá nền',
     description: 'Xoá mọi nền chỉ với một lần bấm. Ảnh PNG trong suốt.',
+    keywords: 'background remover, remove background, cutout',
     category: 'photo',
     slots: [{ label: 'Ảnh', inputLabel: 'Ảnh cần xoá nền', empty: 'Thêm 1 ảnh' }],
   },
@@ -137,6 +146,7 @@ export const APPS: AppConfig[] = [
     feature: 'motion_control',
     name: 'Điều khiển chuyển động',
     description: 'Chép chuyển động từ một video sang nhân vật của bạn.',
+    keywords: 'motion control',
     category: 'video',
     // Its form is its own (AppPage's MotionForm): one image slot and one video slot.
     slots: [],
@@ -146,6 +156,7 @@ export const APPS: AppConfig[] = [
     feature: 'media_optimizer',
     name: 'Tối ưu media',
     description: 'Nén, đổi cỡ và đổi định dạng ảnh ngay trên thiết bị, miễn phí. Chưa hỗ trợ video.',
+    keywords: 'media optimizer, compress, resize, convert',
     category: 'utility',
     slots: [],
   },
@@ -155,6 +166,7 @@ export const APPS: AppConfig[] = [
     feature: 'jewelry_try_on',
     name: 'Thử trang sức',
     description: 'Đeo trang sức của bạn lên ảnh người mẫu, giữ đúng từng chi tiết.',
+    keywords: 'jewelry try on, try-on, thử đồ',
     category: 'fashion',
     slots: [
       { label: 'Trang sức', inputLabel: 'Ảnh trang sức', empty: 'Thêm 1 hoặc nhiều món trang sức, chụp rõ trên nền trơn', many: true },
@@ -167,6 +179,7 @@ export const APPS: AppConfig[] = [
     feature: 'lingerie_try_on',
     name: 'Thử đồ lót',
     description: 'Mặc đồ lót của bạn lên người mẫu, giữ đúng chất liệu ren, lưới và satin.',
+    keywords: 'lingerie try on, try-on',
     category: 'fashion',
     slots: [
       { label: 'Đồ lót', inputLabel: 'Ảnh đồ lót', empty: 'Thêm 1 hoặc nhiều món đồ lót, chụp rõ trên nền trơn', many: true },
@@ -182,6 +195,7 @@ export const APPS: AppConfig[] = [
     feature: 'fashion_model',
     name: 'Tạo người mẫu AI',
     description: 'Chọn đặc điểm để tạo người mẫu hư cấu, lưu lại và dùng trong Thử đồ, Tạo ảnh và Tạo video.',
+    keywords: 'AI fashion model generator',
     category: 'fashion',
     slots: [],
   },
@@ -191,6 +205,7 @@ export const APPS: AppConfig[] = [
     feature: 'multi_angle',
     name: 'Ảnh nhiều góc',
     description: 'Từ một ảnh sản phẩm, tạo ảnh mặt sau, hai bên hoặc góc 3/4, mỗi góc một ảnh riêng.',
+    keywords: 'multi angle, product views',
     category: 'photo',
     slots: [{ label: 'Sản phẩm', inputLabel: 'Ảnh sản phẩm', empty: 'Thêm 1 ảnh mặt trước của sản phẩm' }],
     views: true,
@@ -201,6 +216,7 @@ export const APPS: AppConfig[] = [
     feature: 'breed_swap',
     name: 'Đổi giống chó hàng loạt',
     description: 'Từ một ảnh có chó (mockup, thiết kế hay ảnh chụp), tạo một ảnh cho mỗi giống chó đã chọn, giữ nguyên chữ và bố cục.',
+    keywords: 'breed swap, dog',
     category: 'photo',
     slots: [{ label: 'Ảnh gốc', inputLabel: 'Ảnh gốc có chó', empty: 'Thêm 1 mockup, thiết kế hoặc ảnh chụp có một chú chó' }],
     breeds: true,
@@ -211,6 +227,7 @@ export const APPS: AppConfig[] = [
     feature: 'pet_portrait',
     name: 'Chân dung thú cưng',
     description: 'Từ một ảnh thú cưng, tạo một thiết kế in sẵn nền trắng cho mỗi phong cách đã chọn: màu nước, hoạt hình, nét mực, chân dung hoàng gia và hơn nữa.',
+    keywords: 'pet portrait',
     category: 'photo',
     slots: [{ label: 'Thú cưng', inputLabel: 'Ảnh thú cưng', empty: 'Thêm 1 ảnh chụp rõ mặt của một thú cưng' }],
     styles: true,
@@ -221,6 +238,7 @@ export const APPS: AppConfig[] = [
     feature: 'mockup_pack',
     name: 'Mockup hàng loạt',
     description: 'Từ một thiết kế, tạo một ảnh mockup cho mỗi sản phẩm đã chọn: thảm tròn, ornament, áo thun, cốc, chăn và tranh canvas.',
+    keywords: 'mockup pack, mockups',
     category: 'photo',
     slots: [
       { label: 'Thiết kế', inputLabel: 'Ảnh thiết kế', empty: 'Thêm 1 thiết kế, tốt nhất là PNG nền trong hoặc nền trắng' },
@@ -234,6 +252,7 @@ export const APPS: AppConfig[] = [
     feature: 'name_swap',
     name: 'Đổi tên hàng loạt',
     description: 'Từ một thiết kế có tên, tạo một ảnh cho mỗi tên mới, giữ nguyên phông chữ, màu và vị trí; có thể đổi cả giống chó.',
+    keywords: 'name swap, personalized',
     category: 'photo',
     slots: [{ label: 'Thiết kế có tên', inputLabel: 'Ảnh thiết kế có tên', empty: 'Thêm 1 thiết kế hoặc mockup có một tên in trên đó' }],
     names: true,
@@ -261,10 +280,10 @@ export const appBySlug = (slug: string): AppConfig | undefined => APPS.find((a) 
 /** Lower case without accents or stroked d, so a search typed without diacritics still matches. */
 export const fold = (s: string): string => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd');
 
-/** The apps of one category (or all) whose name or description contains the search text. */
+/** The apps of one category (or all) whose name, description or keywords contain the search text. */
 export function filterApps(category: AppCategory | 'all', search: string, smartRemake = false): AppConfig[] {
   const q = fold(search.trim());
-  return visibleApps(smartRemake).filter((a) => (category === 'all' || a.category === category) && fold(`${a.name} ${a.description}`).includes(q));
+  return visibleApps(smartRemake).filter((a) => (category === 'all' || a.category === category) && fold(`${a.name} ${a.description} ${a.keywords ?? ''}`).includes(q));
 }
 
 /** What a page has chosen, as the Run needs it: the images of each slot (in the order of `slots`), the prompt text and the model. */
@@ -507,6 +526,18 @@ export interface BatchItem {
   style?: string | null;
   product?: string | null;
   name?: string | null;
+}
+
+/**
+ * What stays picked after a batch Run stopped once `done` of its `runs` were sent, so Run again sends only the rest: each key's items of the jobs not sent.
+ * A name with some of its breeds sent is dropped too (picking it again would resend those), and its jobs not sent come back in `left` for the page to name.
+ */
+export function unsentPicks(runs: BatchItem[], done: number): Record<'view' | 'breed' | 'style' | 'product' | 'name', string[]> & { left: BatchItem[] } {
+  const started = new Set(runs.slice(0, done).map((r) => r.name).filter(Boolean));
+  const rest = runs.slice(done);
+  const kept = rest.filter((r) => !r.name || !started.has(r.name));
+  const all = (k: keyof BatchItem) => [...new Set(kept.map((r) => r[k]).filter((v): v is string => !!v))];
+  return { view: all('view'), breed: all('breed'), style: all('style'), product: all('product'), name: all('name'), left: rest.filter((r) => !kept.includes(r)) };
 }
 
 /** What one job of a batch app made, for its History card's title: the view's, style's or product's label, the name (with its breed) or the breed; null for any other job. */

@@ -84,7 +84,7 @@ test('the reuse link refills Try On (person, garments, background, text, model, 
   const swap = await post({ feature: 'character_swap', modelId: 'mock-apps-e2e', assetIds: [person, bg], ratio: 'auto', prompt: 'keep the pose', params: { resolution: '1K', brief: 'keep the pose' } });
   await page.goto(`/apps/character-swap?reuse=${swap}`);
   await expect(page.getByLabel('Nhân vật mới: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'person.png');
-  await expect(page.getByLabel('Ảnh đích: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'bg.png');
+  await expect(page.getByLabel('Ảnh cần thay người: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'bg.png');
   await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('keep the pose');
 
   // A job of another feature is not refilled.

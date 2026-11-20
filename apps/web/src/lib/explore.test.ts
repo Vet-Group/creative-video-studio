@@ -1,6 +1,6 @@
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { expect, test } from 'vitest';
-import { continueJobs, givenName, greeting, jobNote, providerQueueLabel, todayStat, typicalLabel, waitProgress } from './explore';
+import { continueJobs, givenName, greeting, jobNote, providerQueueLabel, todayStat, typicalLabel, waitLabel, waitProgress } from './explore';
 
 test('the given name is the last word of a Vietnamese full name', () => {
   expect(givenName('Nguyễn Văn An')).toBe('An');
@@ -123,4 +123,10 @@ test("the hero's day line counts images and clips across kinds, and keeps the cl
   expect(todayStat({ clips: 1, images: 0 }, { today: 2, cap: 5 })).toBe('Hôm nay bạn còn 3/5 clip video');
   expect(todayStat({ clips: 1, images: 4 }, { today: 2, cap: 5 })).toBe('Hôm nay bạn còn 3/5 clip video · 4 ảnh');
   expect(todayStat({ clips: 6, images: 0 }, { today: 6, cap: 5 })).toBe('Hôm nay bạn còn 0/5 clip video');
+});
+
+test("a model's usual wait before Run reads as minutes, or under a minute", () => {
+  expect(waitLabel({ p50: 150, p75: 200 })).toBe('~2–4 phút');
+  expect(waitLabel({ p50: 70, p75: 110 })).toBe('~1–2 phút');
+  expect(waitLabel({ p50: 20, p75: 40 })).toBe('dưới 1 phút');
 });

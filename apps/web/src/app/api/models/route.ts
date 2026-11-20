@@ -3,7 +3,7 @@ import { capRowOf } from '@cvs/core/limits';
 import { videoInputs } from '@cvs/core/providers/fal';
 import { ASPECTS, COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { pool } from '@/lib/auth';
-import { modelStats, rank, scoreOf } from '@/lib/model-scores';
+import { modelStats, rank, runTimes, scoreOf } from '@/lib/model-scores';
 import { canServe, onePerPair, vertexOnCredits } from '@/lib/model-twins';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
   const followsImage = ratio !== 'auto' || feature === 'motion_control' || images > 0;
 
   const fal = await falBalance();
-  const [models, mine, budget, stats, falCredit] = await Promise.all([
+  const [models, mine, budget, stats, falCredit, times] = await Promise.all([
     pool.query(
       `select m.id, m.label, m.provider, m.endpoint, m.ratios, m.durations_sec, m.max_images, m.max_prompt_chars, m.usd_per_second, m.output_resolution,
               m.created_at > now() - interval '14 days' as is_new, m.twin_of
@@ -80,6 +80,7 @@ export async function GET(request: Request) {
       : undefined,
     modelStats(null),
     falCreditUsd(pool, fal),
+    feature === 'motion_control' ? runTimes(feature) : null, // Motion Control's form shows the usual wait beside the price
   ]);
 
   // One model of each duplicate pair: the dearer one only while its twin cannot serve (lib/model-twins.ts); a fal twin is locked by the same estimate the picker shows.
@@ -131,6 +132,7 @@ export async function GET(request: Request) {
       pairIds: pair.map((p) => p.id as string),
       creditUsd: serving.provider === 'fal' ? falCredit : null,
       creditShown: g.session.user.role === 'admin' && company, // members see that a model is out of budget, not the provider's balance
+      ...(times && { typicalSec: times.get(r.id) ?? null }),
     };
   });
   const supported = list.filter((m) => m.supported && !overCredit(m.provider, m.estimateUsd, m.creditUsd)).map((m) => ({ id: m.id, score: m.score, usd: Number(m.estimateUsd), vertex: m.provider === 'vertex' }));

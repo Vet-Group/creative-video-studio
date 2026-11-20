@@ -9,7 +9,7 @@ import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
 import { PRODUCT_TYPES } from '@/lib/product-types';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun, sendRun } from '@/lib/run-guard';
+import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
@@ -1033,7 +1033,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               <p className="help">
                 Tháng này bạn đã dùng: ${models.monthToDate.usd}
                 {models.monthToDate.provisional && <span className="tag">Tạm tính</span>}
-                {models.remainingBudgetUsd !== undefined && <span> · Ngân sách tháng còn lại của công ty: ${models.remainingBudgetUsd}</span>}
+                {models.remainingBudgetUsd !== undefined && <span> · Ngân sách tháng còn lại của công ty: {usd(models.remainingBudgetUsd)}</span>}
               </p>
             )}
             <Templates

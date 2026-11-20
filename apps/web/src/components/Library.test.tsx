@@ -26,13 +26,14 @@ test('the clip detail offers Nén & tải về on a video as well as on an image
   expect(detail(clip('image'))).toContain('aria-label="Nén &amp; tải về"');
 });
 
-test("an image's detail opens the picture in Xoá nền or Tăng độ phân giải, another member's too, except the tool that made it; never a video", () => {
+test("an image's detail opens the picture in the image tools (Xoá nền, Tăng độ phân giải, Đổi nền, Đổi khung hình), another member's too, except the tool that made it; never a video", () => {
   const tools = (c: Clip) => [...detail(c).matchAll(/<button type="button" class="lightbox-result">([\s\S]*?)<\/button>/g)].map((m) => m[1]!.replace(/<[^>]*>/g, '').trim());
   const own: Clip = { ...clip('image'), feature: 'image', mine: true };
-  expect(tools(own)).toEqual(['Xoá nền', 'Tăng độ phân giải']);
-  expect(tools({ ...own, mine: false })).toEqual(['Xoá nền', 'Tăng độ phân giải']);
-  expect(tools({ ...own, feature: 'background_remover' })).toEqual(['Tăng độ phân giải']);
-  expect(tools({ ...own, feature: 'image_upscale' })).toEqual(['Xoá nền']);
+  expect(tools(own)).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
+  expect(tools({ ...own, mine: false })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
+  expect(tools({ ...own, feature: 'background_remover' })).toEqual(['Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
+  expect(tools({ ...own, feature: 'image_upscale' })).toEqual(['Xoá nền', 'Đổi nền', 'Đổi khung hình']);
+  expect(tools({ ...own, feature: 'reframe' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền']);
   expect(tools({ ...clip('video'), mine: true })).toEqual([]);
 });
 

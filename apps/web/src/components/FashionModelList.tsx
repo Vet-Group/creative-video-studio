@@ -92,7 +92,7 @@ function ModelCard({ model, isAdmin, change }: { model: FashionModelItem; isAdmi
         </p>
       )}
       <div className={s.actions}>
-        <Link href="/try-on" className="button">
+        <Link href={`/try-on?model=${model.assetId}`} className="button">
           Dùng trong Thử đồ
         </Link>
         {model.mine && !editing && (

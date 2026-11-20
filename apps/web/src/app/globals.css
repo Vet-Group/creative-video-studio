@@ -1187,6 +1187,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .enhance[aria-pressed='true'] { background: var(--ink); } /* beats the generic pressed-button fill, which hid the white label */
 .enhance[aria-pressed='false'] { border-color: var(--border-button); background: var(--surface); color: var(--ink); font-weight: 500; }
 .enhance:disabled { cursor: not-allowed; opacity: .6; }
+.app-page .enhance:disabled[aria-pressed='true'] { border-color: var(--border); background: var(--fill); color: var(--text-disabled); opacity: 1; } /* Media Optimizer's locked keep-ratio toggle: grey, not a dark pill that reads as pressed */
 /* The live Generate Audio switch: a 44x24 pill with a white knob, the state beside it. */
 .switch-row { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 14px; line-height: 21px; }
 .switch { position: relative; flex: none; width: 44px; height: 24px; padding: 0; border: 0; border-radius: 12px; background: var(--fill-strong); }
@@ -1595,6 +1596,11 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .theme-choice label:has(:disabled) { opacity: .5; }
 .theme-choice input:disabled { cursor: not-allowed; }
 .angle-choice { flex-wrap: wrap; justify-self: start; max-width: 100%; } /* Create's camera angles: chips that wrap on a phone */
+/* An app's multi-pick chips (views, breeds, styles, products): a picked one carries a check, as the raised fill alone read like an unpicked chip at a glance. */
+.app-page .angle-choice label:has(:checked)::before { content: '\2713'; font-weight: 700; }
+.pick-count { color: var(--text-muted); font-size: 13px; line-height: 18px; white-space: nowrap; }
+.pick-count .link-button { font-size: 13px; }
+@media (pointer: coarse) { .pick-count .link-button { min-height: 44px; } }
 .settings-panel .acct-rows + .actions { margin-top: 12px; }
 .settings-panel .actions button { height: 36px; padding: 0 14px; font-size: 14px; }
 .settings-panel .actions button:hover:not(:disabled) { background: var(--fill); }
@@ -2025,6 +2031,18 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .slot-optional { display: none; }
 .app-slots[data-two='true'] .slot-optional { display: block; white-space: nowrap; }
 .app-slots[data-two='true'] .optional-head .choice-optional { display: none; }
+/* On an app page the half-width tile also says what photo it wants, under its name: the tooltip alone never shows on a phone. Both tiles of a row
+   take the taller one's height, so a longer hint (Motion Control's video) leaves their tops level. */
+.app-page .app-slots[data-two='true'] .slot-add .slot-hint { display: block; order: 1; font-size: 12px; line-height: 16px; }
+.app-page .app-slots[data-two='true'] { align-items: stretch; }
+.app-page .app-slots[data-two='true'] > .field:has(> .field-head) .slot-add:has(.slot-hint) { padding-bottom: 30px; } /* the hint ends above the corner uploads link */
+/* A stock-photo dialog's group names, which jump to each group. */
+.photo-jump { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.photo-jump button { height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 13px; line-height: 18px; }
+.photo-jump button:hover { border-color: var(--border-strong); }
+@media (pointer: coarse) { .photo-jump button { height: 44px; } }
+/* The unpicked option of a two-way choice reads as a chip, not as plain text beside the picked one. */
+.app-page .orientation-choice label:not(:has(:checked)) { box-shadow: inset 0 0 0 1px var(--border); }
 /* Samples in an empty slot (live Try On): a grey strip of pictures to pick from, then the upload tile with a plus and its label. */
 .slot-samples { display: flex; flex: 1; align-items: center; min-width: 0; height: 79px; margin: 0; padding: 0; overflow-x: auto; scrollbar-width: none; border-radius: 12px; background: var(--fill); list-style: none; }
 .slot-samples li { flex: none; height: 100%; overflow: hidden; }
@@ -2114,6 +2132,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .app-head { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 130px; margin-bottom: 16px; padding: 12px; border-radius: 18px; background: var(--zinc-800); color: var(--on-dark); }
 /* The upload slots start 16 px under the banner, as on the live app pages. */
 .app-head:has(+ .app-slots) { margin-bottom: 0; }
+.app-lede { margin: -4px 0 0; } /* a phone's one line on what the app does, between the banner and the slots */
 .app-head[data-category='fashion'] { background: var(--cat-fashion-solid); }
 .app-head[data-category='photo'] { background: var(--cat-photo-solid); }
 .app-head[data-category='video'] { background: var(--cat-video-solid); }

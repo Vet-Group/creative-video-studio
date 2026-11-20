@@ -39,8 +39,8 @@ test('pet portrait: picks styles for a pet photo, sees the price of one design p
   // A priced model: one image's price per style, and the first style's prompt.
   await pickModel(page, /Mock pets priced/);
   for (const name of ['Màu nước', 'Hoạt hình', 'Sơn dầu']) await styles.getByText(name, { exact: true }).click();
-  await expect(cost(page)).toHaveText('3 ảnh × $0.1500 = $0.4500');
-  await expect(runButton(page)).toContainText('$0.4500');
+  await expect(cost(page)).toHaveText('3 ảnh × $0.15 = $0.45');
+  await expect(runButton(page)).toContainText('$0.45');
   await expect(preview(page)).toContainText(`Màu nước: ${petPortraitPrompt('watercolor')}`);
   await expect(page.getByText('2 phong cách còn lại dùng prompt như trên, chỉ khác phần mô tả phong cách.')).toBeVisible();
 
@@ -82,7 +82,7 @@ test('mockup pack: runs one mockup per product for a design, reuses the batch, a
 
   await pickModel(page, /Mock pets priced/);
   for (const name of ['Thảm tròn 3D', 'Cốc sứ 11 oz']) await products.getByText(name, { exact: true }).click();
-  await expect(cost(page)).toHaveText('2 ảnh × $0.1500 = $0.3000');
+  await expect(cost(page)).toHaveText('2 ảnh × $0.15 = $0.30');
   await expect(preview(page)).toContainText(`Thảm tròn 3D: ${mockupPrompt('round-rug', false)}`);
 
   await pickModel(page, /Mock pets E2E/);
@@ -127,6 +127,10 @@ test('name swap: checks the names, prices names times breeds, runs one job per n
   // The names are held to what may go into a prompt, as the server holds them.
   await names.fill('Max\nBella 🐶');
   await expect(reason(page)).toHaveText('Tên "Bella 🐶" chỉ được có chữ cái, chữ số, khoảng trắng, dấu nháy đơn và gạch nối.');
+  // The box says so itself, and no price counts the bad name.
+  await expect(names).toHaveAttribute('aria-invalid', 'true');
+  await expect(names).toHaveAccessibleDescription(/^Tên "Bella 🐶" chỉ được có chữ cái/);
+  await expect(cost(page)).toHaveCount(0);
   await names.fill('x'.repeat(21));
   await expect(reason(page)).toHaveText(`Tên "${'x'.repeat(21)}" dài quá 20 ký tự.`);
   await names.fill(Array.from({ length: 13 }, (_, i) => `Dog ${i + 1}`).join('\n'));
@@ -136,17 +140,18 @@ test('name swap: checks the names, prices names times breeds, runs one job per n
 
   // Two names (a repeat and spaces dropped) times two breeds.
   await names.fill('Max\nNguyễn Ánh\n  Max ');
+  await expect(names).not.toHaveAttribute('aria-invalid');
   await pickModel(page, /Mock pets priced/);
-  await expect(cost(page)).toHaveText('4 ảnh × $0.1500 = $0.6000');
+  await expect(cost(page)).toHaveText('4 ảnh × $0.15 = $0.60');
   await expect(preview(page)).toContainText(`Max · Beagle: ${nameSwapPrompt('Max', 'Beagle')}`);
   await expect(page.getByText('3 ảnh còn lại dùng prompt như trên, chỉ khác tên (và giống chó).')).toBeVisible();
   // With no breed, one picture per name.
   await breeds.getByText('Beagle', { exact: true }).click();
   await breeds.getByText('Pug', { exact: true }).click();
-  await expect(cost(page)).toHaveText('2 ảnh × $0.1500 = $0.3000');
+  await expect(cost(page)).toHaveText('2 ảnh × $0.15 = $0.30');
   await expect(preview(page)).toContainText(`Max: ${nameSwapPrompt('Max')}`);
   await breeds.getByText('Pug', { exact: true }).click();
-  await expect(cost(page)).toHaveText('2 ảnh × $0.1500 = $0.3000');
+  await expect(cost(page)).toHaveText('2 ảnh × $0.15 = $0.30');
 
   await pickModel(page, /Mock pets E2E/);
   await runButton(page).click();
@@ -182,7 +187,7 @@ test('name swap: fills the names from a CSV file, the pet name column first, thr
   await expect(names).toHaveValue('Max\nBella\nNguyễn Ánh');
   await expect(note).toHaveText('Đã lấy 3 tên từ cột “Pet Name” của orders.csv. Bỏ qua 1 giá trị không hợp lệ: "Max 🐶, the dog".');
   await pickModel(page, /Mock pets priced/);
-  await expect(cost(page)).toHaveText('3 ảnh × $0.1500 = $0.4500');
+  await expect(cost(page)).toHaveText('3 ảnh × $0.15 = $0.45');
 
   // Another column: order numbers are no names, so the box empties and the note says why.
   await selectText(page, 'Cột chứa tên', 'Name');
@@ -195,5 +200,5 @@ test('name swap: fills the names from a CSV file, the pet name column first, thr
   await csvFile.setInputFiles({ name: 'many.csv', mimeType: 'text/csv', buffer: Buffer.from(many) });
   await expect(names).toHaveValue(Array.from({ length: 25 }, (_, i) => `Dog ${i + 1}`).join('\n'));
   await expect(note).toHaveText('Đã lấy 25 tên từ cột “Pet Name” của many.csv. Chỉ giữ 25 tên đầu, bỏ 5 tên còn lại.');
-  await expect(cost(page)).toHaveText('25 ảnh × $0.1500 = $3.7500');
+  await expect(cost(page)).toHaveText('25 ảnh × $0.15 = $3.75');
 });

@@ -52,3 +52,18 @@ export async function modelStats(feature: string | null): Promise<Map<string, Mo
   );
   return new Map(rows.map((r: Record<string, unknown>) => [r.id as string, { passes: Number(r.passes), total: Number(r.total), ok: Number(r.ok), bad: Number(r.bad) }]));
 }
+
+/**
+ * The median and 75th percentile, in seconds, of each model's run time (start to finish, without the queue wait) over its latest 50 succeeded jobs of
+ * `feature`, any member's, as modelStats counts them; a model with fewer than 3 is left out, so a form shows no wait it cannot back.
+ */
+export async function runTimes(feature: string): Promise<Map<string, { p50: number; p75: number }>> {
+  const { rows } = await pool.query(
+    `select model, percentile_disc(0.5) within group (order by secs) as p50, percentile_disc(0.75) within group (order by secs) as p75
+       from (select model, extract(epoch from finished_at - coalesce(started_at, created_at))::float8 as secs, row_number() over (partition by model order by finished_at desc) as n
+               from jobs where feature = $1 and status = 'succeeded' and not is_mock and finished_at is not null) j
+      where n <= 50 and secs > 0 group by model having count(*) >= 3`,
+    [feature],
+  );
+  return new Map(rows.map((r: Record<string, unknown>) => [r.model as string, { p50: Number(r.p50), p75: Number(r.p75) }]));
+}

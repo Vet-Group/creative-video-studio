@@ -153,7 +153,7 @@ test('Background Remover (one slot): Run needs the image, a mock job reaches His
   await page.getByLabel('Ảnh cần xoá nền').setInputFiles(file('product.png'));
   await expect(page.getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(runButton(page)).toBeEnabled();
-  await expect(runButton(page)).toContainText('$0.0000'); // a mock model books nothing
+  await expect(runButton(page)).toContainText('$0.00'); // a mock model books nothing
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
@@ -165,6 +165,11 @@ test('Background Remover (one slot): Run needs the image, a mock job reaches His
   expect(jobs.jobs.map((j) => j.feature)).toEqual(['background_remover']);
   const detail = (await (await page.request.get(`/api/jobs/${jobs.jobs[0]!.id}`)).json()) as { prompt: string };
   expect(detail.prompt).toBe('Remove the background.');
+  // Use Result puts the result, copied as a new input, in the app's slot, and the card offers the other photo tools.
+  await expect(tray.getByRole('button', { name: 'Đổi khung hình' })).toBeVisible();
+  await tray.getByRole('button', { name: 'Dùng kết quả' }).click();
+  await expect(page.getByRole('group', { name: 'Ảnh', exact: true }).getByRole('img', { name: /^history-\w{8}\.(png|jpg|webp)$/ })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Ảnh', exact: true }).getByRole('img', { name: 'product.png' })).toHaveCount(0);
 
   await libraryApps(page);
   const mine = page.getByRole('article').filter({ hasText: 'E2E Apps A' });
@@ -186,6 +191,9 @@ test('Jewelry Try-On takes several pieces and then the person; a mock job sends 
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Trang sức.');
   await page.getByLabel('Ảnh trang sức').setInputFiles([file('ring.png'), file('earring.png')]);
   await expect(page.getByRole('group', { name: 'Trang sức' }).locator('img')).toHaveCount(2);
+  // The many-photo slot counts its photos against its cap, and each slot offers the member's earlier uploads.
+  await expect(page.getByRole('group', { name: 'Trang sức' })).toHaveAccessibleDescription(/^2 trên \d+ ảnh trang sức$/);
+  await expect(page.getByRole('button', { name: 'Ảnh đã tải cho Người đeo' })).toBeVisible();
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Người đeo.');
   await page.locator('input[type=file][aria-label="Ảnh người đeo"]').setInputFiles(file('wearer.png'));
   await expect(runButton(page)).toBeEnabled();
@@ -257,16 +265,17 @@ test('Face Swap (two slots): each required slot has its reason, and a mock job t
   await openApp(page, 'Đổi khuôn mặt', 'face-swap');
   await expect(page.locator('.slot')).toHaveCount(2);
   await expect(page.getByRole('group', { name: 'Khuôn mặt nguồn' })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Ảnh đích' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Ảnh cần đổi khuôn mặt' })).toBeVisible();
+  await expect(page.getByText('Thêm 1 ảnh có khuôn mặt cần thay', { exact: true })).toBeVisible(); // each half-width tile says what photo it wants
   await expect(runButton(page)).toBeDisabled();
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Khuôn mặt nguồn.');
 
   await page.getByLabel('Ảnh khuôn mặt nguồn').setInputFiles(file('source.png'));
   await expect(page.getByRole('img', { name: 'source.png' })).toBeVisible();
   await expect(runButton(page)).toBeDisabled();
-  await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Ảnh đích.');
+  await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Ảnh cần đổi khuôn mặt.');
 
-  await page.locator('input[type=file][aria-label="Ảnh đích"]').setInputFiles(file('target.png'));
+  await page.locator('input[type=file][aria-label="Ảnh cần đổi khuôn mặt"]').setInputFiles(file('target.png'));
   await expect(page.getByRole('img', { name: 'target.png' })).toBeVisible();
   await expect(runButton(page)).toBeEnabled();
   await runButton(page).click();
@@ -347,9 +356,9 @@ test('a priced model: Upscale shows its price and stores the chosen resolution, 
   await page.getByLabel('Ảnh cần tăng độ phân giải').setInputFiles(file('small.png'));
   await expectOptions(page, 'Độ phân giải', ['2K', '4K']);
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
-  await expect(runButton(page)).toContainText('$0.0800');
+  await expect(runButton(page)).toContainText('$0.08');
   await selectValue(page, 'Độ phân giải', '4K');
-  await expect(runButton(page)).toContainText('$0.0800');
+  await expect(runButton(page)).toContainText('$0.08');
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect.poll(async () => (await jobs()).filter((j) => j.feature === 'image_upscale').map((j) => j.resolution)).toEqual(['4K']);
@@ -359,7 +368,7 @@ test('a priced model: Upscale shows its price and stores the chosen resolution, 
   await expectOptions(page, 'Tỉ lệ', ['1:1', '16:9']); // no "Tự động": Reframe needs a target ratio
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await page.getByLabel('Ảnh cần đổi khung').setInputFiles(file('photo.png'));
-  await expect(runButton(page)).toContainText('$0.0800');
+  await expect(runButton(page)).toContainText('$0.08');
   await selectValue(page, 'Tỉ lệ', '16:9');
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
@@ -371,12 +380,15 @@ test('the swaps take an optional prompt that is added to their fixed instruction
   await openApp(page, 'Đổi nhân vật', 'character-swap');
   const prompt = page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' });
   await page.locator('input[type=file][aria-label="Ảnh nhân vật mới"]').setInputFiles(file('new.png'));
-  await page.locator('input[type=file][aria-label="Ảnh đích"]').setInputFiles(file('target.png'));
+  await page.locator('input[type=file][aria-label="Ảnh cần thay người"]').setInputFiles(file('target.png'));
   await expect(runButton(page)).toBeEnabled(); // the prompt is not required
   const preview = page.locator('.prompt-preview p');
   await expect(preview).toHaveText('replace the whole person in the second image with the person from the first image, keep the background'); // the instruction alone
   await prompt.fill('keep the red hat');
   await expect(preview).toHaveText('replace the whole person in the second image with the person from the first image, keep the background. keep the red hat');
+  // Two Translate buttons, each with a name of its own: the box's and the sent prompt's.
+  await expect(page.getByRole('button', { name: 'Dịch', exact: true })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Dịch prompt gửi đi', exact: true })).toHaveCount(1);
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const mine = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string }[] };
@@ -474,7 +486,7 @@ test('each upload button names its slot, and the tray stays off the image-only o
   const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await page.goto('/apps/face-swap');
   await expect(page.getByRole('button', { name: 'Tải lên Khuôn mặt nguồn' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Tải lên Ảnh đích' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tải lên Ảnh cần đổi khuôn mặt' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Tải lên', exact: true })).toHaveCount(0);
   await expect(tray).toHaveCount(0); // the page has its own History tab
 
@@ -520,6 +532,7 @@ test('Motion Control: the image and the reference video, a length check, and a R
   await page.getByLabel('Ảnh nhân vật').setInputFiles(file('dancer.png'));
   await expect(page.getByRole('img', { name: 'dancer.png' })).toBeVisible();
   await expect(reasonOf(page)).toHaveText('Tải lên video chuyển động.');
+  await expect(runButton(page)).toContainText('$0.126/giây'); // before a video, the Standard model's price per second
 
   await page.getByLabel('Tệp video chuyển động').setInputFiles({ name: 'short.mp4', mimeType: 'video/mp4', buffer: mp4(1900) });
   await expect(page.getByText('short.mp4 · 1.9 giây')).toBeVisible();
@@ -530,7 +543,7 @@ test('Motion Control: the image and the reference video, a length check, and a R
   await page.getByLabel('Tệp video chuyển động').setInputFiles({ name: 'dance.mp4', mimeType: 'video/mp4', buffer: mp4(5400) });
   await expect(page.getByText('dance.mp4 · 5.4 giây')).toBeVisible();
   await expect(reasonOf(page)).toHaveCount(0);
-  await expect(runButton(page)).toHaveText(/\$0\.7560/); // the recommended Standard model, 6 s
+  await expect(runButton(page)).toHaveText(/\$0\.756/); // the recommended Standard model, 6 s
   // The long model name stays inside the form: the picker is a grid item, which would otherwise grow to its text.
   const picker = (await page.locator('.select-trigger').boundingBox())!;
   const form = (await page.locator('.form-scroll').boundingBox())!;
@@ -574,7 +587,7 @@ test('Run is disabled with a reason when the app has no enabled model, and "Đ�
   await expect(reasonOf(page)).toHaveText('Ứng dụng này chưa được Admin bật');
   await expect(runButton(page)).toBeDisabled();
   await page.getByLabel('Ảnh người mẫu mới').setInputFiles(file('a.png'));
-  await page.locator('input[type=file][aria-label="Ảnh đích"]').setInputFiles(file('b.png'));
+  await page.locator('input[type=file][aria-label="Ảnh cần thay người mẫu"]').setInputFiles(file('b.png'));
   await expect(page.getByRole('img', { name: 'b.png' })).toBeVisible();
   await expect(reasonOf(page)).toHaveText('Ứng dụng này chưa được Admin bật');
   await expect(runButton(page)).toBeDisabled();
@@ -606,14 +619,21 @@ for (const [width, height, columns] of [[390, 844, 2], [1024, 768, 2], [1440, 10
     expect(lefts).toBe(columns);
     expect(await fits(page)).toBe(true);
 
-    for (const slug of ['character-swap', 'background-changer', 'reframe', 'motion-control']) {
+    const heads = new Set<number>(); // the banner keeps one height across apps, whatever the name
+    for (const slug of ['character-swap', 'model-swap', 'background-changer', 'reframe', 'motion-control']) {
       await page.goto(`/apps/${slug}`);
       await expect(page.getByRole('tab').first()).toBeVisible();
+      heads.add(Math.round((await page.locator('.app-head').boundingBox())!.height));
       for (const tab of await page.getByRole('tab').all()) {
         await tab.click();
         expect(await fits(page), `${slug} ${await tab.textContent()}`).toBe(true);
       }
     }
+    expect([...heads]).toHaveLength(1);
+
+    // On a phone the form says what the app does, as About is a tab away; beside About it is not repeated.
+    await page.goto('/apps/character-swap');
+    await expect(page.locator('.app-lede')).toHaveCount(width < 1024 ? 1 : 0);
 
     if (width === 390) {
       // The form tab holds the header card, the slots and Run inside the screen.

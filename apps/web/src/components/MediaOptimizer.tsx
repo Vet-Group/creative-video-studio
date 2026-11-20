@@ -89,6 +89,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   const [entries, setEntries] = useState<OptimizerEntry[]>([]);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else About)
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; of: number } | null>(null); // a listing run's images done so far, so a long one does not look stuck
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const sizeId = useId();
@@ -189,6 +190,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     if (!many && (!image.current || !file)) return;
     const current = generation.current;
     setBusy(true);
+    setProgress(null);
     setError('');
     setNotice('');
     try {
@@ -196,7 +198,9 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
         // One image at a time, so only one decoded image is held; one that cannot be read is left out and named.
         const made: { name: string; blob: Blob; before: number }[] = [];
         const skipped: string[] = [];
-        for (const f of [...(file ? [file] : []), ...more.map((m) => m.file)]) {
+        const files = [...(file ? [file] : []), ...more.map((m) => m.file)];
+        for (const [n, f] of files.entries()) {
+          setProgress({ done: n, of: files.length });
           try {
             const bitmap = f === file && image.current ? image.current : await decodeOptimizerImage(f);
             try {
@@ -226,7 +230,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     } catch (err) {
       if (current === generation.current) setError(err instanceof Error ? err.message : 'Không xử lý được ảnh.');
     } finally {
-      if (current === generation.current) setBusy(false);
+      if (current === generation.current) (setBusy(false), setProgress(null));
     }
   }
 
@@ -344,7 +348,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               {busy ? (
-                'Đang xử lý…'
+                `Đang xử lý…${progress ? ` ${progress.done}/${progress.of} ảnh` : ''}`
               ) : (
                 <>
                   Chạy

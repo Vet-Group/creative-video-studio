@@ -61,6 +61,8 @@ export async function GET(request: Request, { params }: RouteContext) {
     // the Library is where staff learn how a result was made, and the composed prompt carries them anyway.
     garments: job.params.garments ? Number(job.params.garments) : null, pose: job.params.pose ?? null, format: job.params.format ?? null, hook: job.params.hook ?? null, location: job.params.location ?? null, brief: job.params.brief ?? null, script: job.params.script ?? null, roles: job.params.roles ?? null, highlights: job.params.highlights?.split('\n') ?? null, brand: job.params.brand === 'on',
     hookText: job.params.hookText ?? null, ending: job.params.ending ?? null, endText: job.params.endText ?? null, endTextPos: job.params.endTextPos ?? null,
+    // The AI model generator's own traits (JSON), which its Reuse puts back on the form.
+    traits: job.feature === 'fashion_model' ? (job.params.traits ?? null) : null,
     durationSec: job.duration_s, modelId: job.model, modelLabel: job.model_label, storeId: job.store_id, storeLost: job.job_store_id !== null && job.store_id === null, inputCount: job.input_asset_ids.length, inputIds: job.input_asset_ids, outputAssetId: job.output_asset_id, posterAssetId: job.poster_asset_id, images: images.rows, endFrame: end.rows[0] ?? null, videoRef: video.rows[0] ?? null, clips: clips.rows, batchItems: items,
   });
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FASHION_TRAITS, FASHION_AVOID, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, MAX_EXTRA, mentionsMinor, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, VARIED_POOL, withNiche } from './fashion-model';
+import { DEFAULT_FASHION_TRAITS, FASHION_AVOID, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, freeName, MAX_EXTRA, mentionsMinor, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, VARIED_POOL, withNiche } from './fashion-model';
 
 describe('fashionModelPrompt', () => {
   it('puts the fragment of every option into the prompt', () => {
@@ -98,6 +98,13 @@ describe('parseFashionTraits', () => {
 describe('fashionModelName', () => {
   it('names a model from its gender, age and heritage', () => {
     expect(fashionModelName(DEFAULT_FASHION_TRAITS)).toBe('Nữ · 26-40 tuổi · Việt Nam / Đông Nam Á');
+  });
+
+  it('numbers a name a saved model already has, within 60 characters', () => {
+    expect(freeName('Nữ', [])).toBe('Nữ');
+    expect(freeName('Nữ', ['Nữ', 'Nam'])).toBe('Nữ 2');
+    expect(freeName('Nữ', ['Nữ', 'Nữ 2'])).toBe('Nữ 3');
+    expect(freeName('x'.repeat(60), ['x'.repeat(60)])).toBe(`${'x'.repeat(58)} 2`);
   });
 });
 

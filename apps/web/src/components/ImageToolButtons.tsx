@@ -6,13 +6,13 @@ import { appBySlug } from '@/lib/apps';
 import { Icon } from './Icon';
 
 /** The apps an image result opens in, as a new input in their first slot: those not marked as coming soon. */
-const IMAGE_TOOLS = ([['background-remover', 'wand'], ['image-upscale', 'expand']] as const).flatMap(([slug, icon]) => {
+const IMAGE_TOOLS = ([['background-remover', 'wand'], ['image-upscale', 'expand'], ['background-changer', 'image'], ['reframe', 'ratio']] as const).flatMap(([slug, icon]) => {
   const app = appBySlug(slug);
   return app && !app.soon ? [{ ...app, icon }] : [];
 });
 
 /**
- * Background Remover and Image Upscale on an image result (the member's own on a History card, any member's in a Library detail), except the one that made it: the
+ * Background Remover, Image Upscale, Background Changer and Reframe on an image result (the member's own on a History card, any member's in a Library detail), except the one that made it: the
  * result is copied into a new input of the member's (POST /api/assets/copy), which the app's page puts in its first slot.
  * `act` runs the copy and shows its failure, as the caller's other actions do.
  */

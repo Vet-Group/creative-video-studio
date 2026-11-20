@@ -27,6 +27,7 @@ const READERS: Record<string, string[]> = {
   style: ['components/AppPage.tsx'], // the pet portrait app
   product: ['components/AppPage.tsx'], // the mockup pack
   name: ['components/AppPage.tsx'], // the name swap app
+  traits: ['components/FashionModelApp.tsx'], // the AI model generator's traits
   batchItems: ['components/AppPage.tsx'], // every item of a batch app's Run
   ratio: ['components/image-tools.tsx', 'components/CreateForm.tsx', 'components/MarketingStudio.tsx'],
   garments: ['components/TryOn.tsx'],
