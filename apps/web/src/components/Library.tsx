@@ -694,7 +694,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
         )}
         <dl className="recipe" aria-label="Cách tạo">
           {row('Mô hình', clip.modelLabel)}
-          {row('Mẫu', job?.presetId && presets && (presets.get(job.presetId) ?? 'Đã xoá'))}
+          {row(clip.feature === 'image' ? 'Phong cách' : 'Mẫu chuyển động', job?.presetId && presets && (presets.get(job.presetId) ?? 'Đã xoá'))}
           {row('Hook', choiceName(HOOKS, job?.hook ?? null))}
           {row('Bối cảnh', choiceName(LOCATIONS, job?.location ?? null))}
           {row('Tỉ lệ', clip.ratio)}

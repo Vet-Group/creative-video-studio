@@ -8,6 +8,7 @@ import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
 import { asExample, dropRefillQuery, exampleFrom, lostInputs, nothingNote, nothingRefilled, refillFrom, reuseHref, type Skipped, skippedNote } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
+import { isParamFormat } from '@/lib/marketing';
 import type { BatchItem } from '@/lib/apps';
 import { PRODUCT_TYPES } from '@/lib/product-types';
 import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
@@ -975,12 +976,32 @@ export function TileImg(props: ImgHTMLAttributes<HTMLImageElement> & { alt: stri
   return <img {...props} className={loaded ? 'tile-img loaded' : 'tile-img'} onLoad={() => setLoaded(true)} onError={() => setLoaded(true)} />;
 }
 
-/** `feature` is the page's own feature when `kind` is a narrower Library kind (Marketing Studio's format), which the Admin's example order still goes by. */
-export function Gallery({ kind, feature = kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; feature?: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
+/**
+ * `feature` is the page's own feature when `kind` is a narrower Library kind (Marketing Studio's format), which the Admin's example order still goes by.
+ * `format` keeps the fixed samples of that Marketing format only: a sample names it in its details file, and one without a file is UGC.
+ */
+export function Gallery({ kind, feature = kind, label, emptyText, video = false, cols = [2, 3, 4], samples, format }: { kind: string; feature?: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string; format?: string }) {
   const have = useSamples();
-  const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
+  const baseOf = (name: string) => name.replace(/\.(mp4|jpg)$/, '');
+  const numbered = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
+  const [formatOf, setFormatOf] = useState<Record<string, string>>({}); // a sample's format from its details file, once read
+  const askedFormat = useRef(new Set<string>());
+  useEffect(() => {
+    if (!format) return;
+    for (const name of numbered) {
+      const id = baseOf(name);
+      if (!have.has(`${id}.json`) || askedFormat.current.has(id)) continue;
+      askedFormat.current.add(id);
+      api<{ format?: string | null }>(`/api/samples/${id}.json`).then(
+        (d) => setFormatOf((cur) => ({ ...cur, [id]: isParamFormat(d.format) ? d.format : 'ugc' })),
+        () => setFormatOf((cur) => ({ ...cur, [id]: format })), // unreadable: show the sample rather than hide it
+      );
+    }
+  }, [format, have]);
+  const sampleTiles = numbered.filter((name) => !format || (have.has(`${baseOf(name)}.json`) ? formatOf[baseOf(name)] : 'ugc') === format);
+  const readingFormats = !!format && numbered.some((name) => have.has(`${baseOf(name)}.json`) && formatOf[baseOf(name)] === undefined);
   /** Every sample opens in place (SampleDetail); the ones with a details file show its prompt and settings too. */
-  const detailed = sampleTiles.filter((n) => have.has(n.replace(/\.(mp4|jpg)$/, '.json')));
+  const detailed = sampleTiles.filter((n) => have.has(`${baseOf(n)}.json`));
   const [open, setOpen] = useState<number | null>(null);
   const [detail, setDetail] = useState<string | null>(null); // the id of a company result open in place, as in the Library
   const form = useForm();
@@ -1040,7 +1061,7 @@ export function Gallery({ kind, feature = kind, label, emptyText, video = false,
 
   // The fixed samples show at once; only the company's own outputs wait for the request.
   if (sampleTiles.length === 0) {
-    if (state === 'loading')
+    if (state === 'loading' || readingFormats)
       return <TileSkeleton />;
     if (state === 'error') return <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />;
     // A sample list that failed is not an empty company: say so, with a retry (the list also retries by itself).

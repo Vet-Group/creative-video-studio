@@ -30,5 +30,5 @@ test('a click on a preset clip picks it, and a click on the banner clip opens th
   const clip = (await card.locator(':scope > :first-child').boundingBox())!;
   await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2); // where a member clicks, whatever lies on top
   await expect(presetOf(page)).toHaveAttribute('data-value', 'slow-orbit');
-  await expect(page.getByRole('heading', { name: 'Chọn mẫu' })).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Chọn mẫu chuyển động' })).toBeHidden();
 });

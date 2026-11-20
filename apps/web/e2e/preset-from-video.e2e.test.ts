@@ -14,8 +14,8 @@ test("a template editor fills a preset's prompt from its saved clip, and the pro
   try {
     await page.goto('/create');
     await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
-    await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-    const grid = page.getByRole('list', { name: 'Danh sách mẫu' });
+    await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
+    const grid = page.getByRole('list', { name: 'Danh sách mẫu chuyển động' });
     await grid.getByRole('button', { name: 'Sửa mẫu Đi sang trái', exact: true }).click();
     const form = page.getByRole('dialog', { name: 'Sửa mẫu' });
     const prompt = form.getByLabel('Mô tả chuyển động (tiếng Anh)');
@@ -44,8 +44,8 @@ test('the button is off for a preset with no saved clip', async ({ page }) => {
   await signIn(page, 'tpled');
   await page.goto('/create');
   await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  await page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: 'Sửa mẫu Đi sang phải', exact: true }).click();
+  await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
+  await page.getByRole('list', { name: 'Danh sách mẫu chuyển động' }).getByRole('button', { name: 'Sửa mẫu Đi sang phải', exact: true }).click();
   const form = page.getByRole('dialog', { name: 'Sửa mẫu' });
   await expect(form.getByRole('button', { name: 'Gợi ý prompt từ video' })).toBeDisabled();
   await expect(form.getByText('Mẫu này chưa có video mẫu để gợi ý mô tả.')).toBeVisible();

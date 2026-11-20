@@ -13,14 +13,14 @@ test('Create: a preset replaces the typed words, so a card names it, says the wo
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false'); // the presets have loaded
   const words = page.getByLabel('Mô tả chuyển động');
-  const inUse = page.getByRole('group', { name: 'Mẫu đang dùng' });
+  const inUse = page.getByRole('group', { name: 'Mẫu chuyển động đang dùng' });
   await expect(inUse).toHaveCount(0);
 
   // With no words typed, the card only names the preset.
   await pickPreset(page, 'light-sweep');
   await expect(inUse).toContainText('Đang dùng: Lướt gần lấp lánh');
   await expect(inUse).not.toContainText('Mô tả bạn đã viết được giữ lại');
-  await expect(page.getByRole('radiogroup', { name: 'Nguồn mẫu' }).getByRole('radio', { name: 'Có sẵn' })).toBeChecked();
+  await expect(page.getByRole('radiogroup', { name: 'Nguồn mẫu chuyển động' }).getByRole('radio', { name: 'Có sẵn' })).toBeChecked();
   await expect(words).toBeDisabled();
   await inUse.getByRole('button', { name: 'Tự viết thay' }).click();
   await expect(inUse).toHaveCount(0);
@@ -30,8 +30,8 @@ test('Create: a preset replaces the typed words, so a card names it, says the wo
   await words.fill('Slow turn of the shirt.');
   await pickPreset(page, 'light-sweep');
   await expect(inUse).toContainText('Mô tả bạn đã viết được giữ lại nhưng không gửi khi dùng mẫu.');
-  await inUse.getByRole('button', { name: 'Đổi mẫu' }).click();
-  await expect(page.getByRole('dialog', { name: 'Bộ sưu tập mẫu' })).toBeVisible();
+  await inUse.getByRole('button', { name: 'Đổi mẫu chuyển động' }).click();
+  await expect(page.getByRole('dialog', { name: 'Bộ sưu tập mẫu chuyển động' })).toBeVisible();
   await page.keyboard.press('Escape');
   await inUse.getByRole('button', { name: 'Tự viết thay' }).click();
   await expect(inUse).toHaveCount(0);

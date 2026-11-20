@@ -8,7 +8,7 @@ const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướ
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 const runButton = (page: Page) => page.getByRole('button', { name: /^Tạo video/ });
 const reasonOf = (page: Page) => page.locator('.form-message').getByRole('status');
-const brief = (page: Page) => page.getByRole('textbox', { name: 'Mô tả', exact: true });
+const brief = (page: Page) => page.getByRole('textbox', { name: 'Diễn biến', exact: true });
 /** The file input of the reference slot; the slot group and its upload button carry the same name. */
 const refsInput = (page: Page) => page.getByRole('group', { name: 'Ảnh tham chiếu' }).getByLabel('Ảnh tham chiếu', { exact: true });
 const script = (page: Page) => page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' });
