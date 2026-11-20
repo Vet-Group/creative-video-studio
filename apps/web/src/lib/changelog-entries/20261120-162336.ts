@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-20T16:23:36+07:00', kind: 'improved', title: 'Marketing Studio: hook dùng mẫu có sẵn hoặc tự viết, rõ là một trong hai', details: ['Phần ① Hook có nút chuyển "Có sẵn / Tự viết". Khi chọn một hook có sẵn, ô tự viết gọn lại thành thẻ "Đang dùng: …" với nút Đổi hook và Tự viết thay. Chữ bạn đã viết vẫn được giữ và chỉ được gửi khi chọn Tự viết.', 'Thẻ định dạng ghi rõ mỗi kiểu video làm gì và cần ảnh nào; thẻ Khung prompt ghi luôn câu mở đầu và câu kết.', 'Chế độ "Làm từng bước" cho bấm quay lại bước đã qua. Chọn câu có sẵn thay cho chữ đang viết thì được hỏi trước.'], href: '/marketing-studio', prs: [586], audience: 'all' } satisfies ChangeEntry;
