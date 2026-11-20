@@ -308,7 +308,7 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 .sidebar nav { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; } /* pin the single column to the rail width so an oversized child (a guide pill) can never stretch the nav items */
 .nav-group { display: grid; gap: 2px; }
 .nav-group-label { margin: 0; padding: 0 0 2px 12px; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 500; }
-.sidebar nav a { display: flex; align-items: center; height: 37px; padding: 8px 12px; border-radius: 10px; color: var(--text-2); font-size: 14px; line-height: 21px; font-weight: 500; text-decoration: none; transition: background-color .15s; }
+.sidebar nav a, .sidebar nav .nav-search { display: flex; align-items: center; height: 37px; padding: 8px 12px; border-radius: 10px; color: var(--text-2); font-size: 14px; line-height: 21px; font-weight: 500; text-decoration: none; transition: background-color .15s; }
 .nav-icon { position: relative; display: grid; place-items: center; flex: none; width: 20px; margin-right: 12px; color: var(--text-subtle); }
 .nav-progress { position: fixed; top: 0; left: 0; z-index: 1000; width: 100%; height: 2px; background: var(--brand); transform-origin: left; transform: scaleX(0); opacity: 0; pointer-events: none; }
 .nav-progress[data-on='true'] { opacity: 1; transition: opacity 0s .15s; animation: nav-progress 8s linear .15s forwards; }
@@ -325,12 +325,16 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 .nav-sub { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .nav-sub[hidden] { display: none; }
 .sidebar nav .nav-sub a { height: 32px; padding: 4px 12px 4px 44px; font-size: 13px; line-height: 20px; }
+/* The quick search row (Shell.tsx), a button that opens the command palette, drawn as a nav link with its shortcut at the end. */
+.sidebar nav .nav-search { width: 100%; border: 0; background: transparent; text-align: left; }
+.nav-kbd { margin-left: auto; padding-left: 8px; color: var(--text-subtle); font-family: inherit; font-size: 12px; line-height: 16px; white-space: nowrap; }
 @media (pointer: coarse) {
   .nav-toggle { width: 44px; height: 44px; }
   .sidebar nav .nav-sub a { min-height: 44px; }
+  .nav-kbd { display: none; } /* no keyboard to press it on */
 }
 @media (prefers-reduced-motion: reduce) { .nav-toggle, .nav-toggle .icon { transition: none; } }
-.sidebar nav a:hover, .sidebar nav a[aria-current='page'] { background: var(--fill); }
+.sidebar nav a:hover, .sidebar nav .nav-search:hover, .sidebar nav a[aria-current='page'] { background: var(--fill); }
 .sidebar nav a[aria-current='page'] { color: var(--ink); }
 .sidebar nav a[aria-current='page'] .nav-icon { color: var(--ink); }
 .topbar { position: sticky; top: 0; z-index: 99; display: flex; align-items: center; gap: 12px; height: 57px; padding: 8px 0; background: var(--surface); border-bottom: 1px solid rgb(var(--tint) / .1); }
@@ -411,10 +415,10 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
   .app[data-collapsed='true'] .sidebar { width: 64px; padding: 16px 8px 32px; }
   .app[data-collapsed='true'] .content { margin-left: 64px; }
   .app[data-collapsed='true'] .brand { flex-direction: column; padding: 0; }
-  .app[data-collapsed='true'] .nav-badge { display: none; }
+  .app[data-collapsed='true'] :is(.nav-badge, .nav-kbd) { display: none; }
   .app[data-collapsed='true'] :is(.nav-toggle, .nav-sub) { display: none; } /* the rail has no room for a sub-list: expand it to see the apps */
   .app[data-collapsed='true'] :is(.brand strong, .nav-label, .nav-group-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .app[data-collapsed='true'] .sidebar nav a { justify-content: center; padding: 8px 0; }
+  .app[data-collapsed='true'] .sidebar nav :is(a, .nav-search) { justify-content: center; padding: 8px 0; }
   .app[data-collapsed='true'] .nav-icon { margin-right: 0; }
   .app[data-collapsed='true'] .sidebar nav { margin-right: -8px; padding-right: 8px; }
   .app[data-collapsed='true'] .nav-group + .nav-group { padding-top: 12px; border-top: 1px solid var(--divider); }
@@ -2676,6 +2680,31 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
   .app[data-collapsed='true'] .nav-guide { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .nav-hint, .nav-item:is(:hover, :has(a:focus-visible)) .nav-hint { transition: none; } }
+
+/* The command palette (CommandPalette.tsx): near the top, so the box stays put while the results below it change; on a phone a sheet across the top. */
+dialog.modal.palette { width: min(40rem, calc(100vw - 2rem)); max-height: min(34rem, calc(100dvh - 2rem)); margin: min(12vh, 96px) auto auto; overflow: hidden; }
+.palette .modal-body { display: flex; flex-direction: column; max-height: inherit; padding: 0; }
+.palette .modal-close { top: 14px; right: 12px; }
+.palette-field { display: flex; align-items: center; gap: 10px; padding: 0 48px 0 16px; border-bottom: 1px solid var(--divider); color: var(--text-subtle); }
+.palette-field input { flex: 1; min-width: 0; height: 56px; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 16px; }
+.palette-field input:focus-visible { outline: none; } /* the active option carries the ring: the box keeps the focus while the arrows move it */
+.palette-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 8px 8px; }
+.palette-group { margin: 12px 12px 4px; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 500; }
+.palette-list [role='option'] { display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 8px 12px; border-radius: 10px; color: var(--text-2); font-size: 14px; line-height: 20px; text-decoration: none; cursor: pointer; }
+.palette-list [role='option'] > .icon { color: var(--text-subtle); }
+.palette-list [aria-selected='true'] { background: var(--fill); color: var(--ink); outline: 2px solid var(--ink); outline-offset: -2px; }
+.palette-text { display: grid; min-width: 0; font-weight: 500; }
+.palette-desc { overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.palette-empty { margin: 0; padding: 16px 20px 20px; color: var(--text-muted); font-size: 14px; line-height: 20px; }
+.palette-keys { margin: 0; padding: 8px 16px; border-top: 1px solid var(--divider); color: var(--text-subtle); font-size: 12px; line-height: 16px; }
+.palette-keys kbd { font-family: inherit; color: var(--text-muted); }
+@media (pointer: coarse) {
+  .palette-list [role='option'] { min-height: 44px; }
+  .palette-keys { display: none; }
+}
+@media (max-width: 640px) {
+  dialog.modal.palette { width: 100%; max-width: none; max-height: calc(100dvh - 48px); margin: 0 0 auto; border-radius: 0 0 16px 16px; }
+}
 
 dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .tool-guide .modal-body { padding: 24px; }
