@@ -1133,6 +1133,14 @@ describe('Smart Remake', () => {
   });
 });
 
+describe('reference-video analysis', () => {
+  test('the reconcile pass fails an analysis a stopped worker left running, with REA_ANALYZE_ENABLED unset too', async () => {
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, started_at, workspace_id) values ('an-stale', 'u1', 'team-unassigned', 's', 'running', now() - interval '1 day', 'ws_vet')`);
+    await (await start(counting(300))).reconcile();
+    expect((await pool.query(`select status, error from analyses where id = 'an-stale'`)).rows[0]).toEqual({ status: 'failed', error: 'the worker stopped before the analysis finished' });
+  });
+});
+
 describe('the duration backfill', () => {
   test('a dry run writes nothing; --apply sets the length of a clip that has none; --apply-cost books a Motion Control clip that plays less than asked once, as a manual_adjustment', async () => {
     const file = join(mockDir, `${randomUUID()}-backfill.mp4`);
