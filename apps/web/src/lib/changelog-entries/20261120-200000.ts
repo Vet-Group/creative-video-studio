@@ -1,3 +1,0 @@
-import type { ChangeEntry } from '../changelog';
-
-export default { at: '2026-11-20T20:00:00+07:00', kind: 'new', title: 'Thành viên team bán hàng xem chi phí tháng của team so với phần miễn phí', details: ['Trong Cài đặt › Hạn mức, nếu bạn thuộc một team bán hàng, thẻ "Chi phí tháng này của team" cho biết tổng chi phí cả team từ đầu tháng so với phần miễn phí mỗi tháng, và phần vượt sẽ tính cho team.', 'Thanh chuyển màu cảnh báo khi team đã dùng 75% phần miễn phí; phần vượt hiện thành một đoạn riêng có ghi "Tính cho team". Bạn chỉ thấy số của team mình.', 'Phần miễn phí không chặn việc tạo: các hạn mức ngày và tháng của bạn vẫn như cũ.'], prs: [585], audience: 'all' } satisfies ChangeEntry;
