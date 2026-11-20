@@ -63,6 +63,9 @@ test("an image's detail opens the picture in the image tools (Xoá nền, Tăng 
   expect(tools({ ...own, feature: 'background_remover' })).toEqual(['Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
   expect(tools({ ...own, feature: 'image_upscale' })).toEqual(['Xoá nền', 'Đổi nền', 'Đổi khung hình']);
   expect(tools({ ...own, feature: 'reframe' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền']);
+  // The pose generator only on a person's result: an AI model's or a Try On's, not its own or any other.
+  for (const feature of ['fashion_model', 'try_on']) expect(tools({ ...own, feature })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình', 'Đổi tư thế']);
+  expect(tools({ ...own, feature: 'pose_generator' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
   expect(tools({ ...clip('video'), mine: true })).toEqual([]);
 });
 
