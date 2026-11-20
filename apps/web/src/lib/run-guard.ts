@@ -8,7 +8,7 @@ export const RUN_CONFIRM_USD = 1;
 
 /**
  * A price as the forms show it: dollars and cents with thousands separators ($0.70, $99,841.81) and, under a dollar, up to 4 decimals with no trailing zeros
- * ($0.035, $0.0035), so a small price is never shown as free and "3 ảnh × $0.035 = $0.105" adds up.
+ * ($0.035, $0.0035), so a small price is never shown as free and a per-item line ("3 × $0.035 = $0.105") adds up.
  */
 export function usd(value: string | number): string {
   const n = Number(value);
