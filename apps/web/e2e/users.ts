@@ -214,6 +214,8 @@ export const USERS = {
   pbarf: { email: 'pbarf@e2e.test', name: 'E2E Prompt Bar F', role: 'member' },
   pbarg: { email: 'pbarg@e2e.test', name: 'E2E Prompt Bar G', role: 'member' },
   pbarh: { email: 'pbarh@e2e.test', name: 'E2E Prompt Bar H', role: 'member' },
+  pbari: { email: 'pbari@e2e.test', name: 'E2E Prompt Bar I', role: 'member' },
+  pbarj: { email: 'pbarj@e2e.test', name: 'E2E Prompt Bar J', role: 'member' },
   // A template editor (e2e/serve.ts sets it), whose bar opens the brand kit and style editors.
   pbared: { email: 'pbared@e2e.test', name: 'E2E Prompt Bar Editor', role: 'member' },
 } as const;

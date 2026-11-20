@@ -3072,7 +3072,7 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 .imagebar :is(.select-pop, .store-pop):not(dialog *) { right: auto; min-width: 12rem; }
 .imagebar .store-pop:not(dialog *) { min-width: 16rem; }
 .imagebar .locked-fields:not(dialog *) { display: contents; }
-.imagebar-more-on { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--ink); color: var(--surface); font-size: 12px; line-height: 18px; text-align: center; }
+.imagebar-more-on { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--ink); color: var(--on-ink); font-size: 12px; line-height: 18px; text-align: center; }
 .imagebar-chips > .run { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; margin: 0 0 0 auto; padding: 0 20px; border: 0; border-radius: 999px; font-size: 14px; line-height: 21px; font-weight: 500; white-space: nowrap; transition: background-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), scale var(--dur-fast) var(--ease-out); }
 /* Not ready: the neutral grey of the other tools' Run (.runbar), not the brand red at half strength. */
 .imagebar-chips > .run:disabled { background: var(--fill); color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--border-strong); opacity: 1; }
@@ -3085,6 +3085,8 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 .imagebar .prompt-final:not(dialog *) { max-height: 160px; overflow-y: auto; }
 .imagebar .templates:not(dialog *) { margin: 0 0 0 auto; gap: 12px; }
 .imagebar .templates:not(dialog *) > :not(dialog) { font-size: 13px; }
+/* Below 1024 px Run is the bar's last row, the other tools' Run bar, held at the foot of the screen while the bar is in sight. */
+.imagebar > .runbar { position: sticky; bottom: 0; z-index: 1; margin: 12px -16px -16px; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); border-radius: 0 0 24px 24px; background: var(--surface); }
 /* Touch: every control of the bar takes a 44 px tap; a thumbnail's remove button moves inside its corner, the gaps holding its hit area. */
 @media (pointer: coarse) {
   .imagebar :is(.select-trigger, .enhance):not(dialog *), .imagebar-chips > .run { height: 44px; }
@@ -3098,7 +3100,6 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
   .imagebar-count { line-height: 44px; }
   .imagebar-foot { row-gap: 12px; } /* a wrapped link's hit area ends where the row above begins */
 }
-@media (max-width: 480px) { .imagebar-chips > .run { width: 100%; margin-left: 0; } }
 @media (min-width: 1024px) {
   /* The page fills the screen, so the bar sits at its foot even over a short pane. The bar comes first in the page (the keyboard reaches the prompt
      before the pane), and order shows it under the pane, where sticky keeps it at the foot of the screen. */
@@ -3118,10 +3119,10 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
   .imagebar .slot:not(dialog *) { max-width: 162px; }
   .imagebar .field-head:not(dialog *) { min-height: 18px; }
   .imagebar-count { line-height: 18px; }
-  /* One row, Run at its end: on a narrow column the model's name gives way first, cut with an ellipsis. */
+  /* One row, Run at its end: on a narrow column the model's and the style's names give way, cut with an ellipsis. */
   .imagebar-chips { flex-wrap: nowrap; }
   .imagebar-chips > * { flex-shrink: 0; }
-  .imagebar-chips > .field:has([aria-haspopup='dialog']) { flex-shrink: 1; min-width: 0; }
+  .imagebar-chips > :is(.field:has([aria-haspopup='dialog']), .style-pill) { flex-shrink: 1; min-width: 0; }
   .imagebar-chips > .field:has([aria-haspopup='dialog']) :is(.select, .select-trigger) { min-width: 0; max-width: 100%; }
   /* Toasts at the top of the screen, clear of Run at the foot. */
   body:has(.imagebar) .toasts { top: 1rem; bottom: auto; }

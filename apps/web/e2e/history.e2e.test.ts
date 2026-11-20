@@ -273,7 +273,7 @@ test('a failed read of the job list says so with Thử lại instead of a blank 
 
   // The empty History points to the form, Image Generation's prompt bar under it.
   await history.getByRole('button', { name: 'Bắt đầu ngay' }).click();
-  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('.imagebar') !== null)).toBe(true);
+  await expect(page.getByRole('region', { name: 'Thanh tạo ảnh' }).getByRole('textbox', { name: 'Mô tả', exact: true })).toBeFocused();
 
   // The next poll fails: what was read stays, with a short notice.
   fail = true;

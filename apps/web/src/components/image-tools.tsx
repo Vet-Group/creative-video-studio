@@ -417,11 +417,15 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
     if (isPhotoDrag(e)) return photoRole && dropPhoto(photoRole);
     if (hydrated && !full && !busy) add([...e.dataTransfer.files]);
   }
+  // The zone: a drop inside a dialog opened from it (Modal has no portal) is that dialog's; a full or busy strip shows no outline, still keeps the
+  // browser from opening a dropped file, and hands the files to the page, whose upload says the strip is full.
   useEffect(() => {
     const el = zone?.current;
     if (!el) return;
-    const on = (f: (e: Drag) => void) => (e: globalThis.DragEvent) => void (e.dataTransfer && f(e as Drag));
-    const [over, leave, drop] = [on(onDragOver), () => setOver(false), on(onDrop)];
+    const on = (f: (e: Drag) => void) => (e: globalThis.DragEvent) => void (e.dataTransfer && !(e.target as Element).closest('dialog') && f(e as Drag));
+    const over = on((e) => (room || isPhotoDrag(e) ? onDragOver(e) : carries(e) && e.preventDefault()));
+    const leave = (e: globalThis.DragEvent) => !el.contains(e.relatedTarget as Node | null) && setOver(false);
+    const drop = on((e) => (room || isPhotoDrag(e) || !carries(e) ? onDrop(e) : (e.preventDefault(), hydrated && !busy && onAdd([...e.dataTransfer.files]))));
     el.addEventListener('dragover', over);
     el.addEventListener('dragleave', leave);
     el.addEventListener('drop', drop);

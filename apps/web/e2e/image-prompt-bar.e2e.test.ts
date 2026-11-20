@@ -70,7 +70,7 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
     bar.getByRole('button', { name: 'Gợi ý AI' }),
     bar.getByRole('button', { name: 'Mở rộng' }),
     bar.getByRole('button', { name: 'Phong cách', exact: true }),
-    modelButton(page),
+    bar.getByRole('button', { name: /^Mô hình / }),
     bar.getByRole('combobox', { name: 'Tỉ lệ', exact: true }),
     bar.getByRole('combobox', { name: 'Độ phân giải', exact: true }),
     more,
@@ -158,20 +158,31 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
   expect((await toast.boundingBox())!.y).toBeLessThan(100);
 });
 
-test('the bar comes first for the keyboard: a few Tabs from the page tabs reach the prompt, not the whole gallery, and Run says the page is loading', async ({ page }) => {
+test('the bar comes first for the keyboard: a few Tabs from the page tabs reach the prompt, not the whole gallery; Run says the page is loading, and Tabbing in meanwhile keeps the remembered settings', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'pbare');
-  // Run says the page is still loading while the model list is on its way.
-  let release!: () => void;
-  const held = new Promise<void>((r) => (release = r));
-  await page.route(/\/api\/image-models/, async (route) => (await held, route.continue()));
+  // Run says the page is still loading while the model list, then the memory, are on their way.
+  let models!: () => void, memory!: () => void;
+  const [modelsHeld, memoryHeld] = [new Promise<void>((r) => (models = r)), new Promise<void>((r) => (memory = r))];
+  await page.route(/\/api\/image-models/, async (route) => (await modelsHeld, route.continue()));
+  await page.route(/\/api\/recall\?feature=image/, async (route) => (await memoryHeld, route.fulfill({ json: { settings: { modelId: 'mock-image-e2e', ratio: '3:4', durationSec: null, resolution: null, audio: null, enhance: null, storeId: null, brand: null } } })));
   await page.goto('/image-generation');
   const bar = barOf(page);
-  await expect(bar.getByRole('button', { name: /^Tạo ảnh/ })).toContainText('Đang tải…');
-  release();
+  const run = bar.getByRole('button', { name: /^Tạo ảnh/ });
+  const prompt = bar.getByRole('textbox', { name: 'Mô tả', exact: true });
+  await expect(run).toContainText('Đang tải…');
+  models();
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  await expect(bar.getByRole('button', { name: /^Tạo ảnh/ })).not.toContainText('Đang tải…');
+  await expect(run).toContainText('Đang tải…');
+  // Moving through the bar is not a change: the memory, answering after it, still sets the ratio.
+  await page.getByRole('tab', { name: 'Ví dụ' }).focus();
+  for (let i = 0; i < 6 && !(await prompt.evaluate((e) => e === document.activeElement)); i++) await page.keyboard.press('Tab');
+  await expect(prompt).toBeFocused();
+  memory();
+  await expect(run).not.toContainText('Đang tải…');
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
   await page.unroute(/\/api\/image-models/);
+  await page.unroute(/\/api\/recall\?feature=image/);
 
   await openTab(page, 'Ví dụ');
   await expect(page.getByRole('group', { name: 'Ảnh của công ty' }).or(page.getByText('Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên.'))).toBeVisible();
@@ -244,6 +255,7 @@ test('the bar stays compact with a long prompt and 3 photos: Run on the chip row
     const run = (await bar.getByRole('button', { name: /^Tạo ảnh/ }).boundingBox())!;
     const style = (await bar.getByRole('button', { name: 'Phong cách', exact: true }).boundingBox())!;
     near(run.y + run.height / 2, style.y + style.height / 2, `Run on the chip row at ${width}`);
+    expect(run.x + run.width, `Run inside the bar at ${width}`).toBeLessThanOrEqual(b.x + b.width - 16);
     // The model's name may be cut, never hidden.
     expect((await modelButton(page).locator('.select-value-text').boundingBox())!.width, `model name at ${width}`).toBeGreaterThan(40);
   }
@@ -279,6 +291,105 @@ test('a photo file dropped anywhere on the bar goes into the strip, and the page
   await expect(bar.locator('.slot')).toHaveAttribute('data-over', 'false');
   await expect(page).toHaveURL(/\/image-generation$/);
   await expect(box).toHaveValue(''); // the file went to the strip, not into the words
+
+  // Moving from the box onto another part of the bar keeps the outline.
+  await box.dispatchEvent('dragover', { dataTransfer: data });
+  await box.dispatchEvent('dragleave', { dataTransfer: data, relatedTarget: await bar.getByRole('button', { name: 'Phong cách', exact: true }).elementHandle() });
+  await expect(bar.locator('.slot')).toHaveAttribute('data-over', 'true');
+  await box.dispatchEvent('dragleave', { dataTransfer: data });
+  await expect(bar.locator('.slot')).toHaveAttribute('data-over', 'false');
+
+  // A dialog opened from the bar sits inside it: a file dropped there does not land in the strip behind it.
+  const count = bar.locator('.imagebar-count');
+  await expect(count).toHaveText('1/4 ảnh tham chiếu');
+  await bar.getByRole('button', { name: 'Ảnh đã tải cho Ảnh tham chiếu' }).click();
+  const photos = page.getByRole('dialog', { name: 'Ảnh đã tải' });
+  await expect(photos).toBeVisible();
+  await photos.dispatchEvent('dragover', { dataTransfer: data });
+  await expect(bar.locator('.slot')).toHaveAttribute('data-over', 'false');
+  await photos.dispatchEvent('drop', { dataTransfer: data });
+  await page.keyboard.press('Escape');
+  await expect(photos).toBeHidden();
+  await expect(count).toHaveText('1/4 ảnh tham chiếu');
+
+  // A full strip shows no drop outline, and a drop on it says why nothing was added.
+  await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles([2, 3, 4].map((n) => file(`full-${n}.png`)));
+  await expect(count).toHaveText('4/4 ảnh tham chiếu');
+  await box.dispatchEvent('dragover', { dataTransfer: data });
+  await expect(bar.locator('.slot')).toHaveAttribute('data-over', 'false');
+  expect(await bar.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none');
+  await box.dispatchEvent('drop', { dataTransfer: data });
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Tối đa 4 ảnh')).toBeVisible();
+  await expect(count).toHaveText('4/4 ảnh tham chiếu');
+  await expect(page).toHaveURL(/\/image-generation$/);
+});
+
+test('a bar that grows past the screen leaves the foot and keeps the control in use in sight', async ({ page }) => {
+  await signIn(page, 'pbari');
+  for (const prompt of ['first picture for a long History', 'second picture for a long History']) {
+    const made = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '3:4', prompt, enhance: false, params: { resolution: '1K' } } });
+    expect(made.status()).toBe(201);
+  }
+  await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.map((j) => j.status).join(), { timeout: 60_000 }).toBe('succeeded,succeeded');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/image-generation');
+  await openTab(page, 'Lịch sử');
+  const bar = barOf(page);
+  await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem')).toHaveCount(2);
+  await bar.getByRole('textbox', { name: 'Mô tả', exact: true }).fill(LONG);
+  await openMore(page);
+  // A screen just taller than the bar with its options open: opening the sent prompt makes the bar taller than the screen.
+  const h = (await bar.boundingBox())!.height;
+  await page.setViewportSize({ width: 1280, height: Math.round(h + 48 + 40) });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(bar).not.toHaveAttribute('data-tall');
+  const summary = bar.locator('.prompt-preview summary');
+  await summary.focus();
+  await page.keyboard.press('Enter');
+  await expect(bar).toHaveAttribute('data-tall');
+  expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe('static');
+  await expect(summary).toBeFocused();
+  await expect(summary).toBeInViewport();
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0); // the bar moved to the end of the page, and the page followed it
+});
+
+test('the more-options pill says what it holds: its count names the store and brand kit, the brand kit pushing the prompt over the limit is named, and a store list that fails opens it', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'pbarj');
+  // The seeded store with a brand kit, so this spec does not depend on store-brand.e2e filling it.
+  await page.route(/\/api\/stores$/, async (route) => {
+    const res = await route.fetch();
+    const json = (await res.json()) as { stores: { id: string }[] };
+    for (const s of json.stores) if (s.id === 'store-brand') Object.assign(s, { brandVoice: 'Warm, plain words about cotton and linen.', brandTagline: 'Made by hand', brandColors: ['#112233'] });
+    await route.fulfill({ response: res, json });
+  });
+  await page.goto('/image-generation');
+  const bar = barOf(page);
+  await expect(modelButton(page)).toContainText('Mock image E2E');
+  const more = bar.getByRole('button', { name: /^Tuỳ chọn khác/ });
+  await openMore(page);
+  await selectText(page, 'Cửa hàng/Thương hiệu', 'E2E Brand Shop');
+  await expect(more).toHaveAccessibleName('Tuỳ chọn khác 1 tuỳ chọn đang bật');
+  await bar.getByRole('button', { name: 'Dùng bộ nhận diện', exact: true }).click();
+  await expect(more).toHaveAccessibleName('Tuỳ chọn khác 2 tuỳ chọn đang bật');
+  await expect(bar.locator('.imagebar-more-on')).toHaveAttribute('title', '2 tuỳ chọn đang bật: cửa hàng, bộ nhận diện');
+  await more.click();
+  await expect(more).toHaveAttribute('aria-expanded', 'false');
+
+  // Words that fit, which the folded brand kit pushes over the model's limit: Run's reason says the kit counts.
+  const prompt = bar.getByRole('textbox', { name: 'Mô tả', exact: true });
+  const limit = Number(await prompt.getAttribute('maxlength'));
+  await prompt.fill('a'.repeat(limit - 5));
+  await expect(bar.getByRole('button', { name: /^Tạo ảnh/ })).toBeDisabled();
+  await expect(bar.locator('#imagegen-reason')).toHaveText(`Mô hình Mock image E2E nhận tối đa ${limit} ký tự (gồm bộ nhận diện), hãy rút gọn hoặc chọn mô hình khác.`);
+  await page.unroute(/\/api\/stores$/);
+
+  // A store list that does not load opens the options, so its error is seen.
+  await page.route(/\/api\/stores$/, (route) => route.fulfill({ status: 500, json: { error: 'down' } }));
+  await page.reload();
+  await expect(bar.getByText('Không tải được danh sách cửa hàng.')).toBeVisible();
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
+  await page.unroute(/\/api\/stores$/);
 });
 
 test('a card the keyboard reaches under the bar scrolls up into sight, a mouse click does not scroll, and at 1280x720 the first card keeps its actions reachable', async ({ page }) => {
@@ -351,12 +462,17 @@ test('at 390 the prompt bar is the Tạo tab, in the page flow with its names an
 
   const prompt = bar.getByRole('textbox', { name: 'Mô tả', exact: true });
   const run = bar.getByRole('button', { name: /^Tạo ảnh/ });
-  await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('phone-ref.png'));
-  await expect(bar.getByRole('img', { name: 'phone-ref.png' })).toBeVisible();
-  await prompt.fill('a linen shirt on a wooden chair');
+  await fill(bar);
   await expect(run).toBeEnabled();
-  await run.scrollIntoViewIfNeeded();
-  await expect(run).toBeInViewport();
+  // Run stays at the foot of the screen, as on the other tools: at the top of the page, with the bar running past the screen, and at its end.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const b = (await bar.boundingBox())!;
+  expect(b.y + b.height).toBeGreaterThan(844); // the bar runs past the foot of the screen
+  await expect(run).toBeInViewport({ ratio: 1 });
+  expect(await uncovered(run)).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(run).toBeInViewport({ ratio: 1 });
+  expect(await uncovered(run)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect.soft(await blocking(page), 'the bar at 390').toEqual([]);
 
@@ -366,8 +482,8 @@ test('at 390 the prompt bar is the Tạo tab, in the page flow with its names an
   await expect(page.getByRole('complementary', { name: 'Khi nào dùng Tạo ảnh' })).toHaveCount(0);
   await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' })).toBeVisible();
   await openTab(page, 'Tạo');
-  await expect(prompt).toHaveValue('a linen shirt on a wooden chair'); // the bar keeps its words across the tabs
-  await expect(bar.getByRole('img', { name: 'phone-ref.png' })).toBeVisible();
+  await expect(prompt).toHaveValue(LONG); // the bar keeps its words across the tabs
+  await expect(bar.getByRole('img', { name: 'ref-3.png' })).toBeVisible();
 });
 
 for (const scheme of ['light', 'dark'] as const) {

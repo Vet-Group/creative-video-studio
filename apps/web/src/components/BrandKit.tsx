@@ -82,7 +82,7 @@ export function BrandKitForm({ store, onClose, onSaved }: { store: BrandStore | 
  * template editor a "Bộ nhận diện" button that edits the chosen store's kit.
  */
 /** `onKit` hears the kit Run adds (null when none), for the page's prompt preview (PromptPreview). */
-export function BrandPicker({ storeId, onStore, on, onToggle, onKit }: { storeId: string; onStore: (id: string) => void; on: boolean; onToggle: (on: boolean) => void; onKit?: (kit: BrandKit | null) => void }) {
+export function BrandPicker({ storeId, onStore, on, onToggle, onKit, onFailed }: { storeId: string; onStore: (id: string) => void; on: boolean; onToggle: (on: boolean) => void; onKit?: (kit: BrandKit | null) => void; onFailed?: () => void }) {
   const [stores, setStores] = useState<BrandStore[]>([]);
   const [canEdit, setCanEdit] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -90,7 +90,7 @@ export function BrandPicker({ storeId, onStore, on, onToggle, onKit }: { storeId
   useEffect(() => {
     api<{ stores: BrandStore[]; canEdit: boolean }>('/api/stores').then(
       (r) => (setStores(r.stores), setCanEdit(r.canEdit)),
-      () => setFailed(true),
+      () => (setFailed(true), onFailed?.()), // a page that folds the picker away opens it, so the error shows
     );
   }, []);
   const store = stores.find((s) => s.id === storeId);
