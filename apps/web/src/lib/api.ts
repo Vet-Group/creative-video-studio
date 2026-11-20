@@ -129,6 +129,9 @@ export interface TrayJob {
   style: string | null;
   product: string | null;
   name: string | null;
+  /** A pose generator job's pose (a value of POSES) or the member's own words for it; null for any other job. */
+  pose: string | null;
+  poseText: string | null;
   /** The id every job of one Run of a batch app shares (BATCH_FEATURES); null for any other job. */
   batch: string | null;
   favorite: boolean;

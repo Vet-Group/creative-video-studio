@@ -1,0 +1,8 @@
+ALTER TABLE "jobs" DROP CONSTRAINT "jobs_feature_check";--> statement-breakpoint
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_feature_check" CHECK ("jobs"."feature" in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on', 'fashion_model', 'multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator'));--> statement-breakpoint
+-- The pose generator (owner-approved 2026-11-20, feature `pose_generator`): one model photo in, the same person in up to 4 poses out, one job per pose
+-- (a pose of the Try On list or the member's own words). Each job carries the prompt its pose makes (apps/web/src/lib/apps.ts posePrompt), as the pet apps do (0109).
+-- It runs on the Nano Banana edit rows already here, which keep a person's face and outfit when they change one thing: Nano Banana 2.1 and Nano Banana Pro,
+-- each with its Vertex twin (0075). No row is enabled or repriced here. It gets a soft cap of 50 USD a month, as the pet apps did.
+INSERT INTO "feature_caps" ("feature", "monthly_usd") VALUES ('pose_generator', 50) ON CONFLICT DO NOTHING;--> statement-breakpoint
+UPDATE "model_configs" SET "features" = array_append("features", 'pose_generator') WHERE "id" IN ('nano-banana-2.1', 'nano-banana-2.1-vertex', 'nano-banana-pro', 'nano-banana-pro-vertex') AND NOT ('pose_generator' = ANY("features"));

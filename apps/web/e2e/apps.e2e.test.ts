@@ -30,14 +30,14 @@ async function libraryApps(page: Page): Promise<void> {
   await expect(chip).toHaveAttribute('aria-pressed', 'true');
 }
 
-test('the index lists seventeen apps, and the search box and the chips filter the cards', async ({ page }) => {
+test('the index lists eighteen apps, and the search box and the chips filter the cards', async ({ page }) => {
   await signIn(page, 'appsa');
   await nav(page).getByRole('link', { name: 'Ứng dụng' }).click();
   await expect(page).toHaveURL(/\/apps$/);
   await expect(page.getByRole('heading', { name: 'Ứng dụng', level: 1 })).toBeVisible();
   await expect(nav(page).getByRole('link', { name: 'Ứng dụng' })).toHaveAttribute('aria-current', 'page');
   await expect(cards(page).locator('strong')).toHaveText([
-    'Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media', 'Thử trang sức', 'Thử đồ lót', 'Tạo người mẫu AI', 'Ảnh nhiều góc', 'Đổi giống chó hàng loạt', 'Chân dung thú cưng', 'Mockup hàng loạt', 'Đổi tên hàng loạt',
+    'Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media', 'Thử trang sức', 'Thử đồ lót', 'Tạo người mẫu AI', 'Ảnh nhiều góc', 'Đổi giống chó hàng loạt', 'Chân dung thú cưng', 'Mockup hàng loạt', 'Đổi tên hàng loạt', 'Tạo tư thế người mẫu',
   ]);
   await expect(cards(page).filter({ hasText: 'Sắp có' })).toHaveCount(0);
 
@@ -48,11 +48,11 @@ test('the index lists seventeen apps, and the search box and the chips filter th
     await expect(chips.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(cards(page).locator('strong')).toHaveText(expected);
   };
-  await filter('Thời trang', ['Đổi nhân vật', 'Đổi người mẫu', 'Đổi khuôn mặt', 'Thử trang sức', 'Thử đồ lót', 'Tạo người mẫu AI']);
+  await filter('Thời trang', ['Đổi nhân vật', 'Đổi người mẫu', 'Đổi khuôn mặt', 'Thử trang sức', 'Thử đồ lót', 'Tạo người mẫu AI', 'Tạo tư thế người mẫu']);
   await filter('Chỉnh ảnh', ['Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Xoá nền', 'Ảnh nhiều góc', 'Đổi giống chó hàng loạt', 'Chân dung thú cưng', 'Mockup hàng loạt', 'Đổi tên hàng loạt']);
   await filter('Video', ['Điều khiển chuyển động']);
   await filter('Tiện ích', ['Tối ưu media']);
-  await filter('Tất cả', ['Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media', 'Thử trang sức', 'Thử đồ lót', 'Tạo người mẫu AI', 'Ảnh nhiều góc', 'Đổi giống chó hàng loạt', 'Chân dung thú cưng', 'Mockup hàng loạt', 'Đổi tên hàng loạt']);
+  await filter('Tất cả', ['Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media', 'Thử trang sức', 'Thử đồ lót', 'Tạo người mẫu AI', 'Ảnh nhiều góc', 'Đổi giống chó hàng loạt', 'Chân dung thú cưng', 'Mockup hàng loạt', 'Đổi tên hàng loạt', 'Tạo tư thế người mẫu']);
 
   // The search matches the name and the description, with or without accents, and combines with a chip.
   const search = page.getByRole('searchbox', { name: 'Tìm ứng dụng' });
@@ -65,7 +65,7 @@ test('the index lists seventeen apps, and the search box and the chips filter th
   await filter('Video', []);
   await expect(page.getByText('Không có ứng dụng nào khớp.')).toBeVisible();
   await search.fill('');
-  await filter('Tất cả', ['Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media', 'Thử trang sức', 'Thử đồ lót', 'Tạo người mẫu AI', 'Ảnh nhiều góc', 'Đổi giống chó hàng loạt', 'Chân dung thú cưng', 'Mockup hàng loạt', 'Đổi tên hàng loạt']);
+  await filter('Tất cả', ['Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media', 'Thử trang sức', 'Thử đồ lót', 'Tạo người mẫu AI', 'Ảnh nhiều góc', 'Đổi giống chó hàng loạt', 'Chân dung thú cưng', 'Mockup hàng loạt', 'Đổi tên hàng loạt', 'Tạo tư thế người mẫu']);
 });
 
 test('an unknown app is a 404, and Media Optimizer opens its image tool', async ({ page }) => {
