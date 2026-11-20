@@ -5,7 +5,7 @@
 import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import type { AppConfig } from '@/lib/apps';
-import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, type FashionTraits, fashionModelName, fashionModelPrompt, freeName, MAX_EXTRA, mentionsMinor, MINOR_REASON, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, withNiche } from '@/lib/fashion-model';
+import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, type FashionTraits, fashionModelName, fashionModelPrompt, freeName, MAX_EXTRA, mentionsMinor, MINOR_REASON, nicheSetBy, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, withNiche } from '@/lib/fashion-model';
 import { MAX_NAME } from '@/lib/fashion-models';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { waitLabel } from '@/lib/explore';
@@ -38,6 +38,9 @@ const FIELDS: { key: Key; label: string }[] = [
   { key: 'background', label: 'Màu nền' },
   { key: 'expression', label: 'Biểu cảm' },
 ];
+
+/** The names of the traits a niche can set, in its note: the chips' labels, and the origin select's. */
+const FIELD_LABEL: Record<string, string> = { ...Object.fromEntries(FIELDS.map((f) => [f.key, f.label])), ethnicity: 'Nguồn gốc' };
 
 /** One trait as a row of radio chips. */
 function Choice({ label, options, value, onChange }: { label: string; options: { id: string; label: string }[]; value: string; onChange: (id: string) => void }) {
@@ -120,6 +123,7 @@ export function FashionModelApp({ app, isAdmin, reuse }: { app: AppConfig; isAdm
   const reason = offered === null ? 'Đang tải danh sách mô hình...' : failed ? 'Không tải được danh sách mô hình.' : !chosen ? 'Ứng dụng này chưa được Admin bật' : promptTooLong(chosen, prompt.length);
   const minor = mentionsMinor(traits.extra);
   const canRun = reason === null && !minor && !running;
+  const nicheSet = nicheSetBy(traits);
   const set = (key: Key) => (id: string) => setTraits((t) => ({ ...t, [key]: id }));
 
   async function run() {
@@ -184,6 +188,11 @@ export function FashionModelApp({ app, isAdmin, reuse }: { app: AppConfig; isAdm
               options={FASHION_OPTIONS.niche.map((n) => ({ value: n.id, label: n.label }))}
               onChange={(id) => setTraits((t) => withNiche(t, id))}
             />
+            {nicheSet.length > 0 && (
+              <p className="help" role="status">
+                Phong cách đã đặt: {nicheSet.map((n) => `${FIELD_LABEL[n.key]} = ${n.label}`).join(', ')}.
+              </p>
+            )}
             {FIELDS.slice(0, 2).map((f) => (
               <Choice key={f.key} label={f.label} options={FASHION_OPTIONS[f.key]} value={traits[f.key]} onChange={set(f.key)} />
             ))}

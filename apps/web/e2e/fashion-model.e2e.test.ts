@@ -9,10 +9,18 @@ test('picks traits and two images, runs, saves a result as a model and finds it 
   await expect(run).toBeEnabled();
 
   // A niche pre-selects its traits, which stay editable; one image by default, and the cost line follows the number of images.
+  const note = page.getByRole('status').filter({ hasText: 'Phong cách đã đặt:' });
+  await expect(note).toHaveCount(0);
   await selectValue(page, 'Phong cách (tuỳ chọn)', 'faith');
   await expect(select(page, 'Nguồn gốc')).toContainText('Đa dạng');
+  await expect(note).toHaveText('Phong cách đã đặt: Nguồn gốc = Đa dạng.');
   await selectValue(page, 'Phong cách (tuỳ chọn)', 'melanin');
   await expect(select(page, 'Nguồn gốc')).toContainText('Da đen / gốc Phi');
+  await expect(note).toHaveText('Phong cách đã đặt: Nguồn gốc = Da đen / gốc Phi, Màu da = Sâu.');
+  // A trait the member changes after the niche is no longer the niche's, so the note drops it.
+  await selectValue(page, 'Nguồn gốc', 'white');
+  await expect(note).toHaveText('Phong cách đã đặt: Màu da = Sâu.');
+  await selectValue(page, 'Nguồn gốc', 'black');
   await page.getByRole('radio', { name: 'Nam', exact: true }).check();
   await expect(page.getByRole('radio', { name: 'Nam', exact: true })).toBeChecked();
   await expect(page.getByRole('status').filter({ hasText: '1 ảnh ×' })).toBeVisible();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FASHION_TRAITS, FASHION_AVOID, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, freeName, MAX_EXTRA, mentionsMinor, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, VARIED_POOL, withNiche } from './fashion-model';
+import { DEFAULT_FASHION_TRAITS, FASHION_AVOID, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, freeName, MAX_EXTRA, mentionsMinor, nicheSetBy, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, VARIED_POOL, withNiche } from './fashion-model';
 
 describe('fashionModelPrompt', () => {
   it('puts the fragment of every option into the prompt', () => {
@@ -50,6 +50,14 @@ describe('defaults and niches', () => {
     for (const id of ['faith', 'americana', 'veteran', 'game_day', 'southern', 'family_milestone']) expect(withNiche(DEFAULT_FASHION_TRAITS, id).ethnicity, id).toBe(VARIED_ETHNICITY);
     expect(withNiche(DEFAULT_FASHION_TRAITS, 'veteran')).toMatchObject({ gender: 'male', age: 'mature' });
     expect(withNiche({ ...DEFAULT_FASHION_TRAITS, gender: 'male' }, 'family_milestone')).toMatchObject({ gender: 'female', age: 'adult' });
+  });
+
+  it('names what a niche set, and drops a trait the member changed since', () => {
+    expect(nicheSetBy(DEFAULT_FASHION_TRAITS)).toEqual([]);
+    const melanin = withNiche(DEFAULT_FASHION_TRAITS, 'melanin');
+    expect(nicheSetBy(melanin)).toEqual([{ key: 'ethnicity', label: 'Da đen / gốc Phi' }, { key: 'skinTone', label: 'Sâu' }]);
+    expect(nicheSetBy({ ...melanin, ethnicity: 'white' })).toEqual([{ key: 'skinTone', label: 'Sâu' }]);
+    expect(nicheSetBy(withNiche(DEFAULT_FASHION_TRAITS, 'faith'))).toEqual([{ key: 'ethnicity', label: 'Đa dạng' }]);
   });
 
   it('only names valid option ids as niche defaults, apart from the varied ethnicity', () => {
