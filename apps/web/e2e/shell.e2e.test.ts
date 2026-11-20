@@ -141,16 +141,16 @@ test('the sidebar collapses to a 64 px icon rail that keeps its labels for scree
   await expect.poll(async () => (await sidebar(page).boundingBox())!.width).toBe(240);
 });
 
-test('the Apps pages widen the sidebar to 280 px as Fash does, and the icon rail still wins there', async ({ page }) => {
+test('the Apps pages keep the 240 px sidebar of every other page, so the nav does not shift, and the icon rail still wins there', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member1');
   for (const path of ['/apps', '/apps/character-swap']) {
     await page.goto(path);
     const section = page.locator('section:is(.apps, .app-page)');
-    await expect(section).toBeVisible(); // the rule keys on the page section, which follows the loading state
-    await expect.poll(async () => (await sidebar(page).boundingBox())!.width).toBe(280);
-    expect((await page.locator('.content').boundingBox())!.x).toBe(280);
-    expect((await section.boundingBox())!.x).toBe(328);
+    await expect(section).toBeVisible();
+    await expect.poll(async () => (await sidebar(page).boundingBox())!.width).toBe(240);
+    expect((await page.locator('.content').boundingBox())!.x).toBe(240);
+    expect((await section.boundingBox())!.x).toBe(288);
   }
   await page.getByRole('button', { name: 'Thu gọn thanh bên' }).click();
   await expect.poll(async () => (await sidebar(page).boundingBox())!.width).toBe(64);

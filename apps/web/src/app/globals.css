@@ -403,9 +403,6 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
   .nav-label { white-space: nowrap; } /* "Marketing Studio" and its pill stay on one line, as on the live sidebar */
   .topbar, .scrim, .drawer-close { display: none; }
   .content { margin-left: 240px; }
-  /* Fash widens the sidebar to 280 px on the Apps pages only. */
-  .app:not([data-collapsed='true']):has(.apps, .app-page) .sidebar { width: 280px; }
-  .app:not([data-collapsed='true']):has(.apps, .app-page) .content { margin-left: 280px; }
   .frame { padding: 16px 48px 32px; }
   /* Explore rows run to the window edge, as on the live page, and still scroll back to the gutter. */
   .explore .explore-cards { margin-right: -48px; padding-right: 48px; } /* beats .explore ul */
