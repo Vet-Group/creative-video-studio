@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest';
 import type { Clip } from '@/lib/api';
 import LibraryPage from '@/app/(app)/library/page';
 import { filtersFromSearch } from '@/lib/library-view';
-import { ClipCard, ClipDetail, clipLabel, deleteConsequence, emptyNoun, gridStep, Library } from './Library';
+import { ClipCard, ClipDetail, clipLabel, deleteConsequence, emptyNoun, gridStep, Library, RecipeText } from './Library';
 
 test('the empty Library names photos under a photo filter, clips under a video one, and results under a mixed one', () => {
   expect(['images', 'try_on', 'image'].map(emptyNoun)).toEqual(['ảnh', 'ảnh', 'ảnh']);
@@ -11,8 +11,8 @@ test('the empty Library names photos under a photo filter, clips under a video o
   expect(['all', 'apps'].map(emptyNoun)).toEqual(['kết quả', 'kết quả']);
 });
 
-// The page's refresh-on-news hook needs the app shell's provider, which a static render of the Library alone does not have.
-vi.mock('./jobs', async (orig) => ({ ...(await orig<typeof import('./jobs')>()), useFreshResults: () => undefined }));
+// The page's refresh-on-news hook and the detail's toasts need the app shell's provider, which a static render of the Library alone does not have.
+vi.mock('./jobs', async (orig) => ({ ...(await orig<typeof import('./jobs')>()), useFreshResults: () => undefined, useJobs: () => ({ notify: () => undefined }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) })); // the detail's Use this frame navigates; a static render has no app router
 
 const clip = (mediaType: Clip['mediaType']): Clip => ({
@@ -24,6 +24,35 @@ const detail = (c: Clip) => renderToStaticMarkup(<ClipDetail clips={[c]} index={
 test('the clip detail offers Nén & tải về on a video as well as on an image', () => {
   expect(detail(clip('video'))).toContain('aria-label="Nén &amp; tải về"');
   expect(detail(clip('image'))).toContain('aria-label="Nén &amp; tải về"');
+});
+
+test('the clip detail names Download and Use this frame in words, and a video gets a first stop that skips its player', () => {
+  const html = detail(clip('video'));
+  expect(html).toMatch(/<button type="button" class="icon-button labelled" title="Tải xuống">.*?Tải xuống<\/button>/);
+  expect(html).toMatch(/title="Dùng khung hình này làm ảnh cho Tạo video">.*?Dùng khung hình<\/button>/);
+  expect(html.indexOf('Bỏ qua video')).toBeGreaterThan(-1);
+  expect(html.indexOf('Bỏ qua video')).toBeLessThan(html.indexOf('<video'));
+  expect(detail(clip('image'))).not.toContain('Bỏ qua video');
+});
+
+test('the marks and Reuse sit in the pinned footer, and Chạy lại is the quieter button with the price it last cost', () => {
+  const own: Clip = { ...clip('video'), mine: true, canEdit: true };
+  const foot = detail(own).match(/<div class="lightbox-foot">([\s\S]*)<\/div><\/div>/)?.[1] ?? '';
+  expect(foot).toContain('class="verdict-buttons"');
+  expect(foot).toContain('<button type="button" class="lightbox-reuse lightbox-rerun">Chạy lại · $1.00</button>');
+  expect(foot).toMatch(/<a [^>]*href="\/create\?reuse=c1"[^>]*>Dùng lại<\/a>/);
+  expect(detail({ ...own, costUsd: null })).toContain('>Chạy lại</button>');
+  expect(detail({ ...own, mine: false })).not.toContain('Chạy lại');
+});
+
+test('a long recipe text shows its first lines and Xem thêm; a short one shows whole', () => {
+  const long = renderToStaticMarkup(<RecipeText label="Mô tả" text={'một ý dài '.repeat(30)} />);
+  expect(long).toContain('<p data-clamped="">');
+  expect(long).toContain('aria-expanded="false">Xem thêm</button>');
+  expect(renderToStaticMarkup(<RecipeText label="Mô tả" text={'dòng\n'.repeat(5)} />)).toContain('Xem thêm'); // five short lines are long too
+  const short = renderToStaticMarkup(<RecipeText label="Mô tả" text="một câu ngắn" />);
+  expect(short).toContain('<p>một câu ngắn</p>');
+  expect(short).not.toContain('Xem thêm');
 });
 
 test("an image's detail opens the picture in the image tools (Xoá nền, Tăng độ phân giải, Đổi nền, Đổi khung hình), another member's too, except the tool that made it; never a video", () => {

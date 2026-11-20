@@ -19,7 +19,7 @@ test('the groups keep the order users know, and only an Admin gets the admin gro
   const flat = (admin: boolean) => navGroups(admin).flatMap((g) => g.items.map((i) => i.text));
   expect(flat(false)).toEqual(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', 'Có gì mới', 'Hướng dẫn']);
   expect(flat(true)).toEqual([...flat(false), 'Quản trị']);
-  expect(navGroups(false).map((g) => g.label)).toEqual([null, 'Sáng tạo', 'Của bạn']);
+  expect(navGroups(false).map((g) => g.label)).toEqual([null, 'Sáng tạo', 'Thêm']);
   expect(navGroups(true).at(-1)!.label).toBe('Quản lý');
 });
 

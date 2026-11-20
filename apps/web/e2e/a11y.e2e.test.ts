@@ -142,7 +142,9 @@ test.describe('touch phone', () => {
     await runViaApi(page);
     await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs[0]?.status, { timeout: 60_000 }).toBe('succeeded');
     await page.goto('/library');
+    await page.getByRole('button', { name: /^Bộ lọc/ }).click(); // a phone's filters are in a sheet
     await page.getByLabel('Người tạo').selectOption({ label: USERS.phonea.name });
+    await page.getByRole('button', { name: 'Xong' }).click();
     const marks = page.getByRole('article').first().locator('.verdict-buttons button');
     await expect(marks).toHaveCount(3);
     for (const mark of await marks.all()) {
@@ -152,6 +154,10 @@ test.describe('touch phone', () => {
       expect(height, `${label} tall`).toBeGreaterThanOrEqual(44);
       expect(fits, `${label} fits its button`).toBe(true);
     }
+    // Fail shows its first word only, so it no longer wraps to two lines, and keeps its whole name for a screen reader.
+    const fail = page.getByRole('article').first().getByRole('button', { name: 'Không đạt', exact: true });
+    await expect(fail.locator('.verdict-more')).toHaveCSS('clip-path', 'inset(50%)');
+    expect(await fail.evaluate((b) => { const r = document.createRange(); r.selectNodeContents(b.firstChild!); return r.getClientRects().length; })).toBe(1);
   });
 
   // The Góp ý board: its header button, filters, a listed post, and the open form with two photos attached. The list and the upload are routed:

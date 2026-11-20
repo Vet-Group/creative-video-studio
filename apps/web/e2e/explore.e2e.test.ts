@@ -34,6 +34,11 @@ test('Explore greets the member by given name and lists a job they start under C
   await page.goto('/explore');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  // A phone: the sideways rows fade at the edge, and each motion template shows its name without a hover.
+  for (const row of [page.getByRole('list', { name: 'Việc gần đây' }), page.getByRole('list', { name: 'Mô hình' })]) await expect(row).toHaveCSS('mask-image', /linear-gradient/);
+  const tile = page.getByRole('link', { name: 'Tự viết mô tả' });
+  await tile.scrollIntoViewIfNeeded();
+  await expect(tile.locator('.explore-prompt-hover')).toHaveCSS('opacity', '1');
 });
 
 test("a running job's elapsed time under Continue keeps counting without a reload", async ({ page }) => {

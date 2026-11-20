@@ -86,6 +86,10 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await mineOnly();
   await expect(page.getByRole('article')).toHaveCount(2);
   await expect(page.locator('.library-active .library-chip')).toHaveCount(1); // the creator filter, as a removable chip
+  // The type pills wrap rather than cut the last one at the edge (the Apps pill was, at 1440 px).
+  const kinds = page.getByRole('group', { name: 'Loại', exact: true });
+  expect(await kinds.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await expect(kinds.getByRole('button', { name: 'Ứng dụng' })).toBeInViewport({ ratio: 1 });
 
   // List rows keep the item names and actions; the card size belongs to the grid; the choice outlives a reload.
   const listView = page.getByRole('button', { name: 'Danh sách', exact: true });
@@ -133,7 +137,7 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
 
   // Picking a checkbox from the keyboard starts the selection; the bar counts, offers the zip, and Esc ends it.
   const bar = page.getByRole('group', { name: 'Tải nhiều mục' });
-  const checks = page.getByRole('checkbox', { name: /^Chọn \d{8}-e2e-library-view-/ });
+  const checks = page.getByRole('checkbox', { name: /^Chọn Tạo video · Mock E2E · \d\d:\d\d / }); // named like its card (what, model, time), not by its file name
   await expect(bar).toHaveCount(0);
   await checks.nth(0).focus();
   await page.keyboard.press('Space');
@@ -264,7 +268,20 @@ test.describe('touch phone', () => {
     await runViaApi(page);
     await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.every((j) => j.status === 'succeeded'), { timeout: 60_000 }).toBe(true);
     await page.goto('/library');
-    await page.getByLabel('Người tạo').selectOption({ label: 'E2E Library Days' });
+    // The type pills scroll under a fade that cuts into the last one on screen, and the filters open in a sheet from one button that counts the ones set.
+    const kinds = page.getByRole('group', { name: 'Loại', exact: true });
+    await expect(kinds).toHaveCSS('mask-image', /linear-gradient/);
+    expect(await kinds.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
+    const filters = page.getByRole('button', { name: /^Bộ lọc/ });
+    await expect(filters).toHaveText('Bộ lọc');
+    await expect(page.getByLabel('Người tạo')).toHaveCount(0);
+    await filters.click();
+    const sheet = page.getByRole('dialog', { name: 'Bộ lọc' });
+    await sheet.getByLabel('Người tạo').selectOption({ label: 'E2E Library Days' });
+    await sheet.getByRole('button', { name: 'Xong' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(filters).toHaveText('Bộ lọc (1)');
+    await expect(page.locator('.library-active .library-chip')).toContainText('Người tạo: E2E Library Days');
     const day = page.getByRole('checkbox', { name: /^Chọn tất cả \d+ mục ngày Hôm nay$/ });
     const hit = (await page.locator('.lib-day-check').filter({ has: day }).boundingBox())!;
     expect(Math.min(hit.width, hit.height)).toBeGreaterThanOrEqual(44);
@@ -313,6 +330,18 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   await expect(recipe.filter({ hasText: /^5 giây$/ })).toHaveCount(1);
   await expect(recipe.filter({ hasText: /^E2E Library Recipe B · / })).toHaveCount(1);
   await expect(detail.getByRole('button', { name: 'Đạt', exact: true })).toHaveCount(0);
+  // Tab from the close button meets the skip button before the player's six controls, and it takes focus into the side; ← on the player stays the player's.
+  await detail.getByRole('button', { name: 'Đóng' }).focus();
+  await page.keyboard.press('Tab');
+  const skip = detail.getByRole('button', { name: 'Bỏ qua video' });
+  await expect(skip).toBeFocused();
+  await expect(skip).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press('Enter');
+  expect(await detail.locator('.lightbox-side').evaluate((side) => side.contains(document.activeElement))).toBe(true);
+  await detail.locator('.lightbox-media video').focus();
+  await page.keyboard.press('ArrowLeft');
+  await page.evaluate(() => new Promise(requestAnimationFrame)); // a step would have rendered by now
+  await expect(detail.getByText('words of member B', { exact: true })).toBeVisible();
   // Its input photo opens large in the result's place, not in a new tab, and Về kết quả brings the result back.
   const input = detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('button', { name: 'recipe.png' });
   await input.click();
@@ -427,7 +456,13 @@ test('Dùng khung hình này in a video’s detail opens Create video with the f
     await page.locator(`article[data-clip-id="${id}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
     const detail = page.getByRole('dialog');
     await expect.poll(() => detail.locator('video').evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2); // a frame is decoded
-    await detail.getByRole('button', { name: 'Dùng khung hình này' }).click();
+    // Download and the frame carry their words; the rerun, a new paid job, is the quieter button beside Reuse and names the price the clip cost.
+    await expect(detail.locator('.job-actions .labelled')).toHaveText(['Tải xuống', 'Dùng khung hình']);
+    const rerun = detail.getByRole('button', { name: /^Chạy lại · \$\d+\.\d+$/ });
+    await expect(rerun).toHaveCSS('background-color', await detail.locator('.lightbox-side').evaluate((e) => getComputedStyle(e).backgroundColor));
+    await expect(detail.locator('.lightbox-foot-actions').getByRole('link', { name: 'Dùng lại' })).toBeInViewport({ ratio: 1 });
+    await detail.getByRole('button', { name: 'Dùng khung hình', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Thông báo' })).toContainText('Đã tải khung hình lên, đang mở Tạo video'); // the page is about to change: say why
     await expect(page).toHaveURL(/\/create\?image=[\w-]+$/);
     const picked = page.getByLabel('Ảnh đã chọn').getByRole('img');
     await expect(picked).toHaveCount(1);
@@ -446,9 +481,11 @@ test('the photo tools in a picture’s Library detail open the tool with the pic
   expect(res.status()).toBe(201);
   const id = ((await res.json()) as { id: string }).id;
   const shot = (p: Page, name: string) => p.screenshot({ path: process.env.CVS_E2E_SHOTS ? `${process.env.CVS_E2E_SHOTS}/${name}.png` : test.info().outputPath(`${name}.png`) });
-  const open = async (p: Page) => {
+  const open = async (p: Page, phone = false) => {
     await p.goto('/library');
+    if (phone) await p.getByRole('button', { name: /^Bộ lọc/ }).click(); // a phone's filters are in a sheet
     await p.getByLabel('Người tạo').selectOption({ label: 'E2E Library Tools A' });
+    if (phone) await p.getByRole('button', { name: 'Xong' }).click();
     await p.locator(`article[data-clip-id="${id}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
     const detail = p.getByRole('dialog');
     await expect(detail.getByText('a picture for the photo tools', { exact: true })).toBeVisible();
@@ -472,7 +509,9 @@ test('the photo tools in a picture’s Library detail open the tool with the pic
 
     // A touch phone in dark mode: both tools are full touch targets, the side scrolls instead of squeezing the Reuse link (it drew 24 px tall), and nothing scrolls sideways.
     const phone = await (await browser.newContext({ storageState: await page.context().storageState(), viewport: { width: 390, height: 844 }, colorScheme: 'dark', hasTouch: true, isMobile: true })).newPage();
-    const small = await open(phone);
+    const small = await open(phone, true);
+    // Reuse is in the side's pinned footer: on screen before any scroll of the side.
+    await expect(small.getByRole('link', { name: 'Dùng lại' })).toBeInViewport({ ratio: 1 });
     const tools = small.locator('.lightbox-tools');
     await tools.scrollIntoViewIfNeeded();
     await shot(phone, 'library-detail-tools-390-dark');
@@ -533,11 +572,13 @@ test('a system account’s results stay out of the Library until an Admin ticks 
     const phone = await (await browser.newContext({ storageState: await admin.context().storageState(), viewport: { width: 390, height: 844 }, colorScheme: 'dark', hasTouch: true, isMobile: true })).newPage();
     await phone.goto(admin.url());
     await expect(phone.locator(`article[data-clip-id="${id}"]`).locator('.tag', { hasText: 'Hệ thống' })).toBeVisible();
-    const small = phone.getByRole('checkbox', { name: 'Hiện tài khoản hệ thống' });
+    await expect(phone.locator('.library-days')).toHaveAttribute('aria-busy', 'false');
+    await phone.getByRole('button', { name: /^Bộ lọc/ }).click(); // a phone's filters are in a sheet
+    const small = phone.getByRole('dialog', { name: 'Bộ lọc' }).getByRole('checkbox', { name: 'Hiện tài khoản hệ thống' });
     await expect(small).toBeChecked();
     await small.scrollIntoViewIfNeeded();
-    await expect(phone.locator('.library-days')).toHaveAttribute('aria-busy', 'false');
     await shot(phone, 'library-system-390-dark');
+    await phone.getByRole('button', { name: 'Xong' }).click();
     expect(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await phone.context().close();
     await admin.context().close();

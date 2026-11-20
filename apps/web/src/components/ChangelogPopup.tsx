@@ -1,6 +1,6 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_POPUP_KEY, changelogPopupDue, loadSeen, markSeen, unseenEntries } from '@/lib/changelog-seen';
 import { LARK_PROMPT_KEY, larkPromptDue, vnDay } from '@/lib/lark-prompt';
@@ -16,27 +16,31 @@ const read = (key: string) => {
 };
 
 /**
- * A popup at most once a Vietnam day (per browser) listing the newest entries a member has not seen. A first visit marks everything seen instead,
- * and a visit the Lark reminder takes is skipped. It must sit before LarkLinkPrompt in the Shell: effects run in tree order, so this one reads
- * the Lark day before that prompt writes today's.
+ * A popup at most once a Vietnam day (per browser) listing the newest entries a member has not seen, on Explore only: elsewhere it opened over a form
+ * the member was filling in, and the sidebar dot already says there is news. A first visit marks everything seen instead, and a visit the Lark
+ * reminder takes is skipped. It must sit before LarkLinkPrompt in the Shell: effects run in tree order, so this one reads the Lark day before that
+ * prompt writes today's.
  */
 export function ChangelogPopup({ entries, larkPrompt }: { entries: ChangeEntry[]; larkPrompt: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const [items, setItems] = useState<ChangeEntry[]>([]);
   const [open, setOpen] = useState(false);
+  const visit = useRef<{ larkDue: boolean; asked: boolean } | null>(null); // the Shell stays mounted across navigations: one visit
   useEffect(() => {
-    if (pathname === '/changelog') return; // opening the page marks everything seen
-    const unseen = unseenEntries(entries, loadSeen(entries));
     const today = vnDay(new Date());
-    const due = changelogPopupDue({ unseen: unseen.length, lastShown: read(CHANGELOG_POPUP_KEY), today, larkDue: larkPrompt && larkPromptDue(read(LARK_PROMPT_KEY), today) });
+    const v = (visit.current ??= { larkDue: larkPrompt && larkPromptDue(read(LARK_PROMPT_KEY), today), asked: false }); // read on the first page, before the Lark prompt writes
+    if (pathname !== '/explore' || v.asked) return;
+    v.asked = true;
+    const unseen = unseenEntries(entries, loadSeen(entries));
+    const due = changelogPopupDue({ unseen: unseen.length, lastShown: read(CHANGELOG_POPUP_KEY), today, larkDue: v.larkDue });
     if (!due) return;
     try {
       localStorage.setItem(CHANGELOG_POPUP_KEY, today);
     } catch {} // storage blocked: shown on each visit rather than never
     setItems(unseen.slice(0, 3));
     setOpen(true);
-  }, []); // once per visit: the Shell stays mounted across navigations
+  }, [pathname]); // entries and larkPrompt come from the layout, fixed for the visit
 
   function seeAll() {
     markSeen(entries);

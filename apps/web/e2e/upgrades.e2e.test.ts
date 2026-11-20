@@ -271,7 +271,7 @@ test('AC 15: the Library downloads two picked results as one zip, and refuses a 
   const cards = page.getByRole('article');
   await expect(cards).toHaveCount(2);
   await page.getByRole('button', { name: 'Chọn', exact: true }).click();
-  const checks = page.getByRole('checkbox', { name: /^Chọn \d{8}-e2e-upgrades-d-/ });
+  const checks = page.getByRole('checkbox', { name: /^Chọn Tạo ảnh · / }); // named like its card (what, model, time), not by its file name
   await expect(checks).toHaveCount(2);
   await checks.nth(0).check();
   await checks.nth(1).check();

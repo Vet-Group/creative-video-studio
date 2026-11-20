@@ -725,8 +725,12 @@ function AppsNav({ row, pathname }: { row: ReactNode; pathname: string }) {
  */
 function WorkspaceSwitcher({ current, workspaces }: { current: string; workspaces: { id: string; name: string; company: boolean }[] }) {
   const { notify } = useJobs();
+  const pathname = usePathname();
   async function pick(id: string) {
     if (id === current) return;
+    // shortcut: asks on every page with a form (OWN_HISTORY and the apps), not only when the form holds photos or choices, which the Shell cannot see; the reload loses them.
+    const form = OWN_HISTORY.some((p) => pathname.startsWith(p)) || pathname.startsWith('/apps/');
+    if (form && !(await confirmDialog({ title: 'Chuyển không gian làm việc?', body: 'Trang sẽ tải lại, nên ảnh đã chọn và các lựa chọn chưa chạy trên trang này sẽ mất.', confirmLabel: 'Chuyển' }))) return;
     try {
       await api('/api/me/workspace', sendJson('POST', { workspaceId: id }));
       window.location.reload();

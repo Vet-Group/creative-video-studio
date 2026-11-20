@@ -68,7 +68,7 @@ test('a tool page opens with when to use it, links to the others and the guide, 
   }
 });
 
-test('Explore starts from what you need, and the drawer on a phone shows each tool’s line without sideways scrolling', async ({ page }) => {
+test('Explore starts from what you need, and the drawer on a phone lists the tools by name, their lines left to the guide', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'toolg');
   await page.goto('/explore');
@@ -82,7 +82,10 @@ test('Explore starts from what you need, and the drawer on a phone shows each to
   expect(await fits()).toBe(true);
   await page.getByRole('button', { name: 'Mở menu' }).click();
   const drawer = page.getByRole('dialog', { name: 'Menu' });
-  await expect(drawer.locator('.nav-hint').filter({ hasText: 'Công cụ một việc' })).toBeVisible();
+  // Names only, so the Library and the help pages fit a phone's screen; a screen reader still gets each tool's line as its description.
+  await expect(drawer.locator('.nav-hint').filter({ hasText: 'Công cụ một việc' })).toBeHidden();
+  await expect(drawer.getByRole('link', { name: 'Ứng dụng', exact: true })).toHaveAccessibleDescription(/Công cụ một việc/);
+  await expect(drawer.getByRole('link', { name: 'Hướng dẫn', exact: true })).toBeInViewport();
   await drawer.getByRole('button', { name: 'Chọn công cụ nào?' }).click();
   await expect(drawer).toHaveCount(0); // the drawer gives way to the guide
   const guide = page.getByRole('dialog', { name: 'Chọn công cụ nào?' });

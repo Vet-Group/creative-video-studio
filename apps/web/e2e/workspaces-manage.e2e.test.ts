@@ -195,6 +195,16 @@ test('an Admin creates a partner workspace and adds a company member, its owner 
   await rail.click();
   await expect(switcher(both)).toBeVisible();
   await expect(both.getByText(BOARD_ITEM)).toHaveCount(0);
+  // On a page with a form the switch asks first, as its reload drops the photos and choices there; cancel stays put.
+  await both.goto('/create');
+  await switcher(both).click();
+  await both.getByRole('listbox', { name: 'Không gian làm việc' }).getByRole('option', { name: WS_NAME }).click();
+  const ask = both.getByRole('dialog', { name: 'Chuyển không gian làm việc?' });
+  await expect(ask).toBeVisible();
+  await ask.getByRole('button', { name: 'Huỷ' }).click();
+  await expect(ask).toBeHidden();
+  await expect(switcher(both)).toHaveText('VET Group Công ty');
+  await both.goto('/feedback');
   await switcher(both).click();
   const options = both.getByRole('listbox', { name: 'Không gian làm việc' }).getByRole('option');
   await expect(options).toHaveText(['VET Group Công ty', WS_NAME]); // the badge is the company's alone

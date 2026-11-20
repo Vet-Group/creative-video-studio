@@ -14,13 +14,14 @@ import { PRODUCT_TYPES } from '@/lib/product-types';
 import { activeFilterChips, activeFilters, type ChipKey, dayGroups, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, NO_STORE, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { alignInputs, reuseHref } from '@/lib/reuse';
 import { SWIPE_START_PX, swipeStep } from '@/lib/swipe';
+import { useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { CompareSlider } from './CompareSlider';
 import { EmptyArt } from './EmptyArt';
 import { Icon } from './Icon';
 import { uploadImages } from './image-tools';
 import { ImageToolButtons } from './ImageToolButtons';
-import { useFreshResults } from './jobs';
+import { useFreshResults, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import { VerdictGuide } from './VerdictGuide';
@@ -60,6 +61,8 @@ const APP_KINDS = JOB_APPS.map((a) => ({ id: a.feature, label: a.name }));
 /** The size slider: card widths from small to large, remembered per browser. */
 const SIZES = ['12rem', '16rem', '22rem'];
 const SIZE_KEY = 'cvs.library.size';
+/** The Library's phone layout (globals.css), where the filters open in a sheet. */
+const PHONE = '(max-width: 639.98px)';
 /** What the empty Library calls its items under a kind filter: photos, clips, or both. */
 export const emptyNoun = (kind: string) => (['images', 'try_on', 'image'].includes(kind) ? 'ảnh' : kind === 'videos' || kind === 'video' || kind.startsWith('marketing') ? 'clip' : 'kết quả');
 /** The size of the picture the detail view loads instead of the original: the one `w` GET /api/assets/:id/thumb serves besides the tile. */
@@ -177,7 +180,7 @@ function VerdictMarks({ clip, onChange, keys = false, describedBy }: { clip: Cli
           Nổi bật
         </button>
         <button type="button" {...roving(2)} aria-pressed={failing || clip.verdict?.verdict === 'fail'} disabled={saving} onClick={() => setFailing((f) => !f)}>
-          Không đạt
+          Không<span className="verdict-more"> đạt</span>
         </button>
       </span>
       {failing && (
@@ -439,6 +442,25 @@ const loadPresetNames = () =>
 /** A Marketing choice's name; a member's own hook or location shows as their own. */
 const choiceName = (list: { id: string; name: string }[], id: string | null) => id && (list.find((c) => c.id === id)?.name ?? 'Tự tạo');
 
+// shortcut: "long" counts characters and lines instead of measuring the drawn text, so a text near the limit may get the show-more button without needing it.
+const LONG_TEXT = 220;
+/** A text of the recipe: a long one (a Marketing brief) shows its first lines and a show-more button, so the rest of the recipe is not a long scroll away. */
+export function RecipeText({ label, text }: { label: string; text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > LONG_TEXT || text.split('\n').length > 4;
+  return (
+    <div className="recipe-text">
+      <h3>{label}</h3>
+      <p data-clamped={long && !open ? '' : undefined}>{text}</p>
+      {long && (
+        <button type="button" className="link-button" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? 'Thu gọn' : 'Xem thêm'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /**
  * Fash's item detail (survey L3), grown into the recipe of the result: the result large on the left; beside it the title and mark, the words behind it
  * (the creator's prompt, or Marketing's brief and script, the enhanced prompt and the prompt the model got), the inputs, the model, template and
@@ -456,6 +478,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
   const [shown, setShown] = useState<{ id: string; filename: string } | null>(null); // an input photo shown large in the result's place, instead of a new tab
   const [full, setFull] = useState<string | null>(null); // the picture full screen loaded at its own size (the box shows a 1600 px preview)
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
+  const side = useRef<HTMLDivElement>(null);
   const inputs = useRef<HTMLUListElement>(null); // Về kết quả puts focus back on the photo it showed, not on the page
   // A swipe on a touch screen steps to the neighbour like the arrows: the media follows the finger, then opens it or snaps back.
   const box = useRef<HTMLDivElement>(null);
@@ -541,6 +564,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
   const copy = () => act(async () => (await navigator.clipboard.writeText(copyText ?? ''), setNote('Đã sao chép.')), 'Không sao chép được.');
   // Fash's "Use this frame": the video stops on the frame shown, which goes up as a photo and opens Create video as its first image.
   const router = useRouter();
+  const { notify } = useJobs();
   const [grabbing, setGrabbing] = useState(false);
   const takeFrame = async () => {
     const v = media.current;
@@ -555,6 +579,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
       const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/jpeg', 0.92));
       if (!blob) throw new Error('no frame'); // a video not decoded yet draws nothing
       const [frame] = await uploadImages([new File([blob], `${clip.downloadName.replace(/\.\w+$/, '')}-${v.currentTime.toFixed(1)}s.jpg`, { type: 'image/jpeg' })]);
+      notify('Đã tải khung hình lên, đang mở Tạo video'); // the page changes under the member: say why
       router.push(`/create?image=${frame!.id}`);
     }, 'Không lấy được khung hình này.');
     setGrabbing(false);
@@ -565,13 +590,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
       onChange({ ...clip, storeId: storeId || null });
     }, 'Không đổi được cửa hàng.');
 
-  const words = (label: string, text: string | null | undefined) =>
-    text && (
-      <div className="recipe-text">
-        <h3>{label}</h3>
-        <p>{text}</p>
-      </div>
-    );
+  const words = (label: string, text: string | null | undefined) => text && <RecipeText key={`${clip.id}-${label}`} label={label} text={text} />; // the next item starts collapsed
   const row = (label: string, value: string | null | undefined) =>
     value && (
       <div>
@@ -633,10 +652,16 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
         ) : image ? (
           <img ref={media} src={full === clip.videoAssetId ? content(clip.videoAssetId) : thumbUrl(clip.videoAssetId, PREVIEW_W)} alt={clip.downloadName} />
         ) : (
-          <video key={clip.id} ref={media} controls autoPlay muted loop playsInline poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
+          <>
+            {/* The player's controls are six Tab stops before the side; this first stop, shown on focus, goes past them. */}
+            <button type="button" className="lightbox-skip" onClick={() => side.current?.querySelector<HTMLElement>('a[href], button:not(:disabled), select, summary')?.focus()}>
+              Bỏ qua video
+            </button>
+            <video key={clip.id} ref={media} controls autoPlay muted loop playsInline poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
+          </>
         )}
       </div>
-      <div className="lightbox-side">
+      <div ref={side} className="lightbox-side">
         <h2>
           {title}
           {mark && <span className={`lib-mark${verdictClass(clip.verdict!)}`}>{mark}</span>}
@@ -695,14 +720,11 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
             </select>
           </label>
         )}
-        {note && (
-          <p className="muted" role="status">
-            {note}
-          </p>
-        )}
         <div className="job-actions">
-          <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
+          {/* Download and Use this frame carry their words: the bare glyphs read alike (compress, fullscreen). */}
+          <button type="button" className="icon-button labelled" onClick={() => void download()} title="Tải xuống">
             <Icon name="download" />
+            Tải xuống
           </button>
           <button type="button" className="icon-button" disabled={compressing} aria-busy={compressing} onClick={() => void compress()} aria-label="Nén & tải về" title="Nén & tải về">
             <Icon name="compress" />
@@ -720,8 +742,9 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
             </button>
           )}
           {!image && !shown && (
-            <button type="button" className="icon-button" disabled={grabbing} aria-busy={grabbing} onClick={() => void takeFrame()} aria-label="Dùng khung hình này" title="Dùng khung hình này làm ảnh cho Tạo video">
+            <button type="button" className="icon-button labelled" disabled={grabbing} aria-busy={grabbing} onClick={() => void takeFrame()} title="Dùng khung hình này làm ảnh cho Tạo video">
               <Icon name="image" />
+              Dùng khung hình
             </button>
           )}
           {original && (
@@ -730,30 +753,42 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
             </button>
           )}
         </div>
-        {clip.canEdit && <VerdictMarks key={clip.id} clip={clip} onChange={onChange} keys />}
         {admin && <ExampleControl key={`example-${clip.id}`} clip={clip} onChange={onChange} />}
         {clip.canEdit && <p className="recipe-keys">Phím tắt: 1 Đạt · 2 Nổi bật · 3 Không đạt · ←/→ mục trước, sau</p>}
-        {clip.mine && reuseHref(clip) && (
-          <button type="button" className="lightbox-reuse" disabled={rerunning} onClick={() => void rerun()}>
-            Chạy lại
-          </button>
-        )}
-        {reuseHref(clip) &&
-          (onUse ? (
-            <button type="button" className="lightbox-reuse" onClick={() => onUse(clip)}>
-              Dùng lại
-            </button>
-          ) : (
-            <Link href={reuseHref(clip)!} className="lightbox-reuse">
-              Dùng lại
-            </Link>
-          ))}
         {/* As on a History card, on any member's picture: the copy is the viewer's own new input (POST /api/assets/copy takes a Library clip of the workspace). */}
         {image && (
           <div className="lightbox-tools">
             <ImageToolButtons assetId={clip.videoAssetId} feature={clip.feature} className="lightbox-result" act={act} />
           </div>
         )}
+        {/* Pinned under the recipe, which scrolls (a Marketing brief ran 1164 px in a 760 px dialog): the last action's note, the marks and Reuse. */}
+        <div className="lightbox-foot">
+          {note && (
+            <p className="muted" role="status">
+              {note}
+            </p>
+          )}
+          {clip.canEdit && <VerdictMarks key={clip.id} clip={clip} onChange={onChange} keys />}
+          {reuseHref(clip) && (
+            <div className="lightbox-foot-actions">
+              {/* A new paid job: the quieter button, its price on it, beside Reuse. */}
+              {clip.mine && (
+                <button type="button" className="lightbox-reuse lightbox-rerun" disabled={rerunning} onClick={() => void rerun()}>
+                  Chạy lại{clip.costUsd !== null && ` · $${clip.costUsd}`}
+                </button>
+              )}
+              {onUse ? (
+                <button type="button" className="lightbox-reuse" onClick={() => onUse(clip)}>
+                  Dùng lại
+                </button>
+              ) : (
+                <Link href={reuseHref(clip)!} className="lightbox-reuse">
+                  Dùng lại
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       {index > 0 && (
         <button type="button" className="lightbox-step lightbox-prev" onClick={() => onIndex(index - 1)} aria-label="Mục trước">
@@ -1002,6 +1037,8 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [guide, setGuide] = useState(false);
+  const phone = useMediaQuery(PHONE);
+  const [filtering, setFiltering] = useState(false); // the phone's filter sheet
   const [copied, setCopied] = useState(false); // the "copy link" button's brief confirmation
   const [unmarked, setUnmarked] = useState(0); // the items the viewer may mark that have no mark yet, for the verdict filter
   const latest = useRef(0);
@@ -1046,6 +1083,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   const active = activeFilters(filters);
   const inApps = filters.kind === 'apps' || APP_KINDS.some((k) => k.id === filters.kind);
   const chips = activeFilterChips(filters, { creator: creators.find((c) => c.id === filters.creator)?.name, store: storeNames.find((s) => s.id === filters.store)?.name, kind: [...KINDS, ...APP_KINDS].find((k) => k.id === filters.kind)?.label });
+  const inSheet = chips.filter((c) => c.key !== 'q' && c.key !== 'kind').length; // the search box and the type pills stay on the page
   // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
   const listed = useRef(clips); // the list as last rendered, for a refresh to count what it adds
   listed.current = clips;
@@ -1245,6 +1283,120 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
     if (isAdmin) api<{ stores: StoreOption[] }>('/api/admin/stores?includeHidden=1').then((r) => setStores(r.stores), () => null);
   }, [isAdmin]);
 
+  // The filters beyond search and type: a row on a wide screen, a sheet on a phone (where the row hid most of them sideways).
+  const fields = (
+    <>
+      <label className="library-field">
+        <span>Người tạo</span>
+        <select value={filters.creator} onChange={(e) => set({ creator: e.target.value })}>
+          <option value="">Tất cả</option>
+          {creators.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="library-field">
+        <span>Cửa hàng</span>
+        <select value={filters.store} onChange={(e) => set({ store: e.target.value })}>
+          <option value="">Tất cả</option>
+          <option value="none">{NO_STORE}</option>
+          {storeNames.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="library-field">
+        <span>Ngày</span>
+        <select
+          value={filters.days ? `d${filters.days}` : yesterdayOnly ? 'yesterday' : filters.date || pickDay ? 'pick' : ''}
+          onChange={(e) => {
+            const v = e.target.value;
+            openCalendar.current = v === 'pick';
+            setPickDay(v === 'pick');
+            set(v === 'pick' ? { days: '' } : v === 'yesterday' ? { days: '', date: today(1) } : { days: v.slice(1) as LibraryFilters['days'], date: '' });
+          }}
+        >
+          <option value="">Mọi ngày</option>
+          <option value="d1">Hôm nay</option>
+          <option value="yesterday">Hôm qua</option>
+          <option value="d7">7 ngày qua</option>
+          <option value="d30">30 ngày qua</option>
+          <option value="pick">{filters.date && !yesterdayOnly ? filters.date.split('-').reverse().join('/') : 'Chọn một ngày…'}</option>
+        </select>
+      </label>
+      {(pickDay || (filters.date && !yesterdayOnly)) && (
+        <label className="library-field">
+          <span className="sr-only">Ngày cụ thể</span>
+          <input ref={calendar} type="date" value={filters.date} max={today()} onChange={(e) => set({ date: e.target.value })} />
+        </label>
+      )}
+      <label className="library-field">
+        <span>Tỉ lệ</span>
+        <select value={filters.ratio} onChange={(e) => set({ ratio: e.target.value })}>
+          <option value="">Tất cả</option>
+          {/* A linked ratio no item has yet joins the list only once the list is loaded: before that the server and the first render both have none. */}
+          {(ratios.length === 0 || ratios.includes(filters.ratio) || !filters.ratio ? ratios : [...ratios, filters.ratio]).map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="library-field">
+        <span>Kết quả</span>
+        <select value={filters.verdict} onChange={(e) => set({ verdict: e.target.value as VerdictFilter })}>
+          <option value="">Tất cả</option>
+          <option value="none">Chưa chấm{unmarked > 0 ? ` (${unmarked})` : ''}</option>
+          <option value="pass">Đạt</option>
+          <option value="featured">Nổi bật</option>
+          <option value="fail">Không đạt</option>
+        </select>
+      </label>
+      <label className="library-toggle">
+        <input type="checkbox" checked={filters.favoritesOnly} onChange={(e) => set({ favoritesOnly: e.target.checked })} aria-label="Chỉ mục yêu thích" />
+        <Icon name="star" />
+        Yêu thích
+      </label>
+      {/* The two never hold together: one lists what is on Examples, the other what is not yet. */}
+      {isAdmin && (
+        <label className="library-toggle">
+          <input type="checkbox" checked={filters.examplesOnly} onChange={(e) => set({ examplesOnly: e.target.checked, suggestedOnly: false })} />
+          Đang ở Ví dụ
+        </label>
+      )}
+      {isAdmin && (
+        <label className="library-toggle" title="Các kết quả được đánh dấu Nổi bật mà chưa ở tab Ví dụ">
+          <input type="checkbox" checked={filters.suggestedOnly} onChange={(e) => set({ suggestedOnly: e.target.checked, examplesOnly: false })} />
+          Gợi ý làm ví dụ
+        </label>
+      )}
+      {isAdmin && (
+        <label className="library-toggle" title="Kết quả của tài khoản hệ thống (Admin triển khai, tài khoản thử, demo) mặc định không hiện trong Thư viện">
+          <input type="checkbox" checked={filters.showSystem} onChange={(e) => set({ showSystem: e.target.checked })} />
+          Hiện tài khoản hệ thống
+        </label>
+      )}
+    </>
+  );
+  const activeChips = active > 0 && (
+    <span className="library-active">
+      {chips.map((c) => (
+        <button key={c.key} type="button" className="library-chip" onClick={() => clearOne(c.key)} title={`Bỏ lọc: ${c.label}`}>
+          <span>{c.label}</span>
+          <span aria-hidden="true">×</span>
+          <span className="sr-only">— bỏ lọc</span>
+        </button>
+      ))}
+      <button type="button" className="link-button" onClick={clearFilters}>
+        Xoá lọc
+      </button>
+    </span>
+  );
+
   return (
     <section className="library" aria-labelledby="library-title" data-selecting={zip.active}>
       <h1 id="library-title">Thư viện</h1>
@@ -1290,7 +1442,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           {copied && <span className="sr-only">Đã sao chép liên kết.</span>}
         </button>
       </div>
-      <div className="kinds" role="group" aria-label="Loại">
+      <div className="kinds kinds-wrap" role="group" aria-label="Loại">
         {KINDS.map((k) => (
           <button key={k.id} type="button" aria-pressed={filters.kind === k.id || (k.id === 'apps' && inApps)} onClick={() => set({ kind: k.id })}>
             {k.label}
@@ -1298,7 +1450,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
         ))}
       </div>
       {inApps && (
-        <div className="kinds" role="group" aria-label="Theo ứng dụng">
+        <div className="kinds kinds-wrap" role="group" aria-label="Theo ứng dụng">
           {[{ id: 'apps', label: 'Tất cả ứng dụng' }, ...APP_KINDS].map((k) => (
             <button key={k.id} type="button" aria-pressed={filters.kind === k.id} onClick={() => set({ kind: k.id })}>
               {k.label}
@@ -1307,115 +1459,25 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
         </div>
       )}
       <div className="library-filters" role="search" aria-label="Bộ lọc">
-        <label className="library-field">
-          <span>Người tạo</span>
-          <select value={filters.creator} onChange={(e) => set({ creator: e.target.value })}>
-            <option value="">Tất cả</option>
-            {creators.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="library-field">
-          <span>Cửa hàng</span>
-          <select value={filters.store} onChange={(e) => set({ store: e.target.value })}>
-            <option value="">Tất cả</option>
-            <option value="none">{NO_STORE}</option>
-            {storeNames.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="library-field">
-          <span>Ngày</span>
-          <select
-            value={filters.days ? `d${filters.days}` : yesterdayOnly ? 'yesterday' : filters.date || pickDay ? 'pick' : ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              openCalendar.current = v === 'pick';
-              setPickDay(v === 'pick');
-              set(v === 'pick' ? { days: '' } : v === 'yesterday' ? { days: '', date: today(1) } : { days: v.slice(1) as LibraryFilters['days'], date: '' });
-            }}
-          >
-            <option value="">Mọi ngày</option>
-            <option value="d1">Hôm nay</option>
-            <option value="yesterday">Hôm qua</option>
-            <option value="d7">7 ngày qua</option>
-            <option value="d30">30 ngày qua</option>
-            <option value="pick">{filters.date && !yesterdayOnly ? filters.date.split('-').reverse().join('/') : 'Chọn một ngày…'}</option>
-          </select>
-        </label>
-        {(pickDay || (filters.date && !yesterdayOnly)) && (
-          <label className="library-field">
-            <span className="sr-only">Ngày cụ thể</span>
-            <input ref={calendar} type="date" value={filters.date} max={today()} onChange={(e) => set({ date: e.target.value })} />
-          </label>
+        {phone ? (
+          <button type="button" className="library-toggle" aria-haspopup="dialog" onClick={() => setFiltering(true)}>
+            <Icon name="sliders" />
+            Bộ lọc{inSheet > 0 && ` (${inSheet})`}
+          </button>
+        ) : (
+          fields
         )}
-        <label className="library-field">
-          <span>Tỉ lệ</span>
-          <select value={filters.ratio} onChange={(e) => set({ ratio: e.target.value })}>
-            <option value="">Tất cả</option>
-            {/* A linked ratio no item has yet joins the list only once the list is loaded: before that the server and the first render both have none. */}
-            {(ratios.length === 0 || ratios.includes(filters.ratio) || !filters.ratio ? ratios : [...ratios, filters.ratio]).map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="library-field">
-          <span>Kết quả</span>
-          <select value={filters.verdict} onChange={(e) => set({ verdict: e.target.value as VerdictFilter })}>
-            <option value="">Tất cả</option>
-            <option value="none">Chưa chấm{unmarked > 0 ? ` (${unmarked})` : ''}</option>
-            <option value="pass">Đạt</option>
-            <option value="featured">Nổi bật</option>
-            <option value="fail">Không đạt</option>
-          </select>
-        </label>
-        <label className="library-toggle">
-          <input type="checkbox" checked={filters.favoritesOnly} onChange={(e) => set({ favoritesOnly: e.target.checked })} aria-label="Chỉ mục yêu thích" />
-          <Icon name="star" />
-          Yêu thích
-        </label>
-        {/* The two never hold together: one lists what is on Examples, the other what is not yet. */}
-        {isAdmin && (
-          <label className="library-toggle">
-            <input type="checkbox" checked={filters.examplesOnly} onChange={(e) => set({ examplesOnly: e.target.checked, suggestedOnly: false })} />
-            Đang ở Ví dụ
-          </label>
-        )}
-        {isAdmin && (
-          <label className="library-toggle" title="Các kết quả được đánh dấu Nổi bật mà chưa ở tab Ví dụ">
-            <input type="checkbox" checked={filters.suggestedOnly} onChange={(e) => set({ suggestedOnly: e.target.checked, examplesOnly: false })} />
-            Gợi ý làm ví dụ
-          </label>
-        )}
-        {isAdmin && (
-          <label className="library-toggle" title="Kết quả của tài khoản hệ thống (Admin triển khai, tài khoản thử, demo) mặc định không hiện trong Thư viện">
-            <input type="checkbox" checked={filters.showSystem} onChange={(e) => set({ showSystem: e.target.checked })} />
-            Hiện tài khoản hệ thống
-          </label>
-        )}
-        {active > 0 && (
-          <span className="library-active">
-            {chips.map((c) => (
-              <button key={c.key} type="button" className="library-chip" onClick={() => clearOne(c.key)} title={`Bỏ lọc: ${c.label}`}>
-                <span>{c.label}</span>
-                <span aria-hidden="true">×</span>
-                <span className="sr-only">— bỏ lọc</span>
-              </button>
-            ))}
-            <button type="button" className="link-button" onClick={clearFilters}>
-              Xoá lọc
-            </button>
-          </span>
-        )}
+        {activeChips}
       </div>
+      {phone && (
+        <Modal open={filtering} onClose={() => setFiltering(false)} label="Bộ lọc" className="template-sheet library-sheet">
+          <h2>Bộ lọc</h2>
+          <div className="library-sheet-fields">{fields}</div>
+          <button type="button" className="primary" onClick={() => setFiltering(false)}>
+            Xong
+          </button>
+        </Modal>
+      )}
 
       {state === 'loading' && clips.length === 0 && (
         <div className={view === 'list' ? 'library-list library-skeleton' : 'grid library-skeleton'} style={{ '--card-min': SIZES[size] } as CSSProperties} role="status">
@@ -1483,7 +1545,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
                     key={c.id}
                     clip={c}
                     view={view}
-                    select={zip.check(c.id, c.downloadName)}
+                    select={zip.check(c.id, clipLabel(c))}
                     selecting={zip.active}
                     onChange={update}
                     onDeleted={(id) => {
