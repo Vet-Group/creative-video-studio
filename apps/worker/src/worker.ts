@@ -40,6 +40,8 @@ export interface WorkerOptions {
   heartbeatStaleMs: number;
   /** A job not finished this long after it started running is timed out. */
   runTimeoutMs: number;
+  /** A result the provider reports this long or less after the job was given up on (timed out or lost) is still delivered; after it, the result is only billed. */
+  lateDeliveryMs: number;
   /** A queued job without a live pg-boss job is sent again after this long. */
   resendAfterMs: number;
   perUserLimit: number;
@@ -55,6 +57,7 @@ export const DEFAULT_OPTIONS: WorkerOptions = {
   heartbeatStaleMs: 60_000,
   // BytePlus Seedance 2.0 took 627 s for one 5 s 720p clip in the 2026-11-04 canary, so 10 minutes cut real jobs short.
   runTimeoutMs: 20 * 60_000,
+  lateDeliveryMs: 2 * 60 * 60_000,
   resendAfterMs: 30_000,
   perUserLimit: 2,
   globalLimit: 5,
@@ -491,23 +494,46 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
   }
 
-  /** The estimate stays counted until the provider's final state is known. False when the job is no longer running. */
+  /**
+   * The estimate stays counted until the provider's final state is known. False when the job is no longer running. A late delivery's row keeps the
+   * finished_at it was first given up at, so lateDeliveryMs and close24h still count from then.
+   */
   async function timeOut(jobId: string): Promise<boolean> {
-    const { rowCount } = await pool.query(`update jobs set status = 'timed_out', error = 'timed out', finished_at = now() where id = $1 and status = 'running'`, [jobId]);
+    const { rowCount } = await pool.query(`update jobs set status = 'timed_out', error = 'timed out', finished_at = coalesce(finished_at, now()) where id = $1 and status = 'running'`, [jobId]);
     return !!rowCount;
   }
 
-  /** Timed-out and lost jobs: bill them when the provider reports a final state (the late result is not delivered), else close them after 24 h. */
+  /**
+   * Timed-out and lost jobs: a result the provider finished within lateDeliveryMs of the job being given up on is paid for, so it is delivered like any
+   * other; any other final state is billed (lateBill); else the job is closed after 24 h.
+   */
   async function pollUnresolved(): Promise<void> {
     const { rows } = await pool.query(
-      `select j.id, j.provider, j.provider_job_id, j.model, j.params, j.duration_s, m.kind from jobs j join model_configs m on m.id = j.model where j.status in ('timed_out', 'failed_unknown')
+      `select j.id, j.user_id, j.workspace_id, j.status, j.error, j.started_at, j.finished_at, j.provider, j.provider_job_id, j.model, j.feature, j.params, j.duration_s, m.kind, m.output_resolution,
+              coalesce(j.finished_at > now() - ($1::float8 * interval '1 millisecond'), false) as fresh
+         from jobs j join model_configs m on m.id = j.model where j.status in ('timed_out', 'failed_unknown')
           and not exists (select 1 from job_costs c where c.job_id = j.id and c.is_final)`,
+      [o.lateDeliveryMs],
     );
     for (const row of rows) {
       try {
         const adapter = row.provider_job_id ? await adapterFor(row) : undefined;
         if (adapter) {
           const status = await adapter.status();
+          if (status.state === 'succeeded' && row.fresh) {
+            // Back to running for deliver and settle, keeping finished_at (see timeOut). A lost submit has no started_at: set, so pollRunning can time the row out again if this process dies mid-delivery.
+            const revived = await pool.query(`update jobs set status = 'running', error = null, started_at = coalesce(started_at, now()) where id = $1 and status = $2`, [row.id, row.status]);
+            if (!revived.rowCount) continue;
+            try {
+              await deliver(row, status.outputUrl, status.costUsd, status.tokens);
+            } catch (e) {
+              // As it was, for the next pass to try again.
+              await pool.query(`update jobs set status = $2, error = $3, started_at = $4 where id = $1 and status = 'running'`, [row.id, row.status, row.error, row.started_at]);
+              throw e;
+            }
+            await adapter.release().catch((e) => log(`release ${row.id}`, e));
+            continue;
+          }
           if (status.state === 'succeeded' || status.state === 'failed' || status.state === 'canceled') {
             if (await lateBill(pool, row.id, status.costUsd, status.state === 'succeeded', status.state === 'succeeded' ? status.tokens : undefined)) await adapter.release().catch((e) => log(`release ${row.id}`, e));
             continue;

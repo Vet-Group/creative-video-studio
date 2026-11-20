@@ -170,16 +170,17 @@ describe('the mock lifecycle', () => {
     expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
   });
 
-  test('times a job out after the run limit, keeps its estimate, and settles it when the provider finishes', async () => {
+  test('times a job out after the run limit, keeps its estimate, and delivers the clip when the provider finishes late', async () => {
     const id = await newJob('u1');
     await start(counting(2_500), { runTimeoutMs: 600 });
     await send(id, 'u1');
     await waitFor('the job to time out', async () => (await status(id)) === 'timed_out');
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: false });
     await waitFor('the late result', async () => (await total(id)).is_final);
-    expect(await status(id)).toBe('timed_out');
-    expect(await total(id)).toEqual({ usd: '1.5000', is_final: true }); // a late success with no reported cost keeps the estimate, as settle does
-    expect((await job(id)).output_asset_id).toBeNull(); // a late result is not delivered
+    const j = await job(id);
+    expect([j.status, j.error]).toEqual(['succeeded', null]);
+    expect(j.output_asset_id).not.toBeNull(); // the clip the provider billed is delivered, so nobody pays for it a second time
+    expect(await total(id)).toEqual({ usd: '1.5000', is_final: true }); // with no reported cost it keeps the estimate, as settle does
   });
 
   test('books 0 USD for a mock job, from the estimate to the settlement', async () => {
@@ -368,13 +369,36 @@ describe('the mock lifecycle', () => {
   test('times out a job whose delivery keeps failing, frees its slot and settles it from timed_out', async () => {
     const id = await newJob('u2');
     const broken = counting(300, (inner) => ({ ...inner, status: async () => ({ state: 'succeeded', outputUrl: 'http://127.0.0.1:9/gone.mp4', costUsd: 0, costSource: 'estimate' }) }));
-    await start(broken, { runTimeoutMs: 600 });
+    await start(broken, { runTimeoutMs: 600, lateDeliveryMs: 0 });
     await send(id, 'u2');
     await waitFor('the job to time out', async () => (await status(id)) === 'timed_out');
     expect((await pool.query(`select count(*)::int as n from jobs where user_id = 'u2' and status in ('submitting', 'running')`)).rows[0].n).toBe(0);
     await waitFor('the late bill', async () => (await total(id)).is_final);
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
     expect((await job(id)).output_asset_id).toBeNull();
+  });
+
+  test('tries a late delivery only for lateDeliveryMs: the job goes back to timed_out each time it fails, then is billed without it', async () => {
+    const id = await newJob('u2');
+    const broken = counting(300, (inner) => ({ ...inner, status: async () => ({ state: 'succeeded', outputUrl: 'http://127.0.0.1:9/gone.mp4', costUsd: 0, costSource: 'estimate' }) }));
+    await start(broken, { runTimeoutMs: 600, lateDeliveryMs: 1_500 });
+    await send(id, 'u2');
+    await waitFor('the late bill', async () => (await total(id)).is_final);
+    const j = await job(id);
+    expect([j.status, j.error, j.output_asset_id]).toEqual(['timed_out', 'timed out', null]);
+    expect(Date.now() - j.finished_at.getTime()).toBeGreaterThan(1_400); // the failed deliveries kept the time-out's finished_at, so the window ran out
+    expect((await costs(id)).map((c) => c.kind)).toEqual(['estimate', 'late_bill']);
+    expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
+  });
+
+  test('a late delivery a crash left running is timed out again at its first time-out moment, so its window does not start over', async () => {
+    const id = await newJob('u2');
+    const givenUp = new Date(Date.now() - 60_000);
+    await pool.query(`update jobs set status = 'running', provider_job_id = 'mock:0:ok:x', started_at = now() - interval '1 hour', finished_at = $2, claimed_by = 'gone' where id = $1`, [id, givenUp]);
+    const broken = counting(300, (inner) => ({ ...inner, status: async () => ({ state: 'succeeded', outputUrl: 'http://127.0.0.1:9/gone.mp4', costUsd: 0, costSource: 'estimate' }) }));
+    await start(broken, { runTimeoutMs: 600, lateDeliveryMs: 30_000 });
+    await waitFor('the late bill', async () => (await total(id)).is_final);
+    expect([await status(id), (await job(id)).finished_at]).toEqual(['timed_out', givenUp]);
   });
 
   test('times out a running job whose provider has no adapter', async () => {
@@ -726,12 +750,13 @@ describe('a submit that pg-boss expiry or an error would orphan', () => {
     expect(counting.submits).toBe(1);
   });
 
-  test('saves the provider job id even when the row was already marked failed_unknown, so it can be billed late', async () => {
+  test('saves the provider job id even when the row was already marked failed_unknown, so its late result is still delivered', async () => {
     counting.submits = 0;
     const id = await newJob('u1');
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
-    const held = counting(300, (inner) => ({ ...inner, submit: async (req) => { const out = await inner.submit(req); await gate; return out; } }));
+    // The result is ready 1.5 s after the submit, well after the id is saved, so the row still reads failed_unknown when checked below.
+    const held = counting(1_500, (inner) => ({ ...inner, submit: async (req) => { const out = await inner.submit(req); await gate; return out; } }));
     await start(held);
     await send(id, 'u1');
     await waitFor('the submit', async () => counting.submits === 1 && (await status(id)) === 'submitting');
@@ -739,7 +764,10 @@ describe('a submit that pg-boss expiry or an error would orphan', () => {
     release();
     await waitFor('the provider job id', async () => (await job(id)).provider_job_id);
     expect(await status(id)).toBe('failed_unknown');
-    await waitFor('the late bill', async () => (await total(id)).is_final);
+    await waitFor('the late result', async () => (await total(id)).is_final);
+    const j = await job(id);
+    expect([j.status, j.error]).toEqual(['succeeded', null]);
+    expect(j.output_asset_id).not.toBeNull();
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
   });
 });
