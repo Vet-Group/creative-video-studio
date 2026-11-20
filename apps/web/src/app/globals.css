@@ -2628,10 +2628,10 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .nav-guide { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 2px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; transition: background-color var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast); }
 .nav-guide .icon { display: none; } /* no room beside the label in the 240 px rail; the words say it */
 .nav-guide:hover { background: var(--fill); border-color: var(--ink-subtle, var(--border)); color: var(--ink); }
-.nav-hint { display: block; padding: 0 12px 6px 40px; color: var(--text-muted); font-size: 12px; line-height: 16px; }
-.nav-hint strong { display: none; }
+/* The drawer shows the names only: four lines under each tool pushed the Library and the help pages below a phone's fold, and the tool guide has the same lines. */
+.nav-hint { display: none; }
 @media (min-width: 1024px) {
-  .nav-hint { position: absolute; top: var(--hint-top, 0); left: calc(100% + 12px); width: 248px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 32px -12px rgb(var(--shade) / .3); color: var(--text-2); font-size: 13px; line-height: 18px; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-50%); transition: opacity .12s, visibility 0s .12s; }
+  .nav-hint { display: block; position: absolute; top: var(--hint-top, 0); left: calc(100% + 12px); width: 248px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 32px -12px rgb(var(--shade) / .3); color: var(--text-2); font-size: 13px; line-height: 18px; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-50%); transition: opacity .12s, visibility 0s .12s; }
   .nav-hint strong { display: block; margin-bottom: 2px; color: var(--ink); font-weight: 600; }
   /* The hint is placed against the sidebar, not the nav item (no positioned ancestor between), so the scrolling nav does not clip it; Shell sets --hint-top to its link's centre when the pointer or focus arrives. */
   /* Keyboard focus, not the focus a click leaves on the link, so the line does not stay over the page after a click. */
