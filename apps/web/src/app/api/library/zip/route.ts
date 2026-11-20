@@ -1,7 +1,7 @@
 import { crc32 } from 'node:zlib';
 import { itemLabel } from '@/lib/apps';
 import { pool } from '@/lib/auth';
-import { downloadName, extensionOf, ICT_DAY, LIVE_CLIP } from '@/lib/clips';
+import { downloadName, extensionOf, ICT_DAY, LIBRARY_LISTED, LIVE_CLIP } from '@/lib/clips';
 import { signDownloadToken, verifyDownloadToken } from '@/lib/download-token';
 import { guard } from '@/lib/session';
 import { getObject } from '@/lib/storage';
@@ -15,14 +15,14 @@ const ENTRY_OVERHEAD = 512;
 const safeExtension = (filename: string): string => (/^[a-z0-9]{1,5}$/i.test(extensionOf(filename)) ? extensionOf(filename) : 'bin');
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 
-/** The Library items of workspace `workspaceId` to zip, in the order given: 403 unless every id is a live clip there (deleted, failed, purged, unknown ids and
- * ids of another workspace refuse the whole request), 413 at 4 GiB or more. */
-async function items(ids: string[], workspaceId: string) {
+/** The Library items of workspace `workspaceId` to zip, in the order given: 403 unless every id is a live clip there that the caller can list (the Library's own,
+ * their History's or, for an Admin, a system account's; deleted, failed, purged, unknown ids and ids of another workspace refuse the whole request), 413 at 4 GiB or more. */
+async function items(ids: string[], workspaceId: string, me: { id: string; role?: string | null }) {
   const { rows } = await pool.query(
     `select j.id, ${ICT_DAY} as day, u.name, j.params, o.s3_key, o.bytes, o.mime, o.filename
        from jobs j join users u on u.id = j.user_id join assets o on o.id = j.output_asset_id
-      where j.id = any($1::text[]) and j.workspace_id = $2 and ${LIVE_CLIP} and o.deleted_at is null`,
-    [ids, workspaceId],
+      where j.id = any($1::text[]) and j.workspace_id = $2 and ${LIVE_CLIP} and (${LIBRARY_LISTED} or j.user_id = $3 or $4::boolean) and o.deleted_at is null`,
+    [ids, workspaceId, me.id, me.role === 'admin'],
   );
   if (rows.length !== ids.length) return { error: Response.json({ error: 'one or more items cannot be downloaded' }, { status: 403 }) };
   if (rows.reduce((sum, r) => sum + Number(r.bytes) + ENTRY_OVERHEAD, 22) >= ZIP32_LIMIT) return { error: Response.json({ error: 'the items add up to 4 GiB or more; pick fewer' }, { status: 413 }) };
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > MAX_IDS) return bad(`ids must list 1 to ${MAX_IDS} items`);
   if (!ids.every((id) => typeof id === 'string' && /^[\w-]{1,64}$/.test(id))) return bad('each id must be a job id');
   if (new Set(ids).size !== ids.length) return bad('ids must not repeat');
-  const found = await items(ids, g.workspaceId);
+  const found = await items(ids, g.workspaceId, g.session.user);
   if (found.error) return found.error;
   const list = ids.join(',');
   return Response.json({ downloadUrl: `/api/library/zip?ids=${list}&t=${signDownloadToken(`zip:${list}`, g.session.user.id)}` });
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   const list = q.get('ids') ?? '';
   const token = q.get('t');
   if (!token || !verifyDownloadToken(token, `zip:${list}`, g.session.user.id)) return Response.json({ error: 'the download link is invalid or expired' }, { status: 403 });
-  const found = await items(list.split(','), g.workspaceId);
+  const found = await items(list.split(','), g.workspaceId, g.session.user);
   if (found.error) return found.error;
   const taken = new Set<string>();
   const entries = found.rows.map((r) => {

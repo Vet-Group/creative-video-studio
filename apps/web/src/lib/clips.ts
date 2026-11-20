@@ -6,6 +6,10 @@ import { pool } from './auth';
 /** SQL for a job (alias `j`) that is a clip in the Library: succeeded, not deleted, not purged. */
 export const LIVE_CLIP = `j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null and j.output_asset_id is not null`;
 
+/** SQL for a job `j` that the Library lists (owner decision 2026-11-20): one not made by a system account (`users.system`: the deploy Admin, test and demo accounts),
+ * unless an Admin put it on an Examples tab (an `examples` row is keyed by the job, so it is of the job's own workspace). Only the list: a direct link still reads it (LIVE_CLIP). */
+export const LIBRARY_LISTED = `(not exists (select 1 from users su where su.id = j.user_id and su.system) or exists (select 1 from examples ex where ex.job_id = j.id))`;
+
 /** The creator's own words, as the detail view shows them: a free prompt on Create video and Image Generation (kept as the brief beside a style); the other features compose theirs. */
 export const OWN_PROMPT = `case when j.feature in ('image', 'video') and j.preset_id is null then j.prompt when j.feature = 'image' then j.params->>'brief' end`;
 

@@ -493,6 +493,59 @@ test('the photo tools in a picture’s Library detail open the tool with the pic
   }
 });
 
+// A system account's results stay out of everyone's Library; an Admin's "Hiện tài khoản hệ thống" shows them, marked, and the address keeps it (owner decision 2026-11-20).
+// CVS_E2E_SHOTS=<folder> saves the screenshots there (1440 px light, 390 px dark).
+test('a system account’s results stay out of the Library until an Admin ticks Hiện tài khoản hệ thống', async ({ page, browser }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'syslib');
+  const id = await runViaApi(page);
+  const shot = (p: Page, name: string) => p.screenshot({ path: process.env.CVS_E2E_SHOTS ? `${process.env.CVS_E2E_SHOTS}/${name}.png` : test.info().outputPath(`${name}.png`) });
+  const listed = (p: Page) => p.waitForResponse((r) => new URL(r.url()).pathname === '/api/library' && r.ok());
+  try {
+    await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.find((j) => j.id === id)?.status, { timeout: 60_000 }).toBe('succeeded');
+
+    // A member, the account itself included, never gets them back, not even with system=1 in the address, and has no such toggle.
+    const own = listed(page);
+    await page.goto('/library?system=1');
+    await own;
+    await expect(page.locator('.library-empty, .grid .card').first()).toBeVisible(); // the list is drawn, so a missing card is left out, not late
+    await expect(page.locator(`article[data-clip-id="${id}"]`)).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: 'Hiện tài khoản hệ thống' })).toHaveCount(0);
+
+    const admin = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
+    await signIn(admin, 'admin');
+    const first = listed(admin);
+    await admin.goto('/library');
+    await first;
+    await expect(admin.locator('.library-empty, .grid .card').first()).toBeVisible();
+    const toggle = admin.getByRole('checkbox', { name: 'Hiện tài khoản hệ thống' });
+    await expect(toggle).not.toBeChecked();
+    await expect(admin.locator(`article[data-clip-id="${id}"]`)).toHaveCount(0);
+    await expect(admin.getByLabel('Người tạo').locator('option', { hasText: 'E2E System Library' })).toHaveCount(0);
+    await toggle.check();
+    await expect(admin).toHaveURL(/[?&]system=1(&|$)/);
+    await admin.getByLabel('Người tạo').selectOption({ label: 'E2E System Library' });
+    await expect(admin.locator(`article[data-clip-id="${id}"]`).locator('.tag', { hasText: 'Hệ thống' })).toBeVisible();
+    await expect(admin.locator('.library-days')).toHaveAttribute('aria-busy', 'false'); // the creator's list has answered, so the grid is no longer dimmed
+    await shot(admin, 'library-system-1440-light');
+
+    // The same address on a phone in dark mode: the toggle stays on and the card keeps its mark.
+    const phone = await (await browser.newContext({ storageState: await admin.context().storageState(), viewport: { width: 390, height: 844 }, colorScheme: 'dark', hasTouch: true, isMobile: true })).newPage();
+    await phone.goto(admin.url());
+    await expect(phone.locator(`article[data-clip-id="${id}"]`).locator('.tag', { hasText: 'Hệ thống' })).toBeVisible();
+    const small = phone.getByRole('checkbox', { name: 'Hiện tài khoản hệ thống' });
+    await expect(small).toBeChecked();
+    await small.scrollIntoViewIfNeeded();
+    await expect(phone.locator('.library-days')).toHaveAttribute('aria-busy', 'false');
+    await shot(phone, 'library-system-390-dark');
+    expect(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await phone.context().close();
+    await admin.context().close();
+  } finally {
+    expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
+  }
+});
+
 test('a failed Library read says so, and Thử lại loads it without a page reload', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'loada');

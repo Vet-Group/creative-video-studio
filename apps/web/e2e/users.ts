@@ -175,6 +175,8 @@ export const USERS = {
   // library.e2e: a picture's Library detail opens it in Background Remover, for its creator and for another member.
   libtoola: { email: 'libtoola@e2e.test', name: 'E2E Library Tools A', role: 'member' },
   libtoolb: { email: 'libtoolb@e2e.test', name: 'E2E Library Tools B', role: 'member' },
+  // library.e2e: a system account (flag set in serve.ts), whose results stay out of the Library until an Admin shows them.
+  syslib: { email: 'syslib@e2e.test', name: 'E2E System Library', role: 'member' },
   // changelog.e2e: the changelog page, the sidebar dot and the once-a-day popup, one member per test.
   chga: { email: 'chga@e2e.test', name: 'E2E Changelog A', role: 'member' },
   chgb: { email: 'chgb@e2e.test', name: 'E2E Changelog B', role: 'member' },

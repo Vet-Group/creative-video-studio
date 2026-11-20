@@ -7,8 +7,8 @@ describe('libraryQuery', () => {
   });
 
   it('sends every filter, the trimmed words, the sort and the offset', () => {
-    const q = new URLSearchParams(libraryQuery({ q: '  áo  khoác ', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favoritesOnly: true, examplesOnly: true, suggestedOnly: true, sort: 'oldest' }, 24));
-    expect(Object.fromEntries(q)).toEqual({ q: 'áo  khoác', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favorites: '1', example: '1', suggested: '1', sort: 'oldest', offset: '24' });
+    const q = new URLSearchParams(libraryQuery({ q: '  áo  khoác ', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favoritesOnly: true, examplesOnly: true, suggestedOnly: true, showSystem: true, sort: 'oldest' }, 24));
+    expect(Object.fromEntries(q)).toEqual({ q: 'áo  khoác', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favorites: '1', example: '1', suggested: '1', system: '1', sort: 'oldest', offset: '24' });
   });
 
   it('drops blank words', () => {
@@ -22,7 +22,7 @@ describe('filtersFromParams', () => {
   });
 
   it('round-trips every filter through libraryQuery', () => {
-    const f = { q: 'áo khoác', creator: 'u1', store: 'none', date: '2026-10-23', days: '7' as const, ratio: '1:1', kind: 'images', verdict: 'none' as const, favoritesOnly: true, examplesOnly: true, suggestedOnly: true, sort: 'oldest' as const };
+    const f = { q: 'áo khoác', creator: 'u1', store: 'none', date: '2026-10-23', days: '7' as const, ratio: '1:1', kind: 'images', verdict: 'none' as const, favoritesOnly: true, examplesOnly: true, suggestedOnly: true, showSystem: true, sort: 'oldest' as const };
     expect(filtersFromParams(new URLSearchParams(libraryQuery(f, 0)))).toEqual(f);
   });
 
@@ -45,7 +45,7 @@ describe('activeFilters', () => {
     expect(activeFilters({ ...NO_FILTERS, sort: 'oldest', q: ' ' })).toBe(0);
     expect(activeFilters({ ...NO_FILTERS, kind: 'videos' })).toBe(1);
     expect(activeFilters({ ...NO_FILTERS, verdict: 'fail' })).toBe(1);
-    expect(activeFilters({ q: 'x', creator: 'u1', store: 's1', date: '2026-10-23', days: '30', ratio: '9:16', kind: 'apps', verdict: 'pass', favoritesOnly: true, examplesOnly: true, suggestedOnly: true, sort: 'newest' })).toBe(11);
+    expect(activeFilters({ q: 'x', creator: 'u1', store: 's1', date: '2026-10-23', days: '30', ratio: '9:16', kind: 'apps', verdict: 'pass', favoritesOnly: true, examplesOnly: true, suggestedOnly: true, showSystem: true, sort: 'newest' })).toBe(11);
     expect(activeFilters({ ...NO_FILTERS, store: 'none' })).toBe(1);
   });
 });
