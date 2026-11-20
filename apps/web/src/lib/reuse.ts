@@ -60,7 +60,7 @@ export interface Skipped {
   lost?: number;
   /** Photos the form has no place for, left out. */
   extra?: { count: number; max: number };
-  /** The job's store, hidden since. */
+  /** The job's store, hidden since or another billing team's. */
   store?: boolean;
 }
 
@@ -70,7 +70,7 @@ export function skippedNote(kept: number, s: Skipped): string {
     ...(s.model ? [`mô hình ${s.model.label ?? 'đã dùng'} (đã tắt hoặc không còn dùng ở trang này${s.model.instead ? `, đã chọn ${s.model.instead}` : ''})`] : []),
     ...(s.lost ? [`${s.lost} ảnh đầu vào (đã bị xoá)`] : []),
     ...(s.extra ? [`${s.extra.count} ảnh thừa (chỗ này chỉ nhận ${s.extra.max} ảnh)`] : []),
-    ...(s.store ? ['cửa hàng (đã bị ẩn)'] : []),
+    ...(s.store ? ['cửa hàng (đã bị ẩn hoặc không thuộc team của bạn)'] : []),
   ];
   return list.length === 0 ? '' : `Đã điền lại ${kept > 0 ? `${kept} ảnh và ` : ''}phần còn lại. Không dùng lại được: ${list.join('; ')}.`;
 }

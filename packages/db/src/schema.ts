@@ -66,10 +66,14 @@ export const teams = pgTable(
     hidden: boolean('hidden').notNull().default(false),
     /** The page a member of this team lands on after login (apps/web lib/landing.ts); null lands on Create, as everyone did before. */
     defaultTool: text('default_tool'),
+    /** A sales team (docs/BILLING.md): its month's costs past `freeMonthlyUsd` are billed to it, and its members run jobs only for its stores. */
+    billable: boolean('billable').notNull().default(false),
+    freeMonthlyUsd: numeric('free_monthly_usd', { precision: 12, scale: 4 }).notNull().default('20'),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
   (t) => [
     check('teams_default_tool_check', sql`${t.defaultTool} is null or ${t.defaultTool} in ('/explore', '/try-on', '/image-generation', '/create', '/marketing-studio', '/apps')`),
+    check('teams_free_monthly_usd_check', sql`${t.freeMonthlyUsd} >= 0`),
   ],
 );
 
@@ -87,8 +91,10 @@ export const stores = pgTable('stores', {
   brandColors: text('brand_colors').array().notNull().default(sql`'{}'`),
   brandTagline: text('brand_tagline'),
   workspaceId: workspaceId(),
+  /** The team that owns the store (docs/BILLING.md); only a company store has one. */
+  teamId: text('team_id').references(() => teams.id, { onDelete: 'set null' }),
   createdAt: tstz('created_at').notNull().defaultNow(),
-}, (t) => [index('stores_workspace_id_idx').on(t.workspaceId)]);
+}, (t) => [index('stores_workspace_id_idx').on(t.workspaceId), index('stores_team_id_idx').on(t.teamId)]);
 
 // Property names follow better-auth's models; apps/web/src/lib/auth.ts maps its drizzle adapter onto these tables.
 export const users = pgTable(
@@ -580,6 +586,25 @@ export const costEntries = pgTable(
     ),
     check('cost_entries_day_check', sql`${t.jobId} is null or ${t.day} is not null`),
   ],
+);
+
+// A month accounting has read (docs/BILLING.md): its billing figures frozen, so a later team or store change does not move them. Reopening deletes the row (audited).
+export const billingMonthCloses = pgTable(
+  'billing_month_closes',
+  {
+    month: text('month').primaryKey(),
+    /** The largest ledger id the figures include. */
+    asOf: bigint('as_of', { mode: 'number' }).notNull(),
+    /** One entry per team, partner workspace and company reason: bucket, id, name, total, free allowance, payable (USD as numeric text). */
+    buckets: jsonb('buckets').notNull(),
+    /** The rows behind the buckets, summed per bucket, user, store, kind and model: what the CSV and the drill-down read. */
+    lines: jsonb('lines').notNull(),
+    /** The ledger total and the sums of the teams, the partners and the company. */
+    totals: jsonb('totals').notNull(),
+    closedBy: text('closed_by').references(() => users.id, { onDelete: 'set null' }),
+    closedAt: tstz('closed_at').notNull().defaultNow(),
+  },
+  (t) => [check('billing_month_closes_month_check', sql`${t.month} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`)],
 );
 
 // Pass or Fail per job's clip. It is keyed by job so it survives a purge, which nulls output_asset_id.

@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-20T17:30:00+07:00', kind: 'improved', title: 'Thành viên team bán hàng chỉ thấy và chọn được cửa hàng của team mình', details: ['Nếu nhóm của bạn được Admin đặt là team bán hàng, ô chọn cửa hàng khi tạo chỉ còn các cửa hàng của team bạn; bạn vẫn có thể để trống cửa hàng như trước.', 'Thử lại hoặc chạy lại một lượt cũ có cửa hàng nay thuộc team khác thì lượt mới chạy không gắn cửa hàng; dùng lại lượt đó cũng để trống ô cửa hàng và báo cho bạn biết.', 'Các nhóm khác không thay đổi gì: vẫn chọn được mọi cửa hàng đang mở.'], prs: [583], audience: 'all' } satisfies ChangeEntry;

@@ -2,6 +2,7 @@ import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
 import { type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
+import { storeAllowed } from '@/lib/billing';
 import { LIVE_CLIP } from '@/lib/clips';
 import { guard } from '@/lib/session';
 
@@ -9,7 +10,7 @@ const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
 
 /**
  * A job (an image job carries its `feature` and `resolution`, and `durationSec` 0) with what Reuse needs to prefill Create: the input images that still exist, preset, prompt, ratio, duration, model and store
- * (null when the store is hidden now, since a Run cannot take it, and `storeLost` says so), the model's label, how many input images the job had (`inputCount`, so the form can say how many no longer exist) and their ids in the job's order (`inputIds`, so each image goes back to its own slot when one before it is gone), the end frame that still exists (to everyone who gets the inputs when it is one of them, a clip that loops, since a Run takes an end frame among its own images;
+ * (null when the store is hidden now or the caller may not pick it, another billing team's, since a Run cannot take it, and `storeLost` says so), the model's label, how many input images the job had (`inputCount`, so the form can say how many no longer exist) and their ids in the job's order (`inputIds`, so each image goes back to its own slot when one before it is gone), the end frame that still exists (to everyone who gets the inputs when it is one of them, a clip that loops, since a Run takes an end frame among its own images;
  * else to its creator only, as a Run takes only the caller's own), and to its creator the reference audio that still exists. Visible to its owner and to Admins, and to everyone once it is a
  * Library clip. A deleted or purged job is 404. `batchItems` lists, to its creator, every job of a batch app's Run with its item (view, breed, style, product, name), id, status and
  * `outputAssetId` (null once purged), so History's select-the-Run button picks the whole Run's results, however many; else null.
@@ -22,9 +23,9 @@ export async function GET(request: Request, { params }: RouteContext) {
     await pool.query(
       `select j.id, j.user_id, j.status, j.error, j.is_mock, j.feature, j.params, j.preset_id, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.model, j.input_asset_ids, j.output_asset_id, j.poster_asset_id, j.store_id as job_store_id,
               (select m.label from model_configs m where m.id = j.model) as model_label,
-              (select s.id from stores s where s.id = j.store_id and s.workspace_id = j.workspace_id and not s.hidden) as store_id
+              (select s.id from stores s where s.id = j.store_id and s.workspace_id = j.workspace_id and not s.hidden and ${storeAllowed('s', '$3')}) as store_id
          from jobs j where j.id = $1 and j.workspace_id = $2 and j.deleted_at is null and j.purged_at is null`,
-      [id, g.workspaceId],
+      [id, g.workspaceId, g.session.user.id],
     )
   ).rows[0];
   const own = job?.user_id === g.session.user.id;

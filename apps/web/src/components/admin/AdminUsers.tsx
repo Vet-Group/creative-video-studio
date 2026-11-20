@@ -45,7 +45,8 @@ const initials = (name: string) => {
 /** Everything an Admin changes on one user: name and email, role, team, sign-in methods, a temporary password, lock. */
 /** Admin: the stores assigned to a user. An assigned store leads that user's store pickers (the "theirs" group), as one they pinned does. */
 function StoreAssign({ user }: { user: User }) {
-  const stores = useFetch<{ stores: { id: string; name: string }[] }>('/api/stores');
+  // The Admin list, not the picker: an Admin in a billing team picks only their team's stores (lib/billing.ts), but assigns any.
+  const stores = useFetch<{ stores: { id: string; name: string }[] }>('/api/admin/stores');
   const assigned = useFetch<{ storeIds: string[] }>(`/api/admin/users/${user.id}/stores`);
   const { problem, pending, run } = useAction(assigned.reload);
   if (stores.failed || assigned.failed)

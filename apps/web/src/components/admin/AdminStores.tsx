@@ -13,9 +13,15 @@ interface Store extends BrandStore {
   paused: boolean;
   hasCost: boolean;
   inUse: boolean;
+  teamId: string | null;
+}
+interface TeamOption {
+  id: string;
+  name: string;
+  billable: boolean;
 }
 
-function StoreRow({ store, run, pending, onBrand }: { store: Store; run: ReturnType<typeof useAction>['run']; pending: boolean; onBrand: () => void }) {
+function StoreRow({ store, teams, run, pending, onBrand }: { store: Store; teams: TeamOption[] | null; run: ReturnType<typeof useAction>['run']; pending: boolean; onBrand: () => void }) {
   const [name, setName] = useState(store.name);
   const [code, setCode] = useState(store.code);
   const patch = (body: Record<string, unknown>, fallback: string) => run(() => api(`/api/admin/stores/${store.id}`, sendJson('PATCH', body)), fallback);
@@ -41,6 +47,19 @@ function StoreRow({ store, run, pending, onBrand }: { store: Store; run: ReturnT
       <td data-label="Mã cửa hàng">
         <input aria-label={`Mã cửa hàng của ${store.name}`} value={code} onChange={(e) => setCode(e.target.value)} />
       </td>
+      {teams && (
+        <td data-label="Nhóm">
+          {/* A team's members who sell (a billing team) run jobs only for the team's stores (docs/BILLING.md). */}
+          <select aria-label={`Nhóm của ${store.name}`} value={store.teamId ?? ''} disabled={pending} onChange={(e) => void patch({ teamId: e.target.value || null }, 'Không đổi được nhóm của cửa hàng.')}>
+            <option value="">Không thuộc nhóm</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {`${t.name}${t.billable ? ' (tính phí)' : ''}`}
+              </option>
+            ))}
+          </select>
+        </td>
+      )}
       <td data-label="Thao tác">
         <div className="actions">
           <button type="button" disabled={pending || !name.trim() || !code.trim()} onClick={() => void save()}>
@@ -79,7 +98,7 @@ function StoreRow({ store, run, pending, onBrand }: { store: Store; run: ReturnT
 }
 
 export function AdminStores() {
-  const { data, failed, reload } = useFetch<{ stores: Store[] }>('/api/admin/stores?includeHidden=1');
+  const { data, failed, reload } = useFetch<{ stores: Store[]; teams: TeamOption[] | null }>('/api/admin/stores?includeHidden=1');
   const { problem, pending, run } = useAction(reload);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -139,12 +158,13 @@ export function AdminStores() {
               <tr>
                 <th scope="col">Tên cửa hàng</th>
                 <th scope="col">Mã cửa hàng</th>
+                {data.teams && <th scope="col">Nhóm</th>}
                 <th scope="col">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {data.stores.map((s) => (
-                <StoreRow key={s.id} store={s} run={run} pending={pending} onBrand={() => setBrand(s)} />
+                <StoreRow key={s.id} store={s} teams={data.teams} run={run} pending={pending} onBrand={() => setBrand(s)} />
               ))}
             </tbody>
           </table>

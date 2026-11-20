@@ -852,6 +852,10 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin td .link-button:hover { text-decoration: underline; }
 /* The job list spans the row: it is not the sticky, width-capped name cell. */
 .admin table.sticky-first tr.drill > td { position: static; max-width: none; padding: 8px 12px 16px; background: var(--surface-1); box-shadow: none; }
+/* Teams: the billing flag with its allowance under it, and the team's stores opened under the row. */
+.admin .team-billing { display: grid; gap: 8px; min-width: 12rem; }
+.admin .team-billing label:not(.check) { margin: 0; }
+.admin .mobile-records tr.drill > td { padding: 8px 12px 16px; background: var(--surface-1); }
 .admin table.jobs { width: 100%; font-size: 13px; }
 .admin table.jobs .tag { margin-left: 6px; }
 /* On a phone each job is a two-line block: the submit time and the USD on top, the feature, model and status under them. */

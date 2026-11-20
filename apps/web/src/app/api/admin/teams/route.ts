@@ -1,19 +1,27 @@
 import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
+import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { bad, nonEmpty, readBody } from '@/lib/admin';
 import { pool } from '@/lib/auth';
 import { guard } from '@/lib/session';
 
-/** Admin: the teams. Hidden ones are left out unless `?includeHidden=1`, so the new-user form (which uses the default) never offers them. */
+/**
+ * Admin: the teams, each with its billing (`billable`, `freeMonthlyUsd`) and the company stores it owns (`storeIds`), and every company store (`stores`,
+ * closed ones too, with its team) for the team's store picker (docs/BILLING.md). Hidden teams are left out unless `?includeHidden=1`, so the new-user form
+ * (which uses the default) never offers them.
+ */
 export async function GET(request: Request) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
   const all = new URL(request.url).searchParams.get('includeHidden') === '1';
   const { rows } = await pool.query(
-    'select id, name, cost_centre_code as "costCentreCode", hidden, default_tool as "defaultTool" from teams where $1 or not hidden order by name, id',
-    [all],
+    `select t.id, t.name, t.cost_centre_code as "costCentreCode", t.hidden, t.default_tool as "defaultTool", t.billable, t.free_monthly_usd::text as "freeMonthlyUsd",
+            array(select s.id from stores s where s.team_id = t.id and s.workspace_id = $2 order by s.name, s.id) as "storeIds"
+       from teams t where $1 or not t.hidden order by t.name, t.id`,
+    [all, COMPANY_WORKSPACE_ID],
   );
-  return Response.json({ teams: rows });
+  const stores = await pool.query('select id, name, hidden, team_id as "teamId" from stores where workspace_id = $1 order by hidden, name, id', [COMPANY_WORKSPACE_ID]);
+  return Response.json({ teams: rows, stores: stores.rows });
 }
 
 /** Admin: create a team (`name`, optional `costCentreCode`). Audited. */
