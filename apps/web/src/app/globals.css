@@ -506,6 +506,18 @@ dialog.modal.jobs-drawer[open] { animation: jobs-drawer-in .28s cubic-bezier(.2,
 .job-prompt-tools button { display: inline-flex; white-space: nowrap; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; cursor: pointer; }
 .job-prompt-tools button:hover { text-decoration: underline; text-underline-offset: 3px; }
 .job-translation { margin-top: 8px; padding: 8px 10px; border-left: 2px solid var(--border-strong); color: var(--text-2); font-size: 13px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; } /* the Translate button's Vietnamese reading, under the tools */
+/* A wait shown as alive (Suggestions.tsx BusyNote): what is happening with a sliding bar under it and the seconds so far; text-like shimmer lines
+   hold the room of the words to come. Reduced motion keeps a still bar and still lines. */
+.busy-note { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; column-gap: 4px; padding-bottom: 6px; color: var(--text-2); font-size: 13px; font-weight: 500; line-height: 20px; font-variant-numeric: tabular-nums; }
+.busy-bar { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; overflow: hidden; border-radius: 2px; background: rgb(var(--tint) / .12); }
+.busy-bar::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; border-radius: inherit; background: var(--brand); animation: busy-slide 1.1s ease-in-out infinite; }
+@keyframes busy-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+.busy-lines { display: grid; gap: 8px; padding: 6px 2px 2px; }
+.busy-lines > span { height: 10px; border-radius: 5px; background: linear-gradient(90deg, rgb(var(--tint) / .07), rgb(var(--tint) / .18), rgb(var(--tint) / .07)); background-size: 200% 100%; animation: busy-shimmer 1.2s linear infinite; }
+.busy-lines > span:nth-child(2) { width: 85%; }
+.busy-lines > span:nth-child(3) { width: 55%; }
+@keyframes busy-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .busy-bar::after { width: 100%; animation: none; opacity: .5; } .busy-lines > span { animation: none; } }
 .job-inputs { display: flex; flex-wrap: wrap; gap: 8px !important; margin: 0; padding: 0; list-style: none; }
 .job-inputs img { display: block; width: 48px; height: 48px; object-fit: cover; border-radius: 6px; background: var(--fill); }
 .job-chips { display: flex; gap: 6px; margin: 0; }
@@ -744,6 +756,7 @@ label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 .kinds { display: flex; gap: .5rem; margin: .5rem 0 1rem; overflow-x: auto; scrollbar-width: none; }
 .kinds button { flex: none; height: 36px; padding: 0 16px; border: 1px solid rgb(var(--tint) / .1); border-radius: 999px; font-size: 13px; line-height: 20px; font-weight: 500; white-space: nowrap; }
 .kinds button[aria-pressed='true'] { border-color: var(--ink-strong); background: var(--ink-strong); color: var(--on-ink); }
+.kinds-wrap { flex-wrap: wrap; overflow-x: visible; } /* a few categories: wrapped, so a phone shows them all instead of hiding the last off screen */
 input[type='range'] { accent-color: var(--ink); }
 .card img.output { display: block; width: 100%; max-height: 28rem; object-fit: contain; background: var(--fill); border-radius: 10px; }
 .card video { width: 100%; max-height: 28rem; background: var(--media-bg); border-radius: 10px; }

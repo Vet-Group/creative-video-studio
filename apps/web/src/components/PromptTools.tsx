@@ -11,7 +11,7 @@ import { Icon } from './Icon';
 import { useJobs } from './jobs';
 import { Modal } from './Modal';
 import s from './PromptComposer.module.css';
-import { type Ask, isVietnamese, useSuggest, useTranslate } from './Suggestions';
+import { type Ask, BusyNote, isVietnamese, useSuggest, useTranslate } from './Suggestions';
 
 export type PromptPart = 'ai' | 'recent' | 'translate' | 'clear' | 'expand';
 
@@ -137,7 +137,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
       {open === 'ai' && (
         <div ref={list} className={s.popover} role="group" aria-label={aiLabel} aria-busy={ai.busy}>
           <div className={s.popHead}>
-            <span>{ai.busy ? 'AI đang viết 3 gợi ý…' : 'Chọn một gợi ý'}</span>
+            {ai.busy ? <BusyNote text="AI đang viết 3 gợi ý…" /> : <span>Chọn một gợi ý</span>}
             {!ai.busy && (
               <button type="button" className={s.popAction} disabled={!ask} onClick={suggest}>
                 <Icon name="wand" size={12} />
@@ -180,11 +180,23 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
             <span>Bản dịch tiếng Việt</span>
           </div>
           <p className={s.popNote}>Chỉ để đọc. Prompt gửi đi vẫn là tiếng Anh.</p>
-          {tr.busy && <span className={s.skeleton} />}
+          {tr.busy && (
+            <>
+              <BusyNote text="Đang dịch sang tiếng Việt…" />
+              <span className="busy-lines" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            </>
+          )}
           {tr.vi && <p className={s.translation}>{tr.vi}</p>}
           {tr.error && (
             <p className={s.error} role="alert">
-              {tr.error}
+              {tr.error}{' '}
+              <button type="button" className="link-button" onClick={tr.translate}>
+                Thử lại
+              </button>
             </p>
           )}
         </div>

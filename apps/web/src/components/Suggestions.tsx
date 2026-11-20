@@ -101,6 +101,26 @@ export function useTranslate(text: string) {
   };
 }
 
+/**
+ * A wait the member can see is alive (an LLM call through the worker's queue takes seconds, up to GIVE_UP_MS): a sliding bar, what is happening,
+ * and from 2 seconds on the seconds so far. Screen readers hear the words once; the ticking seconds are for the eye.
+ */
+export function BusyNote({ text }: { text: string }) {
+  const [sec, setSec] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => setSec(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span className="busy-note" aria-live="polite">
+      <span className="busy-bar" aria-hidden="true" />
+      {text}
+      {sec >= 2 && <span aria-hidden="true">{` · ${sec} giây${sec >= 15 ? ', thường xong trong 1 phút' : ''}`}</span>}
+    </span>
+  );
+}
+
 export function SuggestButton({ ask, label, onPick, disabled }: { ask: () => Ask; label: string; onPick: (text: string) => void; disabled?: boolean }) {
   const { busy, options, error, run, clear } = useSuggest();
 
@@ -111,8 +131,9 @@ export function SuggestButton({ ask, label, onPick, disabled }: { ask: () => Ask
         <Icon name="wand" size={12} />
         {busy ? 'Đang gợi ý…' : label}
       </button>
-      {(options.length > 0 || error) && (
-        <div className="suggestions" role="group" aria-label={label}>
+      {(busy || options.length > 0 || error) && (
+        <div className="suggestions" role="group" aria-label={label} aria-busy={busy}>
+          {busy && <BusyNote text="AI đang viết gợi ý…" />}
           {options.map((o) => (
             <button key={o} type="button" className="suggestion" onClick={() => (onPick(o), clear())}>
               {o}
