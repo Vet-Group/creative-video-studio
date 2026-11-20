@@ -18,8 +18,8 @@ Status: accepted 2026-11-20 (owner decisions below). Built in two pull requests:
 ## Setup
 
 - Migration 0111 adds `teams.billable` (false), `teams.free_monthly_usd` (numeric, 20, never negative), `stores.team_id` (set null when the team goes) and `billing_month_closes`. It changes no data: an Admin marks the real teams after the deploy.
-- **Admin › Nhóm**: per team, "Team bán hàng (tính phí)", the free allowance in USD, and the team's stores (the company's stores; picking a store of another team moves it). `PATCH /api/admin/teams/:id` takes `billable`, `freeMonthlyUsd` (a non-negative amount with at most 4 decimals) and `storeIds` (the whole set); each change is audited (`team.billing`, `team.stores`).
-- **Admin › Cửa hàng**: in the company workspace each store has a team picker. `PATCH /api/admin/stores/:id` takes `teamId` (a team id or null), audited `store.team`; a partner workspace's store never gets a team.
+- **Admin > Teams**: per team, a "sales team (billed)" checkbox, the free allowance in USD, and the team's stores (the company's stores; picking a store of another team moves it). `PATCH /api/admin/teams/:id` takes `billable`, `freeMonthlyUsd` (a non-negative amount with at most 4 decimals) and `storeIds` (the whole set); each change is audited (`team.billing`, `team.stores`).
+- **Admin > Stores**: in the company workspace each store has a team picker. `PATCH /api/admin/stores/:id` takes `teamId` (a team id or null), audited `store.team`; a partner workspace's store never gets a team.
 
 ## The store restriction
 
