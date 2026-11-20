@@ -1,3 +1,5 @@
+import { audit } from '@cvs/core/audit';
+import { withTransaction } from '@cvs/core/ledger';
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { auth, pool } from '@/lib/auth';
 import { authFailure, bad, readBody } from '@/lib/admin';
@@ -42,12 +44,16 @@ export async function POST(request: Request) {
   if (!(await pool.query('select 1 from teams where id = $1 and not hidden', [teamId])).rowCount) return bad('teamId must be the id of a visible team');
   try {
     const { user } = await auth.api.createUser({ headers: request.headers, body: { email, name, password, role, data: { teamId, emailVerified: true, outsideLark, mustChangePassword: typeof password === 'string' } } });
-    await pool.query('insert into workspace_members (workspace_id, user_id, role, added_by) values ($1, $2, $3, $4) on conflict do nothing', [
-      COMPANY_WORKSPACE_ID,
-      user.id,
-      role === 'admin' ? 'owner' : 'member',
-      g.session.user.id,
-    ]);
+    // better-auth wrote the user on its own connection; the membership and the audit row commit together.
+    await withTransaction(pool, async (tx) => {
+      await tx.query('insert into workspace_members (workspace_id, user_id, role, added_by) values ($1, $2, $3, $4) on conflict do nothing', [
+        COMPANY_WORKSPACE_ID,
+        user.id,
+        role === 'admin' ? 'owner' : 'member',
+        g.session.user.id,
+      ]);
+      await audit(tx, { actorId: g.session.user.id, action: 'user.create', target: `user:${user.id}`, newValue: { email: user.email, role, teamId, outsideLark, password: typeof password === 'string' } });
+    });
     return Response.json({ id: user.id, email: user.email, role, teamId }, { status: 201 });
   } catch (e) {
     return authFailure(e);

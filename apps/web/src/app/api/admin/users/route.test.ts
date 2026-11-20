@@ -135,6 +135,30 @@ describe('/api/admin/users', () => {
       ['outside@example.test', true],
     ]);
   });
+
+  test('refuses a write a page on another origin sent with the Admin cookie, even as text/plain, and audits the user the app itself creates', async () => {
+    const send = (email: string, headers: Record<string, string>) =>
+      POST(new Request(URL_USERS, { method: 'POST', headers: { cookie: adminCookie, 'content-type': 'text/plain', ...headers }, body: JSON.stringify({ email, name: 'Forged', password: PASSWORD, teamId: 'team-unassigned', role: 'admin' }) }));
+    // A sibling subdomain, an opaque origin, and the Fetch Metadata a browser adds for a same-site or cross-site page.
+    for (const headers of [{ origin: 'https://ideas.example.test' }, { origin: 'null' }, { 'sec-fetch-site': 'same-site' }, { origin: 'http://localhost:3400', 'sec-fetch-site': 'cross-site' }] as Record<string, string>[]) {
+      const res = await send('forged@example.test', headers);
+      expect(res.status, JSON.stringify(headers)).toBe(403);
+      expect(await res.json()).toEqual({ error: 'forbidden origin' });
+    }
+    expect((await pool.query(`select 1 from users where email = 'forged@example.test'`)).rowCount).toBe(0);
+    // The app's own page (a fetch or a form post), and a client that is not a browser and sends neither header.
+    const created: string[] = [];
+    for (const [n, headers] of ([{ origin: 'http://localhost:3400', 'sec-fetch-site': 'same-origin' }, { 'sec-fetch-site': 'none' }, {}] as Record<string, string>[]).entries()) {
+      const res = await send(`by-the-app-${n}@example.test`, headers);
+      expect(res.status, JSON.stringify(headers)).toBe(201);
+      created.push(((await res.json()) as { id: string }).id);
+    }
+    expect((await pool.query('select action, new_value from audit_entries where target = $1', [`user:${created[0]}`])).rows).toEqual([
+      { action: 'user.create', new_value: { email: 'by-the-app-0@example.test', role: 'admin', teamId: 'team-unassigned', outsideLark: false, password: true } },
+    ]);
+    // A read is not refused: a link from another site may open a page that loads it.
+    expect((await GET(new Request(URL_USERS, { headers: { cookie: adminCookie, origin: 'https://ideas.example.test', 'sec-fetch-site': 'cross-site' } }))).status).toBe(200);
+  });
 });
 
 describe('PATCH /api/admin/users/:id', () => {
