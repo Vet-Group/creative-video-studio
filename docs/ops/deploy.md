@@ -68,7 +68,8 @@ without it they stay on fal (`FAL_KEY`). After adding or removing the key, resta
 1. Refuses (exit 1, nothing changed) if any of ports 3400, 5435, 9400 or 9401 is taken (`ss -ltnH`), then takes the same
    `~/.local/state/creative-video-studio/ops.lock` that `cvs-backup` uses (waits up to 40 minutes).
 2. Clones or fast-forwards the repo into `/opt/creative-video-studio` over a read-only deploy key. Only the key's path is
-   used; its content is never read or printed.
+   used; its content is never read or printed. A detached checkout (what the gate's `deploy <commit>` leaves, a rollback too)
+   keeps its commit: only a checkout on a branch is fetched and fast-forwarded.
 3. Installs the pinned Node (**24.22.1**, inside the root `engines` range) into `/opt/creative-video-studio/node`. The tarball is
    downloaded from `https://nodejs.org/dist/v24.22.1/` and checked with `sha256sum -c` against that release's `SHASUMS256.txt`.
    Then pnpm at the `packageManager` version is installed next to it.

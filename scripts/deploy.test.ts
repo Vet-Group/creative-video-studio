@@ -336,6 +336,44 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     wouldFailLine(run(installSh, ['--dry-run'], { ...s.env, STUB_GIT_REMOTE: 'https://github.com/someone/else.git' }), 'origin is not CVS_REPO_URL');
   });
 
+  test.skipIf(!onPath('git'))('f5. a real run keeps the detached commit cvs-run-gate deploy <sha> checked out; only a branch is fast-forwarded', () => {
+    const s = sandbox();
+    rmSync(join(s.dir, 'stubs', 'git')); // the real git answers here
+    // The run stops right after step 4 (the repository), before Node, pnpm or anything else would really run.
+    writeFileSync(join(s.dir, 'stubs', 'uname'), '#!/usr/bin/env bash\necho stop-after-repository\n', { mode: 0o755 });
+    const git = (...args: string[]) => {
+      const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.test', '-c', 'commit.gpgsign=false', ...args], {
+        cwd: s.appDir,
+        env: { ...process.env, HOME: join(s.dir, 'home'), GIT_CONFIG_NOSYSTEM: '1' },
+        encoding: 'utf8',
+      });
+      expect(r.status, `git ${args.join(' ')}: ${r.stderr}`).toBe(0);
+      return r.stdout.trim();
+    };
+    git('init', '--quiet', '--bare', `${s.dir}/origin.git`);
+    git('init', '--quiet', '--initial-branch=main');
+    for (const n of [1, 2, 3]) git('commit', '--quiet', '--allow-empty', '-m', `c${n}`);
+    git('remote', 'add', 'origin', `${s.dir}/origin.git`);
+    git('push', '--quiet', 'origin', 'main');
+    const [c2, c3] = [git('rev-parse', 'HEAD~1'), git('rev-parse', 'HEAD')];
+    const env = { ...s.env, CVS_REPO_URL: git('remote', 'get-url', 'origin') };
+    const install = () => {
+      const r = run(installSh, [], env);
+      expect(r.out).toContain('unsupported CPU stop-after-repository');
+      return r.out;
+    };
+
+    git('checkout', '--quiet', '--detach', c2); // the approved commit, or a rollback; main has one more
+    const detached = install();
+    expect(git('rev-parse', 'HEAD')).toBe(c2);
+    expect(detached).toContain(`HEAD is detached at ${c2.slice(0, 7)}`);
+
+    git('checkout', '--quiet', '-B', 'main', c2);
+    const onBranch = install();
+    expect(git('rev-parse', 'HEAD')).toBe(c3);
+    expect(onBranch).toContain('merge --ff-only --quiet refs/remotes/origin/main');
+  });
+
   test('g. a repo URL with a user or password is refused; the SSH form is fine', () => {
     for (const url of ['https://user@github.com/x/y.git', 'https://user:pw@github.com/x/y.git', 'ssh://git@github.com/x/y.git']) {
       const r = run(installSh, ['--dry-run'], { ...sandbox().env, CVS_REPO_URL: url });
