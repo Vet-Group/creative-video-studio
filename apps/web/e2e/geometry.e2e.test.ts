@@ -318,13 +318,21 @@ test.describe('1440x1000', () => {
 
   test('K2 selects: 39 tall, rgb(242,242,242), radius 8, 1px transparent border, padding 8px 10px, 14px/21px, no native select', async ({ page }) => {
     expect(await page.locator('.form-card select').count()).toBe(0);
-    for (const label of ['Độ phân giải', 'Thời lượng', 'Tỉ lệ khung hình', 'Cửa hàng/Thương hiệu']) {
+    const look = ['background-color', 'border-top-left-radius', 'border-top-width', 'border-top-color', 'padding-top', 'padding-right', 'font-size', 'line-height'];
+    const want = ['rgb(242, 242, 242)', '8px', '1px', 'rgba(0, 0, 0, 0)', '8px', '10px', '14px', '21px'];
+    for (const label of ['Thời lượng', 'Tỉ lệ khung hình', 'Cửa hàng/Thương hiệu']) {
       const trigger = select(page, label);
       const b = await box(trigger);
       sized(b, 308, 39, label);
-      expect(await css(trigger, 'background-color', 'border-top-left-radius', 'border-top-width', 'border-top-color', 'padding-top', 'padding-right', 'font-size', 'line-height')).toEqual(['rgb(242, 242, 242)', '8px', '1px', 'rgba(0, 0, 0, 0)', '8px', '10px', '14px', '21px']);
+      expect(await css(trigger, ...look)).toEqual(want);
       expect(await trigger.locator('svg').count(), `${label} has a leading icon and a chevron`).toBe(2);
     }
+    // The mock model's one resolution is text in a select's place: the same box with its icon, but no chevron and no menu to open.
+    await expect(select(page, 'Độ phân giải')).toHaveCount(0);
+    const fixed = page.locator('.select-trigger[data-fixed]');
+    sized(await box(fixed), 308, 39, 'Độ phân giải');
+    expect(await css(fixed, ...look)).toEqual(want);
+    expect(await fixed.locator('svg').count(), 'Độ phân giải has its icon and no chevron').toBe(1);
   });
 
   test('K2 select popover: 3px under the trigger, as wide, max-height 280, padding-top 6, heading row 36, options padding 10px 16px, selected rgba(0,0,0,.06), grey border and up chevron while open', async ({ page }) => {
