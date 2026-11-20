@@ -230,6 +230,9 @@ export const USERS = {
   pbared: { email: 'pbared@e2e.test', name: 'E2E Prompt Bar Editor', role: 'member' },
   // billing.e2e: a member the spec puts in a billing team of its own, whose store picker then lists only that team's store.
   billa: { email: 'billa@e2e.test', name: 'E2E Billing A', role: 'member' },
+  // preset-notes.e2e: the preset card on Create, and Marketing Studio's format filter on History and Examples.
+  notea: { email: 'notea@e2e.test', name: 'E2E Notes A', role: 'member' },
+  noteb: { email: 'noteb@e2e.test', name: 'E2E Notes B', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;
