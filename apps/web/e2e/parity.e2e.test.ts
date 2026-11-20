@@ -203,8 +203,8 @@ test('the preset picker is a vertically scrolling grid like the live one: 4 colu
     await page.setViewportSize({ width, height });
     if (width === 1280) await signIn(page, 'member5');
     await openCreate(page);
-    await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-    const grid = page.getByRole('list', { name: 'Danh sách mẫu' });
+    await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
+    const grid = page.getByRole('list', { name: 'Danh sách mẫu chuyển động' });
     const cards = grid.locator('.preset-card');
     await expect(cards).toHaveCount(43); // the free prompt, then the 17 POD presets of migration 0097, 6 company presets and the 19 motion templates of 0020
     await expect(grid.getByRole('heading', { level: 3 })).toHaveText(['Sản phẩm POD', 'Sản phẩm chung', 'Người mẫu thời trang']); // a section per group
@@ -226,7 +226,7 @@ test('the preset picker is a vertically scrolling grid like the live one: 4 colu
     expect(Math.abs(clip.height - (clip.width * 4) / 3)).toBeLessThan(2); // the free prompt's placeholder is a 3:4 tile like the clips, not a line
     await page.keyboard.press('Escape');
     await expect(grid).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Chọn mẫu khác' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' })).toBeFocused();
   }
 });
 
@@ -252,9 +252,9 @@ test('choosing a preset or using an example fills the form and creates no job', 
   const before = (await presetSelect.getAttribute('data-value'))!;
 
   // The picker: a card fills the preset and closes the dialog.
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  await page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: 'Lướt gần lấp lánh', exact: true }).click();
-  await expect(page.getByRole('list', { name: 'Danh sách mẫu' })).toBeHidden();
+  await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
+  await page.getByRole('list', { name: 'Danh sách mẫu chuyển động' }).getByRole('button', { name: 'Lướt gần lấp lánh', exact: true }).click();
+  await expect(page.getByRole('list', { name: 'Danh sách mẫu chuyển động' })).toBeHidden();
   await expect(presetSelect).toHaveAttribute('data-value', 'light-sweep');
   expect(before).not.toBe('light-sweep');
   await expect(page.locator('.banner-text strong')).toHaveText('Lướt gần lấp lánh');

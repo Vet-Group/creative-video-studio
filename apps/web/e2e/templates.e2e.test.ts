@@ -189,7 +189,7 @@ test('Marketing Studio: an Advanced template chosen on the UGC page opens the Ad
   await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name: 'Launch' }).click();
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img')).toHaveCount(2);
   await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === ''); // the link opened the refill, then the address drops its query
-  await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('my brief');
+  await expect(page.getByRole('textbox', { name: 'Diễn biến', exact: true })).toHaveValue('my brief');
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
 });
 
@@ -264,7 +264,7 @@ test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Ge
   await use(ids.advanced).click();
   await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === '');
   await withExamplePhotos('use-garment.png');
-  await expect(other.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a surfer at dawn');
+  await expect(other.getByRole('textbox', { name: 'Diễn biến', exact: true })).toHaveValue('a surfer at dawn');
 
   await other.goto('/explore');
   await other.getByRole('list', { name: 'Mô hình' }).getByRole('link', { name: /Mock image Solo/ }).click();

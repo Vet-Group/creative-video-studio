@@ -161,7 +161,7 @@ test('a model without an end frame says so where the slot goes while another mod
   // Nor while the one that takes one does not make the ratio and duration chosen: the picker would offer it disabled.
   await withEndModel(page, false);
   await page.reload();
-  await expect(page.getByRole('group', { name: '③ Kết · cảnh cuối' })).toBeVisible();
+  await expect(page.getByRole('group', { name: '③ Cảnh kết' })).toBeVisible();
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(page.getByText(noEndHint)).toHaveCount(0);
 
@@ -169,7 +169,7 @@ test('a model without an end frame says so where the slot goes while another mod
   await withEndModel(page);
   await page.reload();
   // In ③ of the sections, beside the last shot; with free writing, under the photos.
-  await expect(page.getByRole('group', { name: '③ Kết · cảnh cuối' }).getByText(noEndHint)).toBeVisible();
+  await expect(page.getByRole('group', { name: '③ Cảnh kết' }).getByText(noEndHint)).toBeVisible();
   await expect(endSlot(page)).toHaveCount(0);
   await page.getByRole('radiogroup', { name: 'Cách viết prompt' }).getByText('Viết tự do').click();
   await expect(page.getByText(noEndHint)).toBeVisible();

@@ -194,11 +194,11 @@ export async function selectText(page: Page, label: string, text: string): Promi
 /** The Create form's chosen preset: the banner title, whose `data-value` holds the preset id ('' for a prompt of one's own). */
 export const presetOf = (page: Page): Locator => page.locator('.banner-text strong');
 /** The cards of the preset picker, opened from the banner. */
-export const presetCards = (page: Page): Locator => page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button');
+export const presetCards = (page: Page): Locator => page.getByRole('list', { name: 'Danh sách mẫu chuyển động' }).getByRole('button');
 
 /** Opens the preset picker from the banner and picks the card with this preset id (an empty id for a prompt of one's own). */
 export async function pickPreset(page: Page, value: string): Promise<void> {
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
+  await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
   await presetCards(page).and(page.locator(`[data-value="${value}"]`)).click();
   await expect(presetOf(page)).toHaveAttribute('data-value', value);
 }

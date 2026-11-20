@@ -162,8 +162,8 @@ test('the preset banner keeps looping when another preset swaps its clip in plac
   const moving = () => banner.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0);
   await expect.poll(moving).toBe(true);
   const before = await banner.getAttribute('src');
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  await page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: 'Xoay chậm tại chỗ', exact: true }).click();
+  await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
+  await page.getByRole('list', { name: 'Danh sách mẫu chuyển động' }).getByRole('button', { name: 'Xoay chậm tại chỗ', exact: true }).click();
   await expect(banner).not.toHaveAttribute('src', before!); // the same element, a new source
   await expect.poll(moving).toBe(true);
 });
@@ -175,14 +175,14 @@ test('with reduced motion the Create banner, the preset picker and the Explore p
   await page.goto('/create?preset=gentle-push-in');
   const banner = page.locator('.banner video');
   await expect.poll(() => banner.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  const picked = page.getByRole('list', { name: 'Danh sách mẫu' }).locator('.preset-card', { hasText: 'Xoay chậm tại chỗ' }).locator('video');
+  await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
+  const picked = page.getByRole('list', { name: 'Danh sách mẫu chuyển động' }).locator('.preset-card', { hasText: 'Xoay chậm tại chỗ' }).locator('video');
   await picked.scrollIntoViewIfNeeded(); // below the POD section, and a loop plays only once it is in view
   await expect.poll(() => picked.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
   await page.keyboard.press('Escape');
 
   await page.goto('/explore');
-  const tile = page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay chậm tại chỗ' }).locator('video');
+  const tile = page.getByRole('list', { name: 'Mẫu chuyển động' }).getByRole('link', { name: 'Xoay chậm tại chỗ' }).locator('video');
   await tile.scrollIntoViewIfNeeded();
   await expect.poll(() => tile.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
 });

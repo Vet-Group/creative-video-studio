@@ -10,8 +10,8 @@ test("on a touch laptop a card's edit chip is a pencil that shows without a hove
   await page.goto('/create');
   await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
   expect(await page.evaluate(() => matchMedia('(hover: hover) and (any-pointer: coarse)').matches)).toBe(true);
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  const pencil = page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: /^Đề xuất sửa mẫu / }).first(); // any card: preset-edit.e2e renames one for a while
+  await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
+  const pencil = page.getByRole('list', { name: 'Danh sách mẫu chuyển động' }).getByRole('button', { name: /^Đề xuất sửa mẫu / }).first(); // any card: preset-edit.e2e renames one for a while
   await page.mouse.move(0, 0);
   await expect(pencil).toHaveCSS('opacity', '1');
   await expect(pencil.getByText('Đề xuất sửa', { exact: true })).toBeHidden();

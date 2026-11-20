@@ -29,7 +29,7 @@ test('the reuse link in History refills a UGC job, and an Advanced job opens on 
   await expect(page.getByLabel('Sản phẩm: ảnh đã chọn').getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(hook.name);
   await expect(page.getByRole('button', { name: /^Bối cảnh/ })).toContainText(spot.name);
-  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('soft light');
+  await expect(page.getByRole('textbox', { name: 'Diễn biến (tuỳ chọn)' })).toHaveValue('soft light');
   await expect(page.getByRole('switch', { name: 'Tạo âm thanh' })).toHaveAttribute('aria-checked', 'false');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');
@@ -42,7 +42,7 @@ test('the reuse link in History refills a UGC job, and an Advanced job opens on 
   await page.goto(`/marketing-studio?reuse=${advanced}`);
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img')).toHaveCount(2);
   await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === ''); // the link opened the refill, then the address drops its query
-  await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('my brief');
+  await expect(page.getByRole('textbox', { name: 'Diễn biến', exact: true })).toHaveValue('my brief');
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
   await expect(page.getByRole('button', { name: /^Hook/ })).not.toContainText(hook.name);
 

@@ -227,7 +227,7 @@ test('Lưu thiết lập on a History card saves that job as a template of its p
   await saveFromCard(`Bão ${tag}`);
   await page.goto('/marketing-studio');
   await openTemplate(/\/marketing-studio$/, `Bão ${tag}`);
-  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('tpl brief');
+  await expect(page.getByRole('textbox', { name: 'Diễn biến (tuỳ chọn)' })).toHaveValue('tpl brief');
   await expect(hookBox(page)).toContainText(HOOKS[0]!.name);
   await expect(page.getByRole('img', { name: 'cust-person.png' })).toBeVisible();
 });

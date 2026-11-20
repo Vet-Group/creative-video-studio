@@ -229,7 +229,7 @@ test.describe('1440x1000', () => {
     const b = await box(banner);
     near(t.x + t.width / 2, b.x + b.width / 2, 'title centre x');
     near(t.y + t.height / 2, b.y + b.height / 2, 'title centre y');
-    const chip = page.getByRole('button', { name: 'Chọn mẫu khác' });
+    const chip = page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' });
     const c = await box(chip);
     near(c.height, 26, 'chip height');
     expect(c.x + c.width).toBeLessThanOrEqual(b.x + b.width);
@@ -489,7 +489,7 @@ test.describe('1440x1000', () => {
 
   test('focus: the controls show a 2px outline when reached by keyboard', async ({ page }) => {
     await page.keyboard.press('Tab');
-    for (const target of [select(page, 'Thời lượng'), page.locator('.dropzone-pick'), modelButton(page), tab(page, 'Lịch sử'), page.getByRole('button', { name: 'Chọn mẫu khác' })]) {
+    for (const target of [select(page, 'Thời lượng'), page.locator('.dropzone-pick'), modelButton(page), tab(page, 'Lịch sử'), page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' })]) {
       await target.focus();
       expect(await css(target, 'outline-style', 'outline-width')).toEqual(['solid', '2px']);
     }

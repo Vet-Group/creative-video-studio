@@ -8,8 +8,8 @@ import { presetOf, signIn } from './support.test';
 async function openPicker(page: Page) {
   await page.goto('/create');
   await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  return page.getByRole('list', { name: 'Danh sách mẫu' });
+  await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
+  return page.getByRole('list', { name: 'Danh sách mẫu chuyển động' });
 }
 
 async function restoreLabel(page: Page, id: string, label: string) {

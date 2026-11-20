@@ -1388,7 +1388,7 @@ const unboxing: AboutPage = {
         {
           steps: [
             { title: 'Thêm ảnh', text: 'Tải ảnh sản phẩm (bắt buộc). Thêm ảnh người mẫu nếu muốn họ mở hộp trước ống kính, và ảnh hộp hoặc bao bì nếu muốn video mở đúng chiếc hộp đó.' },
-            { title: 'Thêm hook, kết và ý riêng', text: `Nếu muốn, mở đầu bằng một trong ${HOOKS.length} hook, đặt cảnh ở một trong ${LOCATIONS.length} bối cảnh, hoặc điền sẵn Hook, Diễn biến và Kết từ một Khung prompt như Hộp quà, POV tay hay Mở nhanh ASMR.` },
+            { title: 'Thêm hook, kết và ý riêng', text: `Nếu muốn, mở đầu bằng một trong ${HOOKS.length} hook, đặt cảnh ở một trong ${LOCATIONS.length} bối cảnh, hoặc điền sẵn Hook, Diễn biến và Cảnh kết từ một Khung prompt như Hộp quà, POV tay hay Mở nhanh ASMR.` },
             { title: 'Chạy và nhận video', text: 'Chọn tỉ lệ, thời lượng và âm thanh, rồi bấm Tạo video, với chi phí ước tính bằng USD ghi trên nút. Video xong nằm trong tab Lịch sử và trong Thư viện.' },
           ],
         },
@@ -1444,7 +1444,7 @@ const unboxing: AboutPage = {
           faq: [
             ['Mở hộp cần mấy ảnh?', 'Tối thiểu 1: ảnh sản phẩm. Thêm tối đa 2 ảnh nữa là người mẫu và bao bì, tuỳ mô hình đã chọn nhận bao nhiêu ảnh.'],
             ['Không có ảnh người mẫu thì sao?', 'Video quay theo góc nhìn thứ nhất: chỉ thấy đôi tay mở hộp và nhấc sản phẩm ra, không có khuôn mặt.'],
-            ['Có thể tự viết cảnh không?', 'Có. Điền Hook, Diễn biến và Kết bằng chữ của bạn, hoặc bắt đầu từ một Khung prompt rồi sửa. Chỉ dẫn mở hộp cố định luôn được giữ.'],
+            ['Có thể tự viết cảnh không?', 'Có. Điền Hook, Diễn biến và Cảnh kết bằng chữ của bạn, hoặc bắt đầu từ một Khung prompt rồi sửa. Chỉ dẫn mở hộp cố định luôn được giữ.'],
             ['Một video mở hộp tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Chi phí ước tính, đã tính âm thanh, luôn ghi trên nút Tạo video.'],
             ['Video thuộc về ai?', `Video là tài sản của công ty, dùng cho trang sản phẩm, mạng xã hội và quảng cáo của công ty. ${RIGHTS}`],
             PRIVACY,

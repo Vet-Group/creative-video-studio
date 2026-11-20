@@ -35,7 +35,7 @@ test('Create: the sections show by default, Khung prompt fills all three, the pr
   await page.goto('/create');
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(mode(page).getByRole('radio', { name: 'Theo phần' })).toBeChecked();
-  for (const name of ['① Hook · 0–2 giây đầu', '② Diễn biến', '③ Kết · cảnh cuối']) await expect(part(page, name)).toBeVisible();
+  for (const name of ['① Hook · 0–2 giây đầu', '② Diễn biến', '③ Cảnh kết']) await expect(part(page, name)).toBeVisible();
   // ② is the page's own prompt box, with its own rule line.
   await expect(part(page, '② Diễn biến').getByLabel('Mô tả chuyển động')).toBeVisible();
   await expect(part(page, '② Diễn biến')).toContainText('Một hành động chính, thì hiện tại, nói rõ ánh sáng và máy quay.');
@@ -107,18 +107,18 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await expect(page.getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(modelButton(page)).toContainText('Mock E2E');
   // ③ holds the end text box beside the last shot.
-  await expect(part(page, '③ Kết · cảnh cuối').getByLabel('Chữ trên khung cuối (tuỳ chọn)')).toBeVisible();
+  await expect(part(page, '③ Cảnh kết').getByLabel('Chữ trên khung cuối (tuỳ chọn)')).toBeVisible();
   // The end text is optional the one way the sections use: the optional pill beside its name.
-  await expect(part(page, '③ Kết · cảnh cuối').locator('.optional-head', { hasText: 'Chữ trên khung cuối' }).locator('.choice-optional')).toHaveText('Tuỳ chọn');
+  await expect(part(page, '③ Cảnh kết').locator('.optional-head', { hasText: 'Chữ trên khung cuối' }).locator('.choice-optional')).toHaveText('Tuỳ chọn');
   // Its rule line sits right under the Cảnh kết box, above the end text.
-  const ruleY = (await part(page, '③ Kết · cảnh cuối').locator('.prompt-part-rule').boundingBox())!.y;
+  const ruleY = (await part(page, '③ Cảnh kết').locator('.prompt-part-rule').boundingBox())!.y;
   expect(ruleY).toBeGreaterThan((await endingBox(page).boundingBox())!.y);
   expect(ruleY).toBeLessThan((await page.getByLabel('Chữ trên khung cuối (tuỳ chọn)').boundingBox())!.y);
 
   const t = PROMPT_TEMPLATES.marketing[0]!;
   await useTemplate(page, t.name);
   await expect(hookBox(page)).toHaveValue(t.hook);
-  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue(t.body);
+  await expect(page.getByRole('textbox', { name: 'Diễn biến (tuỳ chọn)' })).toHaveValue(t.body);
   await expect(endingBox(page)).toHaveValue(t.ending);
   await expect(preview(page)).toContainText(`${t.hook} Creator notes: ${t.body} ${t.ending}`);
 
@@ -128,7 +128,7 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toHaveCount(0);
   const location = part(page, '② Diễn biến').getByRole('button', { name: /^Bối cảnh/ });
   await expect(location).toBeVisible();
-  expect((await location.boundingBox())!.y).toBeLessThan((await page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' }).boundingBox())!.y);
+  expect((await location.boundingBox())!.y).toBeLessThan((await page.getByRole('textbox', { name: 'Diễn biến (tuỳ chọn)' }).boundingBox())!.y);
   // One of the two shows (owner, 2026-11-20): Có sẵn opens the library, and a chosen hook folds the own box into a card that names it.
   const hookPart = part(page, '① Hook · 0–2 giây đầu');
   const source = hookPart.getByRole('radiogroup', { name: 'Nguồn hook' });
@@ -172,7 +172,7 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await page.keyboard.press('Escape');
 
   await page.goto(`/marketing-studio?reuse=${job.id}`);
-  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue(t.body);
+  await expect(page.getByRole('textbox', { name: 'Diễn biến (tuỳ chọn)' })).toHaveValue(t.body);
   await expect(hookBox(page)).toHaveValue(t.hook);
   await expect(endingBox(page)).toHaveValue(t.ending);
 
@@ -206,19 +206,19 @@ test('at 390 px the templates open as a sheet over the Run bar with the last one
   await signIn(page, 'secta');
   for (const [path, list, body] of [
     ['/create', PROMPT_TEMPLATES.video, 'Mô tả chuyển động'],
-    ['/marketing-studio', PROMPT_TEMPLATES.marketing, 'Mô tả (tuỳ chọn)'],
+    ['/marketing-studio', PROMPT_TEMPLATES.marketing, 'Diễn biến (tuỳ chọn)'],
   ] as const) {
     const t = list.at(-1)!;
     await page.goto(path);
     await expect(part(page, '② Diễn biến')).toBeVisible();
     const sheet = await openPromptTemplates(page);
     await expect(sheet).toHaveClass(/template-sheet/);
-    await expect(sheet.getByText('Điền sẵn Hook · Diễn biến · Kết để bạn sửa tiếp.')).toBeVisible();
+    await expect(sheet.getByText('Điền sẵn Hook · Diễn biến · Cảnh kết để bạn sửa tiếp.')).toBeVisible();
     const last = sheet.getByRole('button', { name: new RegExp(`^${t.name}`) });
     // Each template: its Vietnamese line, then what it opens and ends on, one muted line each, on both pages.
     for (const x of list) await expect(sheet.getByRole('button', { name: new RegExp(`^${x.name}`) })).toContainText(x.desc);
     await expect(last).toContainText(`Hook: ${t.hook}`);
-    await expect(last).toContainText(`Kết: ${t.ending}`);
+    await expect(last).toContainText(`Cảnh kết: ${t.ending}`);
     for (const line of await sheet.locator('.prompt-template-line').all()) expect((await line.boundingBox())!.height).toBe(18);
     // Ten templates outgrow a phone, so the sheet scrolls; scrolled to, the last is whole on the screen and on top: nothing (the sticky Run bar) covers its middle.
     await last.scrollIntoViewIfNeeded();
@@ -236,7 +236,7 @@ test('at 390 px the templates open as a sheet over the Run bar with the last one
     await page.getByText('Xem prompt gửi đi').click();
     await expect(preview(page).first()).toBeVisible();
     expect(await fits(page)).toBe(true);
-    for (const section of ['① Hook · 0–2 giây đầu', '③ Kết · cảnh cuối']) {
+    for (const section of ['① Hook · 0–2 giây đầu', '③ Cảnh kết']) {
       const box = (await part(page, section).boundingBox())!;
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(390);
@@ -272,7 +272,7 @@ test('Create: Khung prompt opens as a card dialog on a computer, and its Gần �
   // A dialog like the hook picker (not the phone's sheet), and the form under it stays where it was: nothing opens inline.
   await expect(dialog).toHaveClass(/choice-dialog/);
   await expect(dialog).not.toHaveClass(/template-sheet/);
-  await expect(dialog.getByText('Điền sẵn Hook · Diễn biến · Kết để bạn sửa tiếp.')).toBeVisible();
+  await expect(dialog.getByText('Điền sẵn Hook · Diễn biến · Cảnh kết để bạn sửa tiếp.')).toBeVisible();
   expect(await second.boundingBox()).toEqual(before);
   for (const t of PROMPT_TEMPLATES.video) await expect(dialog.getByRole('button', { name: new RegExp(`^${t.name}`) })).toContainText(t.desc);
   expect(await fits(page)).toBe(true);
@@ -292,7 +292,7 @@ test('Create: Khung prompt opens as a card dialog on a computer, and its Gần �
   const again = await openPromptTemplates(page);
   const recent = again.getByRole('region', { name: 'Gần đây' });
   await expect(recent.getByRole('group', { name: 'Hook gần đây' }).getByRole('button')).toHaveText(['hook four', 'hook one', 'hook three']);
-  await expect(recent.getByRole('group', { name: 'Kết gần đây' }).getByRole('button')).toHaveText(['end two', 'end one']);
+  await expect(recent.getByRole('group', { name: 'Cảnh kết gần đây' }).getByRole('button')).toHaveText(['end two', 'end one']);
   // A recent hook fills ① only, with no question while the box is empty.
   await recent.getByRole('button', { name: 'hook four' }).click();
   await expect(again).toBeHidden();
@@ -343,8 +343,8 @@ test('Create and Marketing Studio: Cài đặt video groups ratio, length, sound
     await page.keyboard.press('Escape');
   }
   await page.goto('/create');
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  await expect(page.getByRole('dialog', { name: 'Bộ sưu tập mẫu' }).getByText('chọn mẫu sẽ thay cả prompt', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Chọn mẫu chuyển động khác' }).click();
+  await expect(page.getByRole('dialog', { name: 'Bộ sưu tập mẫu chuyển động' }).getByText('chọn mẫu sẽ thay cả prompt', { exact: false })).toBeVisible();
 });
 
 const sampleMp4 = readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.mp4', import.meta.url)));

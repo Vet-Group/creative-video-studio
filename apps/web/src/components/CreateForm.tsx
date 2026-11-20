@@ -829,9 +829,9 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                 <strong data-value={presetId}>{current?.label ?? 'Tự viết mô tả'}</strong>
               </div>
               {/* Short like the live "Prompts" chip; the name says what it does. */}
-              <button type="button" className="banner-chip" aria-label="Chọn mẫu khác" onClick={() => setPicking(true)}>
+              <button type="button" className="banner-chip" aria-label="Chọn mẫu chuyển động khác" onClick={() => setPicking(true)}>
                 <Icon name="edit" size={12} />
-                Mẫu
+                Mẫu chuyển động
               </button>
             </div>
 
@@ -936,8 +936,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
             {presetId !== '' ? (
               <>
                 <PresetOrOwn
-                  noun="mẫu"
-                  chosen={current?.label ?? 'Mẫu'}
+                  noun="mẫu chuyển động"
+                  chosen={current?.label ?? 'Mẫu chuyển động'}
                   onOpen={() => setPicking(true)}
                   onDrop={() => (setPresetId(''), setTimeout(() => document.getElementById(promptId)?.focus()))}
                   box={null}
@@ -959,7 +959,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                   ask: chosen ? () => ({ field: 'hook', text: hookText, rest: sectionPrompt({ body: prompt, ending }), model: chosen.id, audio, seconds: durationSec }) : null,
                 }}
                 ending={{
-                  box: <PhraseChoice kind="ending" label="Cảnh kết có sẵn" title="Chọn cảnh kết" sub="Cảnh cuối clip dừng lại ở đó. Chọn một cảnh kết để điền vào phần Kết, rồi sửa nếu cần." choices={choices} stores={stores} storeId={storeId} text={ending} onText={setEnding} />,
+                  box: <PhraseChoice kind="ending" label="Cảnh kết có sẵn" title="Chọn cảnh kết" sub="Cảnh cuối clip dừng lại ở đó. Chọn một cảnh kết để điền vào phần Cảnh kết, rồi sửa nếu cần." choices={choices} stores={stores} storeId={storeId} text={ending} onText={setEnding} />,
                   text: ending,
                   onText: setEnding,
                   ask: chosen ? () => ({ field: 'ending', text: ending, rest: sectionPrompt({ hook: hookText, body: prompt }), model: chosen.id, audio, seconds: durationSec }) : null,
@@ -1165,10 +1165,10 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         </div>
       </div>
 
-      <Modal open={picking} onClose={() => setPicking(false)} label="Bộ sưu tập mẫu">
-        <h2>Chọn mẫu</h2>
+      <Modal open={picking} onClose={() => setPicking(false)} label="Bộ sưu tập mẫu chuyển động">
+        <h2>Chọn mẫu chuyển động</h2>
         <p className="modal-sub">Mỗi mẫu là một kiểu chuyển động có sẵn, kèm video ví dụ; chọn mẫu sẽ thay cả prompt. Hoặc tự viết mô tả.</p>
-        <ul className="preset-grid" aria-label="Danh sách mẫu">
+        <ul className="preset-grid" aria-label="Danh sách mẫu chuyển động">
           {/* The free prompt leads, as "General" does on the live picker: it is the default choice. */}
           <li className="preset-card">
             {free.video ? <Preview src={free.video} poster={free.poster ?? ''} width={3} height={4} title="Tự viết mô tả" /> : <div className="banner-empty" />}

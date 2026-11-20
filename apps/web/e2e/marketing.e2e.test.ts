@@ -98,7 +98,7 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await places.getByRole('option', { name: spot.name, exact: true }).click();
   await expect(locationBox).toContainText(spot.name);
 
-  await page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' }).fill('soft morning light');
+  await page.getByRole('textbox', { name: 'Diễn biến (tuỳ chọn)' }).fill('soft morning light');
   // The preview, open on a computer, shows the English prompt Run is about to send.
   const preview = page.locator('.prompt-preview p');
   await expect(preview).toContainText(' soft morning light Natural sound recorded on the phone:');
@@ -252,7 +252,7 @@ test('the brief may take what the chosen model leaves; a switch to a model with 
   await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
   await expect(modelButton(page)).toContainText('Mock E2E');
-  const brief = page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' });
+  const brief = page.getByRole('textbox', { name: 'Diễn biến (tuỳ chọn)' });
   const counter = page.locator('.prompt-count');
   const room = async () => Number((await counter.textContent())!.split('/')[1]);
   await expect(counter).toHaveCount(0); // the count shows once there is text
@@ -565,6 +565,7 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
     await expect(page.getByRole('button', { name: /^Bối cảnh/ })).toContainText(spot.name);
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
     await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
+
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }

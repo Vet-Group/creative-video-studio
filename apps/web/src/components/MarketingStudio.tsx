@@ -725,7 +725,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
                 ask: chosen ? () => ({ field: 'hook', ...(pf && { format: pf }), text: hookText, rest: sectionPrompt({ body: prompt, ending }), model: chosen.id, audio, seconds: durationSec }) : null,
               }}
               ending={{
-                box: <PhraseChoice kind="ending" label="Cảnh kết có sẵn" title="Chọn cảnh kết" sub="Cảnh cuối clip dừng lại ở đó. Chọn một cảnh kết để điền vào phần Kết, rồi sửa nếu cần." choices={choices} stores={stores} storeId={storeId} text={ending} onText={setEnding} />,
+                box: <PhraseChoice kind="ending" label="Cảnh kết có sẵn" title="Chọn cảnh kết" sub="Cảnh cuối clip dừng lại ở đó. Chọn một cảnh kết để điền vào phần Cảnh kết, rồi sửa nếu cần." choices={choices} stores={stores} storeId={storeId} text={ending} onText={setEnding} />,
                 text: ending,
                 onText: setEnding,
                 ask: chosen ? () => ({ field: 'ending', ...(pf && { format: pf }), text: ending, rest: sectionPrompt({ hook: hooks[0] ? hookList.find((c) => c.id === hooks[0])?.phrase : hookText, body: prompt }), model: chosen.id, audio, seconds: durationSec }) : null,
@@ -741,7 +741,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
               {sec && locationBox}
               <PromptComposer
                 id={promptId}
-                label="Mô tả"
+                label={sec ? 'Diễn biến' : 'Mô tả'}
                 optional={!advanced}
                 required={advanced}
                 feature="marketing"
