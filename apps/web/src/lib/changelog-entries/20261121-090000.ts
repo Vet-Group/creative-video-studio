@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-21T09:00:00+07:00', kind: 'improved', title: 'Trang Phân tích video mở gọn hơn và báo rõ khi bạn còn một phân tích chưa xong', details: ['Trên máy tính, danh sách Video mẫu hiện ngay khi trang mở, nên các ví dụ bên dưới không còn bị đẩy xuống sau một nhịp.', 'Mỗi người phân tích một video tại một thời điểm: khi video trước chưa xong, bấm Phân tích sẽ báo để bạn đợi nó xong.', 'Hình đầu video ở Lịch sử và Video mẫu chỉ tải khi bạn cuộn tới, nên danh sách mở nhanh hơn.'], href: '/analyze', prs: [607], audience: 'all' } satisfies ChangeEntry;
