@@ -377,13 +377,16 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
   .account-menu button { min-height: 44px; }
   .account-hint { display: none; } /* no keyboard to press it on */
 }
-/* The workspace switcher under the brand (Shell.tsx), for a user in two or more workspaces: the house select, a full touch target on a touch screen. */
-.ws-switch .field { margin: 0; padding: 0 4px; }
-.ws-switch .field-label { padding-left: 8px; color: var(--text-muted); font-size: 12px; line-height: 16px; }
-.ws-switch .select-trigger { background: var(--surface); border-color: var(--border); }
+/* The workspace switcher under the brand (Shell.tsx), for a user in two or more workspaces: the house select as wide as the nav rows, a full touch target on a touch screen.
+   Closed, it wraps a long name to two lines and then ends it in an ellipsis; the name's title and the open list keep all of it. */
+.ws-switch .field { margin: 0; }
+.ws-switch .field-label { padding-left: 12px; color: var(--text-muted); font-size: 12px; line-height: 16px; }
+.ws-switch .select-trigger { height: auto; min-height: 39px; background: var(--surface); border-color: var(--border); }
+.ws-switch .select-value { display: -webkit-box; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .ws-switch .tag { flex: none; margin-left: 6px; } /* the company badge, which no workspace name can imitate */
+.ws-switch .select-trigger .tag { margin-left: 0; } /* the trigger's own gap is enough there, and the name gets the room */
 @media (pointer: coarse), (max-width: 1023.98px) {
-  .ws-switch .select-trigger { height: 44px; }
+  .ws-switch .select-trigger { min-height: 44px; }
   .ws-switch .select-pop li { min-height: 44px; }
 }
 .menu-button { display: grid; place-items: center; flex: none; width: 44px; height: 44px; margin-right: -4px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--ink); } /* a full touch target; the margin keeps the title at x=52 */
@@ -1300,6 +1303,9 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
 .lightbox-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 16px; overflow-y: auto; background: var(--surface); }
 .lightbox-side h2 { margin: 6px 40px 0 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 600; }
 .lightbox-side [role='status'] { margin: 0; font-size: 12px; }
+/* A Library detail's photo tools on the member's own picture (ImageToolButtons): a full touch target on a touch screen. */
+@media (pointer: coarse) { .lightbox-tools .lightbox-result { height: 44px; } }
+.lightbox-side > * { flex: none; } /* a long side scrolls; its buttons keep their height (the Reuse link drew 24 px tall on a phone) */
 .lightbox-reuse { display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 8px; background: var(--ink-strong); color: var(--on-ink); font-size: 13px; font-weight: 600; text-decoration: none; }
 .lightbox-step { position: fixed; top: 50%; display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; background: rgb(var(--shade) / 70%); color: var(--on-dark); transform: translateY(-50%); }
 .lightbox-prev { left: 24px; }

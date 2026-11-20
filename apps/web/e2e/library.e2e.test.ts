@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { png, runViaApi, signIn } from './support.test';
 
 test('Library tools: favourites only, oldest first, the size slider and the empty state', async ({ page }) => {
@@ -432,6 +432,53 @@ test('Dùng khung hình này in a video’s detail opens Create video with the f
     const picked = page.getByLabel('Ảnh đã chọn').getByRole('img');
     await expect(picked).toHaveCount(1);
     await expect(picked).toHaveAccessibleName(/s\.jpg$/); // the frame, named after the clip and its second
+  } finally {
+    expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
+  }
+});
+
+// As from a History card: the creator's own picture opens in the two photo tools from its Library detail, the copy already in the tool's slot; another member's
+// picture offers neither (POST /api/assets/copy takes only the caller's own results). CVS_E2E_SHOTS=<folder> saves the screenshots there (1440 px light, 390 px dark).
+test('Xoá nền in a picture’s Library detail opens Background Remover with the picture in its slot; another member’s picture offers neither tool', async ({ page, browser }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'libtoola');
+  const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt: 'a picture for the photo tools', enhance: false, params: { resolution: '1K' } } });
+  expect(res.status()).toBe(201);
+  const id = ((await res.json()) as { id: string }).id;
+  const shot = (p: Page, name: string) => p.screenshot({ path: process.env.CVS_E2E_SHOTS ? `${process.env.CVS_E2E_SHOTS}/${name}.png` : test.info().outputPath(`${name}.png`) });
+  const open = async (p: Page) => {
+    await p.goto('/library');
+    await p.getByLabel('Người tạo').selectOption({ label: 'E2E Library Tools A' });
+    await p.locator(`article[data-clip-id="${id}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
+    const detail = p.getByRole('dialog');
+    await expect(detail.getByText('a picture for the photo tools', { exact: true })).toBeVisible();
+    return detail;
+  };
+  try {
+    await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.find((j) => j.id === id)?.status, { timeout: 60_000 }).toBe('succeeded');
+    const other = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
+    await signIn(other, 'libtoolb');
+    await expect((await open(other)).locator('.lightbox-tools')).toHaveCount(0);
+    await other.context().close();
+
+    // A touch phone in dark mode: both tools are full touch targets, the side scrolls instead of squeezing the Reuse link (it drew 24 px tall), and nothing scrolls sideways.
+    const phone = await (await browser.newContext({ storageState: await page.context().storageState(), viewport: { width: 390, height: 844 }, colorScheme: 'dark', hasTouch: true, isMobile: true })).newPage();
+    const small = await open(phone);
+    const tools = small.locator('.lightbox-tools');
+    await tools.scrollIntoViewIfNeeded();
+    await shot(phone, 'library-detail-tools-390-dark');
+    for (const name of ['Xoá nền', 'Tăng độ phân giải']) expect((await tools.getByRole('button', { name }).boundingBox())!.height, name).toBeGreaterThanOrEqual(44);
+    expect((await small.getByRole('link', { name: 'Dùng lại' }).boundingBox())!.height).toBe(40);
+    expect(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await phone.context().close();
+
+    const detail = await open(page);
+    await expect(detail.getByRole('button', { name: 'Tăng độ phân giải' })).toBeVisible();
+    await shot(page, 'library-detail-tools-1440-light');
+    await detail.getByRole('button', { name: 'Xoá nền' }).click();
+    await expect(page).toHaveURL(/\/apps\/background-remover\?image=[\w-]+$/);
+    await expect(page.getByRole('group', { name: 'Ảnh', exact: true }).getByRole('img', { name: /^history-\w{8}\.(png|jpg|webp)$/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Chạy/ })).toBeEnabled(); // the photo is all Background Remover needs
   } finally {
     expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
   }
