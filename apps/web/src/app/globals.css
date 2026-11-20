@@ -327,7 +327,7 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 .sidebar nav .nav-sub a { height: 32px; padding: 4px 12px 4px 44px; font-size: 13px; line-height: 20px; }
 /* The quick search row (Shell.tsx), a button that opens the command palette, drawn as a nav link with its shortcut at the end. */
 .sidebar nav .nav-search { width: 100%; border: 0; background: transparent; text-align: left; }
-.nav-kbd { margin-left: auto; padding-left: 8px; color: var(--text-subtle); font-family: inherit; font-size: 12px; line-height: 16px; white-space: nowrap; }
+.nav-kbd { margin-left: auto; padding-left: 8px; color: var(--text-muted); font-family: inherit; font-size: 12px; line-height: 16px; white-space: nowrap; }
 @media (pointer: coarse) {
   .nav-toggle { width: 44px; height: 44px; }
   .sidebar nav .nav-sub a { min-height: 44px; }
@@ -2696,8 +2696,8 @@ dialog.modal.palette { width: min(40rem, calc(100vw - 2rem)); max-height: min(34
 .palette-text { display: grid; min-width: 0; font-weight: 500; }
 .palette-desc { overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .palette-empty { margin: 0; padding: 16px 20px 20px; color: var(--text-muted); font-size: 14px; line-height: 20px; }
-.palette-keys { margin: 0; padding: 8px 16px; border-top: 1px solid var(--divider); color: var(--text-subtle); font-size: 12px; line-height: 16px; }
-.palette-keys kbd { font-family: inherit; color: var(--text-muted); }
+.palette-keys { margin: 0; padding: 8px 16px; border-top: 1px solid var(--divider); color: var(--text-muted); font-size: 12px; line-height: 16px; }
+.palette-keys kbd { font-family: inherit; color: var(--ink); }
 @media (pointer: coarse) {
   .palette-list [role='option'] { min-height: 44px; }
   .palette-keys { display: none; }
