@@ -1,3 +1,4 @@
+import { audit } from '@cvs/core/audit';
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { auth, pool } from '@/lib/auth';
 import { authFailure, bad, readBody } from '@/lib/admin';
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * Admin: create a Member or Admin account (Q4: accounts are created by an Admin, never by sign-up).
+ * Admin: create a Member or Admin account (Q4: accounts are created by an Admin, never by sign-up). Audited as user.create, without the password.
  * The team is required and must be a visible one. The password is optional (interview round 8): a user without one can sign in only
  * with Lark or Google. The email counts as verified, which better-auth needs before it links a first social sign-in to the account.
  * A password set here is known to the Admin, so the user must replace it at the first sign-in, as with a temporary one ([id]/route.ts).
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
       role === 'admin' ? 'owner' : 'member',
       g.session.user.id,
     ]);
+    await audit(pool, { actorId: g.session.user.id, action: 'user.create', target: `user:${user.id}`, newValue: { email: user.email, name, role, teamId, outsideLark, passwordSet: typeof password === 'string' } });
     return Response.json({ id: user.id, email: user.email, role, teamId }, { status: 201 });
   } catch (e) {
     return authFailure(e);
