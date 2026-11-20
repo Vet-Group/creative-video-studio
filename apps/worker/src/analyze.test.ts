@@ -5,8 +5,13 @@ import { join } from 'node:path';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { ANALYSIS_PROMPTS_SYSTEM } from '@cvs/core/analysis/prompts';
+import { ANALYZE_QUEUE_OPTIONS } from '@cvs/core/queue';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { type AnalyzeSeams, backfillScenePrompts, defaultVlmEnv, hasScenePrompts, planScenePrompts, reaAnalyzeEnabled, runReaAnalyze, scenePromptsEstimateUsd } from './analyze';
+import { type AnalyzeSeams, backfillScenePrompts, closeStaleAnalyses, defaultVlmEnv, hasScenePrompts, planScenePrompts, reaAnalyzeEnabled, runReaAnalyze, scenePromptsEstimateUsd } from './analyze';
+
+// rea-video never runs here: the one test without a decompose seam reads the options the real one hands execFile, which fails as a killed run would.
+const execFile = vi.hoisted(() => vi.fn((_file: string, _args: string[], _opts: object, done: (e: Error) => void) => done(new Error('Command failed: rea-video decompose'))));
+vi.mock('node:child_process', async (importOriginal) => ({ ...(await importOriginal<typeof import('node:child_process')>()), execFile }));
 
 const testDb = await createTestDatabase();
 const pool = createPool(testDb.url, 2);
@@ -272,4 +277,30 @@ test('the backfill rewrites only the result of the old analyses from their store
   asked.length = 0;
   expect(await backfillScenePrompts(pool, { apply: true, force: false }, seams, log)).toMatchObject({ todo: 1 });
   expect(asked).toEqual(['A broken beat.']); // the done analysis is skipped
+});
+
+test("runs rea-video with the queue job's signal and a timeout inside the queue's expiry, so a hung run is killed and the analysis ends failed", async () => {
+  const id = await queued();
+  const expiry = new AbortController();
+  await runReaAnalyze(pool, id, seams({ decompose: undefined }), expiry.signal);
+  expect(execFile).toHaveBeenCalledOnce();
+  const opts = execFile.mock.calls[0]![2] as { signal?: AbortSignal; timeout?: number; killSignal?: string };
+  expect(opts.signal).toBe(expiry.signal);
+  expect(opts.killSignal).toBe('SIGKILL');
+  expect(opts.timeout).toBeGreaterThan(0);
+  expect(opts.timeout).toBeLessThan(ANALYZE_QUEUE_OPTIONS.expireInSeconds * 1000);
+  expect((await row(id)).status).toBe('failed');
+});
+
+test('closes an analysis a stopped worker left running, so the member can delete it, and leaves one that may still run', async () => {
+  await pool.query(
+    `insert into analyses (id, user_id, team_id, source_key, status, started_at, workspace_id) values
+       ('an-stale', 'u1', 'team-unassigned', 'sources/stale.mp4', 'running', now() - interval '40 minutes', 'ws_vet'),
+       ('an-busy', 'u1', 'team-unassigned', 'sources/busy.mp4', 'running', now() - interval '5 minutes', 'ws_vet')`,
+  );
+  expect(await closeStaleAnalyses(pool)).toBe(1);
+  const stale = (await pool.query(`select status, error, finished_at from analyses where id = 'an-stale'`)).rows[0];
+  expect([stale.status, stale.error]).toEqual(['failed', 'the worker stopped before the analysis finished']); // DELETE /api/analyses/[id] takes a failed row
+  expect(stale.finished_at).not.toBeNull();
+  expect((await row('an-busy')).status).toBe('running');
 });

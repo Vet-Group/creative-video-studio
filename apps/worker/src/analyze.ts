@@ -17,6 +17,7 @@ import { bookLlm, withTransaction } from '@cvs/core/ledger';
 import { byteplusReaVlm, pickReaVlm, reaVlmEnv, vertexReaVlm } from '@cvs/core/providers/rea-vlm';
 import { serviceAccountToken } from '@cvs/core/providers/vertex';
 import { vertexAccounts } from '@cvs/core/providers/vertex-accounts';
+import { ANALYZE_QUEUE_OPTIONS } from '@cvs/core/queue';
 import { getObject, putObject } from './storage';
 import type { WorkerDeps } from './worker';
 
@@ -25,8 +26,8 @@ const run = promisify(execFile);
 type Pool = WorkerDeps['pool'];
 
 export interface AnalyzeSeams {
-  /** Runs `rea-video decompose <video> -o <outDir>` with REA_VLM_* in its environment. */
-  decompose?: (videoPath: string, outDir: string, env: Record<string, string>) => Promise<void>;
+  /** Runs `rea-video decompose <video> -o <outDir>` with REA_VLM_* in its environment; `signal` (the queue job's, aborted at its expiry) stops it. */
+  decompose?: (videoPath: string, outDir: string, env: Record<string, string>, signal?: AbortSignal) => Promise<void>;
   read?: (key: string) => Promise<Uint8Array>;
   write?: (key: string, body: Uint8Array, contentType: string) => Promise<void>;
   /** Resolves the REA_VLM_* environment; defaults to BytePlus from BYTEPLUS_ARK_API_KEY. */
@@ -53,11 +54,13 @@ export const reaAnalyzeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean
 // --no-stems --no-speakers: ac47077 separates vocals/music and diarizes speakers by default, which nothing here reads; the
 //   stems pass alone was OOM-killed at 2G on prod (50s/720p clip, 2026-11-19). Without both: 898 MB peak / 4.5 min, survey on.
 //   The flags are unknown to earlier rea-video, so the host's install must be ac47077 or later.
-const realDecompose = async (video: string, outDir: string, env: Record<string, string>): Promise<void> => {
+// Killed a minute before the queue's expiry (at once when the job's signal aborts), so a hung rea-video cannot hold the one analysis slot.
+const DECOMPOSE_TIMEOUT_MS = ANALYZE_QUEUE_OPTIONS.expireInSeconds * 1000 - 60_000;
+const realDecompose = async (video: string, outDir: string, env: Record<string, string>, signal?: AbortSignal): Promise<void> => {
   await run(
     process.env.REA_VIDEO_BIN || 'rea-video',
     ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en', '--workers', '5', '--max-vlm-shots', '40', '--no-stems', '--no-speakers'],
-    { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024 },
+    { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024, timeout: DECOMPOSE_TIMEOUT_MS, killSignal: 'SIGKILL', signal },
   );
 };
 
@@ -132,7 +135,7 @@ export async function analysisFromBreakdown(
 
 /** Claims a queued analysis row, runs rea-video over its source video, and stores the result. Safe to
  * call more than once for the same id: only a `queued` row is claimed. */
-export async function runReaAnalyze(pool: Pool, analysisId: string, seams: AnalyzeSeams = {}): Promise<void> {
+export async function runReaAnalyze(pool: Pool, analysisId: string, seams: AnalyzeSeams = {}, signal?: AbortSignal): Promise<void> {
   const decompose = seams.decompose ?? realDecompose;
   const read = seams.read ?? getObject;
   const write = seams.write ?? putObject;
@@ -151,7 +154,7 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
     await writeFile(video, await read(row.source_key));
     const out = join(dir, 'out');
     const { env, provider, model } = await vlmEnv();
-    await decompose(video, out, env);
+    await decompose(video, out, env, signal);
     const rawBytes = await readFile(join(out, 'breakdown.json'));
     // Best-effort prompts and Vietnamese display: a failed or missing LLM leaves the points and English only, still succeeded.
     const { analysis, costUsd } = await analysisFromBreakdown(JSON.parse(rawBytes.toString('utf8')), { writePrompts, translate }, (line) => console.warn(`worker: analysis ${analysisId}: ${line}`));
@@ -173,6 +176,22 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/** Longer than any analysis runs: the queue's expiry and a margin. */
+const STALE_AFTER_MS = ANALYZE_QUEUE_OPTIONS.expireInSeconds * 1000 + 5 * 60_000;
+
+/**
+ * Closes the analyses a stopped worker left running: the queue never retries one and its expiry does not write the row, and a running row cannot be
+ * deleted. Failed, the member can remove it and analyse again. Returns how many it closed.
+ */
+export async function closeStaleAnalyses(pool: Pool, staleAfterMs = STALE_AFTER_MS): Promise<number> {
+  const { rowCount } = await pool.query(
+    `update analyses set status = 'failed', error = coalesce(error, 'the worker stopped before the analysis finished'), finished_at = now()
+      where status = 'running' and coalesce(started_at, created_at) < now() - ($1::float8 * interval '1 millisecond')`,
+    [staleAfterMs],
+  );
+  return rowCount ?? 0;
 }
 
 /**

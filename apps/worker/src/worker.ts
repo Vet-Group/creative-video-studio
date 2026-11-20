@@ -25,7 +25,7 @@ import { compressVideoAsset } from './compress';
 import { purgeDeletedClips } from './purge';
 import { dropPreview, storePreview } from './preview';
 import { deleteObject, getObject, putObject } from './storage';
-import { reaAnalyzeEnabled, runReaAnalyze } from './analyze';
+import { closeStaleAnalyses, reaAnalyzeEnabled, runReaAnalyze } from './analyze';
 import { closeStaleRemakes, reaRemakeEnabled, runRemake, takeOverRemakes } from './remake';
 import { runSuggestion } from './suggest';
 
@@ -528,11 +528,13 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     for (const t of await takeOverRemakes(pool, id, o.heartbeatStaleMs)) void oneRemake(() => runRemake(pool, t.id, { workerId: id }, t.resume)).catch((e) => log(`resume remake ${t.id}`, e));
     await closeStaleRemakes(pool, undefined, o.heartbeatStaleMs);
   };
+  // An analysis whose worker stopped would stay running for good; swept even with the flag off, for the rows an earlier worker left.
+  const closeAnalyses = async () => void (await closeStaleAnalyses(pool));
 
   let reconciling: Promise<void> | undefined;
   const reconcile = () =>
     (reconciling ??= (async () => {
-      for (const [what, step] of [['resend queued jobs', resendQueued], ['fail lost submits', failLostSubmits], ['poll running jobs', pollRunning], ['poll unresolved jobs', pollUnresolved], ['resume or close stale remakes', closeRemakes]] as const) {
+      for (const [what, step] of [['resend queued jobs', resendQueued], ['fail lost submits', failLostSubmits], ['poll running jobs', pollRunning], ['poll unresolved jobs', pollUnresolved], ['resume or close stale remakes', closeRemakes], ['close stale analyses', closeAnalyses]] as const) {
         await step().catch((e) => log(what, e));
       }
     })().finally(() => {
@@ -567,7 +569,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   if (reaAnalyzeEnabled()) {
     await boss.createQueue(ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS);
     await boss.work<AnalyzeJobData>(ANALYZE_QUEUE, { localConcurrency: 1, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
-      await Promise.all(jobs.map((job) => runReaAnalyze(pool, job.data.analysisId).catch((e) => log(`analyze ${job.data.analysisId}`, e))));
+      await Promise.all(jobs.map((job) => runReaAnalyze(pool, job.data.analysisId, {}, job.signal).catch((e) => log(`analyze ${job.data.analysisId}`, e))));
     });
   }
   // Smart Remake makes paid fal calls; off by default, and one remake at a time per worker.
