@@ -360,7 +360,7 @@ export async function mailClose(month: string, actorId: string, env: NodeJS.Proc
   if (app && to.length > 0) {
     try {
       const summary = closeSummary(await billingMonth(month));
-      const csv = await (await billingCsv(month, false)).text();
+      const csv = `﻿${await (await billingCsv(month, false)).text()}`; // text() drops the route's BOM, which Excel needs to read UTF-8
       const [sendText, sendFile] = [larkSender(app, f), larkFileSender(app, f)];
       outcome = await sendEach(to, async (r) => {
         await sendText(r, summary);

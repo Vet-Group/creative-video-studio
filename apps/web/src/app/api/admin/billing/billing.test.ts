@@ -290,6 +290,7 @@ describe('mailing a closed month to accounting', () => {
     const upload = seen[3]!.body as FormData;
     expect(upload.get('file_name')).toBe('cvs-chi-phi-2026-08.csv');
     expect(await (upload.get('file') as File).text()).toBe(await (await CSV(req(admin, '/api/admin/billing/csv?month=2026-08'))).text()); // the CSV route's content
+    expect([...new Uint8Array(await (upload.get('file') as File).arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]); // the BOM Excel needs for UTF-8
     expect(seen[4]!.body).toEqual({ receive_id: 'a@vet.test', msg_type: 'file', content: '{"file_key":"file_v2_x"}' });
     expect(await sendAudit('2026-08')).toEqual({ sent: 2, failed: [] });
     await reopen('2026-08');
