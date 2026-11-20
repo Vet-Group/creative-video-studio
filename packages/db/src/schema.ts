@@ -523,6 +523,10 @@ export const jobs = pgTable(
     index('jobs_user_id_created_at_idx').on(t.userId, t.createdAt),
     index('jobs_workspace_id_created_at_idx').on(t.workspaceId, t.createdAt.desc().nullsFirst()),
     index('jobs_status_idx').on(t.status),
+    // Every thumbnail and range request of another member's clip asks whether a Library clip names the asset (readableAsset in apps/web/src/lib/assets.ts): one index per arm of its OR.
+    index('jobs_output_asset_id_idx').on(t.outputAssetId),
+    index('jobs_poster_asset_id_idx').on(t.posterAssetId),
+    index('jobs_input_asset_ids_idx').using('gin', t.inputAssetIds),
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
     check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9', '4:1', '1:4', '8:1', '1:8')`),
     check('jobs_provider_check', sql`${t.provider} in ('fal', 'vertex', 'byteplus', 'mock')`),
