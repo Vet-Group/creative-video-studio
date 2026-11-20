@@ -86,10 +86,22 @@ export function sameOrigin(request: Request): boolean {
 }
 
 /**
+ * A request the browser itself says another origin sent: an Origin header that is not APP_URL's, or a Sec-Fetch-Site other than same-origin or none.
+ * A browser sends Origin on every request that is not a GET or HEAD, and a page's script can set neither header. A client that sends neither (a script,
+ * a test) is not a browser carrying someone's cookie, so it passes; the routes that call sameOrigin themselves stay stricter and refuse a missing Origin too.
+ */
+export function crossOrigin(request: Request): boolean {
+  const site = request.headers.get('sec-fetch-site');
+  if (site !== null && site !== 'same-origin' && site !== 'none') return true;
+  return request.headers.get('origin') !== null && !sameOrigin(request);
+}
+
+/**
  * For API routes: 401 without a valid session (or a banned user), 403 while the user must first replace an Admin's temporary password
  * (only /api/auth stays open, for /change-password; an Admin signed in as the user is not held up by it), 403 `no_workspace` for a user in no active
- * workspace, 403 when an Admin (or a template editor, isEditor) is required and the user is not one, and 409 `workspace_changed` for a write sent by a tab
- * that rendered another workspace than the one this request resolves to (no header: no check, as from a tab opened before workspaces).
+ * workspace, 403 when an Admin (or a template editor, isEditor) is required and the user is not one, 403 `forbidden origin` for a write another origin sent
+ * (crossOrigin), and 409 `workspace_changed` for a write sent by a tab that rendered another workspace than the one this request resolves to (no header:
+ * no check, as from a tab opened before workspaces).
  */
 export async function guard(request: Request, role: 'member' | 'editor' | 'admin'): Promise<Guard> {
   const session = await readSession(request.headers);
@@ -99,6 +111,8 @@ export async function guard(request: Request, role: 'member' | 'editor' | 'admin
   if (!workspace) return { error: Response.json({ error: 'no_workspace' }, { status: 403 }) };
   if ((role === 'admin' && session.user.role !== 'admin') || (role === 'editor' && !isEditor(session.user, workspace.workspaceId))) return { error: Response.json({ error: 'forbidden' }, { status: 403 }) };
   const write = request.method !== 'GET' && request.method !== 'HEAD';
+  // A page on a sibling subdomain gets the cookie (SameSite=Lax is per site) and a text/plain body needs no preflight, so the browser's own word decides.
+  if (write && crossOrigin(request)) return { error: Response.json({ error: 'forbidden origin' }, { status: 403 }) };
   // An Admin signed in as an Admin only looks: a change made here would be logged under that Admin's name.
   if (role === 'admin' && isImpersonated(session) && write) return { error: impersonationRefusal() };
   const rendered = request.headers.get(WORKSPACE_HEADER);
