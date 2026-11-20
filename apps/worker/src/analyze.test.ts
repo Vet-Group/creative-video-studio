@@ -304,3 +304,10 @@ test('closes an analysis a stopped worker left running, so the member can delete
   expect(stale.finished_at).not.toBeNull();
   expect((await row('an-busy')).status).toBe('running');
 });
+
+test("a run that outlives the sweep still ends succeeded, without the sweep's error", async () => {
+  const id = await queued();
+  const swept = seams({ decompose: async (video, out, env) => (await closeStaleAnalyses(pool, 0), seams().decompose!(video, out, env)) });
+  await runReaAnalyze(pool, id, swept);
+  expect(await row(id)).toMatchObject({ status: 'succeeded', error: null });
+});

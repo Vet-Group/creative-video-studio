@@ -165,7 +165,8 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
     // matches a succeeded analysis. bookLlm is idempotent (ref llm:analysis:<id>); staff are not charged, the cost is only recorded.
     await withTransaction(pool, async (tx) => {
       await tx.query(
-        `update analyses set status = 'succeeded', result = $2, raw_key = $3, provider = $4, model = $5, cost_usd = $6, finished_at = now() where id = $1`,
+        // error = null: a run that outlived closeStaleAnalyses still wins, without the sweep's error.
+        `update analyses set status = 'succeeded', result = $2, raw_key = $3, provider = $4, model = $5, cost_usd = $6, error = null, finished_at = now() where id = $1`,
         [analysisId, JSON.stringify(analysis), rawKey, provider, model, String(Number(cost.toFixed(6)))],
       );
       await bookLlm(tx, { analysis: analysisId }, { costUsd: cost, provider, model });
