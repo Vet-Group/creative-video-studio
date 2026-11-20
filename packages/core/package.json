@@ -24,6 +24,7 @@
     "./analysis/translate": "./src/analysis/translate.ts",
     "./presets": "./src/presets.ts",
     "./enhance": "./src/enhance.ts",
+    "./lark": "./src/lark.ts",
     "./ledger": "./src/ledger.ts",
     "./limits": "./src/limits.ts",
     "./queue": "./src/queue.ts",

@@ -48,7 +48,7 @@ export interface Usage {
   monthUsd: { used: string; cap: string } | null;
   monthToDate: { usd: string; provisional: boolean } | null;
   /** Only for a member of a billing team in the company's workspace: the team's month so far against its free allowance (docs/BILLING.md). */
-  team?: { name: string; monthUsd: string; freeUsd: string; payableUsd: string; provisional: boolean };
+  team?: { name: string; monthUsd: string; freeUsd: string; payableUsd: string; forecastUsd: string; provisional: boolean };
 }
 
 export type Section = 'profile' | 'limits' | 'security' | 'preferences' | 'methods' | 'support';
@@ -157,7 +157,7 @@ function Limits({ usage }: { usage: Usage | null | 'failed' }) {
                 {team.provisional && <span className="tag">Tạm tính</span>}
               </strong>
             </div>
-            <AllowanceBar totalUsd={team.monthUsd} freeUsd={team.freeUsd} label={`Team ${team.name}`} />
+            <AllowanceBar totalUsd={team.monthUsd} freeUsd={team.freeUsd} label={`Team ${team.name}`} forecastUsd={team.forecastUsd} />
             <p className="meter-left">Cả team dùng chung phần miễn phí; phần vượt tính cho team và không chặn việc tạo</p>
           </div>
         </div>

@@ -1,10 +1,11 @@
 // The fal account switch (owner request, 2026-11-11; docs/ops/provider-balances.md). With FAL_KEY_NEXT set (the "VET Group" team account),
 // new fal jobs go to FAL_KEY's account (the personal one) until it runs out, then to the team, without anyone changing a key on the server.
 import { audit } from '@cvs/core/audit';
+import type { SendLark } from '@cvs/core/lark';
 import type { Queryable } from '@cvs/core/ledger';
 import type { FalBalance } from '@cvs/core/providers/balances';
 import { type Pinnable, pinToAccounts } from '@cvs/core/providers/vertex-accounts';
-import { messageAdmins, type SendLark } from './fal-alert';
+import { messageAdmins } from './fal-alert';
 
 /** fal's answers when an account is out of credit (fal docs, Errors and Billing, checked 2026-11-11). */
 const CREDIT_REFUSAL = /account is locked|user is locked|exhausted balance|insufficient credits/i;

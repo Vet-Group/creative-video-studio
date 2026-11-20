@@ -1570,6 +1570,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .allowance:is([data-level='warn'], [data-level='over']) .allowance-used { background: var(--warn-fill); }
 .allowance-over { background: var(--brand); }
 .allowance-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-top: 6px; color: var(--text-muted); font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.allowance-forecast { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; }
 .allowance-over-label { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-weight: 600; }
 .allowance-over-label i { width: 8px; height: 8px; border-radius: 2px; background: var(--brand); }
 /* Rows of sign-in methods and security facts: a mark, the words, a status and one action. Also on the sign-in methods page. */

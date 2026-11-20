@@ -61,12 +61,21 @@ afterAll(async () => {
 });
 
 test('a billing team’s member sees the team’s month total, allowance and payable, an Admin of the team too', async () => {
-  const team = { name: 'Sales A', monthUsd: '22.5000', freeUsd: '20.0000', payableUsd: '2.5000', provisional: false };
+  const forecastUsd = expect.stringMatching(/^\d+\.\d{4}$/); // the pace so far to the month's end: moves with the clock, checked in the next test
+  const team = { name: 'Sales A', monthUsd: '22.5000', freeUsd: '20.0000', payableUsd: '2.5000', forecastUsd, provisional: false };
   expect((await limits(seller)).team).toEqual(team);
   expect((await limits(teammate)).team).toEqual(team);
-  expect((await limits(otherSeller)).team).toEqual({ name: 'Sales B', monthUsd: '50.0000', freeUsd: '20.0000', payableUsd: '30.0000', provisional: false });
+  expect((await limits(otherSeller)).team).toEqual({ name: 'Sales B', monthUsd: '50.0000', freeUsd: '20.0000', payableUsd: '30.0000', forecastUsd, provisional: false });
   // The usual caps are still there, unchanged.
   expect(await limits(seller)).toMatchObject({ clips: { used: 0 }, monthToDate: { usd: '15.0000' } });
+});
+
+test('the team’s forecast is its month at the pace so far: never below the total, and a team with no cost forecasts zero', async () => {
+  const { monthUsd, forecastUsd } = (await limits(seller)).team as { monthUsd: string; forecastUsd: string };
+  expect(Number(forecastUsd)).toBeGreaterThanOrEqual(Number(monthUsd));
+  await pool.query(`insert into teams (id, name, billable, free_monthly_usd) values ('sales-empty', 'Sales Empty', true, 20) on conflict do nothing`);
+  const empty = await newUser('sales-empty');
+  expect((await limits(empty)).team).toMatchObject({ monthUsd: '0.0000', forecastUsd: '0.0000' });
 });
 
 test('a member outside billing teams, and a billing member acting in a partner workspace, get nothing new', async () => {
