@@ -6,11 +6,11 @@ import { modelButton, signIn } from './support.test';
 
 test('Marketing Studio keeps its model select with the recommended badge, the audio switch and the cost in USD on Run', async ({ page }) => {
   await signIn(page, 'mkta');
-  // The badge shows on whichever model the server recommends; the test makes the first one recommended.
+  // The badge shows on whichever model the server recommends once its score rests on enough marks; the test makes the first one recommended, with 3 marks.
   await page.route('**/api/models?feature=marketing*', async (route) => {
     const res = await route.fetch();
-    const body = (await res.json()) as { models: { recommended: boolean }[] };
-    await route.fulfill({ response: res, json: { ...body, models: body.models.map((m, i) => ({ ...m, recommended: i === 0 })) } });
+    const body = (await res.json()) as { models: { recommended: boolean; total: number }[] };
+    await route.fulfill({ response: res, json: { ...body, models: body.models.map((m, i) => ({ ...m, recommended: i === 0, ...(i === 0 && { total: Math.max(3, m.total) }) })) } });
   });
   await page.goto('/marketing-studio');
   await expect(modelButton(page)).toBeVisible();

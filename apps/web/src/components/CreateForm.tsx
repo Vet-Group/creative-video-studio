@@ -992,7 +992,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
             <VideoSettings>
               {models && models.models.length > 0 && (
                 <ModelPicker
-                  models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))}
+                  models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, why: m.supported ? undefined : !m.ratios.includes(ratio) ? `Không có tỉ lệ ${ratio}` : !m.durationsSec.includes(durationSec) ? `Không có ${durationSec} giây` : images.length > m.maxImages ? `Nhận tối đa ${m.maxImages} ảnh` : undefined, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))}
                   value={modelId}
                   onChange={setModelId}
                   id={modelTrigger}
