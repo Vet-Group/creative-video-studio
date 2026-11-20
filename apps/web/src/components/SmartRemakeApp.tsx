@@ -3,13 +3,15 @@
 // (the analysis API, as on /analyze); once it has succeeded and a product is set, an AI pass marks the scenes that show a product like theirs (the `scenes`
 // suggestion) and those are pre-ticked in the same RemakePanel /analyze uses, which shows the price and makes the video. If the pick fails, nothing is ticked.
 // Or the member picks a reference video an Admin shared (SharedVideos), whose analysis is already done.
+import { ANALYZE_COST_USD } from '@cvs/core/analysis/breakdown';
 import { REMAKE_MAX_SHOTS } from '@cvs/core/analysis/remake';
 import { useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import type { AppConfig } from '@/lib/apps';
-import { mergeShots, scenePicks } from '@/lib/analyze';
+import { analysisError, mergeShots, scenePicks } from '@/lib/analyze';
+import { MAX_VIDEO_BYTES } from '@/lib/upload-limits';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
-import type { AnalysisRow } from './AnalyzeView';
+import { AnalysisWait, type AnalysisRow } from './AnalyzeView';
 import { AppAbout, AppHeader, TAB_LABEL } from './AppPage';
 import { copyError, type Img, Slot, uploadError, uploadImages, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
@@ -22,9 +24,10 @@ type Tab = 'create' | 'about';
 const LABEL: Record<Tab, string> = { create: 'Tạo', about: TAB_LABEL.about };
 const POLL_MS = 2500;
 
-/** What the member reads about the pick: how many scenes were ticked for them, or that they choose themselves. */
-export const pickNote = (picked: number | null): string =>
-  picked === null ? 'Chưa tự chọn được cảnh nào. Bạn hãy tự chọn các cảnh cần thay sản phẩm.' : picked === 0 ? 'AI chưa thấy cảnh nào có sản phẩm giống của bạn. Bạn hãy tự chọn các cảnh cần thay.' : `AI đã chọn sẵn ${picked} cảnh có sản phẩm của bạn; bỏ chọn cảnh nào không cần.`;
+/** What the member reads about the pick: how many scenes were ticked for them, or that they choose themselves. `again`: another product image replaced the ticks of the last pick. */
+export const pickNote = (picked: number | null, again = false): string =>
+  (again ? 'Ảnh sản phẩm đã đổi nên các cảnh được chọn lại từ đầu. ' : '') +
+  (picked === null ? 'Chưa tự chọn được cảnh nào. Bạn hãy tự chọn các cảnh cần thay sản phẩm.' : picked === 0 ? 'AI chưa thấy cảnh nào có sản phẩm giống của bạn. Bạn hãy tự chọn các cảnh cần thay.' : `AI đã chọn sẵn ${picked} cảnh có sản phẩm của bạn; bỏ chọn cảnh nào không cần.`);
 
 /** The app's address for an analysis and the product on view, or the bare app without an analysis. */
 export const remakeHref = (slug: string, id: string | null, product?: string): string =>
@@ -55,6 +58,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
   const [busy, setBusy] = useState(false); // an upload or the start of the analysis
   const [error, setError] = useState('');
   const [asked, setAsked] = useState(''); // `analysis:product` the pick was last asked for
+  const [again, setAgain] = useState(false); // that pick replaced an earlier one of the same analysis (another product)
   const wanted = useRef(''); // the video whose analysis is being started
   const addProductButton = useRef<HTMLButtonElement>(null);
   const [taken, setTaken] = useState(0); // counts the shelf's picks, so the product field is brought into view once the pick's layout has rendered
@@ -177,6 +181,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
   const key = analysis?.status === 'succeeded' && product[0] ? `${analysis.id}:${product[0].id}` : '';
   useEffect(() => {
     if (!key || asked === key) return;
+    setAgain(asked.startsWith(`${analysis!.id}:`));
     setAsked(key);
     remakeDrafts.delete(analysis!.id); // the panel starts from the new pick, not from an earlier form
     void pick.run({ field: 'scenes', text: '', analysisId: analysis!.id, productAssetId: product[0]!.id });
@@ -192,9 +197,9 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
     analysis === null
       ? video && !error ? 'Đang gửi video…' : ''
       : open
-        ? 'Đang phân tích video… (khoảng một phút)'
+        ? '' // AnalysisWait below
         : analysis.status === 'failed'
-          ? 'Không phân tích được video này. Hãy thử lại hoặc chọn video khác.'
+          ? analysisError(analysis.error)
           : !product[0]
             ? 'Đã phân tích xong video. Thêm ảnh sản phẩm để AI chọn các cảnh có sản phẩm của bạn.'
             : picking
@@ -223,7 +228,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
               video={video}
               busy={locked}
               optional={false}
-              hint="Video MP4 hoặc MOV. Video được phân tích ngay khi bạn thêm."
+              hint={`Video MP4 hoặc MOV (tối đa ${MAX_VIDEO_BYTES / 1024 / 1024} MB). Video được phân tích ngay khi bạn thêm (phí phân tích $${ANALYZE_COST_USD.toFixed(2)}).`}
               onFile={(f) => void take(() => uploadVideoDirect(f).then((v) => [v]), (e) => uploadError(e, 'video'))}
               onHistory={(id) => void take(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, 'Không dùng được video này.'))}
               onRemove={() => {
@@ -236,6 +241,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
             />
             <Slot label="Ảnh sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={locked} onAdd={(files) => void addProduct(files)} onRemove={() => setProduct([])} onPick={(a) => setProduct([a])} slot="product" addRef={addProductButton} />
             <p className="help">Mẹo: dùng ảnh sản phẩm rõ nét trên nền trơn, cùng loại sản phẩm với trong video mẫu (áo thay cho áo).</p>
+            {open && <AnalysisWait row={analysis} />}
             {status && (
               <p className="help" role="status">
                 {status}
@@ -251,7 +257,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
                 {error}
               </p>
             )}
-            {ready && analysis && product[0] && <RemakePanel key={key} row={analysis} initialProduct={product} initialChosen={picked ?? []} note={pickNote(picked === null ? null : picked.length)} productFixed />}
+            {ready && analysis && product[0] && <RemakePanel key={key} row={analysis} initialProduct={product} initialChosen={picked ?? []} note={pickNote(picked === null ? null : picked.length, again)} productFixed />}
             <YourRemakes slug={app.slug} exclude={ready ? analysis?.id : undefined} />
           </div>
         </div>

@@ -691,9 +691,9 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     else setFreeText(text);
     notify('Đã chép mô tả');
   }
-  /** Free writing starts from what the sections would send. */
+  /** Free writing starts from what the sections would send, unless the free box already holds words of its own (a round trip keeps them). */
   function switchMode(next: typeof mode) {
-    if (next === 'free') setFreeText(composed);
+    if (next === 'free' && !freeText.trim()) setFreeText(composed);
     setMode(next);
   }
   /** Fash's Recreate: the form refills in place; on a narrow screen the form is its own tab, so it opens. */
@@ -730,7 +730,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
       value={sec ? prompt : freeText}
       onChange={sec ? setPrompt : setFreeText}
       maxLength={room}
-      onRun={() => canRun && void run()}
+      onRun={() => (canRun ? void run() : (reason?.text ?? false))}
       disabled={presetId !== ''}
       placeholder={presetId === '' ? 'Ví dụ: The camera orbits slowly around the product in soft light (nên viết bằng tiếng Anh)' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'}
       ask={chosen ? () => ({ field: 'prompt', feature: 'video', text: sec ? prompt : freeText, seconds: durationSec, audio, room: room!, model: chosen.id }) : null}
@@ -924,7 +924,6 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
             )}
             {clipsOver && <p className="error" id={fieldIds.clips}>Mô hình này nhận tối đa {takes!.max} tệp âm thanh, tổng {takes!.seconds} giây.</p>}
 
-            {wordsOnly && presetId !== '' && <p className="help">Mẫu chuyển động cần ảnh sản phẩm. Không có ảnh thì chọn &quot;Tự viết mô tả&quot;.</p>}
             {tooLong && (
               <p className="error" id={fieldIds.prompt}>
                 {tooLong}
@@ -955,7 +954,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                 templates={PROMPT_TEMPLATES.video}
                 onTemplate={(t) => (sec ? (setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
                 filled={(sec ? hookText + prompt + ending : freeText).trim() !== ''}
-                onRun={() => canRun && void run()}
+                onRun={() => (canRun ? void run() : (reason?.text ?? false))}
               >
                 {body}
               </PromptSections>
@@ -993,7 +992,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
             <VideoSettings>
               {models && models.models.length > 0 && (
                 <ModelPicker
-                  models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))}
+                  models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, why: m.supported ? undefined : !m.ratios.includes(ratio) ? `Không có tỉ lệ ${ratio}` : !m.durationsSec.includes(durationSec) ? `Không có ${durationSec} giây` : images.length > m.maxImages ? `Nhận tối đa ${m.maxImages} ảnh` : undefined, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))}
                   value={modelId}
                   onChange={setModelId}
                   id={modelTrigger}
@@ -1003,7 +1002,18 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               {tooMany && chosen && <p className="error" id={fieldIds.images}>Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
               {endOver && <p className="error" id={fieldIds.end}>Mô hình này chỉ nhận khung hình cuối cho clip tối đa {chosen!.endMaxSec} giây.</p>}
               {!endOver && endImagesOver && <p className="error" id={fieldIds.end}>Mô hình này chỉ nhận khung hình cuối khi có tối đa {chosen!.endMaxImages} ảnh. Bỏ bớt ảnh hoặc bỏ khung hình cuối.</p>}
-              <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={resolutions.length > 1 ? chosen!.id : (chosen?.resolution ?? '')} options={resolutions.length > 1 ? resolutions.map((m) => ({ value: m.id, label: m.resolution! })) : [{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={resolutions.length > 1 ? setModelId : () => undefined} />
+              {resolutions.length > 1 ? (
+                <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={chosen!.id} options={resolutions.map((m) => ({ value: m.id, label: m.resolution! }))} onChange={setModelId} />
+              ) : (
+                // One resolution is nothing to choose: the value in the select's place, with no chevron and no menu.
+                <div className="field">
+                  <span className="field-label">Độ phân giải</span>
+                  <span className="select-trigger" data-fixed>
+                    <Icon name="preset" />
+                    <span className="select-value">{chosen?.resolution ?? 'Theo mô hình'}</span>
+                  </span>
+                </div>
+              )}
               <Select
                 label="Thời lượng"
                 icon="clock"

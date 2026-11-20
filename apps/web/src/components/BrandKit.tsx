@@ -95,6 +95,9 @@ export function BrandPicker({ storeId, onStore, on, onToggle, onKit, onFailed }:
   }, []);
   const store = stores.find((s) => s.id === storeId);
   const usable = store !== undefined && hasBrand(store);
+  // Why the kit switch is off; nothing while a chosen store is still loading.
+  const why = usable ? null : store ? 'Cửa hàng này chưa có bộ nhận diện' : storeId ? null : 'Chọn cửa hàng để dùng bộ nhận diện';
+  const whyId = useId();
   useEffect(() => onKit?.(on && usable ? store : null), [on, usable, store]);
   async function togglePin(id: string) {
     try {
@@ -112,7 +115,8 @@ export function BrandPicker({ storeId, onStore, on, onToggle, onKit, onFailed }:
         className="enhance"
         aria-pressed={on && usable}
         disabled={!usable}
-        title={usable ? 'Thêm phong cách và màu của cửa hàng vào prompt gửi đi' : store ? 'Cửa hàng này chưa có bộ nhận diện' : 'Chọn cửa hàng để dùng bộ nhận diện'}
+        title={why ?? 'Thêm phong cách và màu của cửa hàng vào prompt gửi đi'}
+        aria-describedby={why ? whyId : undefined}
         onClick={() => onToggle(!on)}
       >
         <Icon name="store" size={12} />
@@ -122,6 +126,12 @@ export function BrandPicker({ storeId, onStore, on, onToggle, onKit, onFailed }:
         <button type="button" className="link-button" onClick={() => setEditing(store)}>
           Bộ nhận diện
         </button>
+      )}
+      {/* Shown, not only in the title: touch and keyboard users never see a tooltip. */}
+      {why && !failed && (
+        <p className="help" id={whyId}>
+          {why}.
+        </p>
       )}
       {failed && <p className="error">Không tải được danh sách cửa hàng.</p>}
       <BrandKitForm store={editing} onClose={() => setEditing(null)} onSaved={(s) => (setStores((cur) => cur.map((x) => (x.id === s.id ? s : x))), setEditing(null))} />

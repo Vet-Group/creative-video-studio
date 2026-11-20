@@ -58,7 +58,21 @@ test('the form offers every shot of the analysis, caps the pick at 6, and cannot
   expect(html.match(/type="checkbox"/g)).toHaveLength(2);
   expect(html).toContain('tối đa 6');
   expect(html).toContain('5.2–12.0s');
-  expect(html).toMatch(/<button type="button" class="primary" disabled="">Tạo video với sản phẩm<\/button>/);
+  expect(html).toMatch(/<button type="button" class="primary" disabled="" aria-describedby="remake-reason-a1">Tạo video với sản phẩm<\/button>/);
+  expect(html).toContain('<p class="help" id="remake-reason-a1" role="status">Thêm 1 ảnh sản phẩm để tạo video.</p>');
+});
+
+test('the off button says why: no scene yet; at the cap the other scenes say the limit; with a pick there is no reason', () => {
+  const shots = Array.from({ length: 7 }, (_, i) => ({ index: i + 1, start: i, end: i + 1, role: '', prompt: `p${i}` }));
+  const analysis: Analysis = { durationS: 7, shotCount: 7, format: '', hook: '', summary: '', shots };
+  const panel = (chosen: number[]) =>
+    renderToStaticMarkup(<RemakePanel row={{ id: 'a9', status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-13T00:00:00Z', sourceAssetId: null }} initialProduct={[{ id: 'p', filename: 'p.jpg' }]} initialChosen={chosen} />);
+  expect(panel([])).toContain('Chọn ít nhất 1 cảnh.');
+  const full = panel([1, 2, 3, 4, 5, 6]);
+  expect(full).toContain('Đã chọn tối đa 6 cảnh');
+  expect(full.match(/aria-describedby="remake-full-a9"/g)).toHaveLength(1); // the one scene left out
+  expect(full).not.toContain('remake-reason-a9');
+  expect(panel([1])).not.toContain('Đã chọn tối đa');
 });
 
 test('the form offers the scenes the result list shows, sending each as its first stored shot, and a clip is named by its scene', () => {

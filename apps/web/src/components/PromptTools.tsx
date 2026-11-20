@@ -21,8 +21,8 @@ interface Props {
   value: string;
   onChange: (text: string) => void;
   maxLength?: number;
-  /** Presses Run; false when Run is off (the editor then stays open). */
-  onRun: () => boolean | void;
+  /** Presses Run; false, or why as text, when Run is off (the editor then stays open and shows the why, which its modal hides on the page). */
+  onRun: () => boolean | string | void;
   /** The AI request for this field; without it there is no AI button. Null keeps the button off until the page knows its model, so a request never goes without the model's room. */
   ask?: (() => Ask) | null;
   /** The AI button's name, e.g. the lines' own one on Advanced. */
@@ -46,6 +46,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
   // A reading is of the words it was asked for: new words close it.
   useEffect(() => setOpen((o) => (o === 'vi' ? null : o)), [value]);
   const [editing, setEditing] = useState(false);
+  const [blocked, setBlocked] = useState<string | null>(null); // why the editor's Ctrl+Enter did not run
   const [undo, setUndo] = useState<{ before: string; after: string } | null>(null);
   const root = useRef<HTMLSpanElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -124,17 +125,20 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
         </button>
       )}
       {!compact && <span className={s.spacer} />}
-      {/* Clear sits right, beside the editor; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
-      {has('clear') && !compact && value && (
-        <button type="button" className={`${btn} ${s.iconTool}`} aria-label="Xoá mô tả" title="Xoá mô tả" onClick={() => pick('')}>
-          <Icon name="x" size={13} />
-        </button>
-      )}
-      {has('expand') && (
-        <button type="button" className={compact ? btn : `${s.tool} ${s.iconTool}`} aria-label="Mở rộng" title="Mở rộng" onClick={() => setEditing(true)}>
-          <Icon name="expand" size={13} />
-        </button>
-      )}
+      {/* Clear and the editor wrap together, so a full toolbar never leaves one icon alone on a row. */}
+      <span className={s.end}>
+        {/* Clear sits right, beside the editor; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
+        {has('clear') && !compact && value && (
+          <button type="button" className={`${btn} ${s.iconTool}`} aria-label="Xoá mô tả" title="Xoá mô tả" onClick={() => pick('')}>
+            <Icon name="x" size={13} />
+          </button>
+        )}
+        {has('expand') && (
+          <button type="button" className={compact ? btn : `${s.tool} ${s.iconTool}`} aria-label="Mở rộng" title="Mở rộng" onClick={() => setEditing(true)}>
+            <Icon name="expand" size={13} />
+          </button>
+        )}
+      </span>
 
       {open === 'ai' && (
         <div ref={list} className={s.popover} role="group" aria-label={aiLabel} aria-busy={ai.busy}>
@@ -216,9 +220,25 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
         </div>
       )}
 
-      <Modal open={editing} onClose={() => setEditing(false)} label="Sửa mô tả" className="choice-dialog prompt-editor">
+      <Modal open={editing} onClose={() => (setEditing(false), setBlocked(null))} label="Sửa mô tả" className="choice-dialog prompt-editor">
         <h2>Sửa mô tả</h2>
-        <textarea aria-label="Mô tả mở rộng" value={value} maxLength={maxLength} onChange={(e) => onChange(e.target.value)} onKeyDown={runKey(() => onRun() !== false && setEditing(false))} autoFocus />
+        <textarea
+          aria-label="Mô tả mở rộng"
+          value={value}
+          maxLength={maxLength}
+          onChange={(e) => (onChange(e.target.value), setBlocked(null))}
+          onKeyDown={runKey(() => {
+            const r = onRun();
+            if (r === false || typeof r === 'string') setBlocked(r || null);
+            else setEditing(false);
+          })}
+          autoFocus
+        />
+        {blocked && (
+          <p className="help" role="status">
+            {blocked}
+          </p>
+        )}
         <div className={s.editorFoot}>
           <span>
             <span className="help">
@@ -227,7 +247,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
             </span>{' '}
             · Ctrl+Enter để chạy
           </span>
-          <button type="button" className="primary" onClick={() => setEditing(false)}>
+          <button type="button" className="primary" onClick={() => (setEditing(false), setBlocked(null))}>
             Xong
           </button>
         </div>

@@ -144,7 +144,7 @@ export function useImageChoice(models: ImageModel[] | null, images: number, init
   const resolution = chosen ? nearestOption(chosen.resolutions, wantResolution) : wantResolution;
   const thinking = chosen?.thinking.includes(wantThinking) ? wantThinking : chosen?.thinking[0];
   const options: ModelOption[] = (models ?? []).map((m) => ({
-    id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended, resolution: m.resolutions.join('/'), isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total,
+    id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), why: fits(m) ? undefined : `Nhận tối đa ${m.maxImages} ảnh`, estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended, resolution: m.resolutions.join('/'), isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total,
   }));
   const user = <T,>(set: (v: T) => void) => (v: T) => (setAsked(null), set(v));
   function refill(j: { modelId: string | null; ratio: string | null; resolution: string | null; modelLabel?: string | null; images?: unknown[]; lost?: number; extra?: Skipped['extra']; store?: boolean }) {
@@ -521,7 +521,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         )}
         {/* Empty, the whole slot is the upload button, a grey circle over its hint as on the live pages; with images, a small tile adds more. */}
         {!full && (
-          <button ref={addRef} type="button" className="slot-add" aria-label={`Tải lên ${label}`} aria-haspopup={onBrowse ? 'dialog' : undefined} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => (onBrowse ? onBrowse() : input.current?.click())}>
+          <button ref={addRef} type="button" className="slot-add" aria-label={onBrowse ? `Tải lên ${label} hoặc chọn ảnh có sẵn` : `Tải lên ${label}`} aria-haspopup={onBrowse ? 'dialog' : undefined} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => (onBrowse ? onBrowse() : input.current?.click())}>
             <span className="slot-icon" aria-hidden="true">
               <Icon name={images.length === 0 && offer.length === 0 ? icon : 'plus'} size={16} />
               {offer.length > 0 && <span>Tải lên</span>}
@@ -969,7 +969,7 @@ export function TileSkeleton() {
 }
 
 /** A tile's picture, which fades in over the tile's own fill once it has loaded (see `.tile-img`). */
-function TileImg(props: ImgHTMLAttributes<HTMLImageElement> & { alt: string }) {
+export function TileImg(props: ImgHTMLAttributes<HTMLImageElement> & { alt: string }) {
   const [loaded, setLoaded] = useState(false);
   return <img {...props} className={loaded ? 'tile-img loaded' : 'tile-img'} onLoad={() => setLoaded(true)} onError={() => setLoaded(true)} />;
 }
@@ -1056,12 +1056,12 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               typeof it === 'string' ? (
                 <li key={it} className="gallery-item">
                   {video ? (
-                    <a href={`/api/samples/${it}`} aria-label={detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Xem video mẫu'} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
+                    <a href={`/api/samples/${it}`} aria-label={`${detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Xem video mẫu'} ${sampleTiles.indexOf(it) + 1}`} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
                       <Preview src={`/api/samples/${it}`} poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} width={9} height={16} title="Video mẫu" onHover />
                     </a>
                   ) : (
                     // A picture opens in place as a clip does, with its details when it has a file.
-                    <a href={`/api/samples/${it}`} aria-label={detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Xem ảnh mẫu'} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
+                    <a href={`/api/samples/${it}`} aria-label={`${detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Xem ảnh mẫu'} ${sampleTiles.indexOf(it) + 1}`} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
                       <TileImg src={`/api/samples/${it}`} alt={`Ảnh mẫu ${sampleTiles.indexOf(it) + 1}`} loading="lazy" {...photoDrag(form?.result && form.photo ? (to) => form.photo!({ sample: it }, to) : undefined)} />
                     </a>
                   )}

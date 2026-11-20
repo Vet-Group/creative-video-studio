@@ -47,8 +47,8 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await expect(page.getByRole('img', { name: 'model.png' })).toBeVisible();
   await expect(runButton(page)).toBeDisabled();
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh sản phẩm.');
-  // The empty product tile already says what to add: the same reason is read out but not drawn over the form's foot.
-  expect((await reasonOf(page).boundingBox())!.height).toBeLessThanOrEqual(1);
+  // The empty product tile already says what to add, and the reason by Run says it too, as a muted line: a disabled Run is never unexplained.
+  expect((await reasonOf(page).boundingBox())!.height).toBeGreaterThan(10);
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
   await expect(page.getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(runButton(page)).toBeEnabled();
@@ -205,7 +205,7 @@ test('with one photo tile still empty, a reason about the model stays on screen 
   await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
   await expect(page.getByRole('img', { name: 'model.png' })).toBeVisible();
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh sản phẩm.');
-  expect((await reasonOf(page).boundingBox())!.height).toBeLessThanOrEqual(1); // the empty product tile says it
+  expect((await reasonOf(page).boundingBox())!.height).toBeGreaterThan(10); // a muted line beside the empty product tile, never hidden
   await selectValue(page, 'Tỉ lệ', '16:9');
   await expect(runButton(page)).toBeDisabled();
   await expect(reasonOf(page)).toHaveText(/Mô hình này không có tỉ lệ hoặc thời lượng đã chọn/);

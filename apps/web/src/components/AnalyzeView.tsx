@@ -4,11 +4,13 @@
 // prompt ready to push into Create (/create). Reachable only when REA_ANALYZE_ENABLED is on (the route 404s otherwise).
 // /analyze?analysis=<id> opens one analysis; the URL follows the one on view.
 import Link from 'next/link';
-import type { Analysis } from '@cvs/core/analysis/breakdown';
-import { useEffect, useRef, useState } from 'react';
-import { analysisFormat, mergeShots, roleLabel, scriptPrompt, scriptText, timeRange } from '@/lib/analyze';
+import { ANALYZE_COST_USD, type Analysis } from '@cvs/core/analysis/breakdown';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { ANALYSIS_RUN, analysisError, analysisFormat, mergeShots, roleLabel, scriptPrompt, scriptText, timeRange } from '@/lib/analyze';
 import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
 import { api, ApiError, errorText, sendJson } from '@/lib/api';
+import { runProgress } from '@/lib/explore';
+import { confirmRun } from '@/lib/run-guard';
 import { MAX_VIDEO_BYTES } from '@/lib/upload-limits';
 import { useFrames } from '@/lib/use-frames';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -181,10 +183,44 @@ export function AnalysisWithSource({ analysis, src, poster, preload = 'metadata'
   );
 }
 
-/** One analysis, its status and result: the Kết quả tab on a wide screen and the Phân tích panel on a phone. `onShared`, for an Admin, adds the share control. */
-export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false, onShared }: { row: AnalysisRow; onRetry?: () => void; onClose: () => void; remakeEnabled?: boolean; onShared?: (id: string, sharedTitle: string | null) => void }) {
+const BUSY_TITLE = 'Đang phân tích · ';
+
+/** An analysis still running, on /analyze and in Smart Remake: the tray's wait bar and caption against an analysis' usual run time, with the time it has run, on a
+ * 2 s ticker; the tab title says so meanwhile. `children` end the caption. */
+export function AnalysisWait({ row, children }: { row: Pick<AnalysisRow, 'status' | 'createdAt'>; children?: ReactNode }) {
+  const [now, setNow] = useState<number>();
+  useEffect(() => {
+    const tick = () => {
+      setNow(Date.now());
+      if (!document.title.startsWith(BUSY_TITLE)) document.title = BUSY_TITLE + document.title; // again after the shell's own title effect rewrote it
+    };
+    tick();
+    const t = setInterval(tick, 2000);
+    return () => {
+      clearInterval(t);
+      if (document.title.startsWith(BUSY_TITLE)) document.title = document.title.slice(BUSY_TITLE.length);
+    };
+  }, []);
+  const progress = runProgress(now === undefined ? 0 : Math.max(0, (now - Date.parse(row.createdAt)) / 1000), ANALYSIS_RUN);
+  const elapsed = elapsedLabel(row, now);
+  return (
+    <div className="analysis-wait" role="status">
+      <strong>Đang phân tích video…</strong>
+      <span className="muted">
+        {progress.label}
+        {elapsed && ` · ${elapsed}`}.{children}
+      </span>
+      <span className="job-wait-bar" aria-hidden="true">
+        <span style={{ transform: `scaleX(${progress.fraction})` }} />
+      </span>
+    </div>
+  );
+}
+
+/** One analysis, its status and result: the Kết quả tab on a wide screen and the Phân tích panel on a phone. `onShared`, for an Admin, adds the share control.
+ * `onReuse` puts a failed analysis' video back in the form when it is not there already. */
+export function AnalysisPanel({ row, onRetry, onReuse, onClose, remakeEnabled = false, onShared }: { row: AnalysisRow; onRetry?: () => void; onReuse?: () => void; onClose: () => void; remakeEnabled?: boolean; onShared?: (id: string, sharedTitle: string | null) => void }) {
   const waiting = !terminal(row.status);
-  const elapsed = waiting ? elapsedLabel(row) : null;
   return (
     <div className="analysis-panel">
       <div className="analysis-panel-head">
@@ -194,22 +230,20 @@ export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false, on
         </button>
       </div>
       {row.creatorName && <p className="muted">Người tạo: {row.creatorName}</p>}
-      {waiting && (
-        <div className="analysis-wait" role="status">
-          <strong>Đang phân tích video…</strong>
-          <span className="muted">
-            Thường mất khoảng 2–4 phút{elapsed && ` · ${elapsed}`}. Bạn có thể xem tab khác, kết quả cũng sẽ có ở Lịch sử.
-          </span>
-        </div>
-      )}
+      {waiting && <AnalysisWait row={row}> Bạn có thể xem tab khác, kết quả cũng sẽ có ở Lịch sử.</AnalysisWait>}
       {row.status === 'failed' && (
         <>
           <p className="error" role="alert">
-            Phân tích không thành công. Hãy thử lại với video khác.
+            {analysisError(row.error)}
           </p>
           {onRetry && (
             <button type="button" className="link-button" onClick={onRetry}>
               Thử lại
+            </button>
+          )}
+          {onReuse && (
+            <button type="button" className="link-button" onClick={onReuse}>
+              Dùng video này lại
             </button>
           )}
         </>
@@ -230,7 +264,7 @@ export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false, on
 function Examples({ busy, onUse }: { busy: boolean; onUse: (video: string) => void }) {
   return (
     <div className="analysis-examples">
-      <p className="help">Video mẫu kèm kết quả phân tích: xem một video được rã thành cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh. Bấm "Dùng video này" để nạp video vào ô Video tham chiếu rồi tự phân tích.</p>
+      <p className="help">Video mẫu kèm kết quả phân tích: xem một video được rã thành cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh. Bấm "Dùng video này" để nạp video vào ô Video tham chiếu, rồi bấm Phân tích.</p>
       {ANALYZE_EXAMPLES.map((ex) => (
         <section key={ex.video} className="card analysis-example">
           <div className="analysis-example-head">
@@ -349,7 +383,7 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
   }
 
   async function analyse() {
-    if (!video) return;
+    if (!video || !(await confirmRun(ANALYZE_COST_USD))) return;
     setError('');
     setBusy(true);
     try {
@@ -397,6 +431,11 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
   const shown: Tab = narrow ? (tab === null || tab === 'result' ? 'create' : tab) : tab === null || tab === 'create' || (tab === 'result' && !current) ? (current ? 'result' : 'examples') : tab;
   const panel = shown === 'create' ? 'examples' : shown;
   const retry = video && current?.status === 'failed' && current.sourceAssetId === video.id && !busy ? () => void analyse() : undefined;
+  // A failed analysis of the member's own whose video is not in the form (opened from History or a link): put that video back, to analyse again.
+  const reuse = (a: AnalysisRow) =>
+    a.status === 'failed' && a.sourceAssetId && !a.creatorName && a.sourceAssetId !== video?.id && !busy
+      ? () => void takeVideo(() => api<{ id: string; filename: string; bytes: number }>(`/api/assets/${a.sourceAssetId}`).then((v) => [{ id: v.id, filename: v.filename, durationMs: 0, bytes: v.bytes }]), (e) => errorText(e, 'Không mở được video này.'))
+      : undefined;
 
   return (
     <section aria-labelledby="analyze-title" className="create analyze-page">
@@ -408,11 +447,13 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
 
         <div className="card form-card" id="analyze-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'analyze-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
-            <p className="help">Tải lên một video (hoặc chọn từ Lịch sử) rồi bấm Phân tích để rã thành danh sách cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh. Bấm "Dùng prompt này" ở một cảnh, hoặc "Dùng cả kịch bản", để mở Tạo video với prompt đó.</p>
+            <h2 className="analyze-form-title">Phân tích video tham chiếu</h2>
+            <p className="help">Rã video thành cảnh, câu mở đầu và prompt tiếng Anh cho từng cảnh, rồi đưa sang Tạo video.</p>
 
             <ReferenceVideoSlot
               video={video}
               busy={busy}
+              optional={false}
               hint={`Video MP4 hoặc MOV (tối đa ${MAX_VIDEO_BYTES / 1024 / 1024} MB). Hoặc bấm "Dùng video này" ở tab Ví dụ.`}
               onFile={(f) => void takeVideo(() => uploadVideoDirect(f).then((v) => [v]), (e) => uploadError(e, 'video'))}
               onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, 'Không dùng được video này.'))}
@@ -422,10 +463,13 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
               }}
             />
 
-            {video && (
-              <button type="button" className="primary" disabled={busy || running} onClick={() => void analyse()}>
-                <Icon name="chart" /> Phân tích
-              </button>
+            <button type="button" className="primary" disabled={!video || busy || running} aria-describedby={video ? undefined : 'analyze-reason'} onClick={() => void analyse()}>
+              <Icon name="chart" /> Phân tích<span className="run-cost"> · ${ANALYZE_COST_USD.toFixed(2)}</span>
+            </button>
+            {!video && (
+              <p className="help" id="analyze-reason">
+                Thêm video để bắt đầu.
+              </p>
             )}
             {error && (
               <p className="error" role="alert">
@@ -433,13 +477,13 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
               </p>
             )}
 
-            {narrow && current && <AnalysisPanel row={current} onRetry={retry} onClose={close} remakeEnabled={remakeEnabled} onShared={onShared} />}
+            {narrow && current && <AnalysisPanel row={current} onRetry={retry} onReuse={reuse(current)} onClose={close} remakeEnabled={remakeEnabled} onShared={onShared} />}
           </div>
         </div>
 
         <div className="side" id={`analyze-panel-${panel}`} role="tabpanel" aria-labelledby={`analyze-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'result' && current ? (
-            <AnalysisPanel row={current} onRetry={retry} onClose={close} remakeEnabled={remakeEnabled} onShared={onShared} />
+            <AnalysisPanel row={current} onRetry={retry} onReuse={reuse(current)} onClose={close} remakeEnabled={remakeEnabled} onShared={onShared} />
           ) : shown === 'history' ? (
             <section className="analysis-history">
               <h2>Gần đây</h2>
@@ -453,7 +497,7 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
                   }}
                 />
               )}
-              <AnalysisHistory loading={historyLoading} error={historyError} items={history} currentId={current?.id} onRetry={() => void loadHistory()} onPick={pick} onDelete={(a) => void remove(a)} />
+              <AnalysisHistory loading={historyLoading} error={historyError} items={history} currentId={current?.id} onRetry={() => void loadHistory()} onPick={pick} onReuse={(a) => (reuse(a)?.(), narrow && setTab('create'))} onDelete={(a) => void remove(a)} />
               {removeError && (
                 <p className="error" role="alert">
                   {removeError}

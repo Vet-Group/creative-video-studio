@@ -35,7 +35,12 @@ export interface ModelOption {
   creditShown?: boolean;
   /** How many marks the score rests on: a model nobody has marked shows no score. */
   marks?: number;
+  /** Why an unsupported model cannot take this form's settings (the ratio, length or image count), where the page can tell. */
+  why?: string;
 }
+
+/** The recommendation shows only once the score rests on enough marks: a badge without evidence reads as a guess. A model without marks (none sent) keeps it. */
+export const vouched = (m: Pick<ModelOption, 'recommended' | 'marks'>): boolean => !!m.recommended && (m.marks === undefined || m.marks >= MIN_MARKS);
 
 /** Why a locked model cannot be picked: an Admin sees the provider's balance, a member only that it is out of budget (owner decision 2026-11-06). */
 export const lockedText = (m: ModelOption) => (m.creditShown ? `Hết credits: còn $${Math.max(0, Number(m.creditUsd)).toFixed(2)}` : 'Tạm hết ngân sách, báo Admin');
@@ -226,21 +231,21 @@ export function ModelPicker({ models: given, value, onChange, id }: { models: Mo
           )}
           {m.isNew && fresh && <span className="badge badge-new">MỚI</span>}
           {m.isMock && <span className="badge">MOCK</span>}
-          {m.recommended && <span className="badge badge-recommended">Đề xuất</span>}
+          {vouched(m) && <span className="badge badge-recommended">Đề xuất</span>}
         </span>
         <span className="model-sub">
           {m.resolution && <span>{m.resolution}</span>}
           {lengths(m.durationsSec) && <span>{lengths(m.durationsSec)}</span>}
           <span>${m.estimateUsd}</span>
           {m.marks !== undefined && m.marks > 0 && m.marks < MIN_MARKS ? (
-            <span>Chưa đủ đánh giá</span>
+            <span>Ít đánh giá ({m.marks})</span>
           ) : (
             <>
               {m.score !== undefined && m.marks !== 0 && <span>Điểm {m.score}</span>}
               {m.rate !== undefined && <span>Đạt {m.rate}</span>}
             </>
           )}
-          {m.locked ? <span>{lockedText(m)}</span> : !m.supported && <span>Không hỗ trợ lựa chọn này</span>}
+          {m.locked ? <span>{lockedText(m)}</span> : !m.supported && <span>{m.why ?? 'Không hỗ trợ lựa chọn này'}</span>}
         </span>
       </div>
       {m.id === value && <Icon name="check" />}
@@ -344,7 +349,7 @@ export function ModelPicker({ models: given, value, onChange, id }: { models: Mo
           <span className="select-value select-value-row" id={valueId}>
             <span className="select-value-text" title={chosen?.label}>{chosen ? chosen.label : 'Chưa chọn mô hình'}</span>
             {chosen?.isMock && <span className="badge">MOCK</span>}
-            {chosen?.recommended && <span className="badge badge-recommended">Đề xuất</span>}
+            {chosen && vouched(chosen) && <span className="badge badge-recommended">Đề xuất</span>}
           </span>
           <Icon name={open ? 'up' : 'down'} />
         </button>

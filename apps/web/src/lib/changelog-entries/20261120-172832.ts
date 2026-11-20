@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-20T17:28:32+07:00', kind: 'improved', title: 'Thư viện dễ dùng hơn trên điện thoại, nút trong chi tiết luôn trong tầm tay', details: ['Trên điện thoại, các ô lọc của Thư viện nằm trong nút "Bộ lọc"; trên màn hình rộng, các nhóm lọc xuống dòng thay vì phải cuộn ngang.', 'Trong chi tiết một kết quả, phần đánh giá, Chạy lại và Dùng lại luôn nằm ở đáy khung; mô tả dài được gấp gọn với nút "Xem thêm"; các nút Tải xuống và Dùng khung hình có ghi chữ.', 'Cửa sổ "Có gì mới" chỉ hiện ở trang Khám phá, không còn che form đang làm. Đổi không gian làm việc khi đang ở trang tạo thì được hỏi trước, vì ảnh và lựa chọn sẽ mất.'], href: '/library', prs: [588], audience: 'all' } satisfies ChangeEntry;

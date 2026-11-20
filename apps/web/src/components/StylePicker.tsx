@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useSamples, versionedSample } from '@/lib/use-samples';
 import { Icon } from './Icon';
+import { TileImg } from './image-tools';
 import { useJobs } from './jobs';
 import { Modal } from './Modal';
 import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, PresetSections, type Proposal } from './PresetEditing';
@@ -91,7 +92,13 @@ export function StylePicker({ value, onChange, onStyle }: { value: string; onCha
               const off = p.enabled === false; // shown to an editor only, who can switch it back on
               return (
                 <li key={p.id} className={off ? 'preset-card off' : 'preset-card'}>
-                  {src ? <img src={src} alt="" /> : <div className="banner-empty" />}
+                  {src ? (
+                    <span className="preset-photo">
+                      <TileImg src={src} alt="" />
+                    </span>
+                  ) : (
+                    <div className="banner-empty" />
+                  )}
                   {off ? (
                     <span className="preset-name">
                       {p.label}

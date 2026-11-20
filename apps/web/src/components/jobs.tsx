@@ -356,16 +356,16 @@ export const useForm = (): FormActions | null => useContext(FormContext);
 
 /** The reuse action (Fash's Recreate): beside a form it refills that form in place and the URL stays; elsewhere (the Library) it opens the page that made it.
  * `from` is the API path the form refills from (lib/reuse.ts), `href` the page link; `onDone` runs after an in-place refill starts; `recipe` as FormActions.recreate. */
-export function Recreate({ href, from, className, label, onDone, recipe, children }: { href: string; from: string; className?: string; label?: string; onDone?: () => void; recipe?: boolean; children: ReactNode }) {
+export function Recreate({ href, from, className, label, title, onDone, recipe, children }: { href: string; from: string; className?: string; label?: string; title?: string; onDone?: () => void; recipe?: boolean; children: ReactNode }) {
   const form = useForm();
   if (!form)
     return (
-      <Link href={href} className={className} aria-label={label} data-from={from}>
+      <Link href={href} className={className} aria-label={label} title={title} data-from={from}>
         {children}
       </Link>
     );
   return (
-    <button type="button" className={className} aria-label={label} data-from={from} onClick={() => (form.recreate(from, recipe), onDone?.())}>
+    <button type="button" className={className} aria-label={label} title={title} data-from={from} onClick={() => (form.recreate(from, recipe), onDone?.())}>
       {children}
     </button>
   );
@@ -422,7 +422,8 @@ export function useFreshResults(run: () => void): void {
   useTabReturn(run);
 }
 
-export function JobsProvider({ userId, children }: { userId: string; children: ReactNode }) {
+/** `page`: the page's name, which leads the tab title (WCAG 2.4.2) before the site's. */
+export function JobsProvider({ userId, page, children }: { userId: string; page?: string; children: ReactNode }) {
   const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, clips: null as JobsState['clips'], queue: null as JobsState['queue'], loaded: false, failed: false, lastFinished: 0 });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [news, setNews] = useState(false);
@@ -483,8 +484,14 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
 
   const active = data.jobs.filter((j) => !FINISHED.includes(j.status)).length;
   useEffect(() => {
-    document.title = news ? `Đã xong · ${BASE_TITLE}` : active > 0 ? `Đang tạo (${active}) · ${BASE_TITLE}` : BASE_TITLE;
-  }, [news, active, pathname]);
+    const base = page ? `${page} · ${BASE_TITLE}` : BASE_TITLE;
+    const want = news ? `Đã xong · ${base}` : active > 0 ? `Đang tạo (${active}) · ${base}` : base;
+    document.title = want;
+    // The layout's metadata title can land after this (Next streams it in after the page): put the page's name back when it does.
+    const watch = new MutationObserver(() => document.title === BASE_TITLE && want !== BASE_TITLE && (document.title = want));
+    watch.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => watch.disconnect();
+  }, [news, active, pathname, page]);
 
   const dismiss = useCallback((id: number) => {
     setToasts((cur) => cur.filter((t) => t.id !== id));

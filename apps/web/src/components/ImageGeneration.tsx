@@ -165,8 +165,8 @@ ${style.prompt}` : prompt.trim();
                 : prompt.trim() === ''
                   ? NO_PROMPT
                   : promptTooLong(chosen, sent.length, added);
-  // While the page loads (Run says so), and before the first word (the box's placeholder asks for it), the reason is for screen readers and Run's
-  // description only, so the bar keeps its height; a prompt of spaces alone gets the line.
+  // While the page loads (Run says so), and before the first word (the box's placeholder asks for it), the reason is a quiet muted line rather than a
+  // box; a prompt of spaces alone gets the box.
   const starting = !recall.answered || models === null;
   const quiet = starting || (reason === NO_PROMPT && prompt === '');
   const canRun = reason === null && !busy;
@@ -251,7 +251,7 @@ ${style.prompt}` : prompt.trim();
             value={prompt}
             onChange={setPrompt}
             maxLength={chosen?.maxPromptChars}
-            onRun={() => canRun && void run()}
+            onRun={() => (canRun ? void run() : (reason ?? false))}
             placeholder="Mô tả cảnh bạn muốn tạo…"
             ask={chosen ? () => ({ field: 'prompt', feature: 'image', text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}
             enhance={<EnhanceToggle on={enhance} onChange={(v) => (recall.touch(), setEnhance(v))} />}

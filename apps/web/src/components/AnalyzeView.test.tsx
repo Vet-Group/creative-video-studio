@@ -90,6 +90,17 @@ test('a running analysis shows a status block with the usual wait, and a failed 
   expect(retry).toContain('Thử lại');
 });
 
+test('the wait shows the tray bar and its usual-time caption, a failed one its mapped reason, and the reuse action only when offered', () => {
+  const running = renderToStaticMarkup(<AnalysisPanel row={{ ...base, status: 'queued', result: null, createdAt: new Date().toISOString() }} onClose={() => undefined} />);
+  expect(running).toContain('class="job-wait-bar"');
+  expect(running).toContain('Thường mất khoảng 2–4 phút · vừa gửi. Bạn có thể xem tab khác');
+  const failed = { ...base, status: 'failed' as const, result: null, error: 'Command failed: rea-video decompose: Invalid data found when processing input' };
+  const html = renderToStaticMarkup(<AnalysisPanel row={failed} onClose={() => undefined} />);
+  expect(html).toContain('Không đọc được video này');
+  expect(html).not.toContain('Dùng video này lại');
+  expect(renderToStaticMarkup(<AnalysisPanel row={failed} onReuse={() => undefined} onClose={() => undefined} />)).toContain('Dùng video này lại');
+});
+
 test('with a source video each scene has a thumbnail slot that seeks like the time button, and the whole script can be copied', () => {
   const html = renderToStaticMarkup(<AnalysisPanel row={base} onClose={() => undefined} />);
   expect(html.match(/class="analysis-frame"/g)).toHaveLength(2); // a placeholder per scene until its still is cut in the browser

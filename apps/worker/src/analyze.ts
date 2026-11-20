@@ -9,7 +9,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { type Analysis, type AnalysisVi, mergeShots, parseBreakdown } from '@cvs/core/analysis/breakdown';
+import { ANALYZE_COST_USD, type Analysis, type AnalysisVi, mergeShots, parseBreakdown } from '@cvs/core/analysis/breakdown';
 import { createAnalysisPromptWriter, writeScenePrompts } from '@cvs/core/analysis/prompts';
 import { analysisChat, type Chat, createAnalysisTranslator, translateAnalysisVi } from '@cvs/core/analysis/translate';
 import { OPENAI_PRICES } from '@cvs/core/enhance';
@@ -21,10 +21,6 @@ import { getObject, putObject } from './storage';
 import type { WorkerDeps } from './worker';
 
 const run = promisify(execFile);
-
-// rea-video does not report VLM token usage, and seed-2-0-lite is cheap; the real spend is the
-// generation the user runs afterward. shortcut: flat estimate, upgrade when rea-video surfaces usage.
-const ANALYZE_COST_USD = 0.02;
 
 type Pool = WorkerDeps['pool'];
 

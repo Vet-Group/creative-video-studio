@@ -16,7 +16,9 @@ test('the app asks for two things only, a reference video and one product image,
   expect(html).toContain('Ảnh sản phẩm');
   expect(html).toContain('Mẹo: dùng ảnh sản phẩm rõ nét trên nền trơn');
   expect(html).not.toContain('Tạo video với sản phẩm'); // RemakePanel mounts once the video is analysed and the scenes are picked
-  expect(html).not.toContain('role="status"');
+  expect(html).not.toContain('<p class="help" role="status">'); // no form status yet (only the remake list says it is loading)
+  expect(html).toContain('tối đa 20 MB'); // the upload limit, as on /analyze
+  expect(html).toContain('phí phân tích $0.02'); // the analysis starts on its own, so the hint names its price
   expect(html).toContain('Giới thiệu'); // the About tab beside the form
 });
 
@@ -32,13 +34,14 @@ test('the note says how many scenes were ticked, that none matched, or that the 
   expect(pickNote(2)).toBe('AI đã chọn sẵn 2 cảnh có sản phẩm của bạn; bỏ chọn cảnh nào không cần.');
   expect(pickNote(0)).toContain('chưa thấy cảnh nào');
   expect(pickNote(null)).toContain('tự chọn');
+  expect(pickNote(2, true)).toBe('Ảnh sản phẩm đã đổi nên các cảnh được chọn lại từ đầu. AI đã chọn sẵn 2 cảnh có sản phẩm của bạn; bỏ chọn cảnh nào không cần.');
 });
 
 test('opened with an analysis id it still shows the form, with no remake list until the member has some', () => {
   const html = renderToStaticMarkup(<SmartRemakeApp app={appBySlug('smart-remake')!} initialId="an-1" />);
   expect(html).toContain('Ảnh sản phẩm');
   expect(html).not.toContain('Tạo video với sản phẩm'); // the panel needs the analysis fetched and a product added again
-  expect(html).not.toContain('Video của bạn');
+  expect(html).not.toContain('class="remake-item"');
 });
 
 test('the address names the analysis and the product on view, the analysis alone without a product, or the bare app', () => {

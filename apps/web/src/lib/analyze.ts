@@ -79,6 +79,16 @@ export const timeRange = (start: number, end: number): string => (end < 60 ? `${
 // The scene merge lives in core, as Smart Remake's API and worker remake a whole scene too.
 export { mergeShots };
 
+/** An analysis' usual run time in seconds, measured on prod 2026-11-14 (median 125 s, slowest 232 s): the wait bar and its "2–4 phút" on /analyze and in Smart Remake. */
+export const ANALYSIS_RUN = { p50: 125, p75: 232 };
+
+/** Why an analysis failed, in words a member can act on, from the worker's raw `error` (null on a shared analysis, whose error stays its owner's). */
+export function analysisError(error: string | null | undefined): string {
+  if (error?.includes('could not queue')) return 'Máy chủ phân tích đang bận nên chưa nhận video. Hãy thử lại sau ít phút.';
+  if (error && /invalid data found|moov atom not found|unsupported/i.test(error)) return 'Không đọc được video này. Hãy thử một video MP4 hoặc MOV khác.';
+  return 'Phân tích không thành công. Hãy thử lại với video khác.';
+}
+
 /** Create's free prompt takes at most this many characters from ?prompt= (the create page slices to it). */
 const SCRIPT_LIMIT = 2000;
 

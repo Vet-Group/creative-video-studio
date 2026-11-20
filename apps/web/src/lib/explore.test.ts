@@ -1,6 +1,6 @@
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { expect, test } from 'vitest';
-import { continueJobs, givenName, greeting, jobNote, providerQueueLabel, todayStat, typicalLabel, waitLabel, waitProgress } from './explore';
+import { continueJobs, givenName, greeting, jobNote, providerQueueLabel, runProgress, todayStat, typicalLabel, waitLabel, waitProgress } from './explore';
 
 test('the given name is the last word of a Vietnamese full name', () => {
   expect(givenName('Nguyễn Văn An')).toBe('An');
@@ -129,4 +129,12 @@ test("a model's usual wait before Run reads as minutes, or under a minute", () =
   expect(waitLabel({ p50: 150, p75: 200 })).toBe('~2–4 phút');
   expect(waitLabel({ p50: 70, p75: 110 })).toBe('~1–2 phút');
   expect(waitLabel({ p50: 20, p75: 40 })).toBe('dưới 1 phút');
+});
+
+test('a fixed usual run time (an analysis) gives the same bar and caption as a job: the range, then past it, longer than usual', () => {
+  const t = { p50: 125, p75: 232 };
+  expect(runProgress(0, t)).toEqual({ fraction: 0, label: 'Thường mất khoảng 2–4 phút' });
+  expect(runProgress(125, t).fraction).toBeGreaterThan(0.7);
+  expect(runProgress(125, t).fraction).toBeLessThan(0.9);
+  expect(runProgress(300, t).label).toBe('Lâu hơn thường lệ một chút');
 });

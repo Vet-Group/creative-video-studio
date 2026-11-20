@@ -89,11 +89,12 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
   await more.click();
   await expect(more).toHaveAttribute('aria-expanded', 'false');
 
-  // Before a prompt the reason is for screen readers and Run's description, not a line in the bar; a prompt of spaces alone gets the line.
+  // Before a prompt the reason is a quiet muted line in the bar and Run's description; a prompt of spaces alone gets the box.
   await expect(run).toBeDisabled();
   const reason = bar.locator('#imagegen-reason');
   await expect(reason).toHaveText('Nhập mô tả cảnh bạn muốn tạo.');
   await expect(reason).toHaveAttribute('data-quiet');
+  expect((await reason.boundingBox())!.height).toBeGreaterThan(10);
   await expect(run).toHaveAttribute('aria-describedby', 'imagegen-reason');
   await prompt.fill('   ');
   await expect(reason).not.toHaveAttribute('data-quiet');
@@ -303,8 +304,9 @@ test('the bar stays compact with a long prompt and 3 photos: Run on the chip row
 test('a suggested model with thinking levels keeps its name readable in the chip row; its badge stays in the model menu', async ({ page }) => {
   await page.route('**/api/image-models?feature=image', async (route) => {
     const res = await route.fetch();
-    const body = (await res.json()) as { models: { id: string; label: string; isMock: boolean; recommended: boolean }[] };
-    body.models = body.models.map((m) => (m.id === 'mock-image-solo' ? { ...m, label: 'Nano Banana 2.1', isMock: false, recommended: true } : { ...m, recommended: false }));
+    const body = (await res.json()) as { models: { id: string; label: string; isMock: boolean; recommended: boolean; total: number }[] };
+    // Recommended with 3 marks, so its badge shows (fewer marks hide it).
+    body.models = body.models.map((m) => (m.id === 'mock-image-solo' ? { ...m, label: 'Nano Banana 2.1', isMock: false, recommended: true, total: Math.max(3, m.total) } : { ...m, recommended: false }));
     await route.fulfill({ response: res, json: body });
   });
   await signIn(page, 'pbark');

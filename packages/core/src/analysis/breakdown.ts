@@ -85,3 +85,8 @@ export function mergeShots(a: Analysis): { shots: Analysis['shots']; vi: string[
   });
   return { shots, vi: a.vi ? vi : undefined, first };
 }
+
+// rea-video does not report VLM token usage, and seed-2-0-lite is cheap; the real spend is the generation the user runs
+// afterward. The worker books this per analysis (plus the prompt and translation calls, a fraction of a cent), and the
+// analyze buttons show it as the price. shortcut: flat estimate, upgrade when rea-video surfaces usage.
+export const ANALYZE_COST_USD = 0.02;

@@ -1074,6 +1074,10 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 @supports (animation-timeline: scroll()) {
   .form-scroll::after { animation: form-more linear both; animation-timeline: scroll(nearest); }
 }
+/* Without scroll timelines (Firefox) the fade stays on, so a long form still shows that more lies below. */
+@supports not (animation-timeline: scroll()) {
+  .form-scroll::after { opacity: 1; }
+}
 @keyframes form-more { from, 96% { opacity: 1; } to { opacity: 0; } }
 .form-message { padding-top: 8px; font-size: 14px; line-height: 21px; }
 .form-message p { margin: 0; }
@@ -1089,7 +1093,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .templates > [role='status'] { margin: 0 auto 0 0; color: var(--text-muted); }
 /* The brand kit picker (components/BrandKit.tsx): the store select, the switch and an editor's edit button on one wrapping row; swatches preview the colours. */
 .brand-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.brand-picker > .error { flex-basis: 100%; margin: 0; }
+.brand-picker > :is(.error, .help) { flex-basis: 100%; margin: 0; }
 .brand-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .brand-swatch { width: 16px; height: 16px; border: 1px solid var(--border-button); border-radius: 4px; }
 .link-button { padding: 0; border: 0; background: none; color: var(--ink-strong); font: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
@@ -1115,6 +1119,8 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .banner-chip { position: absolute; top: 8px; right: 8px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 4px 12px; border: 0; border-radius: 16px; background: transparent; font-weight: 600; text-shadow: 0 1px 4px rgb(var(--shade) / .6); color: var(--on-dark); font-size: 12px; line-height: 18px; }
 /* Marketing's Change chip as on Fash (measured 2026-10-29): 4 px from the corner, regular weight over a blur, an 11 px pencil. */
 .marketing-head .banner-chip { top: 4px; right: 4px; font-weight: 400; backdrop-filter: blur(4.5px); }
+.banner .banner-chip { background: rgb(var(--shade) / 60%); text-shadow: none; } /* a dark pill, as the gallery's "use" chip, keeps the white label legible on a bright photo */
+@media (pointer: coarse) { .banner .banner-chip::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); } }
 .marketing-head .banner-chip .icon { width: 11px; height: 11px; }
 
 .dropzone { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 130px; margin-top: 16px; border: 1px dashed var(--text-disabled); border-radius: 18px; transition: border-color var(--dur-fast), background-color var(--dur-fast); }
@@ -1200,6 +1206,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .select-trigger { display: flex; align-items: center; gap: 8px; width: 100%; height: 39px; padding: 8px 10px; border: 1px solid transparent; border-radius: 8px; background: var(--fill); color: var(--ink); font-size: 14px; line-height: 21px; text-align: left; transition: border-color var(--dur-fast); }
 .select-trigger .icon { color: var(--text-muted); }
 .select-trigger:hover, .select[data-open='true'] .select-trigger { border-color: var(--border-strong); }
+.select-trigger[data-fixed] { border-color: transparent; cursor: default; } /* a field with one value, shown as text in a select's place */
 .select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .select-value-row { display: flex; align-items: baseline; }
 .select-value-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -1918,8 +1925,8 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .variants label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .variants input[type='checkbox'] { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width must not push the box away from its text */
 .choice-dialog .variants { position: sticky; bottom: 0; z-index: 1; margin: 16px -16px 0; padding: 12px 16px; border-top: 1px solid var(--hairline); background: Canvas; } /* the dialog's own canvas colour: the row stays in reach under a long list on a phone */
-.prompt-final { margin-top: 6px; padding: 8px 10px 10px; border: 1px solid var(--border-strong); border-left: 3px solid var(--brand); border-radius: 8px; background: var(--fill); }
-.prompt-final-label { display: block; color: var(--link); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .02em; }
+.prompt-final { margin-top: 6px; padding: 8px 10px 10px; border: 1px solid var(--border-strong); border-left: 3px solid var(--text-muted); border-radius: 8px; background: var(--fill); } /* neutral: brand red read as an error */
+.prompt-final-label { display: block; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .02em; }
 .prompt-preview .prompt-final p { margin: 4px 0 0; color: var(--ink); font-family: ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-preview .prompt-final p + p { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-strong); }
 .prompt-preview .prompt-final strong { font-family: 'Inter Variable', Inter, Arial, sans-serif; } /* a variant's name stays in the page's type */
@@ -2098,6 +2105,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .gallery-item:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgb(var(--shade) / .13); } /* as Create video's .example, measured on Fash (docs/UI-MOTION-PARITY-M7B-LIVE.md) */
 @media (prefers-reduced-motion: reduce) { .gallery-item { transition: none; } .gallery-item:hover { transform: none; } }
 .gallery-use { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); padding: 4px 10px; border-radius: 999px; background: rgb(var(--shade) / 60%); color: var(--on-dark); font-size: 12px; line-height: 18px; font-weight: 500; opacity: 0; transition: opacity var(--dur-fast); }
+@media (pointer: coarse) { .gallery-use::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); } } /* a 44 px tap on the small chip */
 .gallery-item:hover .gallery-use, .gallery-use:focus-visible { opacity: 1; }
 @media (hover: none) { .gallery-use { opacity: 1; } }
 .gallery-item img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -2255,7 +2263,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .model-grid button, .model-upload { position: relative; aspect-ratio: 163 / 217; min-height: 0; padding: 0; overflow: hidden; border-radius: 12px; }
 .model-grid img { display: block; width: 100%; height: 100%; object-fit: cover; background: var(--fill); } /* the grey shows while a thumbnail is still being made or loaded */
 /* A name over a photo's foot, as Fash's model and pose names: small capitals on a dark fade, so it reads on the white studio ground. */
-.photo-caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; margin: 0; padding: 28px 10px 10px; background: linear-gradient(to top, rgb(var(--shade) / .72), rgb(var(--shade) / 0)); color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .06em; text-align: left; text-transform: uppercase; overflow-wrap: anywhere; pointer-events: none; } /* a long Vietnamese name wraps rather than losing its end */
+.photo-caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; margin: 0; padding: 28px 10px 10px; background: linear-gradient(to top, rgb(var(--shade) / .85), rgb(var(--shade) / .55) 55%, rgb(var(--shade) / 0)); /* dark enough under white text on a white product shot */ color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .06em; text-align: left; text-transform: uppercase; overflow-wrap: anywhere; pointer-events: none; } /* a long Vietnamese name wraps rather than losing its end */
 .model-grid button[aria-pressed='true'] { outline: 2px solid var(--ink-strong); outline-offset: 2px; } /* the chosen tile's ring, outside the tile's own clip */
 /* The chosen tile with the keyboard focus: its ring moves to a shadow, so the focus ring shows apart from it, outside. */
 .model-grid button[aria-pressed='true']:focus-visible { outline: 2px solid var(--ink); outline-offset: 6px; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink-strong); }
@@ -2431,9 +2439,9 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .select-trigger.locked { color: var(--text-disabled); cursor: not-allowed; }
 .select-trigger.locked .icon { color: var(--icon-locked); }
 .form-message p.help[role='status'] { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); color: var(--ink-3); font-size: 13px; line-height: 19px; }
-/* Before the first image the empty slots say what is missing, so the reason under them is for screen readers only. */
-/* On Marketing UGC an empty model or product tile already says what to add, so the same reason is kept for screen readers only. */
-.form-card:has(.slot):not(:has(.slot-thumbs li)) .form-message p.help[role='status'], .form-message p.help[role='status'][data-quiet] { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Before the first image, and for a reason a page flags quiet (still loading, or the empty box or tile already asks for it), the reason is a short muted line by Run
+   rather than a box: never hidden, so a disabled Run always says what is missing. */
+.form-card:has(.slot):not(:has(.slot-thumbs li)) .form-message p.help[role='status'], .form-message p.help[role='status'][data-quiet] { padding: 0; background: none; color: var(--text-muted); }
 .library .card video.tall { display: block; width: auto; max-width: 100%; margin: 0 auto; background: transparent; }
 .job-body a { color: var(--ink-link); font-size: 13px; text-decoration-color: rgb(var(--tint) / .3); text-underline-offset: 2px; }
 /* Library card actions: the clip actions on one row with Delete at its end; the verdict buttons sit together in their own block below. */
@@ -2734,6 +2742,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .style-pill img { flex: none; width: 20px; height: 20px; border-radius: 4px; object-fit: cover; }
 .style-pill > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .preset-card > img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+.preset-photo { display: block; aspect-ratio: 3 / 4; overflow: hidden; background: var(--fill); } /* a style's photo fades in over the grey, as the gallery tiles do */
+.preset-photo > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 /* A touch screen has no hover, and below 1024 px the tiles are a phone's or a tablet's: Explore's preset tiles show their name and Create button at once, over a lighter shade. */
 @media (hover: none), (max-width: 1023.98px) { .explore-prompt-hover { opacity: 1; background: rgb(var(--shade) / .2); } }
 /* Every width: the text buttons that draw under 24 px tall take clicks across 24 px (WCAG 2.5.8) through the same invisible ::after; phones widen it to 44 px below. */
@@ -2743,8 +2753,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 /* Phones: a 44 px hit area around the controls that draw smaller, which keep their look. Each control's own ::after is its hit area, so none reaches under another control:
    the image tile's actions get the gap that makes room for it, and the Library's two view buttons split the gap between them and use the free side. */
 @media (max-width: 480px) {
-  .explore-start-head .link-button, .library .segmented button, .card-actions > *, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-back, .fb-admin-note-head .link-button { position: relative; }
-  :is(.tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .theme-choice label, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-thumbs button, .fb-back, .fb-admin-note-head .link-button)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .tabs button, .remake-item > .link-button, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-back, .fb-admin-note-head .link-button { position: relative; }
+  :is(.tabs button, .remake-item > .link-button, .tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .theme-choice label, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-thumbs button, .fb-back, .fb-admin-note-head .link-button)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
   .fb-thumbs button { z-index: 1; } /* its hit area lies over the next photo, which takes no tap */
   .fb-form .fb-uploads { gap: 18px; } /* a photo's remove hit area ends where the attach button begins */
   .fb-admin .fb-admin-note { gap: 10px; } /* the preview toggle's hit area ends where the reply box begins */
@@ -2754,6 +2764,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   .prompt-preview + .templates { margin-top: 26px; } /* an app form without a field between them: the summary's hit area ends where the buttons' begins */
   .wizard-toggle { margin: 10px 0; } /* room for its hit area: the scrolling form clips above it, and the format card below is drawn over it */
   .card-actions { gap: 14px; }
+  .remake-item { gap: 20px; } /* each link's hit area ends where the next row's begins */
   .library .segmented button:first-child::after { right: -1px; left: -12px; }
   .library .segmented button:last-child::after { right: -12px; left: -1px; }
   /* Fields, the pills and the Library's toolbar draw at 44 px instead: they sit in rows and scrolling strips, where a wider hit area would reach under the next control or be clipped. */
@@ -2949,6 +2960,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .form-scroll > .analysis-panel { margin-top: 16px; } /* on a phone the result follows the video slot in the form */
 .analysis-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .analysis-panel-head h2 { margin: 0; font-size: 16px; line-height: 24px; }
+.analyze-form-title { margin: 0 0 4px; font-size: 16px; line-height: 24px; }
+.analysis-wait .job-wait-bar { margin-top: 4px; }
 .analysis-wait { display: grid; gap: 4px; padding: 16px; border-radius: 12px; background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite; }
 .analysis-box { container-type: inline-size; min-width: 0; }
 .analysis-result { margin-top: 16px; display: grid; gap: 8px; min-width: 0; }
@@ -2994,6 +3007,7 @@ div.analysis-card { opacity: .85; }
 .analysis-card-body { display: grid; gap: 2px; align-content: start; min-width: 0; font-size: 14px; line-height: 21px; }
 .analysis-card-body .muted { font-size: 13px; line-height: 19px; }
 .analysis-hook { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.analysis-card-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the summary leads the card on one line */
 .analysis-chip { justify-self: start; padding: 0 8px; border-radius: 999px; font-size: 12px; line-height: 20px; font-weight: 600; }
 .analysis-chip[data-tone='wait'] { background: var(--warn-bg); border: 1px solid var(--warn-border); }
 .analysis-chip[data-tone='fail'] { background: var(--danger-soft); border: 1px solid var(--danger-border); color: var(--danger); }
@@ -3178,7 +3192,7 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 .imagebar :is(.slot-hint, .slot-name, .slot-optional):not(dialog *) { display: none; }
 /* Messages sit between the prompt and the chips, each with its own top space, so an empty line takes none. */
 .imagebar .form-message:not(dialog *) { padding: 0; border: 0; }
-.imagebar .form-message:not(dialog *) > :not([data-quiet]), .imagebar .form-message p.help[role='status']:not([data-quiet], dialog *) { margin: 8px 0 0; }
+.imagebar .form-message:not(dialog *) > *, .imagebar .form-message p.help[role='status']:not(dialog *) { margin: 8px 0 0; }
 /* The settings chips and Run: one row of pills on a wide screen, as Fash's model, ratio and resolution pills. */
 .imagebar-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .imagebar .select-trigger:not(dialog *) { width: auto; max-width: 16rem; height: 32px; padding: 0 12px; gap: 6px; border: 1px solid var(--field-border); border-radius: 999px; background: var(--surface); font-size: 13px; line-height: 18px; }
