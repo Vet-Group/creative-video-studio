@@ -263,7 +263,7 @@ function Section({ title, rule, after, children }: { title: string; rule: string
  * format) adds the Check button, which reviews the first prompt; only a page whose prompt is the member's own passes it.
  * `folded` starts it folded on a computer too (Image Generation's prompt bar, which would otherwise grow over the page with each word).
  */
-export function PromptPreview({ feature, prompts, labels, limit, note, check, folded = false }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number; note?: string; check?: Pick<Ask, 'model' | 'audio' | 'seconds' | 'format'>; folded?: boolean }) {
+export function PromptPreview({ feature, prompts, labels, limit, note, check, folded = false, system }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number; note?: string; check?: Pick<Ask, 'model' | 'audio' | 'seconds' | 'format'>; folded?: boolean; system?: number }) {
   const narrow = useMediaQuery(NARROW);
   const hydrated = useHydrated();
   const [toggled, setToggled] = useState<boolean | null>(null); // the person's own choice beats the screen's default
@@ -274,8 +274,15 @@ export function PromptPreview({ feature, prompts, labels, limit, note, check, fo
       <summary>
         Xem prompt gửi đi (EN)
         <span className="prompt-preview-count" data-over={(limit !== undefined && longest > limit) || undefined}>
-          {longest}
-          {limit !== undefined && `/${limit}`} ký tự
+          {/* The page's own text beside words whose box already counts against the room left: one number, not a second limit. */}
+          {system !== undefined ? (
+            `+ ${system} ký tự hệ thống`
+          ) : (
+            <>
+              {longest}
+              {limit !== undefined && `/${limit}`} ký tự
+            </>
+          )}
         </span>
       </summary>
       {/* Set apart from the page's own words, so the text the model gets is never mistaken for help or the member's draft. */}

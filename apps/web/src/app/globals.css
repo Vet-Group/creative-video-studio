@@ -1074,6 +1074,10 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 @supports (animation-timeline: scroll()) {
   .form-scroll::after { animation: form-more linear both; animation-timeline: scroll(nearest); }
 }
+/* Without scroll timelines (Firefox) the fade stays on, so a long form still shows that more lies below. */
+@supports not (animation-timeline: scroll()) {
+  .form-scroll::after { opacity: 1; }
+}
 @keyframes form-more { from, 96% { opacity: 1; } to { opacity: 0; } }
 .form-message { padding-top: 8px; font-size: 14px; line-height: 21px; }
 .form-message p { margin: 0; }
@@ -1921,8 +1925,8 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .variants label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .variants input[type='checkbox'] { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width must not push the box away from its text */
 .choice-dialog .variants { position: sticky; bottom: 0; z-index: 1; margin: 16px -16px 0; padding: 12px 16px; border-top: 1px solid var(--hairline); background: Canvas; } /* the dialog's own canvas colour: the row stays in reach under a long list on a phone */
-.prompt-final { margin-top: 6px; padding: 8px 10px 10px; border: 1px solid var(--border-strong); border-left: 3px solid var(--brand); border-radius: 8px; background: var(--fill); }
-.prompt-final-label { display: block; color: var(--link); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .02em; }
+.prompt-final { margin-top: 6px; padding: 8px 10px 10px; border: 1px solid var(--border-strong); border-left: 3px solid var(--text-muted); border-radius: 8px; background: var(--fill); } /* neutral: brand red read as an error */
+.prompt-final-label { display: block; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .02em; }
 .prompt-preview .prompt-final p { margin: 4px 0 0; color: var(--ink); font-family: ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-preview .prompt-final p + p { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-strong); }
 .prompt-preview .prompt-final strong { font-family: 'Inter Variable', Inter, Arial, sans-serif; } /* a variant's name stays in the page's type */
@@ -2259,7 +2263,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .model-grid button, .model-upload { position: relative; aspect-ratio: 163 / 217; min-height: 0; padding: 0; overflow: hidden; border-radius: 12px; }
 .model-grid img { display: block; width: 100%; height: 100%; object-fit: cover; background: var(--fill); } /* the grey shows while a thumbnail is still being made or loaded */
 /* A name over a photo's foot, as Fash's model and pose names: small capitals on a dark fade, so it reads on the white studio ground. */
-.photo-caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; margin: 0; padding: 28px 10px 10px; background: linear-gradient(to top, rgb(var(--shade) / .72), rgb(var(--shade) / 0)); color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .06em; text-align: left; text-transform: uppercase; overflow-wrap: anywhere; pointer-events: none; } /* a long Vietnamese name wraps rather than losing its end */
+.photo-caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; margin: 0; padding: 28px 10px 10px; background: linear-gradient(to top, rgb(var(--shade) / .85), rgb(var(--shade) / .55) 55%, rgb(var(--shade) / 0)); /* dark enough under white text on a white product shot */ color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .06em; text-align: left; text-transform: uppercase; overflow-wrap: anywhere; pointer-events: none; } /* a long Vietnamese name wraps rather than losing its end */
 .model-grid button[aria-pressed='true'] { outline: 2px solid var(--ink-strong); outline-offset: 2px; } /* the chosen tile's ring, outside the tile's own clip */
 /* The chosen tile with the keyboard focus: its ring moves to a shadow, so the focus ring shows apart from it, outside. */
 .model-grid button[aria-pressed='true']:focus-visible { outline: 2px solid var(--ink); outline-offset: 6px; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink-strong); }

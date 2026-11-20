@@ -521,7 +521,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         )}
         {/* Empty, the whole slot is the upload button, a grey circle over its hint as on the live pages; with images, a small tile adds more. */}
         {!full && (
-          <button ref={addRef} type="button" className="slot-add" aria-label={`Tải lên ${label}`} aria-haspopup={onBrowse ? 'dialog' : undefined} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => (onBrowse ? onBrowse() : input.current?.click())}>
+          <button ref={addRef} type="button" className="slot-add" aria-label={onBrowse ? `Tải lên ${label} hoặc chọn ảnh có sẵn` : `Tải lên ${label}`} aria-haspopup={onBrowse ? 'dialog' : undefined} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => (onBrowse ? onBrowse() : input.current?.click())}>
             <span className="slot-icon" aria-hidden="true">
               <Icon name={images.length === 0 && offer.length === 0 ? icon : 'plus'} size={16} />
               {offer.length > 0 && <span>Tải lên</span>}

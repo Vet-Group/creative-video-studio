@@ -125,17 +125,20 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
         </button>
       )}
       {!compact && <span className={s.spacer} />}
-      {/* Clear sits right, beside the editor; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
-      {has('clear') && !compact && value && (
-        <button type="button" className={`${btn} ${s.iconTool}`} aria-label="Xoá mô tả" title="Xoá mô tả" onClick={() => pick('')}>
-          <Icon name="x" size={13} />
-        </button>
-      )}
-      {has('expand') && (
-        <button type="button" className={compact ? btn : `${s.tool} ${s.iconTool}`} aria-label="Mở rộng" title="Mở rộng" onClick={() => setEditing(true)}>
-          <Icon name="expand" size={13} />
-        </button>
-      )}
+      {/* Clear and the editor wrap together, so a full toolbar never leaves one icon alone on a row. */}
+      <span className={s.end}>
+        {/* Clear sits right, beside the editor; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
+        {has('clear') && !compact && value && (
+          <button type="button" className={`${btn} ${s.iconTool}`} aria-label="Xoá mô tả" title="Xoá mô tả" onClick={() => pick('')}>
+            <Icon name="x" size={13} />
+          </button>
+        )}
+        {has('expand') && (
+          <button type="button" className={compact ? btn : `${s.tool} ${s.iconTool}`} aria-label="Mở rộng" title="Mở rộng" onClick={() => setEditing(true)}>
+            <Icon name="expand" size={13} />
+          </button>
+        )}
+      </span>
 
       {open === 'ai' && (
         <div ref={list} className={s.popover} role="group" aria-label={aiLabel} aria-busy={ai.busy}>

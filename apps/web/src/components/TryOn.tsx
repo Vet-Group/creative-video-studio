@@ -149,6 +149,7 @@ export function TryOn({ reuse, model }: { reuse?: string; model?: Img }) {
   const canRun = reason === null && !busy;
   /** What the member may write: the model's limit less the image roles the prompt starts with. */
   const room = chosen && chosen.maxPromptChars - (tryOnPrompt(Math.max(1, garments.length), background.length > 0, 'x', pose)!.length - 1);
+  const preview = basePrompt('try_on', tryOnPrompt(Math.max(1, garments.length), background.length > 0, prompt, pose))!;
 
   /** A detail's photo in its slot, as Fash's clicks on a detail's inputs and its Use Result do. */
   async function take(p: Photo, role: PhotoRole, note?: string) {
@@ -349,7 +350,7 @@ export function TryOn({ reuse, model }: { reuse?: string; model?: Img }) {
               placeholder="Ví dụ: người mẫu đứng trong studio sáng, toàn thân"
               ask={chosen ? () => ({ field: 'prompt', feature: 'try_on', text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
             />
-            <PromptPreview feature="try_on" prompts={[basePrompt('try_on', tryOnPrompt(Math.max(1, garments.length), background.length > 0, prompt, pose))!]} limit={chosen?.maxPromptChars} />
+            <PromptPreview feature="try_on" prompts={[preview]} limit={chosen?.maxPromptChars} system={preview.length - prompt.trim().length} />
 
             {models !== null && !failed && !chosen && <LockedFields />}
             {chosen && (
