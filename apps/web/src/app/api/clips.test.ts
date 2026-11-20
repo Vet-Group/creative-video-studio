@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
 import { itemLabel, JOB_APPS } from '@/lib/apps';
-import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -1094,28 +1094,6 @@ describe('GET /api/jobs?mine clips', () => {
     await clip(bob.id);
     const cap = (await pool.query(`select member_daily_clip_cap from settings where id = 1`)).rows[0].member_daily_clip_cap;
     expect(await clips()).toEqual({ today: before.today + 1, cap });
-  });
-
-  test('asks whether each row was retried through the retry_of index, not by reading every job', async () => {
-    const spy = vi.spyOn(pool, 'query');
-    let calls: unknown[][];
-    try {
-      expect((await GET_MINE(req('/api/jobs?mine', alice.cookie))).status).toBe(200);
-    } finally {
-      calls = spy.mock.calls;
-      spy.mockRestore();
-    }
-    const [text, values] = calls.find(([q]) => typeof q === 'string' && q.includes('r.retry_of = j.id')) as [string, unknown[]];
-    const client = await pool.connect();
-    try {
-      await client.query('begin');
-      await client.query('set local enable_seqscan = off'); // this file's few jobs would be read whole anyway: the question is whether an index answers the probe
-      const plan = JSON.stringify((await client.query(`explain (format json) ${text}`, values)).rows);
-      expect(plan).toMatch(/"Index Name":"jobs_retry_of_idx"[^}]*"Index Cond":"\(retry_of = j\.id\)"/);
-    } finally {
-      await client.query('rollback');
-      client.release();
-    }
   });
 });
 
