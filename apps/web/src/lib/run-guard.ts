@@ -6,11 +6,13 @@ import { api, ApiError, sendJson } from '@/lib/api';
 /** A Run whose button shows this many USD or more asks first. */
 export const RUN_CONFIRM_USD = 1;
 
-/** A price as the forms show it: dollars and cents with thousands separators ($0.70, $99,841.81), and up to 4 decimals under a cent ($0.0035), which cents would show as free. */
+/**
+ * A price as the forms show it: dollars and cents with thousands separators ($0.70, $99,841.81) and, under a dollar, up to 4 decimals with no trailing zeros
+ * ($0.035, $0.0035), so a small price is never shown as free and "3 ảnh × $0.035 = $0.105" adds up.
+ */
 export function usd(value: string | number): string {
   const n = Number(value);
-  const subCent = n !== 0 && Math.abs(n) < 0.01;
-  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: subCent ? 4 : 2 });
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: Math.abs(n) < 1 ? 4 : 2 });
 }
 
 /** True when the Run may go: the price is unknown or under RUN_CONFIRM_USD, or the member said yes. */

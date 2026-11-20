@@ -532,7 +532,7 @@ test('Motion Control: the image and the reference video, a length check, and a R
   await page.getByLabel('Ảnh nhân vật').setInputFiles(file('dancer.png'));
   await expect(page.getByRole('img', { name: 'dancer.png' })).toBeVisible();
   await expect(reasonOf(page)).toHaveText('Tải lên video chuyển động.');
-  await expect(runButton(page)).toContainText('$0.13/giây'); // before a video, the Standard model's price per second
+  await expect(runButton(page)).toContainText('$0.126/giây'); // before a video, the Standard model's price per second
 
   await page.getByLabel('Tệp video chuyển động').setInputFiles({ name: 'short.mp4', mimeType: 'video/mp4', buffer: mp4(1900) });
   await expect(page.getByText('short.mp4 · 1.9 giây')).toBeVisible();
@@ -543,7 +543,7 @@ test('Motion Control: the image and the reference video, a length check, and a R
   await page.getByLabel('Tệp video chuyển động').setInputFiles({ name: 'dance.mp4', mimeType: 'video/mp4', buffer: mp4(5400) });
   await expect(page.getByText('dance.mp4 · 5.4 giây')).toBeVisible();
   await expect(reasonOf(page)).toHaveCount(0);
-  await expect(runButton(page)).toHaveText(/\$0\.76/); // the recommended Standard model, 6 s
+  await expect(runButton(page)).toHaveText(/\$0\.756/); // the recommended Standard model, 6 s
   // The long model name stays inside the form: the picker is a grid item, which would otherwise grow to its text.
   const picker = (await page.locator('.select-trigger').boundingBox())!;
   const form = (await page.locator('.form-scroll').boundingBox())!;

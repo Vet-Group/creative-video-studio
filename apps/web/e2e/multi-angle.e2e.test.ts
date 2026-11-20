@@ -27,16 +27,16 @@ test('picks the views of a product photo, sees the price of one image per view, 
 
   // A priced model: the line and the Run button show one image's price per view.
   await pickModel(page, /Mock angles priced/);
-  await expect(cost(page)).toHaveText('3 ảnh × $0.04 = $0.11');
-  await expect(runButton(page)).toContainText('$0.11');
+  await expect(cost(page)).toHaveText('3 ảnh × $0.035 = $0.105');
+  await expect(runButton(page)).toContainText('$0.105');
   await views(page).getByText('Nhìn từ trên', { exact: true }).click();
-  await expect(cost(page)).toHaveText('4 ảnh × $0.04 = $0.14');
+  await expect(cost(page)).toHaveText('4 ảnh × $0.035 = $0.14');
   for (const name of ['Mặt sau', 'Bên trái', 'Bên phải', 'Nhìn từ trên']) await views(page).getByText(name, { exact: true }).click();
   await expect(page.locator('.form-message').getByRole('status')).toHaveText('Chọn ít nhất một góc.');
   await expect(runButton(page)).toBeDisabled();
   await expect(runButton(page)).not.toContainText('$'); // no free-looking $0.0000 while nothing is picked
   for (const name of ['Mặt sau', 'Bên trái']) await views(page).getByText(name, { exact: true }).click();
-  await expect(cost(page)).toHaveText('2 ảnh × $0.04 = $0.07');
+  await expect(cost(page)).toHaveText('2 ảnh × $0.035 = $0.07');
 
   // The run itself on the mock model, which makes the pictures.
   await pickModel(page, /Mock angles E2E/);
