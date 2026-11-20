@@ -17,7 +17,7 @@ import { Preview } from './Preview';
 import { PromptComposer } from './PromptComposer';
 import s from './PromptComposer.module.css';
 import { PromptTools } from './PromptTools';
-import { type Ask, useSuggest } from './Suggestions';
+import { type Ask, BusyNote, useSuggest } from './Suggestions';
 
 export type PromptMode = 'sections' | 'free';
 const MODES: [PromptMode, string][] = [
@@ -312,6 +312,7 @@ function PromptCheck({ text, ask }: { text: string; ask: Pick<Ask, 'model' | 'au
         {busy ? 'Đang kiểm tra…' : error ? 'Thử lại' : 'Kiểm tra'}
       </button>
       <div className="prompt-check" role="group" aria-label="Kết quả kiểm tra prompt" aria-live="polite" hidden={!(busy || done || error)}>
+        {busy && <BusyNote text="AI đang đọc prompt…" />}
         {done && options.length === 0 && <p className="help">Prompt ổn, có thể chạy.</p>}
         {options.length > 0 && (
           <ul>

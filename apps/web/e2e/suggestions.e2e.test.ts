@@ -182,6 +182,35 @@ test('Dịch shows a Vietnamese reading of English words under the box, asks onc
   await expect(translate).toHaveCount(0);
 });
 
+test('while Dịch waits the reading says so, with a moving bar and the seconds so far; a failed run offers Thử lại', async ({ page }) => {
+  await signIn(page, 'sugga');
+  await page.goto('/create');
+  // Hold the first poll, so the wait is long enough to read.
+  let held = false;
+  await page.route(/\/api\/suggestions\/[^/?]+$/, async (route) => {
+    if (!held) (held = true), await new Promise((r) => setTimeout(r, 3_000));
+    await route.continue();
+  });
+  const box = page.getByLabel('Mô tả chuyển động');
+  const translate = page.getByRole('group', { name: '② Diễn biến', exact: true }).getByRole('button', { name: 'Dịch', exact: true });
+  const reading = page.getByRole('group', { name: 'Bản dịch tiếng Việt' });
+  const note = reading.locator('.busy-note');
+  await box.fill('a quiet harbor at dawn');
+  await translate.click();
+  await expect(reading).toHaveAttribute('aria-busy', 'true');
+  await expect(note).toHaveText(/^Đang dịch sang tiếng Việt…( · \d+ giây)?$/);
+  await expect(note).toHaveText(/ · \d+ giây$/); // from the second second
+  await expect(reading.getByText('Translation: a quiet harbor at dawn')).toBeVisible({ timeout: 20_000 });
+  await expect(note).toHaveCount(0);
+
+  await page.route('/api/suggestions', (r) => r.fulfill({ status: 503, json: { error: 'Chưa lấy được gợi ý lúc này, hãy thử lại sau.' } }), { times: 1 });
+  await box.fill('a calm lake at noon');
+  await translate.click();
+  await expect(reading.getByRole('alert')).toContainText('Chưa lấy được gợi ý lúc này');
+  await reading.getByRole('button', { name: 'Thử lại' }).click();
+  await expect(reading.getByText('Translation: a calm lake at noon')).toBeVisible({ timeout: 20_000 });
+});
+
 test('a History card translates its English prompt on Dịch and hides it again', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'sugga');

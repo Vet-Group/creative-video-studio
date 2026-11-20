@@ -15,8 +15,11 @@
 .input:disabled { cursor: not-allowed; }
 
 /* Starter chips: dashed until hovered, so they read as suggestions, not as chosen tags. */
-.starters { display: flex; gap: 6px; padding: 0 10px 10px; overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(90deg, var(--ink) calc(100% - 24px), transparent); }
-.starters::-webkit-scrollbar { display: none; }
+/* Folded to the first row (PromptComposer sets its height), the rest behind the "+N" chip; the clip margin keeps the phones' 44 px taps. */
+.starters { display: flex; align-items: flex-start; gap: 6px; padding: 0 10px 10px; contain: inline-size; } /* no say in the bar's widths: the chips fold to whatever room is left */
+.starterList { display: flex; flex: 1; flex-wrap: wrap; gap: 6px; min-width: 0; overflow: clip; overflow-clip-margin: 8px; }
+.starterList > [data-past] { visibility: hidden; }
+.more { min-width: 44px; border-style: solid; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; } /* a steady width, so a count gaining a digit does not refold the row */
 .starter { flex: none; height: 28px; padding: 0 10px; border: 1px dashed var(--border-button); border-radius: 999px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; }
 .starter:hover { border-style: solid; color: var(--ink); }
 
@@ -48,7 +51,7 @@
 .optionEn { display: -webkit-box; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); color: var(--text-muted); font-size: 12px; line-height: 18px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; }
 .popNote { margin: -2px 2px 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
 .translation { margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink-strong); font-size: 13px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; }
-.skeleton { display: block; height: 80px; border-radius: 10px; background: linear-gradient(90deg, rgb(var(--tint) / .04), rgb(var(--tint) / .1), rgb(var(--tint) / .04)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.skeleton { display: block; height: 80px; border-radius: 10px; background: linear-gradient(90deg, rgb(var(--tint) / .07), rgb(var(--tint) / .18), rgb(var(--tint) / .07)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 .error { margin: 0; padding: 6px; color: var(--danger-text); font-size: 13px; }
@@ -82,11 +85,12 @@
   :global(.imagebar) .popover:not(dialog *) { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 40; max-height: max(160px, min(480px, 60vh, calc(100dvh - var(--imagebar-h, 0px) - var(--impersonation-h, 0px) - 24px))); overflow-y: auto; margin: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(var(--shade) / .16); }
 }
 /* Phones: the tools and the starter pills take a 44 px tap through an invisible ::after. The toolbar's padding and the strip's padding hold it,
-   so it neither reaches another control (a wrapped toolbar row keeps 12 px apart) nor is clipped by the scrolling strip. */
+   so it neither reaches another control (a wrapped toolbar row keeps 12 px apart) nor is clipped by the folded strip. */
 @media (max-width: 480px) {
   .tool, .starter { position: relative; }
   .tool::after, .starter::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
   .iconTool { width: 44px; }
   .toolbar { row-gap: 12px; }
   .starters { padding-top: 8px; padding-bottom: 8px; }
+  .starterList { row-gap: 16px; } /* unfolded rows keep their taps apart */
 }

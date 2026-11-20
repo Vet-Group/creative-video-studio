@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { STARTERS } from '../src/lib/prompt-starters';
 import { modelButton, openMore, openTab, pickModel, png, select, selectText, signIn } from './support.test';
 
 // Image Generation's prompt bar, as Fash's: on a wide screen it floats at the foot of the screen over the full-width tabs and gallery, and holds every
@@ -325,6 +326,42 @@ test('a suggested model with thinking levels keeps its name readable in the chip
   }
   await modelButton(page).click();
   await expect(page.getByRole('dialog', { name: 'Chọn mô hình' }).locator('.badge-recommended').first()).toBeVisible();
+});
+
+test('the starter chips fold to one row, a +N chip unfolds the rest and folds them back, and a folded chip takes no Tab stop', async ({ page }) => {
+  await signIn(page, 'pbarl');
+  const starters = STARTERS.image!;
+  const total = starters.length;
+  for (const [width, height] of [[1440, 900], [1024, 768], [390, 844]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto('/image-generation');
+    const group = page.getByRole('group', { name: 'Gợi ý nhanh' });
+    const shown = group.getByRole('button'); // hidden chips leave the accessibility tree
+    const more = group.getByRole('button', { name: /gợi ý nữa$/ });
+    await expect(more, `the row overflows at ${width}`).toBeVisible();
+    const past = Number((await more.innerText()).replace(/\D/g, ''));
+    expect(past).toBeGreaterThan(0);
+    await expect(shown).toHaveCount(total - past + 1);
+    const tops = await shown.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(tops).size, `one row at ${width}`).toBe(1);
+    const folded = group.locator('[data-past]').first();
+    expect(await folded.evaluate((e: HTMLElement) => (e.focus(), document.activeElement === e))).toBe(false);
+
+    await more.click();
+    const less = group.getByRole('button', { name: 'Thu gọn' });
+    await expect(less).toHaveAttribute('aria-expanded', 'true');
+    await expect(shown).toHaveCount(total + 1);
+    await expect(group.getByRole('button', { name: starters[total - 1]!.label, exact: true })).toBeVisible();
+    await less.click();
+    await expect(more).toHaveAttribute('aria-expanded', 'false');
+    await expect(shown).toHaveCount(total - past + 1);
+  }
+  // A chip still fills the box, which hides the row.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/image-generation');
+  await page.getByRole('group', { name: 'Gợi ý nhanh' }).getByRole('button').first().click();
+  await expect(page.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
+  await expect(barOf(page).getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue(starters[0]!.text);
 });
 
 test('a photo file dropped anywhere on the bar goes into the strip, and the page stays put', async ({ page }) => {

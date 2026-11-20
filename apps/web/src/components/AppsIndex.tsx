@@ -26,7 +26,7 @@ export function AppsIndex() {
           <Icon name="search" size={16} />
           <input id={searchId} type="search" value={search} placeholder="Tìm ứng dụng..." onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="kinds" role="group" aria-label="Danh mục">
+        <div className="kinds kinds-wrap" role="group" aria-label="Danh mục">
           {CATEGORIES.map((c) => (
             <button key={c.id} type="button" aria-pressed={category === c.id} onClick={() => setCategory(c.id)}>
               {c.label}

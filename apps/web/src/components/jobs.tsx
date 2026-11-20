@@ -15,7 +15,7 @@ import type { UploadSlot } from '@/lib/upload-slots';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
-import { isVietnamese, useTranslate } from './Suggestions';
+import { BusyNote, isVietnamese, useTranslate } from './Suggestions';
 
 const POLL_MS = 5_000;
 const SEEN_KEY = 'cvs.tray.seenUntil';
@@ -324,8 +324,15 @@ export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void })
       </div>
       {reading && (
         <div className="job-translation" role="group" aria-label="Bản dịch tiếng Việt" aria-busy={tr.busy}>
-          {tr.busy ? 'Đang dịch…' : tr.vi}
-          {tr.error && <span role="alert">{tr.error}</span>}
+          {tr.busy ? <BusyNote text="Đang dịch sang tiếng Việt…" /> : tr.vi}
+          {tr.error && (
+            <span role="alert">
+              {tr.error}{' '}
+              <button type="button" className="link-button" onClick={tr.translate}>
+                Thử lại
+              </button>
+            </span>
+          )}
         </div>
       )}
     </div>
