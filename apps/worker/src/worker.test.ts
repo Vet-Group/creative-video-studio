@@ -391,6 +391,16 @@ describe('the mock lifecycle', () => {
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
   });
 
+  test('a late delivery a crash left running is timed out again at its first time-out moment, so its window does not start over', async () => {
+    const id = await newJob('u2');
+    const givenUp = new Date(Date.now() - 60_000);
+    await pool.query(`update jobs set status = 'running', provider_job_id = 'mock:0:ok:x', started_at = now() - interval '1 hour', finished_at = $2, claimed_by = 'gone' where id = $1`, [id, givenUp]);
+    const broken = counting(300, (inner) => ({ ...inner, status: async () => ({ state: 'succeeded', outputUrl: 'http://127.0.0.1:9/gone.mp4', costUsd: 0, costSource: 'estimate' }) }));
+    await start(broken, { runTimeoutMs: 600, lateDeliveryMs: 30_000 });
+    await waitFor('the late bill', async () => (await total(id)).is_final);
+    expect([await status(id), (await job(id)).finished_at]).toEqual(['timed_out', givenUp]);
+  });
+
   test('times out a running job whose provider has no adapter', async () => {
     const id = await newJob('u2', { provider: 'fal' });
     await pool.query(`update jobs set status = 'running', provider_job_id = 'fal:1', started_at = now() - interval '1 hour', claimed_by = 'gone' where id = $1`, [id]);
@@ -745,7 +755,8 @@ describe('a submit that pg-boss expiry or an error would orphan', () => {
     const id = await newJob('u1');
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
-    const held = counting(300, (inner) => ({ ...inner, submit: async (req) => { const out = await inner.submit(req); await gate; return out; } }));
+    // The result is ready 1.5 s after the submit, well after the id is saved, so the row still reads failed_unknown when checked below.
+    const held = counting(1_500, (inner) => ({ ...inner, submit: async (req) => { const out = await inner.submit(req); await gate; return out; } }));
     await start(held);
     await send(id, 'u1');
     await waitFor('the submit', async () => counting.submits === 1 && (await status(id)) === 'submitting');

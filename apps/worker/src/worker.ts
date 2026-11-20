@@ -494,9 +494,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
   }
 
-  /** The estimate stays counted until the provider's final state is known. False when the job is no longer running. */
+  /**
+   * The estimate stays counted until the provider's final state is known. False when the job is no longer running. A late delivery's row keeps the
+   * finished_at it was first given up at, so lateDeliveryMs and close24h still count from then.
+   */
   async function timeOut(jobId: string): Promise<boolean> {
-    const { rowCount } = await pool.query(`update jobs set status = 'timed_out', error = 'timed out', finished_at = now() where id = $1 and status = 'running'`, [jobId]);
+    const { rowCount } = await pool.query(`update jobs set status = 'timed_out', error = 'timed out', finished_at = coalesce(finished_at, now()) where id = $1 and status = 'running'`, [jobId]);
     return !!rowCount;
   }
 
@@ -518,14 +521,14 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         if (adapter) {
           const status = await adapter.status();
           if (status.state === 'succeeded' && row.fresh) {
-            // Back to running for deliver and settle. A lost submit has no started_at: set, so pollRunning can time the row out again if this process dies mid-delivery.
-            const revived = await pool.query(`update jobs set status = 'running', error = null, finished_at = null, started_at = coalesce(started_at, now()) where id = $1 and status = $2`, [row.id, row.status]);
+            // Back to running for deliver and settle, keeping finished_at (see timeOut). A lost submit has no started_at: set, so pollRunning can time the row out again if this process dies mid-delivery.
+            const revived = await pool.query(`update jobs set status = 'running', error = null, started_at = coalesce(started_at, now()) where id = $1 and status = $2`, [row.id, row.status]);
             if (!revived.rowCount) continue;
             try {
               await deliver(row, status.outputUrl, status.costUsd, status.tokens);
             } catch (e) {
-              // As it was, finished_at included, so lateDeliveryMs and close24h still count from the first time it was given up on; the next pass tries again.
-              await pool.query(`update jobs set status = $2, error = $3, started_at = $4, finished_at = $5 where id = $1 and status = 'running'`, [row.id, row.status, row.error, row.started_at, row.finished_at]);
+              // As it was, for the next pass to try again.
+              await pool.query(`update jobs set status = $2, error = $3, started_at = $4 where id = $1 and status = 'running'`, [row.id, row.status, row.error, row.started_at]);
               throw e;
             }
             await adapter.release().catch((e) => log(`release ${row.id}`, e));
