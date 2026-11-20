@@ -10,6 +10,7 @@ import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjec
 import type { Enhancer } from '@cvs/core/enhance';
 import { cancelQueued, reserve, withTransaction } from '@cvs/core/ledger';
 import { ImageReadError } from '@cvs/core/providers/http';
+import { createVertexImageProvider } from '@cvs/core/providers/vertex';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
 import { createDb, createPool } from '@cvs/db/client';
@@ -22,7 +23,7 @@ import { backfillDurations } from './durations';
 import { closestRatio, ensureH264, requireFfmpeg } from './media';
 import { createMockImageProvider, createMockProvider, MOCK_FAIL } from './mock-provider';
 import { backfillPreviews } from './preview';
-import { bucketName, ensureBucket, getObject, putObject, s3 } from './storage';
+import { bucketName, deleteObject, ensureBucket, getObject, hasObject, putObject, s3 } from './storage';
 import { DEFAULT_OPTIONS, type RunningWorker, startWorker, type WorkerOptions } from './worker';
 
 vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
@@ -904,6 +905,31 @@ describe('image jobs', () => {
     const p = (await pool.query(`select kind, mime, filename, width, height, owner_id from assets where id = $1`, [j.poster_asset_id])).rows[0];
     expect(p).toEqual({ kind: 'output', mime: 'image/jpeg', filename: `preview-${id.slice(0, 8)}.jpg`, width: 192, height: 256, owner_id: 'u1' }); // never enlarged
     expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.0000'], ['actual_adjustment', '0.0000']]);
+  });
+
+  test('a Vertex image whose first delivery fails is delivered on the next pass, and Vertex forgets it only then', async () => {
+    const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#ffffff' } }).png().toBuffer();
+    const answer = { candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: png.toString('base64') } }] } }] };
+    // The real Vertex adapter over a canned Google answer (nothing leaves the machine), keeping its outcome in MinIO as the worker's does.
+    const vertex = createVertexImageProvider({ key: { client_email: 'sa@test.invalid', private_key: 'unused' }, project: 'proj', fetch: async () => Response.json(answer), token: async () => 'tok', store: { put: putObject, get: getObject, delete: deleteObject } });
+    let reads = 0;
+    const flaky: ImageProvider = {
+      ...vertex,
+      // The mock model has no Vertex request, so the call is made as Nano Banana Pro.
+      submit: (req) => vertex.submit({ ...req, model: { ...req.model, endpoint: 'gemini-3-pro-image' } }),
+      async status(job) {
+        const s = await vertex.status(job);
+        // The first delivery cannot fetch the image, as when MinIO or the network fails for a moment.
+        return s.state === 'succeeded' && ++reads === 1 ? { ...s, outputUrl: 'http://127.0.0.1:9/gone.png' } : s;
+      },
+    };
+    const id = await newImageJob('u1');
+    await startImages(flaky);
+    await send(id, 'u1');
+    await waitFor('the job to close', async () => !['queued', 'submitting', 'running'].includes(await status(id)));
+    expect([await status(id), reads]).toEqual(['succeeded', 2]);
+    expect((await job(id)).output_asset_id).not.toBeNull();
+    await waitFor('the stored outcome to be removed', async () => !(await hasObject(`vertex-outcomes/${(await job(id)).provider_job_id}.json`)));
   });
 
   test('sends the model, resolution, ratio, quality, thinking level and view to the image adapter and books the per-image price of that level', async () => {

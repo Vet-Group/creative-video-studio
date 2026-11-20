@@ -187,12 +187,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       const provider = imageProviders[row.provider];
       if (!provider) return undefined;
       const job: ImageProviderJob = { providerJobId: row.provider_job_id, model: await loadImageModel(row.model, row.params.thinking), resolution: row.params.resolution! };
-      return { status: (): Promise<ProviderStatus> => provider.status(job), cancel: () => provider.cancel(job) };
+      return { status: (): Promise<ProviderStatus> => provider.status(job), cancel: () => provider.cancel(job), release: async (): Promise<void> => provider.release?.(job) };
     }
     const provider = providers[row.provider];
     if (!provider) return undefined;
     const job: ProviderJob = { providerJobId: row.provider_job_id, model: await loadModel(row.model, row.params.audio, { videoAssetId: row.params.videoAssetId, durationSec: row.duration_s }) };
-    return { status: (): Promise<ProviderStatus> => provider.status(job), cancel: () => provider.cancel(job) };
+    return { status: (): Promise<ProviderStatus> => provider.status(job), cancel: () => provider.cancel(job), release: async (): Promise<void> => undefined };
   }
 
   // ---- admission and submit (the pg-boss handler) ----
@@ -475,9 +475,14 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         if (status.state === 'queued' || status.state === 'running') {
           await pool.query(`update jobs set provider_queue_position = $2 where id = $1 and status = 'running' and provider_queue_position is distinct from $2`, [row.id, status.state === 'queued' ? (status.queuePosition ?? null) : null]);
         }
-        if (status.state === 'succeeded') await deliver(row, status.outputUrl, status.costUsd, status.tokens);
-        else if (status.state === 'failed' || status.state === 'canceled') await settle(pool, row.id, { status: 'failed', costUsd: status.costUsd, error: status.error });
-        else if (row.expired && (await timeOut(row.id)) && adapter) await adapter.cancel().catch((e) => log(`cancel ${row.id}`, e));
+        // The provider may forget a result (Vertex keeps it) only once the job is closed: a delivery that throws reads it again on the next pass.
+        const forget = () => adapter?.release().catch((e) => log(`release ${row.id}`, e));
+        if (status.state === 'succeeded') {
+          await deliver(row, status.outputUrl, status.costUsd, status.tokens);
+          await forget();
+        } else if (status.state === 'failed' || status.state === 'canceled') {
+          if (await settle(pool, row.id, { status: 'failed', costUsd: status.costUsd, error: status.error })) await forget();
+        } else if (row.expired && (await timeOut(row.id)) && adapter) await adapter.cancel().catch((e) => log(`cancel ${row.id}`, e));
       } catch (e) {
         log(`running job ${row.id}`, e);
         // A delivery or status call that keeps failing must not keep the job running past its limit; lateBill or close24h finalize it from timed_out. Not on a shutdown, though: a delivery cut short by it stays running for the next worker.
@@ -504,7 +509,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         if (adapter) {
           const status = await adapter.status();
           if (status.state === 'succeeded' || status.state === 'failed' || status.state === 'canceled') {
-            await lateBill(pool, row.id, status.costUsd, status.state === 'succeeded', status.state === 'succeeded' ? status.tokens : undefined);
+            if (await lateBill(pool, row.id, status.costUsd, status.state === 'succeeded', status.state === 'succeeded' ? status.tokens : undefined)) await adapter.release().catch((e) => log(`release ${row.id}`, e));
             continue;
           }
         }

@@ -49,7 +49,10 @@ describe('vertex Gemini image models', () => {
     });
     const job = { providerJobId, model: PRO, resolution: '4K' };
     expect(await p.status(job)).toEqual({ state: 'succeeded', outputUrl: 'data:image/png;base64,T1VU', costUsd: 0.24, costSource: 'estimate' });
-    // The outcome is handed over once; a second read (after a worker restart, say) cannot find it and reports the estimate as possibly billed.
+    // The outcome stays until the worker releases the job: a delivery that failed reads the same image again.
+    expect(await p.status(job)).toEqual({ state: 'succeeded', outputUrl: 'data:image/png;base64,T1VU', costUsd: 0.24, costSource: 'estimate' });
+    await p.release!(job);
+    // Once released (or after a restart without a store) it cannot be found, and the estimate is reported as possibly billed.
     expect(await p.status(job)).toEqual({ state: 'failed', error: 'the vertex result was lost when the worker restarted', costUsd: 0.24, costSource: 'estimate' });
   });
 
@@ -148,7 +151,7 @@ describe('vertex failures and inputs', () => {
     expect(await p.status({ providerJobId, model: nb21, resolution: '1K' })).toMatchObject({ state: 'succeeded' });
   });
 
-  test('with a store, a provider started after a restart still hands back the billed image, once, and the stored copy is removed', async () => {
+  test('with a store, a provider started after a restart hands back the billed image until the worker releases it, and only then is the stored copy removed', async () => {
     const objects = new Map<string, Uint8Array>();
     const store = {
       put: async (key: string, body: Uint8Array) => void objects.set(key, body),
@@ -160,6 +163,9 @@ describe('vertex failures and inputs', () => {
     const restarted = createVertexImageProvider({ key: KEY, project: 'proj', fetch: fakeFetch().fn, readImage, token: async () => 'tok', store });
     const job = { providerJobId, model: PRO, resolution: '1K' };
     expect(await restarted.status(job)).toEqual({ state: 'succeeded', outputUrl: 'data:image/png;base64,T1VU', costUsd: 0.134, costSource: 'estimate' });
+    expect(await restarted.status(job)).toEqual({ state: 'succeeded', outputUrl: 'data:image/png;base64,T1VU', costUsd: 0.134, costSource: 'estimate' }); // a second read finds it again
+    expect(objects.size).toBe(1);
+    await restarted.release!(job);
     expect(objects.size).toBe(0);
     expect(await restarted.status(job)).toMatchObject({ state: 'failed', error: 'the vertex result was lost when the worker restarted' });
   });

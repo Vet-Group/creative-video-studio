@@ -96,6 +96,13 @@ describe('a Vertex billing refusal', () => {
     expect(rerun).not.toHaveBeenCalled();
   });
 
+  test('passes release on to the provider it wraps', async () => {
+    const release = vi.fn(async () => undefined);
+    const inner = { submit: async () => ({ providerJobId: 'p' }), status: async () => ({ state: 'running' as const }), cancel: async () => ({ supported: false }), release };
+    await failoverOnBilling('release-project', inner, vi.fn(async () => undefined)).release!({ providerJobId: 'p' });
+    expect(release).toHaveBeenCalledWith({ providerJobId: 'p' });
+  });
+
   test('moves new jobs to the next account, or to none, and the guard takes the account back after the cool-down', async () => {
     await pool.query(`insert into vertex_accounts (project_id) values ('next-billing')`);
     const both = [account('first-billing', ok([])), account('next-billing', ok([]))];
