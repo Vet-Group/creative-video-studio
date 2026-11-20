@@ -9,7 +9,7 @@ async function openStyles(page: Page) {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/image-generation');
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  await page.locator('.form-card').getByRole('button', { name: 'Phong cách', exact: true }).click();
+  await page.locator('.imagebar').getByRole('button', { name: 'Phong cách', exact: true }).click();
   return page.getByRole('dialog', { name: 'Chọn phong cách' }).getByRole('list', { name: 'Danh sách phong cách' });
 }
 
@@ -20,7 +20,7 @@ test('a member picks a style, and a mock Run sends its id while History and Reus
   await expect(grid.getByRole('button', { name: /^Sửa phong cách / })).toHaveCount(0);
   await grid.getByRole('button', { name: 'Đường phố', exact: true }).click();
   await expect(grid).toBeHidden();
-  const form = page.locator('.form-card');
+  const form = page.locator('.imagebar');
   await expect(form.getByRole('button', { name: 'Phong cách: Đường phố' })).toBeVisible();
 
   await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a red shirt on a hanger');
@@ -39,7 +39,7 @@ test('a member picks a style, and a mock Run sends its id while History and Reus
   // Reuse fills the member's words and the style back, not the composed prompt.
   await page.goto(`/image-generation?reuse=${id}`);
   await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a red shirt on a hanger');
-  await expect(page.locator('.form-card').getByRole('button', { name: 'Phong cách: Đường phố' })).toBeVisible();
+  await expect(page.locator('.imagebar').getByRole('button', { name: 'Phong cách: Đường phố' })).toBeVisible();
 });
 
 test('a template editor renames a style in the picker, and the picker shows and picks it under the new label', async ({ page }) => {
@@ -56,6 +56,6 @@ test('a template editor renames a style in the picker, and the picker shows and 
   await expect(form).toBeHidden();
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Đã lưu phong cách.')).toBeVisible();
   await grid.getByRole('button', { name: 'Phẳng nằm (sửa)', exact: true }).click();
-  await expect(page.locator('.form-card').getByRole('button', { name: 'Phong cách: Phẳng nằm (sửa)' })).toBeVisible();
+  await expect(page.locator('.imagebar').getByRole('button', { name: 'Phong cách: Phẳng nằm (sửa)' })).toBeVisible();
   expect((await page.request.patch('/api/presets/style-flat-lay', { data: { label: 'Phẳng nằm' } })).ok()).toBe(true);
 });

@@ -261,12 +261,13 @@ function Section({ title, rule, after, children }: { title: string; rule: string
  * The server renders it open, and until hydration CSS (data-ssr) shows it folded on a phone, so neither screen flashes the other's state on load.
  * `note` says what still changes after Run (Enhance's rewrite, a preset's text the member may not read). `check` (the page's model, audio, seconds and
  * format) adds the Check button, which reviews the first prompt; only a page whose prompt is the member's own passes it.
+ * `folded` starts it folded on a computer too (Image Generation's prompt bar, which would otherwise grow over the page with each word).
  */
-export function PromptPreview({ feature, prompts, labels, limit, note, check }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number; note?: string; check?: Pick<Ask, 'model' | 'audio' | 'seconds' | 'format'> }) {
+export function PromptPreview({ feature, prompts, labels, limit, note, check, folded = false }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number; note?: string; check?: Pick<Ask, 'model' | 'audio' | 'seconds' | 'format'>; folded?: boolean }) {
   const narrow = useMediaQuery(NARROW);
   const hydrated = useHydrated();
   const [toggled, setToggled] = useState<boolean | null>(null); // the person's own choice beats the screen's default
-  const open = toggled ?? !narrow;
+  const open = toggled ?? !(narrow || folded);
   const longest = Math.max(0, ...prompts.map((p) => p.length));
   return (
     <details className="prompt-preview" data-ssr={hydrated ? undefined : ''} open={open} onToggle={(e) => e.currentTarget.open !== open && setToggled(e.currentTarget.open)}>

@@ -492,11 +492,13 @@ export const HistoryArtContext = createContext<ReactNode>(null);
 function HistoryEmpty({ feature }: { feature: string }) {
   const art = useContext(HistoryArtContext);
   const toForm = () => {
-    const form = document.querySelector<HTMLElement>('.form-card');
+    const form = document.querySelector<HTMLElement>('.form-card, .imagebar'); // Image Generation's form is its prompt bar
     if (!form) return;
     if (form.hidden) document.getElementById(form.getAttribute('aria-labelledby') ?? '')?.click();
     // After the tab has rendered the form.
-    requestAnimationFrame(() => form.querySelector<HTMLElement>('textarea, select, input:not([type=file]):not([hidden]), button:not(:disabled)')?.focus());
+    // The prompt bar starts with its uploaded-photos link; its prompt is what the member came for.
+    const first = () => (form.matches('.imagebar') && form.querySelector<HTMLElement>('textarea')) || form.querySelector<HTMLElement>('textarea, select, input:not([type=file]):not([hidden]), button:not(:disabled)');
+    requestAnimationFrame(() => first()?.focus());
   };
   return (
     <div className="library-empty">

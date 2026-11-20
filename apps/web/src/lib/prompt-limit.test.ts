@@ -9,6 +9,10 @@ describe('promptTooLong', () => {
     expect(promptTooLong(kling, 2501)).toBe('Mô hình Kling 2.6 Pro nhận tối đa 2500 ký tự, hãy rút gọn hoặc chọn mô hình khác.');
     expect(promptTooLong(undefined, 9999)).toBeNull();
   });
+  it('names what the page added when the words alone fit', () => {
+    expect(promptTooLong(kling, 2501, 'bộ nhận diện và phong cách')).toBe('Mô hình Kling 2.6 Pro nhận tối đa 2500 ký tự (gồm bộ nhận diện và phong cách), hãy rút gọn hoặc chọn mô hình khác.');
+    expect(promptTooLong(kling, 2500, 'bộ nhận diện')).toBeNull();
+  });
 });
 
 describe('basePrompt', () => {

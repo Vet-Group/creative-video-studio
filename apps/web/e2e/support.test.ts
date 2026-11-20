@@ -117,8 +117,20 @@ export async function openTab(page: Page, name: string): Promise<void> {
   }).toPass();
 }
 
+/** Image Generation's prompt bar folds the store, its brand kit, the saved settings and the sent prompt under a more-options pill on a wide screen: opens
+ * it. Elsewhere, and on a phone, there is no such button and nothing to do. */
+export async function openMore(page: Page): Promise<void> {
+  const more = page.getByRole('button', { name: /^Tuỳ chọn khác/ });
+  if ((await more.count()) === 0) return;
+  await expect(async () => {
+    if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+    await expect(more).toHaveAttribute('aria-expanded', 'true', { timeout: 2_000 });
+  }).toPass();
+}
+
 /** Opens the My templates list. Retries the click, as a click before hydration only focuses the button (as openTab does with a tab). */
 export async function openTemplates(page: Page): Promise<Locator> {
+  await openMore(page);
   const dialog = page.getByRole('dialog', { name: 'Thiết lập đã lưu' });
   await expect(async () => {
     if (!(await dialog.isVisible())) await page.getByRole('button', { name: 'Thiết lập đã lưu' }).click();

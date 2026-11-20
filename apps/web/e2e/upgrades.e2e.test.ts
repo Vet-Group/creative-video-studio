@@ -30,7 +30,7 @@ async function answer(page: Page, question: string, yes: boolean) {
   await expect(confirm).toBeHidden();
 }
 
-const form = (page: Page) => page.locator('.form-card');
+const form = (page: Page) => page.locator('.imagebar'); // Image Generation's prompt bar
 const formPrompt = (page: Page) => form(page).getByRole('textbox', { name: 'Mô tả', exact: true });
 const formRun = (page: Page) => form(page).getByRole('button', { name: /^Tạo ảnh/ });
 
@@ -218,11 +218,11 @@ test('AC 14: the prompt box grows with the text up to a cap and then scrolls, an
 
   await page.goto('/image-generation');
   const short = await size();
-  expect(short.offset).toBe(76); // the composer's start, under four lines
+  expect(short.offset).toBe(40); // the prompt bar's start, one line, as Fash's bar
   await formPrompt(page).fill(text);
   const tall = await size();
-  expect(tall.offset).toBeGreaterThan(76);
-  expect(tall.offset).toBeLessThanOrEqual(500); // 50% of the viewport
+  expect(tall.offset).toBeGreaterThan(40);
+  expect(tall.offset).toBeLessThanOrEqual(300); // 30% of the viewport, so the bar keeps most of the screen for the gallery
   expect(tall.sh).toBeGreaterThan(tall.h);
   await form(page).getByRole('button', { name: 'Mở rộng' }).click();
   const editor = page.getByRole('dialog', { name: 'Sửa mô tả' });

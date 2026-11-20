@@ -18,7 +18,7 @@ test('Image Generation offers the thinking level only on a model that lists one,
     await route.fulfill({ response: res, json: body });
   });
   await page.goto('/image-generation');
-  const form = page.locator('.form-card');
+  const form = page.locator('.imagebar');
   const thinking = select(page, 'Mức suy luận');
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await expect(thinking).toHaveCount(0);

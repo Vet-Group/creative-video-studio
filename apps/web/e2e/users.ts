@@ -205,6 +205,19 @@ export const USERS = {
   // workspaces-manage.e2e: the Admin who creates a partner workspace and adds a company member to it, who then switches between the two.
   wsadm: { email: 'wsadm@e2e.test', name: 'E2E WS Admin', role: 'admin' },
   wsboth: { email: 'wsboth@e2e.test', name: 'E2E WS Both', role: 'member' },
+  // image-prompt-bar.e2e: the prompt bar at 1440, at 390, and its axe scans.
+  pbara: { email: 'pbara@e2e.test', name: 'E2E Prompt Bar A', role: 'member' },
+  pbarb: { email: 'pbarb@e2e.test', name: 'E2E Prompt Bar B', role: 'member' },
+  pbarc: { email: 'pbarc@e2e.test', name: 'E2E Prompt Bar C', role: 'member' },
+  pbard: { email: 'pbard@e2e.test', name: 'E2E Prompt Bar D', role: 'member' },
+  pbare: { email: 'pbare@e2e.test', name: 'E2E Prompt Bar E', role: 'member' },
+  pbarf: { email: 'pbarf@e2e.test', name: 'E2E Prompt Bar F', role: 'member' },
+  pbarg: { email: 'pbarg@e2e.test', name: 'E2E Prompt Bar G', role: 'member' },
+  pbarh: { email: 'pbarh@e2e.test', name: 'E2E Prompt Bar H', role: 'member' },
+  pbari: { email: 'pbari@e2e.test', name: 'E2E Prompt Bar I', role: 'member' },
+  pbarj: { email: 'pbarj@e2e.test', name: 'E2E Prompt Bar J', role: 'member' },
+  // A template editor (e2e/serve.ts sets it), whose bar opens the brand kit and style editors.
+  pbared: { email: 'pbared@e2e.test', name: 'E2E Prompt Bar Editor', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;
