@@ -532,6 +532,11 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
     await page.goto('/marketing-studio');
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
     const gallery = page.getByRole('group', { name: 'Video Marketing Studio của công ty' });
+    // The page's own format first: the sample whose details file says Editorial stays out, and one with no details file counts as UGC.
+    await expect(gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' })).toHaveCount(1);
+    await expect(gallery.getByRole('link', { name: 'Xem video mẫu' })).toHaveCount(1);
+    await expect(gallery.locator('[href="/api/samples/marketing-example-2.mp4"]')).toHaveCount(0);
+    await page.getByRole('group', { name: 'Lọc theo định dạng' }).getByRole('button', { name: 'Tất cả định dạng' }).click();
     await expect(gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' })).toHaveCount(2);
     await expect(gallery.getByRole('link', { name: 'Xem video mẫu' })).toHaveCount(1); // no details file: it opens in place too, with the clip and its file actions only
 
@@ -566,6 +571,11 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
     await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
 
+    // Editorial's own page shows only its sample.
+    await page.goto('/marketing-studio/advanced');
+    await page.getByRole('tab', { name: 'Ví dụ' }).click();
+    await expect(gallery.getByRole('link', { name: /^Xem (chi tiết )?video mẫu/ })).toHaveCount(1);
+    await expect(gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' }).and(page.locator('[href="/api/samples/marketing-example-2.mp4"]'))).toHaveCount(1);
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }

@@ -889,8 +889,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
           )}
           {shown === 'examples' ? (
             <FormContext.Provider value={actions}>
-              {/* The fixed sample clips carry their format only in a details file, so they show under both. */}
-              <Gallery kind={allFormats ? 'marketing' : `marketing_${format}`} feature="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText={allFormats ? 'Chưa có video Marketing Studio nào trong công ty.' : `Chưa có video ${name} nào trong công ty.`} />
+              <Gallery kind={allFormats ? 'marketing' : `marketing_${format}`} feature="marketing" video samples="marketing-example-" format={allFormats ? undefined : format} label="Video Marketing Studio của công ty" emptyText={allFormats ? 'Chưa có video Marketing Studio nào trong công ty.' : `Chưa có video ${name} nào trong công ty.`} />
             </FormContext.Provider>
           ) : shown === 'about' ? (
             <About page={advanced ? 'advanced' : unboxing ? 'unboxing' : review ? 'review' : 'marketing'} />
