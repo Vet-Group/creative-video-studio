@@ -1303,7 +1303,7 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
 .lightbox-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 16px; overflow-y: auto; background: var(--surface); }
 .lightbox-side h2 { margin: 6px 40px 0 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 600; }
 .lightbox-side [role='status'] { margin: 0; font-size: 12px; }
-/* A Library detail's photo tools on the member's own picture (ImageToolButtons): a full touch target on a touch screen. */
+/* A Library detail's photo tools on a picture (ImageToolButtons): a full touch target on a touch screen. */
 @media (pointer: coarse) { .lightbox-tools .lightbox-result { height: 44px; } }
 .lightbox-side > * { flex: none; } /* a long side scrolls; its buttons keep their height (the Reuse link drew 24 px tall on a phone) */
 .lightbox-reuse { display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 8px; background: var(--ink-strong); color: var(--on-ink); font-size: 13px; font-weight: 600; text-decoration: none; }

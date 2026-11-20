@@ -172,7 +172,7 @@ export const USERS = {
   toolsb: { email: 'toolsb@e2e.test', name: 'E2E Tools B', role: 'member' },
   toolsc: { email: 'toolsc@e2e.test', name: 'E2E Tools C', role: 'member' }, // the listing preset's .zip of several images
   toolsd: { email: 'toolsd@e2e.test', name: 'E2E Tools D', role: 'member' }, // History selects a whole Run of more than the 20 jobs it loads (seeded)
-  // library.e2e: a picture's Library detail opens it in Background Remover for its creator, and offers neither photo tool to another member.
+  // library.e2e: a picture's Library detail opens it in Background Remover, for its creator and for another member.
   libtoola: { email: 'libtoola@e2e.test', name: 'E2E Library Tools A', role: 'member' },
   libtoolb: { email: 'libtoolb@e2e.test', name: 'E2E Library Tools B', role: 'member' },
   // changelog.e2e: the changelog page, the sidebar dot and the once-a-day popup, one member per test.

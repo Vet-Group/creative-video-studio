@@ -437,9 +437,9 @@ test('Dùng khung hình này in a video’s detail opens Create video with the f
   }
 });
 
-// As from a History card: the creator's own picture opens in the two photo tools from its Library detail, the copy already in the tool's slot; another member's
-// picture offers neither (POST /api/assets/copy takes only the caller's own results). CVS_E2E_SHOTS=<folder> saves the screenshots there (1440 px light, 390 px dark).
-test('Xoá nền in a picture’s Library detail opens Background Remover with the picture in its slot; another member’s picture offers neither tool', async ({ page, browser }) => {
+// As from a History card: a picture opens in the two photo tools from its Library detail, the copy (a new input of the viewer's) already in the tool's slot,
+// for its creator and for another member of the workspace (owner decision 2026-11-20). CVS_E2E_SHOTS=<folder> saves the screenshots there (1440 px light, 390 px dark).
+test('the photo tools in a picture’s Library detail open the tool with the picture in its slot, for its creator and for another member', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'libtoola');
   const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt: 'a picture for the photo tools', enhance: false, params: { resolution: '1K' } } });
@@ -454,11 +454,20 @@ test('Xoá nền in a picture’s Library detail opens Background Remover with t
     await expect(detail.getByText('a picture for the photo tools', { exact: true })).toBeVisible();
     return detail;
   };
+  const inSlot = (p: Page) => expect(p.getByRole('group', { name: 'Ảnh', exact: true }).getByRole('img', { name: /^history-\w{8}\.(png|jpg|webp)$/ })).toBeVisible();
   try {
     await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.find((j) => j.id === id)?.status, { timeout: 60_000 }).toBe('succeeded');
+
+    // Another member: the Background Remover button on A's picture opens it with B's own copy of the picture, ready to run.
     const other = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
     await signIn(other, 'libtoolb');
-    await expect((await open(other)).locator('.lightbox-tools')).toHaveCount(0);
+    const theirs = await open(other);
+    await expect(theirs.getByRole('button', { name: 'Tăng độ phân giải' })).toBeVisible();
+    await shot(other, 'library-detail-tools-other-1440-light');
+    await theirs.getByRole('button', { name: 'Xoá nền' }).click();
+    await expect(other).toHaveURL(/\/apps\/background-remover\?image=[\w-]+$/);
+    await inSlot(other);
+    await expect(other.getByRole('button', { name: /^Chạy/ })).toBeEnabled(); // the photo is all Background Remover needs
     await other.context().close();
 
     // A touch phone in dark mode: both tools are full touch targets, the side scrolls instead of squeezing the Reuse link (it drew 24 px tall), and nothing scrolls sideways.
@@ -472,13 +481,13 @@ test('Xoá nền in a picture’s Library detail opens Background Remover with t
     expect(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await phone.context().close();
 
+    // The creator: the Image Upscale button opens it with the picture in its slot.
     const detail = await open(page);
-    await expect(detail.getByRole('button', { name: 'Tăng độ phân giải' })).toBeVisible();
+    await expect(detail.getByRole('button', { name: 'Xoá nền' })).toBeVisible();
     await shot(page, 'library-detail-tools-1440-light');
-    await detail.getByRole('button', { name: 'Xoá nền' }).click();
-    await expect(page).toHaveURL(/\/apps\/background-remover\?image=[\w-]+$/);
-    await expect(page.getByRole('group', { name: 'Ảnh', exact: true }).getByRole('img', { name: /^history-\w{8}\.(png|jpg|webp)$/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Chạy/ })).toBeEnabled(); // the photo is all Background Remover needs
+    await detail.getByRole('button', { name: 'Tăng độ phân giải' }).click();
+    await expect(page).toHaveURL(/\/apps\/image-upscale\?image=[\w-]+$/);
+    await inSlot(page);
   } finally {
     expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
   }

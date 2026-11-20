@@ -12,8 +12,8 @@ const IMAGE_TOOLS = ([['background-remover', 'wand'], ['image-upscale', 'expand'
 });
 
 /**
- * Background Remover and Image Upscale on one of the member's own image results (a History card, a Library detail), except the one that made it: the result is copied
- * into a new input of the member's (POST /api/assets/copy, which takes only the caller's own results), which the app's page puts in its first slot.
+ * Background Remover and Image Upscale on an image result (the member's own on a History card, any member's in a Library detail), except the one that made it: the
+ * result is copied into a new input of the member's (POST /api/assets/copy), which the app's page puts in its first slot.
  * `act` runs the copy and shows its failure, as the caller's other actions do.
  */
 export function ImageToolButtons({ assetId, feature, className, act }: { assetId: string; feature: string; className: string; act: (what: () => Promise<unknown>, fail: string) => Promise<void> }) {

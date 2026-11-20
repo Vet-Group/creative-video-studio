@@ -746,8 +746,8 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
               Dùng lại
             </Link>
           ))}
-        {/* As on a History card: the copy takes only the member's own results, so another member's picture offers neither tool. */}
-        {image && clip.mine && (
+        {/* As on a History card, on any member's picture: the copy is the viewer's own new input (POST /api/assets/copy takes a Library clip of the workspace). */}
+        {image && (
           <div className="lightbox-tools">
             <ImageToolButtons assetId={clip.videoAssetId} feature={clip.feature} className="lightbox-result" act={act} />
           </div>
