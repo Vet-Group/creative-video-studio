@@ -288,7 +288,7 @@ export async function POST(request: Request) {
       `select a.id, a.mime, a.duration_ms from assets a
         where a.id = any($1::text[]) and a.workspace_id = $3 and a.deleted_at is null and a.kind = 'input'
           and (a.owner_id = $2
-               or exists (select 1 from jobs j where a.id = any(j.input_asset_ids) and j.workspace_id = $3 and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null)
+               or exists (select 1 from jobs j where j.input_asset_ids @> array[a.id] and j.workspace_id = $3 and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null)
                or exists (select 1 from fashion_models f where f.asset_id = a.id and f.workspace_id = $3 and f.deleted_at is null and (f.user_id = $2 or f.shared)))`,
       [assetIds, userId, g.workspaceId],
     );
