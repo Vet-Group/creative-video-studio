@@ -34,3 +34,38 @@ One SQL predicate, `storeAllowed` in `apps/web/src/lib/billing.ts`, decides whic
 | `PUT /api/admin/jobs/:id/store` | Unrestricted (Admin tool). |
 
 The Admin user editor lists stores from `/api/admin/stores`, so an Admin in a billing team still assigns any store to a user.
+
+## Attribution
+
+`billedRows(month)` in `apps/web/src/lib/billing.ts` is the one SQL source of truth: every reader (the accounting view, its CSV, a month close and the member's panel) selects from it. It gives each ledger row of the month one bucket, testing in this order:
+
+```sql
+case
+  when ce.month < '2026-11'          then 'company:before_start'
+  when ce.workspace_id <> 'ws_vet'   then 'partner:' || ce.workspace_id
+  when ce.user_id is null            then 'company:shared'
+  when bu.system                     then 'company:system'
+  when not but.billable              then 'company:non_billing'
+  when bst.billable                  then 'team:' || bst.id   -- the store's team
+  else                                    'team:' || but.id   -- the member's team
+end
+-- bu = the row's user now, but = that user's team now, bst = the team of the row's store now
+```
+
+`cost_entries.team_id` (the team when the row was booked) is not read: the owner chose today's mapping. Each row lands in exactly one bucket, so the teams, the partners and the company always add up to the month's ledger; the view sums the unrounded `numeric` amounts in whole 1/10000 USD and shows an "in balance" check when they match and an "out of balance" one when not. A team's payable is `max(0, total − free allowance)`; a partner's payable is its total. Amounts are rounded only for display; the CSV carries the exact 4 decimals.
+
+## Accounting view
+
+**Admin > Costs > By team** (`/admin/costs/teams`, `GET /api/admin/billing?month=`), default this ICT month:
+
+- the ledger total, what the teams pay, what the partners pay and the company's cost;
+- each billing team: members, stores, total, the allowance bar (neutral below 75%, a warning from 75%, the part past the allowance as its own segment labelled "billed to the team", with the amounts in words beside it), payable, and its rows by user, store and model;
+- each partner workspace (total = payable) and the company's cost by reason (before 2026-11, shared rows, system accounts, non-billing teams), each opening its rows.
+
+CSV (`GET /api/admin/billing/csv?month=`): one line per (month, bucket, team or partner, user, store, kind, USD); `&part=summary` gives one line per team, partner and company reason with its total, free allowance and payable, and the ledger's total.
+
+**Closing a month.** An open month follows today's teams and stores. Once accounting has read a past month, an Admin closes it ("Close month", `POST /api/admin/billing/close`, audited `billing.close`): its buckets, lines and totals are stored in `billing_month_closes` with the ledger id they include, and the view and the CSV read that snapshot and say when it was closed. A row booked later in that month or a later team change does not move it. An Admin may reopen it (`DELETE /api/admin/billing/close?month=`, audited `billing.reopen`); this month cannot be closed.
+
+## The member's panel
+
+`GET /api/me/limits` adds `team: { name, monthUsd, freeUsd, payableUsd, provisional }` for a member of a billing team acting in the company workspace: their own team's month so far by the same attribution. The Limits section of Settings shows it with the same bar. Members of other teams and every partner workspace get nothing new; partner owners still see no USD. The allowance never blocks a Run.

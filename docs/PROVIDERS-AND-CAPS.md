@@ -34,6 +34,8 @@ Assumed use for 30 staff (6 heavy, 12 medium, 12 light users) was simulated over
 
 The per-feature caps only warn, because hard caps at p95 for ten features would block one feature or another in about 18% of months even at the assumed use.
 
+A billing team's free monthly allowance (docs/BILLING.md) is not a cap: it never refuses a Run, it only decides what the team is billed past it.
+
 The hard caps are checked in `packages/core/src/limits.ts` (`checkCaps` with the job's `feature`), in the same transaction and advisory lock as the job insert. The image and apps budget sums the ledger rows of jobs whose `feature` is not `video` or `marketing`. Shared rows (bake-off, adjustments, invoice differences) stay in the video budget. Admins change every cap on the Settings page; each change is audited.
 
 ## Image models and jobs (migration 0007)

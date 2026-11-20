@@ -5,6 +5,7 @@ import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
 import { Budget } from './AdminOverview';
+import { CostViews } from './CostViews';
 import { Empty, PageHead } from './PageHead';
 
 interface Money {
@@ -755,6 +756,7 @@ export function AdminCosts() {
   const { data, failed, reload } = useFetch<Costs>(`/api/admin/costs${month ? `?month=${month}` : ''}`, { onTabReturn: true });
   return (
     <section aria-labelledby="costs-title">
+      <CostViews />
       <PageHead id="costs-title" title="Chi phí" lead="Chi phí theo tháng (giờ Việt Nam): ngân sách, chi tiết theo người, nhóm, cửa hàng, tỉ giá và hóa đơn nhà cung cấp.">
         {data && (
           <>
