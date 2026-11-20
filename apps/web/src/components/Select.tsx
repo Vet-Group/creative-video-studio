@@ -116,7 +116,9 @@ export function Select({ label, icon, heading, value, options, onChange, chip = 
           onBlur={() => setOpen(false)}
         >
           <Icon name={icon === 'ratio' ? ratioIcon(value) : icon} />
-          <span className="select-value">{options[selected]?.short ?? options[selected]?.label ?? value}</span>
+          <span className="select-value" title={options[selected]?.label}>
+            {options[selected]?.short ?? options[selected]?.label ?? value}
+          </span>
           {options[selected]?.tag && (
             <>
               {' '}

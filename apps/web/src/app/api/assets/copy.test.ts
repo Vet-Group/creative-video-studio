@@ -1,5 +1,6 @@
 // POST /api/assets/copy against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`): a member's own finished clip becomes
-// a new input asset of theirs, for Marketing Studio Advanced's reference video; and a finished image becomes one for the image pages' "Use result" button.
+// a new input asset of theirs, for Marketing Studio Advanced's reference video; a finished image becomes one for the image pages' "Use result" button; and another
+// member's Library result of the same workspace becomes one too, for the Library detail's photo tools.
 import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
@@ -34,15 +35,15 @@ const copy = (cookie: string | undefined, body: unknown) =>
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
 
-/** A finished clip, or a finished image with `image`: an output asset (in the store unless `object` is false) and the job that points at it. */
-async function clip(id: string, owner: string, o: { mime?: string; bytes?: number; purged?: boolean; deleted?: boolean; kind?: string; object?: boolean; image?: boolean } = {}): Promise<void> {
+/** A finished clip, or a finished image with `image`: an output asset (in the store unless `object` is false) and the job that points at it, in `workspace` (ws_vet). */
+async function clip(id: string, owner: string, o: { mime?: string; bytes?: number; purged?: boolean; deleted?: boolean; kind?: string; object?: boolean; image?: boolean; status?: string; workspace?: string } = {}): Promise<void> {
   const bytes = o.image ? PNG : mp4Fixture({ ms: 6200, width: 720, height: 1280, fps: 30, size: 1024 });
   if (o.object !== false) await putObject(`assets/${id}`, bytes, o.image ? 'image/png' : 'video/mp4');
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, $3, $4, 'video.mp4', $5, $6, 'ws_vet')`, [id, owner, o.kind ?? 'output', `assets/${id}`, o.mime ?? (o.image ? 'image/png' : 'video/mp4'), o.bytes ?? bytes.length]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, $3, $4, 'video.mp4', $5, $6, $7)`, [id, owner, o.kind ?? 'output', `assets/${id}`, o.mime ?? (o.image ? 'image/png' : 'video/mp4'), o.bytes ?? bytes.length, o.workspace ?? 'ws_vet']);
   await pool.query(
     `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, purged_at, deleted_at, workspace_id)
-     values ($1, $2, 'team-unassigned', 'marketing', 'mock-model', 'mock', 'p', '9:16', 7, '{}', 'succeeded', $3, $4, $5, 'ws_vet')`,
-    [`job-${id}`, owner, id, o.purged ? new Date() : null, o.deleted ? new Date() : null],
+     values ($1, $2, 'team-unassigned', 'marketing', 'mock-model', 'mock', 'p', '9:16', 7, '{}', $6, $3, $4, $5, $7)`,
+    [`job-${id}`, owner, id, o.purged ? new Date() : null, o.deleted ? new Date() : null, o.status ?? 'succeeded', o.workspace ?? 'ws_vet'],
   );
 }
 
@@ -86,23 +87,48 @@ describe('POST /api/assets/copy', () => {
     expect(made!.durationMs).toBe(7000);
   });
 
-  test('is 404 for someone else’s clip, an input asset, a clip whose job was deleted or purged, and an asset that is not there', async () => {
-    await clip('theirs', otherId);
+  test('is 404 for an input asset, a clip whose job was deleted or purged, and an asset that is not there', async () => {
     await clip('an-input', userId, { kind: 'input' });
     await clip('purged', userId, { purged: true });
     await clip('deleted', userId, { deleted: true });
-    for (const assetId of ['theirs', 'an-input', 'purged', 'deleted', 'nope']) expect((await copy(member, { assetId })).status, assetId).toBe(404);
-    expect((await copy(other, { assetId: 'theirs' })).status).toBe(201); // the owner may
+    for (const assetId of ['an-input', 'purged', 'deleted', 'nope']) expect((await copy(member, { assetId })).status, assetId).toBe(404);
   });
 
-  test('copies the caller’s own finished image as a new input asset of its own, for owner, output, live job and image type only', async () => {
+  // Owner decision 2026-11-20: the Library detail's photo tools copy any member's Library picture, which every member of the workspace can already read.
+  test('copies another member’s live Library clip into a new input of the caller’s own, in the caller’s workspace', async () => {
+    await clip('lib-pic', otherId, { image: true });
+    await clip('lib-clip', otherId);
+    for (const assetId of ['lib-pic', 'lib-clip']) {
+      const res = await copy(member, { assetId });
+      expect(res.status, assetId).toBe(201);
+      const [made] = ((await res.json()) as { assets: { id: string }[] }).assets;
+      expect((await pool.query('select owner_id, kind, workspace_id from assets where id = $1', [made!.id])).rows[0]).toEqual({ owner_id: userId, kind: 'input', workspace_id: 'ws_vet' });
+    }
+    expect((await pool.query(`select owner_id, kind from assets where id = 'lib-pic'`)).rows[0]).toEqual({ owner_id: otherId, kind: 'output' }); // the result stays theirs
+  });
+
+  test('is 404 for another member’s output that is not a live Library clip: unfinished, failed, deleted or purged', async () => {
+    await clip('their-running', otherId, { image: true, status: 'running' });
+    await clip('their-failed', otherId, { image: true, status: 'failed' });
+    await clip('their-deleted', otherId, { image: true, deleted: true });
+    await clip('their-purged', otherId, { image: true, purged: true });
+    for (const assetId of ['their-running', 'their-failed', 'their-deleted', 'their-purged']) expect((await copy(member, { assetId })).status, assetId).toBe(404);
+  });
+
+  test('is 404 for a Library clip of another workspace, the caller’s own too', async () => {
+    await pool.query(`insert into workspaces (id, name) values ('ws_copy', 'Partner') on conflict do nothing`);
+    await clip('elsewhere', otherId, { image: true, workspace: 'ws_copy' });
+    await clip('mine-elsewhere', userId, { image: true, workspace: 'ws_copy' });
+    for (const assetId of ['elsewhere', 'mine-elsewhere']) expect((await copy(member, { assetId })).status, assetId).toBe(404);
+  });
+
+  test('copies the caller’s own finished image as a new input asset of its own, for output, live job and image type only', async () => {
     await clip('pic', userId, { image: true });
-    await clip('pic-theirs', otherId, { image: true });
     await clip('pic-input', userId, { image: true, kind: 'input' });
     await clip('pic-purged', userId, { image: true, purged: true });
     await clip('pic-deleted', userId, { image: true, deleted: true });
     await clip('pic-gif', userId, { image: true, mime: 'image/gif' });
-    for (const assetId of ['pic-theirs', 'pic-input', 'pic-purged', 'pic-deleted', 'pic-gif']) expect((await copy(member, { assetId })).status, assetId).toBe(404);
+    for (const assetId of ['pic-input', 'pic-purged', 'pic-deleted', 'pic-gif']) expect((await copy(member, { assetId })).status, assetId).toBe(404);
     const res = await copy(member, { assetId: 'pic' });
     expect(res.status).toBe(201);
     const [made] = ((await res.json()) as { assets: { id: string; filename: string; mime: string; bytes: number }[] }).assets;

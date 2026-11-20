@@ -26,6 +26,16 @@ test('the clip detail offers Nén & tải về on a video as well as on an image
   expect(detail(clip('image'))).toContain('aria-label="Nén &amp; tải về"');
 });
 
+test("an image's detail opens the picture in Xoá nền or Tăng độ phân giải, another member's too, except the tool that made it; never a video", () => {
+  const tools = (c: Clip) => [...detail(c).matchAll(/<button type="button" class="lightbox-result">([\s\S]*?)<\/button>/g)].map((m) => m[1]!.replace(/<[^>]*>/g, '').trim());
+  const own: Clip = { ...clip('image'), feature: 'image', mine: true };
+  expect(tools(own)).toEqual(['Xoá nền', 'Tăng độ phân giải']);
+  expect(tools({ ...own, mine: false })).toEqual(['Xoá nền', 'Tăng độ phân giải']);
+  expect(tools({ ...own, feature: 'background_remover' })).toEqual(['Tăng độ phân giải']);
+  expect(tools({ ...own, feature: 'image_upscale' })).toEqual(['Xoá nền']);
+  expect(tools({ ...clip('video'), mine: true })).toEqual([]);
+});
+
 const sample: Clip = {
   id: 'job-1', creator: { id: 'u1', name: 'Mai' }, createdAt: '2026-11-14T01:04:00.000Z', modelId: 'seedance', modelLabel: 'Seedance 1.5 Pro', ratio: '9:16', durationSec: 5,
   feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'vid-1', posterAssetId: 'poster-1', storeId: null, storeName: null, costUsd: '0.1000', costFinal: true,

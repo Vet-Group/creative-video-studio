@@ -38,6 +38,24 @@ async function phone(browser: Browser, from: BrowserContext): Promise<Page> {
 const blocking = async (page: Page) =>
   (await new AxeBuilder({ page }).exclude('nextjs-portal').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(' | ')}`);
 const switcher = (page: Page) => page.getByRole('combobox', { name: 'Không gian làm việc', exact: true });
+/** The closed switcher as drawn: its height, the name's lines, whether the name is cut (an ellipsis or a clamp), and whether the page or the phone's drawer scrolls sideways. */
+const drawn = (page: Page) =>
+  switcher(page).evaluate((button) => {
+    const name = button.querySelector('.select-value')!;
+    const sidebar = document.getElementById('sidebar')!;
+    return {
+      height: Math.round(button.getBoundingClientRect().height),
+      lines: Math.round(name.getBoundingClientRect().height / parseFloat(getComputedStyle(name).lineHeight)),
+      cut: name.scrollWidth > name.clientWidth || name.scrollHeight > name.clientHeight,
+      // The desktop sidebar does not scroll (overflow visible): the guide pill may run past it by design.
+      sideways: document.documentElement.scrollWidth > innerWidth || (getComputedStyle(sidebar).overflowX !== 'visible' && sidebar.scrollWidth > sidebar.clientWidth),
+    };
+  });
+/** Opens the phone's drawer and waits until it has slid in. */
+async function openDrawer(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Mở menu' }).click();
+  await expect.poll(async () => (await page.locator('#sidebar').boundingBox())?.x).toBe(0);
+}
 
 test('an Admin creates a partner workspace and adds a company member, its owner adds a member, the company member switches; a stale tab is told to reload', async ({ browser }) => {
   test.setTimeout(360_000);
@@ -166,6 +184,16 @@ test('an Admin creates a partner workspace and adds a company member, its owner 
   await signIn(both, 'wsboth');
   await both.goto('/feedback');
   await expect(switcher(both)).toHaveText('VET Group Công ty');
+  // The closed switcher shows the whole name beside the badge (it read "VET Gr…" at 1440 px), which a pointer also gets as the name's title.
+  await shot(both, 'switcher-closed-1440-light');
+  expect(await drawn(both)).toMatchObject({ lines: 1, cut: false, sideways: false });
+  await expect(switcher(both).locator('.select-value')).toHaveAttribute('title', 'VET Group');
+  // The icon rail has no room for it: it hides there and comes back with the full sidebar.
+  const rail = both.getByRole('button', { name: 'Thu gọn thanh bên' });
+  await rail.click();
+  await expect(switcher(both)).toBeHidden();
+  await rail.click();
+  await expect(switcher(both)).toBeVisible();
   await expect(both.getByText(BOARD_ITEM)).toHaveCount(0);
   await switcher(both).click();
   const options = both.getByRole('listbox', { name: 'Không gian làm việc' }).getByRole('option');
@@ -178,12 +206,39 @@ test('an Admin creates a partner workspace and adds a company member, its owner 
   await expect(both.getByText(BOARD_ITEM)).toBeVisible();
   const bothPhone = await phone(browser, bothContext);
   await bothPhone.goto('/feedback');
-  await bothPhone.getByRole('button', { name: 'Mở menu' }).click();
+  await openDrawer(bothPhone);
+  await expect(switcher(bothPhone)).toHaveText(WS_NAME);
+  await shot(bothPhone, 'switcher-closed-390-dark');
+  expect(await drawn(bothPhone)).toMatchObject({ cut: false, sideways: false });
+  expect((await drawn(bothPhone)).height).toBeGreaterThanOrEqual(44); // a full touch target
   await switcher(bothPhone).click();
   await expect(bothPhone.getByRole('listbox', { name: 'Không gian làm việc' }).getByRole('option')).toHaveCount(2);
   await shot(bothPhone, 'switcher-390-dark');
   expect.soft(await blocking(bothPhone), 'switcher dark').toEqual([]);
+  // A long name takes two lines, then an ellipsis at 1440 px; the title and the open list keep all of it, and a phone still fits it without scrolling sideways.
+  const longName = `E2E Đối tác có một cái tên rất dài để thử xuống dòng ${run}`;
+  await db.query('update workspaces set name = $1 where id = $2', [longName, workspaceId]);
+  try {
+    await both.reload();
+    await expect(switcher(both)).toHaveText(longName);
+    await shot(both, 'switcher-closed-long-1440-light');
+    expect(await drawn(both)).toMatchObject({ lines: 2, cut: true, sideways: false });
+    await expect(switcher(both).locator('.select-value')).toHaveAttribute('title', longName);
+    await switcher(both).click();
+    await expect(both.getByRole('listbox', { name: 'Không gian làm việc' }).getByRole('option', { name: longName })).toBeVisible();
+    await both.keyboard.press('Escape');
+    await bothPhone.reload();
+    await openDrawer(bothPhone);
+    await shot(bothPhone, 'switcher-closed-long-390-dark');
+    const phoneLong = await drawn(bothPhone);
+    expect(phoneLong).toMatchObject({ sideways: false });
+    expect(phoneLong.lines).toBeLessThanOrEqual(2);
+    expect(phoneLong.height).toBeGreaterThanOrEqual(44);
+  } finally {
+    await db.query('update workspaces set name = $1 where id = $2', [WS_NAME, workspaceId]);
+  }
   await bothPhone.context().close();
+  await both.reload();
 
   // 5. A second tab still shows the partner workspace while the first switches back: its next write is refused and it offers the reload.
   const stale = await bothContext.newPage();

@@ -1,15 +1,18 @@
 import { insertAssets } from '@cvs/db/assets';
 import { db, mp4DurationMs, readJson, sniffImage, sniffVideo } from '@/lib/assets';
 import { pool } from '@/lib/auth';
+import { LIVE_CLIP } from '@/lib/clips';
 import { MAX_SAMPLE_BYTES } from '@/lib/samples';
 import { guard } from '@/lib/session';
 import { deleteObject, getObject, putObject } from '@/lib/storage';
 import { COPY_HOURLY_LIMIT } from '../samples/route';
 
 /**
- * Copies one of the caller's own finished results (`{ assetId }`, the output of one of their jobs, from History) into a new input asset of theirs on the server: an output
- * is not an input, so a job cannot name it. An MP4 clip (Advanced's reference video; its length comes from the file's header, else from the job's duration) or a
- * JPEG, PNG or WebP image (the "Use result" button), of at most 50 MB. 429 beyond COPY_HOURLY_LIMIT new inputs an hour, as the sample copy.
+ * Copies a finished result (`{ assetId }`, the output of a job) into a new input asset of the caller's on the server: an output is not an input, so a job cannot name it.
+ * The result is the caller's own (from History) or a live Library clip of the active workspace (LIVE_CLIP, the rule that lets every member read it, owner decision
+ * 2026-11-20); an Admin gets no more than that. The asset and its job are in the active workspace either way. An MP4 clip (Advanced's reference video; its length comes from the
+ * file's header, else from the job's duration) or a JPEG, PNG or WebP image (the "Use result" button and the photo tools), of at most 50 MB. 429 beyond
+ * COPY_HOURLY_LIMIT new inputs an hour, as the sample copy.
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
@@ -20,11 +23,11 @@ export async function POST(request: Request) {
   const found = (
     await pool.query(
       `select a.s3_key, a.bytes, a.mime, j.duration_s from assets a join jobs j on j.output_asset_id = a.id
-        where a.id = $1 and a.owner_id = $2 and a.workspace_id = $3 and j.workspace_id = $3 and a.kind = 'output' and a.mime in ('video/mp4', 'image/png', 'image/jpeg', 'image/webp') and a.deleted_at is null and j.deleted_at is null and j.purged_at is null`,
+        where a.id = $1 and (a.owner_id = $2 or (${LIVE_CLIP})) and a.workspace_id = $3 and j.workspace_id = $3 and a.kind = 'output' and a.mime in ('video/mp4', 'image/png', 'image/jpeg', 'image/webp') and a.deleted_at is null and j.deleted_at is null and j.purged_at is null`,
       [body.assetId, userId, g.workspaceId],
     )
   ).rows[0] as { s3_key: string; bytes: number; mime: string; duration_s: number } | undefined;
-  if (!found) return Response.json({ error: 'the result does not exist or is not yours' }, { status: 404 });
+  if (!found) return Response.json({ error: 'the result does not exist, or is neither yours nor in the Library' }, { status: 404 });
   if (found.bytes > MAX_SAMPLE_BYTES) return Response.json({ error: 'the result is larger than 50 MB' }, { status: 413 });
   const { n } = (await pool.query(`select count(*)::int as n from assets where owner_id = $1 and kind = 'input' and created_at > now() - interval '1 hour'`, [userId])).rows[0];
   if (n + 1 > COPY_HOURLY_LIMIT) return Response.json({ error: `at most ${COPY_HOURLY_LIMIT} new files an hour; try again later` }, { status: 429 });

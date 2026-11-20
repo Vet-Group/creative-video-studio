@@ -19,6 +19,7 @@ import { CompareSlider } from './CompareSlider';
 import { EmptyArt } from './EmptyArt';
 import { Icon } from './Icon';
 import { uploadImages } from './image-tools';
+import { ImageToolButtons } from './ImageToolButtons';
 import { useFreshResults } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
@@ -745,6 +746,12 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
               Dùng lại
             </Link>
           ))}
+        {/* As on a History card, on any member's picture: the copy is the viewer's own new input (POST /api/assets/copy takes a Library clip of the workspace). */}
+        {image && (
+          <div className="lightbox-tools">
+            <ImageToolButtons assetId={clip.videoAssetId} feature={clip.feature} className="lightbox-result" act={act} />
+          </div>
+        )}
       </div>
       {index > 0 && (
         <button type="button" className="lightbox-step lightbox-prev" onClick={() => onIndex(index - 1)} aria-label="Mục trước">
