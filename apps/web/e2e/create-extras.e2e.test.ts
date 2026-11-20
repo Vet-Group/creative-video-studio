@@ -229,7 +229,7 @@ test('a model that runs from the prompt alone lets Run go with no image and a wr
   await expect(page.getByText('Tối đa 4 ảnh sản phẩm, hoặc chỉ viết mô tả')).toBeVisible();
   await pickPreset(page, 'gentle-push-in');
   await expect(run).toBeDisabled();
-  await expect(page.getByText('Mẫu chuyển động cần ảnh sản phẩm.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Mẫu cần ít nhất 1 ảnh sản phẩm. Bỏ chọn mẫu để tạo video chỉ từ mô tả.')).toBeVisible(); // Run's reason alone says it (no second notice)
   await pickPreset(page, '');
   await page.getByLabel('Mô tả chuyển động').fill('A red bottle on a beach at sunset.');
   const body = nextRun(page);

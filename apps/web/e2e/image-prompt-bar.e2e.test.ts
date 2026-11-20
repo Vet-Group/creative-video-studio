@@ -89,11 +89,12 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
   await more.click();
   await expect(more).toHaveAttribute('aria-expanded', 'false');
 
-  // Before a prompt the reason is for screen readers and Run's description, not a line in the bar; a prompt of spaces alone gets the line.
+  // Before a prompt the reason is a quiet muted line in the bar and Run's description; a prompt of spaces alone gets the box.
   await expect(run).toBeDisabled();
   const reason = bar.locator('#imagegen-reason');
   await expect(reason).toHaveText('Nhập mô tả cảnh bạn muốn tạo.');
   await expect(reason).toHaveAttribute('data-quiet');
+  expect((await reason.boundingBox())!.height).toBeGreaterThan(10);
   await expect(run).toHaveAttribute('aria-describedby', 'imagegen-reason');
   await prompt.fill('   ');
   await expect(reason).not.toHaveAttribute('data-quiet');

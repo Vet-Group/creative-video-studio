@@ -65,8 +65,8 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await refsInput(page).setInputFiles([file('model.png'), file('product.png'), file('style.png')]);
   await expect(page.getByRole('img', { name: 'style.png' })).toBeVisible();
   await expect(reasonOf(page)).toHaveText('Viết mô tả video bạn muốn.');
-  // The empty prompt box already asks for it: the reason is read out but not drawn over the form's foot.
-  expect((await reasonOf(page).boundingBox())!.height).toBeLessThanOrEqual(1);
+  // The empty prompt box already asks for it, and the reason by Run says it too, as a muted line: a disabled Run is never unexplained.
+  expect((await reasonOf(page).boundingBox())!.height).toBeGreaterThan(10);
   await expect(runButton(page)).toBeDisabled();
   await brief(page).fill('   ');
   await expect(runButton(page)).toBeDisabled();

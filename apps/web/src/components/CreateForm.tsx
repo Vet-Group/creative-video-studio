@@ -691,9 +691,9 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     else setFreeText(text);
     notify('Đã chép mô tả');
   }
-  /** Free writing starts from what the sections would send. */
+  /** Free writing starts from what the sections would send, unless the free box already holds words of its own (a round trip keeps them). */
   function switchMode(next: typeof mode) {
-    if (next === 'free') setFreeText(composed);
+    if (next === 'free' && !freeText.trim()) setFreeText(composed);
     setMode(next);
   }
   /** Fash's Recreate: the form refills in place; on a narrow screen the form is its own tab, so it opens. */
@@ -924,7 +924,6 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
             )}
             {clipsOver && <p className="error" id={fieldIds.clips}>Mô hình này nhận tối đa {takes!.max} tệp âm thanh, tổng {takes!.seconds} giây.</p>}
 
-            {wordsOnly && presetId !== '' && <p className="help">Mẫu chuyển động cần ảnh sản phẩm. Không có ảnh thì chọn &quot;Tự viết mô tả&quot;.</p>}
             {tooLong && (
               <p className="error" id={fieldIds.prompt}>
                 {tooLong}
@@ -1003,7 +1002,18 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               {tooMany && chosen && <p className="error" id={fieldIds.images}>Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
               {endOver && <p className="error" id={fieldIds.end}>Mô hình này chỉ nhận khung hình cuối cho clip tối đa {chosen!.endMaxSec} giây.</p>}
               {!endOver && endImagesOver && <p className="error" id={fieldIds.end}>Mô hình này chỉ nhận khung hình cuối khi có tối đa {chosen!.endMaxImages} ảnh. Bỏ bớt ảnh hoặc bỏ khung hình cuối.</p>}
-              <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={resolutions.length > 1 ? chosen!.id : (chosen?.resolution ?? '')} options={resolutions.length > 1 ? resolutions.map((m) => ({ value: m.id, label: m.resolution! })) : [{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={resolutions.length > 1 ? setModelId : () => undefined} />
+              {resolutions.length > 1 ? (
+                <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={chosen!.id} options={resolutions.map((m) => ({ value: m.id, label: m.resolution! }))} onChange={setModelId} />
+              ) : (
+                // One resolution is nothing to choose: the value in the select's place, with no chevron and no menu.
+                <div className="field">
+                  <span className="field-label">Độ phân giải</span>
+                  <span className="select-trigger" data-fixed>
+                    <Icon name="preset" />
+                    <span className="select-value">{chosen?.resolution ?? 'Theo mô hình'}</span>
+                  </span>
+                </div>
+              )}
               <Select
                 label="Thời lượng"
                 icon="clock"

@@ -79,7 +79,8 @@ test('Create: the sections show by default, Khung prompt fills all three, the pr
   await expect(hookBox(page)).toHaveValue(t.hook);
   await expect(endingBox(page)).toHaveValue(ENDINGS[2]!.phrase);
 
-  // free writing takes the composed prompt in today's one box; back in the sections, they are as they were. The choice is remembered.
+  // free writing takes the composed prompt in today's one box; back in the sections, they are as they were, and back in free writing its own words are
+  // still there (a round trip once emptied it). The choice is remembered.
   await mode(page).getByText('Viết tự do').click();
   await expect(part(page, '① Hook · 0–2 giây đầu')).toHaveCount(0);
   await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue(composed);
@@ -88,8 +89,7 @@ test('Create: the sections show by default, Khung prompt fills all three, the pr
   await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue(t.body);
   await expect(hookBox(page)).toHaveValue(t.hook);
   await mode(page).getByText('Viết tự do').click();
-  await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue(composed);
-  await page.getByLabel('Mô tả chuyển động').fill('a slow turn');
+  await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue('a slow turn');
   await page.reload();
   await expect(mode(page).getByRole('radio', { name: 'Viết tự do' })).toBeChecked();
   await expect(page.getByLabel('Mô tả chuyển động')).toBeVisible();
