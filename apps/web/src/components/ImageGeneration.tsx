@@ -275,6 +275,7 @@ ${style.prompt}` : prompt.trim();
             </p>
           )}
           {pick.note && <p className="help" role="status">{pick.note}</p>}
+          {style && <p className="help">Phong cách: {style.label} · thêm vào cuối mô tả của bạn</p>}
           <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
         </div>
 
