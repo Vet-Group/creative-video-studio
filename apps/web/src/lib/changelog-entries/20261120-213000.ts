@@ -9,6 +9,6 @@ export default {
     'Admin thấy dự báo này trên từng team ở Chi phí › Theo team, cùng dự báo của cả sổ cái.',
     'Khi Admin chốt một tháng, bot Lark của app gửi cho những người nhận bản tóm tắt (tổng, team phải trả, đối tác phải trả, phần của công ty) và tệp CSV của tháng; nếu không gửi được, trang báo rõ để Admin tải CSV và gửi tay.',
   ],
-  prs: [0],
+  prs: [603],
   audience: 'all',
 } satisfies ChangeEntry;
