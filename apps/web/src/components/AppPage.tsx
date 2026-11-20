@@ -5,11 +5,15 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, type AppCategory, BATCH_FEATURES, type BatchItem, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MOCKUP_PRODUCTS, motionReason, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { waitLabel } from '@/lib/explore';
+import { parseFashionTraits } from '@/lib/fashion-model';
+import { usable } from '@/lib/fashion-models';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { alignInputs, placesOf, type Skipped, skippedNote } from '@/lib/reuse';
 import { confirmRun, sendRun, usd } from '@/lib/run-guard';
+import { portraitGender, POSES } from '@/lib/try-on-stock';
+import { useFashionModels } from '@/lib/use-fashion-models';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
@@ -19,7 +23,7 @@ import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { CsvNames } from './CsvNames';
 import { Icon, type IconName } from './Icon';
-import { copyError, copySamples, FormNotice, Gallery, type Img, PhotoDialog, photoImg, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, copySamples, fashionTiles, FormNotice, Gallery, type Img, PhotoDialog, photoImg, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, type Photo, useApplier, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
@@ -39,6 +43,7 @@ const REST_NOTE: Record<string, string> = {
   pet_portrait: 'phong cách còn lại dùng prompt như trên, chỉ khác phần mô tả phong cách.',
   mockup_pack: 'sản phẩm còn lại dùng prompt như trên, chỉ khác phần mô tả sản phẩm.',
   name_swap: 'ảnh còn lại dùng prompt như trên, chỉ khác tên (và giống chó).',
+  pose_generator: 'tư thế còn lại dùng prompt như trên, chỉ khác phần mô tả tư thế.',
 };
 
 /** A batch app's items to pick (the pet portrait's styles, the mockup pack's products) as a row of checkbox chips, as the views and breeds are; `children` add the help and the price under them. */
@@ -158,6 +163,9 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const [styles, setStyles] = useState<string[]>([]); // the pet portrait app: one job per style, none until picked
   const [products, setProducts] = useState<string[]>([]); // the mockup pack: one job per product, none until picked
   const [names, setNames] = useState(''); // the name swap app's box: one job per name (or per name and breed)
+  const [poses, setPoses] = useState<string[]>([]); // the pose generator: one job per pose, none until picked
+  const [poseText, setPoseText] = useState(''); // its own words for one more pose, a job of their own
+  const [poseGender, setPoseGender] = useState<'woman' | 'man' | null>(null); // the pose pictures' gender the member chose, else the photo's
   const promptId = useId();
   const reasonId = useId();
   const viewsId = useId();
@@ -165,10 +173,23 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const namesId = useId();
   const namesHelpId = useId();
   const namesErrorId = useId();
+  const posesId = useId();
+  const poseTextId = useId();
+  const genderName = useId();
   const { models, failed } = useImageModels(app.feature);
   const count = images.reduce((n, list) => n + list.length, 0);
   const pick = useImageChoice(models, Math.max(1, count));
   const { chosen } = pick;
+  // The saved AI models a slot offers (the pose generator's model photo), as Try On's model picker does.
+  const aiModels = usable(useFashionModels(app.slots.some((s) => s.aiModels)).models ?? []);
+  // The pose pictures' gender: the member's choice, else the photo's (a catalog portrait's, a saved AI model's), else the first one with pictures, as Try On's pose step.
+  const pictured = (g: 'woman' | 'man') => POSES.some((p) => have.has(`try-on-pose-${g}-${p.value}.jpg`));
+  const person = images[0]?.[0];
+  const aiGender = parseFashionTraits(aiModels.find((m) => m.assetId === person?.id)?.traits)?.gender;
+  const gender = poseGender ?? portraitGender(person?.filename ?? '') ?? (aiGender === 'male' ? 'man' : aiGender === 'female' ? 'woman' : null) ?? (pictured('woman') ? 'woman' : 'man');
+  const ownPose = cleanName(poseText); // the box's words as a job takes them: trimmed, one space between words, as a name is
+  const posesPicked = poses.length + (ownPose ? 1 : 0);
+  const togglePose = (v: string) => (poses.includes(v) ? setPoses(poses.filter((x) => x !== v)) : posesPicked >= MAX_POSES ? notify(`Tối đa ${MAX_POSES} tư thế mỗi lần chạy`) : setPoses([...poses, v]));
   // The member's last model and settings, unless a refill opens the page.
   const recall = useRecall(
     app.feature,
@@ -206,6 +227,10 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
       if (j.style) setStyles(all('style'));
       if (j.product) setProducts(all('product'));
       if (j.name) setNames(all('name').join('\n'));
+      if (j.pose || j.poseText) {
+        setPoses(all('pose'));
+        setPoseText(all('poseText')[0] ?? '');
+      }
       pick.refill({ ...j, ...(extra > 0 && { extra: { count: extra, max: slots!.flat().length } }) });
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
@@ -213,7 +238,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   // The swaps add the member's text to their fixed instruction, so it shares the model's limit with it.
   const fixed = app.prompt === 'optional' ? FEATURE_PROMPTS[app.feature]!.length + 2 : 0;
   const room = chosen && chosen.maxPromptChars - fixed;
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
   /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
   const sent = basePrompt(app.feature, appInputs(app, { images, prompt }).prompt);
@@ -231,7 +256,9 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
           ? MOCKUP_PRODUCTS.filter((p) => products.includes(p.id)).map((p) => ({ product: p.id }))
           : app.names
             ? parseNames(names).names.flatMap((name) => (pickedBreeds.length > 0 ? pickedBreeds.map((breed) => ({ name, breed })) : [{ name }]))
-            : [{}];
+            : app.poses
+              ? [...POSES.filter((p) => poses.includes(p.value)).map((p) => ({ pose: p.value })), ...(ownPose ? [{ poseText: ownPose }] : [])]
+              : [{}];
   const batchApp = BATCH_FEATURES.includes(app.feature);
   // What is wrong with the typed names, said under the box; an empty box only waits, as the reason under Run says.
   const namesProblem = app.names && names.trim() ? parseNames(names).problem : null;
@@ -331,6 +358,10 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
         if (app.styles) setStyles(p.style);
         if (app.products) setProducts(p.product);
         if (app.names) setNames(p.name.join('\n'));
+        if (app.poses) {
+          setPoses(p.pose);
+          setPoseText(p.poseText[0] ?? '');
+        }
         sent = ` Đã gửi ${done}/${runs.length} ảnh và bỏ chọn các mục đã gửi.${p.left.length > 0 ? ` Chưa gửi: ${p.left.map(itemLabel).join(', ')}.` : ''}`;
       }
       setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${sent}`);
@@ -361,6 +392,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
               {app.slots.map((s, i) => {
                 const max = slotMax(app, i, chosen?.maxImages ?? 1);
                 const templates = stockGroups(s, have).length > 0;
+                const offersModels = s.aiModels && aiModels.length > 0;
                 return (
                   <Slot
                     key={s.inputLabel}
@@ -375,16 +407,19 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     onAdd={add(i)}
                     onRemove={(id) => setImages((cur) => cur.map((list, j) => (j === i ? list.filter((x) => x.id !== id) : list)))}
                     onPick={(img) => setImages((cur) => cur.map((list, j) => (j === i ? (max === 1 ? [img] : [...list, img]) : list)))}
-                    onBrowse={templates ? () => setPicker(i) : undefined}
+                    onBrowse={templates || offersModels ? () => setPicker(i) : undefined}
                   />
                 );
               })}
             </div>
             <PhotoDialog
               open={picker !== null}
-              title={picker === null ? '' : app.slots[picker]!.stock!.title}
+              title={picker === null ? '' : (app.slots[picker]!.stock?.title ?? 'Chọn người mẫu')}
               tiles={stock.filter((g) => !g.label).flatMap((g) => stockTiles(picker!, g.names, 'Người mẫu có sẵn'))}
-              groups={stock.filter((g) => g.label).map((g) => ({ title: g.label!, tiles: stockTiles(picker!, g.names, g.label!) }))}
+              groups={[
+                ...stock.filter((g) => g.label).map((g) => ({ title: g.label!, tiles: stockTiles(picker!, g.names, g.label!) })),
+                ...(picker !== null && app.slots[picker]!.aiModels ? [{ title: 'Người mẫu AI', tiles: fashionTiles(aiModels, (img) => setImages((cur) => cur.map((list, j) => (j === picker ? [img] : list)))) }] : []),
+              ]}
               // Many groups make a long dialog (Jewelry's 7), so their names at the top jump to each one.
               filter={
                 stock.filter((g) => g.label).length > 1 && (
@@ -438,6 +473,62 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                 <p className="help">Mỗi sản phẩm tạo một ảnh mockup riêng và tính tiền riêng. Có ảnh sản phẩm trơn thì chỉ chọn một sản phẩm, đúng loại trong ảnh đó: AI in thiết kế lên chính sản phẩm ấy.</p>
                 {runCost}
               </ItemChecks>
+            )}
+
+            {app.poses && (
+              <>
+                <div className="field">
+                  {/* Many pictures: how many poses are picked out of the Run's four, and a way to untick them all, by the label rather than in a long scroll. */}
+                  <div className="field-head">
+                    <span id={posesId} className="field-label">
+                      Tư thế cần tạo
+                    </span>
+                    {posesPicked > 0 && (
+                      <span className="pick-count">
+                        {posesPicked}/{MAX_POSES} đã chọn
+                        {poses.length > 0 && (
+                          <>
+                            {' · '}
+                            <button type="button" className="link-button" onClick={() => setPoses([])}>
+                              Bỏ chọn hết
+                            </button>
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  {(pictured('woman') || pictured('man')) && (
+                    <div className="segmented theme-choice" role="radiogroup" aria-label="Ảnh tư thế mẫu">
+                      {(['woman', 'man'] as const).map((g) => (
+                        <label key={g}>
+                          <input type="radio" name={genderName} checked={gender === g} onChange={() => setPoseGender(g)} />
+                          {g === 'woman' ? 'Nữ' : 'Nam'}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {/* Try On's pose pictures as toggles: each pose's picture on that gender, or its name until one is uploaded; a picked one carries the check mark. */}
+                  <div className="choice-grid model-grid" role="group" aria-labelledby={posesId}>
+                    {POSES.map((p) => {
+                      const file = `try-on-pose-${gender}-${p.value}.jpg`;
+                      return (
+                        <button key={p.value} type="button" className={have.has(file) ? undefined : 'photo-name'} aria-label={p.label} aria-pressed={poses.includes(p.value)} disabled={busy} onClick={() => togglePose(p.value)}>
+                          {have.has(file) ? <img src={sampleThumb(file)} alt="" /> : <strong>{p.label}</strong>}
+                          {have.has(file) && <span className="photo-caption">{p.label}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor={poseTextId} className="field-label">
+                    {OWN_POSE} (tuỳ chọn)
+                  </label>
+                  <textarea id={poseTextId} className="names-box" rows={2} maxLength={MAX_POSE_TEXT} value={poseText} placeholder="Ví dụ: ngồi trên bậc thềm, tay chống cằm, nhìn ra xa" onChange={(e) => setPoseText(e.target.value)} />
+                  <p className="help">Mỗi tư thế tạo một ảnh riêng và tính tiền riêng, tối đa {MAX_POSES} tư thế mỗi lần chạy. Ô này tính là một tư thế và chạy thành ảnh riêng, không trộn với tư thế đã chọn. AI giữ khuôn mặt, tóc, dáng người và trang phục; hãy xem lại từng ảnh.</p>
+                  {runCost}
+                </div>
+              </>
             )}
 
             {app.names && (

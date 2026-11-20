@@ -72,16 +72,16 @@ await pool.query(
      ('mock-lingerie-e2e', 'mock', 'mock', 'Mock lingerie E2E', 'image', '{lingerie_try_on}', '{auto,1:1}', '{}', 4, '{"1K": "0.0500", "2K": "0.0800"}', '{}', true),
      ('mock-angles-e2e', 'mock', 'mock', 'Mock angles E2E', 'image', '{multi_angle}', '{auto}', '{}', 1, '{"1K": "0.0350"}', '{}', true),
      ('mock-breeds-e2e', 'mock', 'mock', 'Mock breeds E2E', 'image', '{breed_swap}', '{auto}', '{}', 1, '{"1K": "0.0400"}', '{}', true),
-     ('mock-pets-e2e', 'mock', 'mock', 'Mock pets E2E', 'image', '{pet_portrait,mockup_pack,name_swap}', '{auto}', '{}', 2, '{"1K": "0.1500"}', '{}', true)`,
+     ('mock-pets-e2e', 'mock', 'mock', 'Mock pets E2E', 'image', '{pet_portrait,mockup_pack,name_swap,pose_generator}', '{auto}', '{}', 2, '{"1K": "0.1500"}', '{}', true)`,
 );
-// A priced model for Upscale and Reframe (and one each for the multi-angle and breed swap apps, and one for the three pet apps), which an e2e page picks to see real prices, a model's own ratios (no `auto`) and resolutions. Its provider is `fal`
+// A priced model for Upscale and Reframe (and one each for the multi-angle and breed swap apps, and one for the three pet apps and the pose generator), which an e2e page picks to see real prices, a model's own ratios (no `auto`) and resolutions. Its provider is `fal`
 // so the page shows its prices (a mock model shows 0), and the e2e worker has no fal adapter: its jobs are posted and stored, then released. Never used by another spec.
 await pool.query(
   `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled) values
      ('mock-apps-priced', 'fal', 'fal-ai/e2e-priced', 'Mock apps priced', 'image', '{image_upscale,reframe}', '{1:1,16:9}', '{}', 1, '{"2K": "0.08", "4K": "0.08"}', '{}', true),
      ('mock-angles-priced', 'fal', 'fal-ai/e2e-angles-priced', 'Mock angles priced', 'image', '{multi_angle}', '{auto}', '{}', 1, '{"1K": "0.035"}', '{}', true),
      ('mock-breeds-priced', 'fal', 'fal-ai/e2e-breeds-priced', 'Mock breeds priced', 'image', '{breed_swap}', '{auto}', '{}', 1, '{"1K": "0.04"}', '{}', true),
-     ('mock-pets-priced', 'fal', 'fal-ai/e2e-pets-priced', 'Mock pets priced', 'image', '{pet_portrait,mockup_pack,name_swap}', '{auto}', '{}', 2, '{"1K": "0.15"}', '{}', true)`,
+     ('mock-pets-priced', 'fal', 'fal-ai/e2e-pets-priced', 'Mock pets priced', 'image', '{pet_portrait,mockup_pack,name_swap,pose_generator}', '{auto}', '{}', 2, '{"1K": "0.15"}', '{}', true)`,
 );
 // A store the Create picker offers, for the specs that tag a clip with one.
 await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-e2e', 'E2E Shop', 'E2E-SEED', 'ws_vet')`);
