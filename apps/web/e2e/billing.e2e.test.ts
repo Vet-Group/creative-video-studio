@@ -1,6 +1,6 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 import { type UserKey, USERS } from './users';
-import { optionsOf, png, select, signIn } from './support.test';
+import { openSettings, optionsOf, png, select, signIn } from './support.test';
 
 // Billing teams (docs/BILLING.md). The spec makes a billing team and two stores of its own, so no other spec's member or store is restricted:
 // only billa joins the team.
@@ -37,14 +37,14 @@ test('an Admin makes a billing team with its store, and its member picks and run
   const admin = await as(browser, 'admin');
   const { other } = await setUp(admin);
 
-  // Admin › Nhóm shows the team as a billing team with its allowance, and its store ticked under the row.
+  // Admin > Teams shows the team as a billing team with its allowance, and its store ticked under the row.
   await admin.goto('/admin/teams');
   await expect(admin.getByLabel(`Nhóm ${TEAM} là team bán hàng (tính phí)`)).toBeChecked();
   await expect(admin.getByLabel(`Miễn phí mỗi tháng của ${TEAM} (USD)`)).toHaveValue('20');
   await admin.getByRole('button', { name: `Cửa hàng của ${TEAM}: 1` }).click();
   await expect(admin.getByLabel(`Cửa hàng ${OWN} của nhóm ${TEAM}`)).toBeChecked();
   await expect(admin.getByLabel(`Cửa hàng ${OTHER} của nhóm ${TEAM}`)).not.toBeChecked();
-  // Admin › Cửa hàng names the store's team.
+  // Admin > Stores names the store's team.
   await admin.goto('/admin/stores');
   await expect(admin.getByLabel(`Nhóm của ${OWN}`).locator('option:checked')).toHaveText(`${TEAM} (tính phí)`);
 
@@ -64,6 +64,48 @@ test('an Admin makes a billing team with its store, and its member picks and run
   const refused = await member.request.post('/api/jobs', { data: { assetIds: [assets[0]!.id], modelId: 'mock-e2e', presetId: 'gentle-push-in', ratio: '9:16', durationSec: 5, storeId: other } });
   expect(refused.status()).toBe(403);
   expect(await refused.json()).toMatchObject({ code: 'store_not_in_team' });
+  await admin.context().close();
+  await member.context().close();
+});
+
+test('the costs by team view shows the team with its member and store and closes a past month; the member sees the team’s month in Limits', async ({ browser }) => {
+  const admin = await as(browser, 'admin');
+  const { team } = await setUp(admin);
+
+  // The member's limits carry the team's month (the mock models cost nothing, so it is $0; the amounts are unit-tested in billing.test.ts).
+  const member = await as(browser, 'billa');
+  const limits = (await (await member.request.get('/api/me/limits')).json()) as { team: unknown };
+  expect(limits.team).toMatchObject({ name: TEAM, monthUsd: '0.0000', freeUsd: '20.0000', payableUsd: '0.0000' });
+
+  // The Limits section of Settings shows the team's month against its allowance, in words as well as the bar.
+  const settings = await openSettings(member);
+  await settings.getByRole('button', { name: 'Hạn mức', exact: true }).click();
+  await expect(settings.locator('.meter-head', { hasText: `Chi phí tháng này của team ${TEAM}` })).toBeVisible();
+  await expect(settings.getByRole('img', { name: `Team ${TEAM}: Đã dùng`, exact: false })).toBeVisible();
+  await expect(settings.locator('.allowance-legend')).toContainText('/ $20.00');
+
+  // Admin > Costs > By team: the team's card with its member and store, and the books in balance.
+  await admin.goto('/admin/costs/teams');
+  await expect(admin.getByRole('heading', { name: 'Chi phí theo team' })).toBeVisible();
+  await expect(admin.getByRole('navigation', { name: 'Các góc nhìn chi phí' }).getByRole('link', { name: 'Theo team' })).toHaveAttribute('aria-current', 'page');
+  await expect(admin.getByRole('navigation', { name: 'Các trang quản trị' }).getByRole('link', { name: 'Chi phí' })).toHaveAttribute('aria-current', 'page');
+  await expect(admin.getByText('Khớp sổ', { exact: true })).toBeVisible();
+  const card = admin.getByRole('region', { name: TEAM, exact: true });
+  await expect(card).toContainText(USERS.billa.name);
+  await expect(card).toContainText(OWN);
+  await card.getByRole('button', { name: 'Chi tiết' }).click();
+  await expect(card).toContainText('Chưa có chi phí.');
+  await expect(admin.getByRole('button', { name: 'Chốt tháng' })).toHaveCount(0); // this month stays open
+  expect(await (await admin.request.get('/api/admin/billing/csv?part=summary')).text()).toContain(`team:${team}`);
+
+  // A past month closes, says so, and reopens; both are confirmed first.
+  await admin.getByLabel('Tháng', { exact: true }).fill('2026-10');
+  await admin.getByRole('button', { name: 'Chốt tháng' }).click();
+  await admin.getByRole('dialog', { name: 'Chốt tháng 2026-10?' }).getByRole('button', { name: 'Chốt tháng' }).click();
+  await expect(admin.getByText(/^Đã chốt \d{1,2}\/\d{1,2}\/\d{4}$/)).toBeVisible();
+  await admin.getByRole('button', { name: 'Mở lại tháng' }).click();
+  await admin.getByRole('dialog', { name: 'Mở lại tháng 2026-10?' }).getByRole('button', { name: 'Mở lại' }).click();
+  await expect(admin.getByText('Đang mở', { exact: true })).toBeVisible();
   await admin.context().close();
   await member.context().close();
 });

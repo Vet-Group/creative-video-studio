@@ -27,7 +27,7 @@ export function AdminNav() {
   return (
     <nav ref={bar} className="admin-nav" aria-label="Các trang quản trị">
       {PAGES.map(([slug, text, icon]) => (
-        <Link key={slug} href={`/admin/${slug}`} aria-current={pathname === `/admin/${slug}` ? 'page' : undefined}>
+        <Link key={slug} href={`/admin/${slug}`} aria-current={pathname === `/admin/${slug}` || pathname.startsWith(`/admin/${slug}/`) ? 'page' : undefined}>
           <Icon name={icon} />
           <span>{text}</span>
         </Link>

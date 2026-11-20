@@ -10,6 +10,7 @@ import { AVATAR_COLORS, NAME_LENGTH, initials, isEmail, levelOf, nameProblem, pr
 import type { SignInMethod } from '@/lib/sign-in-methods';
 import { useMediaQuery } from '@/lib/use-media-query';
 import { PasswordChange, Sessions, TwoFactor } from './AccountSecurity';
+import { AllowanceBar } from './AllowanceBar';
 import { Icon, type IconName } from './Icon';
 import { Modal } from './Modal';
 import { Preferences } from './Preferences';
@@ -46,6 +47,8 @@ export interface Usage {
   dayUsd: { used: string; cap: string } | null;
   monthUsd: { used: string; cap: string } | null;
   monthToDate: { usd: string; provisional: boolean } | null;
+  /** Only for a member of a billing team in the company's workspace: the team's month so far against its free allowance (docs/BILLING.md). */
+  team?: { name: string; monthUsd: string; freeUsd: string; payableUsd: string; provisional: boolean };
 }
 
 export type Section = 'profile' | 'limits' | 'security' | 'preferences' | 'methods' | 'support';
@@ -106,7 +109,7 @@ const LIMITS_FAILED = (
 function Limits({ usage }: { usage: Usage | null | 'failed' }) {
   if (usage === 'failed') return LIMITS_FAILED;
   if (!usage) return <p className="muted">Đang tải hạn mức...</p>;
-  const { clips, dayUsd, monthUsd, monthToDate } = usage;
+  const { clips, dayUsd, monthUsd, monthToDate, team } = usage;
   return (
     <>
       <div className="settings-card meters">
@@ -144,6 +147,21 @@ function Limits({ usage }: { usage: Usage | null | 'failed' }) {
           />
         )}
       </div>
+      {team && (
+        <div className="settings-card meters">
+          <div className="meter">
+            <div className="meter-head">
+              <span>Chi phí tháng này của team {team.name}</span>
+              <strong>
+                {usd(team.monthUsd)}
+                {team.provisional && <span className="tag">Tạm tính</span>}
+              </strong>
+            </div>
+            <AllowanceBar totalUsd={team.monthUsd} freeUsd={team.freeUsd} label={`Team ${team.name}`} />
+            <p className="meter-left">Cả team dùng chung phần miễn phí; phần vượt tính cho team và không chặn việc tạo</p>
+          </div>
+        </div>
+      )}
       <p className="settings-note">Hạn mức ngày đặt lại lúc 0:00 giờ Việt Nam, hạn mức tháng vào ngày 1. Admin đặt các hạn mức này. Khi ngân sách chung của công ty đã hết, việc tạo cũng tạm dừng dù thanh của bạn còn trống.</p>
     </>
   );
