@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useId, useState } from 'react';
 import { NO_CAP } from '@/lib/caps';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
-import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, cardTitleOfFormat, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { WIZARD_KEY } from '@/lib/onboarding';
 import { type BrandKit, withBrand } from '@/lib/brand';
@@ -88,6 +88,14 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '16:9 (ngang)', '1:1': '1:1 (vuông)' };
 
 const QUIET_REASONS = ['Tải lên ảnh người mẫu.', 'Tải lên ảnh sản phẩm.', 'Viết mô tả video bạn muốn.'];
+
+/** What each format makes and needs, on its card in the format picker: "Editorial" alone says little, and each format wants other photos. */
+const FORMAT_LINE: Record<MarketingFormat, string> = {
+  ugc: 'Người mẫu mặc thử sản phẩm, quay như video tự quay. Cần: ảnh người mẫu, ảnh sản phẩm.',
+  advanced: 'Video quảng cáo theo brief của bạn, nhiều ảnh tham chiếu và lời thoại. Cần: 1 ảnh trở lên và brief.',
+  unboxing: 'Mở hộp sản phẩm trước camera. Cần: ảnh sản phẩm; người mẫu và bao bì tuỳ chọn.',
+  review: 'Người mẫu đánh giá sản phẩm theo các ý bạn đưa. Cần: ảnh người mẫu, ảnh sản phẩm, 1–3 ý.',
+};
 
 /** The formats of the format picker, each with the name of its sample photo and loop (Review's keeps the name the first upload used). */
 const FORMATS: { id: MarketingFormat; sample: string }[] = [
@@ -319,7 +327,8 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
       .then(async (loaded) => {
         if (stale) return;
         if (loaded.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
-        if (hrefOfFormat(loaded.format) !== FORMAT_HREF[format]) return router.replace(`${hrefOfFormat(loaded.format)}?${queryOf(reuse)}${source.recipe ? '&recipe=1' : ''}`);
+        // Another format's clip refills on its own page: the toast says why the page changed.
+        if (hrefOfFormat(loaded.format) !== FORMAT_HREF[format]) return (notify(`Clip này làm bằng ${cardTitleOfFormat(loaded.format)}: đã mở trang đó để dùng lại.`), router.replace(`${hrefOfFormat(loaded.format)}?${queryOf(reuse)}${source.recipe ? '&recipe=1' : ''}`));
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
@@ -615,8 +624,9 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   );
 
   /** The library hook, up to three variants: in ① Hook when writing by sections, in the photo grid as on Fash when writing freely. */
+  const hookValue = hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`;
   const hookBox = (
-    <ChoiceBox label="Hook (tuỳ chọn)" icon="film" media={hooks[0] ? cardSample(have, `marketing-hook-${hooks[0]}`) : undefined} value={hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`} onOpen={() => setPicker('hook')} onClear={() => setHooks([])} />
+    <ChoiceBox label="Hook (tuỳ chọn)" icon="film" media={hooks[0] ? cardSample(have, `marketing-hook-${hooks[0]}`) : undefined} value={hookValue} onOpen={() => setPicker('hook')} onClear={() => setHooks([])} />
   );
 
   /** The location: in ② Body when writing by sections, in the photo grid when writing freely. */
@@ -646,13 +656,20 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
                     <span className="wizard-step-n" aria-hidden="true">
                       {i + 1}
                     </span>
-                    {s}
+                    {/* A step already passed is a way back to it; later steps open through Tiếp tục, which checks each one. */}
+                    {i < step ? (
+                      <button type="button" className="link-button" onClick={() => setStep(i)}>
+                        {s}
+                      </button>
+                    ) : (
+                      s
+                    )}
                   </li>
                 ))}
               </ol>
             )}
             <button type="button" className="link-button wizard-toggle" onClick={() => setWizardMode(!wizard)}>
-              {wizard ? 'Chuyển sang chế độ đầy đủ' : 'Chuyển sang chế độ hướng dẫn'}
+              {wizard ? 'Hiện cả form' : 'Làm từng bước'}
             </button>
             {/* A click anywhere on the banner opens the format picker, as Create's banner opens its presets; the chip stays the keyboard and screen-reader way in. */}
             {atStep(0) && (
@@ -687,7 +704,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
               </div>
             )}
             {atStep(1) && unboxing && person.length === 0 && <p className="help">Không có ảnh người mẫu: video quay theo góc nhìn thứ nhất, chỉ thấy đôi tay mở hộp.</p>}
-            {atStep(2) && review && <Highlights lines={highlights} onChange={setHighlights} />}
+            {atStep(2) && review && <Highlights lines={highlights} onChange={setHighlights} use={!chosen || audioOn ? (script.trim() ? 'Có lời thoại thì người mẫu chỉ đọc lời thoại; các ý này được cho thấy bằng hình.' : undefined) : 'Đang tắt âm thanh: người mẫu chỉ cho thấy các ý này, không nói.'} />}
 
             {atStep(1) && advanced && <ReferenceVideoSlot video={video} busy={busy} onFile={(f) => void takeVideo(() => uploadImages([f], 'video', storeId) as Promise<RefVideo[]>, (e) => uploadError(e, 'video'))} onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, VIDEO_ERROR))} onRemove={() => setVideo(null)} />}
 
@@ -696,11 +713,12 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
               feature="marketing"
               format={pf}
               mode={mode}
-              onMode={(next) => (next === 'free' && setFreeText(sectionPrompt({ hook: hooks.length > 0 ? '' : hookText, body: prompt, ending })), setMode(next))}
+              // The free box keeps its own words: the sections only seed it while it is empty.
+              onMode={(next) => (next === 'free' && !freeText.trim() && setFreeText(sectionPrompt({ hook: hooks.length > 0 ? '' : hookText, body: prompt, ending })), setMode(next))}
               hook={{
-                // The library pick (with its variants); the own words stand in for it.
+                // The library pick (with its variants) or the own words, one of the two.
                 box: hookBox,
-                hint: hooks.length > 0 ? 'Đang dùng hook đã chọn; chữ tự viết chỉ dùng khi bỏ chọn hook đó.' : 'Chọn hook có sẵn ở trên hoặc tự viết bên dưới. Chữ tự viết chỉ dùng khi chưa chọn hook.',
+                pick: { noun: 'hook', chosen: hookValue, onOpen: () => setPicker('hook'), onDrop: () => setHooks([]) },
                 text: hookText,
                 onText: setHookText,
                 ask: chosen ? () => ({ field: 'hook', ...(pf && { format: pf }), text: hookText, rest: sectionPrompt({ body: prompt, ending }), model: chosen.id, audio, seconds: durationSec }) : null,
@@ -714,9 +732,9 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
               }}
               endText
               templates={PROMPT_TEMPLATES[format === 'ugc' ? 'marketing' : format]}
-              // A template's own hook counts only with no hook chosen, so the chosen ones go.
-              onTemplate={(t) => (sec ? (setHooks([]), setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
-              filled={(sec ? hookText + prompt + ending : freeText).trim() !== ''}
+              // A template brings its own opening, so the chosen hooks go in both modes (two openings would fight), and they count as words to confirm.
+              onTemplate={(t) => (setHooks([]), sec ? (setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
+              filled={hooks.length > 0 || (sec ? hookText + prompt + ending : freeText).trim() !== ''}
               onRun={() => canRun && void run()}
             >
               {sec && locationBox}
@@ -751,8 +769,8 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
                 aiLabel="Gợi ý lời thoại"
                 parts={['ai', 'translate', 'clear', 'expand']}
                 starters={[]}
-                // About two words a second (the About tab).
-                meta={words > 0 ? <span>{`${words} từ, khoảng ${Math.ceil(words / 2)} giây`}</span> : undefined}
+                // About two words a second (the About tab); with the sound off the script is not used, and the line says so instead.
+                meta={chosen && !audioOn ? <span>Đang tắt âm thanh nên lời thoại không được dùng</span> : words > 0 ? <span>{`${words} từ, khoảng ${Math.ceil(words / 2)} giây`}</span> : undefined}
               />
             )}
 
@@ -777,6 +795,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
             <BrandPicker storeId={storeId} onStore={setStoreId} on={useBrand} onToggle={setUseBrand} onKit={setKit} />
             <Templates
               feature="marketing"
+              note={hooks.length > 1 ? `Thiết lập chỉ lưu hook đầu tiên (${hookName(hooks[0]!)}); các biến thể khác cần chọn lại khi dùng.` : undefined}
               data={() => ({
                 // The model and the product go back by place, so an empty model keeps one. Unboxing's roles name the model and the box only when
                 // they are there but always the product, so an empty product keeps its place ('') and the roles still match the photos.
@@ -877,9 +896,12 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         <p className="modal-sub">Kiểu video marketing sẽ tạo.</p>
         <div className="choice-grid">
           {FORMATS.map((f) => (
-            <button key={f.id} type="button" aria-pressed={f.id === format} onClick={() => (setPicker(null), f.id !== format && router.push(FORMAT_HREF[f.id]))}>
+            <button key={f.id} type="button" aria-pressed={f.id === format} aria-label={FORMAT_NAME[f.id]} aria-describedby={`format-${f.id}-desc`} onClick={() => (setPicker(null), f.id !== format && router.push(FORMAT_HREF[f.id]))}>
               {picker === 'format' && <CardMedia {...cardSample(have, f.sample)} />}
               <span className="choice-name">{FORMAT_NAME[f.id]}</span>
+              <span id={`format-${f.id}-desc`} className="choice-desc">
+                {FORMAT_LINE[f.id]}
+              </span>
             </button>
           ))}
         </div>
@@ -909,6 +931,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         storeId={storeId}
         canShare={custom?.canShare ?? false}
         selected={hooks}
+        multi={many}
         onPick={pickHook}
         onAdded={(c) => added('hook', c)}
         onEdited={() => void loadChoices()}
@@ -925,6 +948,9 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
                 Xong ({hooks.length}/{MAX_VARIANTS})
               </button>
             )}
+            <span className="sr-only" aria-live="polite">
+              {many ? `Đã chọn ${hooks.length}/${MAX_VARIANTS} hook` : ''}
+            </span>
           </div>
         }
       />

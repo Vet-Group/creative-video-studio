@@ -24,7 +24,7 @@ export type Scope = 'mine' | 'store' | 'company';
  * The Save template dialog: a name (`name` to start with) and who may use it: the member alone, the store chosen on the form (`store`: undefined on a
  * page without a store picker, null while none is chosen) or, for a template editor (`canShare`), the company. `onSave` throws to show its error here.
  */
-export function SaveTemplateDialog({ open, onClose, onSave, canShare, store, name: initial = '' }: { open: boolean; onClose: () => void; onSave: (name: string, scope: Scope) => Promise<void>; canShare: boolean; store?: Store | null; name?: string }) {
+export function SaveTemplateDialog({ open, onClose, onSave, canShare, store, name: initial = '', note }: { open: boolean; onClose: () => void; onSave: (name: string, scope: Scope) => Promise<void>; canShare: boolean; store?: Store | null; name?: string; note?: string }) {
   const nameId = useId();
   const scopeId = useId();
   const [name, setName] = useState(initial);
@@ -48,6 +48,7 @@ export function SaveTemplateDialog({ open, onClose, onSave, canShare, store, nam
   return (
     <Modal open={open} onClose={onClose} label="Lưu thiết lập" className="choice-dialog">
       <h2>Lưu thiết lập</h2>
+      {note && <p className="modal-sub">{note}</p>}
       <label className="field-label" htmlFor={nameId}>
         Tên thiết lập
       </label>
@@ -88,7 +89,8 @@ export function SaveTemplateDialog({ open, onClose, onSave, canShare, store, nam
  * `data` reads the form when Save template is pressed: images as asset ids, the rest as the reuse link reads them from a job. `store` is the store chosen
  * on the form (null for none; leave it out on a page without a store picker): its templates are listed and it is offered as the scope.
  */
-export function Templates({ feature, data, store }: { feature: string; data: () => TemplateData; store?: Store | null }) {
+/** `note` tells the save dialog what the setup cannot keep (Marketing's extra hook variants). */
+export function Templates({ feature, data, store, note }: { feature: string; data: () => TemplateData; store?: Store | null; note?: string }) {
   const path = usePathname();
   const [open, setOpen] = useState<'list' | 'save' | null>(null);
   const [list, setList] = useState<{ templates: Template[]; canShare: boolean } | null>(null);
@@ -165,7 +167,7 @@ export function Templates({ feature, data, store }: { feature: string; data: () 
           </p>
         )}
       </Modal>
-      <SaveTemplateDialog open={open === 'save'} onClose={() => setOpen(null)} onSave={save} canShare={list?.canShare ?? false} store={store} />
+      <SaveTemplateDialog open={open === 'save'} onClose={() => setOpen(null)} onSave={save} canShare={list?.canShare ?? false} store={store} note={note} />
     </div>
   );
 }
