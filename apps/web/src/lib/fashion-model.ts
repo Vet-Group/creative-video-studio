@@ -103,6 +103,14 @@ export function withNiche(traits: FashionTraits, niche: string): FashionTraits {
   return { ...traits, ...(FASHION_OPTIONS.niche.find((n) => n.id === niche)?.defaults ?? {}), niche };
 }
 
+/** The traits the chosen niche set that still hold its value, each with its option's label, so the page can say what the niche changed. */
+export function nicheSetBy(traits: FashionTraits): { key: string; label: string }[] {
+  const defaults = FASHION_OPTIONS.niche.find((n) => n.id === traits.niche)?.defaults ?? {};
+  return (Object.entries(defaults) as [Exclude<OptionKey, 'niche'>, string][])
+    .filter(([key, id]) => traits[key] === id)
+    .map(([key, id]) => ({ key, label: id === VARIED_ETHNICITY ? 'Đa dạng' : optionOf(key, id).label }));
+}
+
 /** The traits of image `index` in a run: a varied ethnicity becomes a concrete one from the pool, so every job (and saved model) records a valid trait. */
 export function traitsForImage(t: FashionTraits, index: number): FashionTraits {
   return t.ethnicity === VARIED_ETHNICITY ? { ...t, ethnicity: VARIED_POOL[index % VARIED_POOL.length]! } : t;

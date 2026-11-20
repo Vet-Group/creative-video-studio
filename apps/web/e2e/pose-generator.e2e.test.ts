@@ -49,6 +49,9 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await expect(page.getByRole('radio', { name: 'Nam', exact: true })).toBeChecked();
     await expect(kneel.locator('img')).toHaveAttribute('src', `/api/samples/${sample}?thumb=1`);
     await expect(kneel.locator('.photo-caption')).toHaveText('Quỳ một gối');
+    // Three tiles a row in the form column, also once a pose has its picture.
+    const rows = await Promise.all([0, 1, 2].map(async (i) => (await poses(page).getByRole('button').nth(i).boundingBox())!.y));
+    expect(rows).toEqual([rows[0], rows[0], rows[0]]);
     await page.getByRole('radio', { name: 'Nữ', exact: true }).check();
     await expect(kneel).toHaveClass('photo-name');
     await expect(kneel).toHaveText('Quỳ một gối');

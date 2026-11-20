@@ -350,6 +350,7 @@ export function TryOn({ reuse, model }: { reuse?: string; model?: Img }) {
               placeholder="Ví dụ: người mẫu đứng trong studio sáng, toàn thân"
               ask={chosen ? () => ({ field: 'prompt', feature: 'try_on', text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
             />
+            {pose && prompt.trim() && <p className="help">Tư thế đã chọn ở ô Người mẫu sẽ được ưu tiên.</p>}
             <PromptPreview feature="try_on" prompts={[preview]} limit={chosen?.maxPromptChars} system={preview.length - prompt.trim().length} />
 
             {models !== null && !failed && !chosen && <LockedFields />}

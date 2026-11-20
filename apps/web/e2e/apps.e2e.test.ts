@@ -335,10 +335,21 @@ test('Image Upscale shows the resolution field and Background Changer follows it
   await expect(runButton(page)).toBeEnabled();
   await page.locator('input[type=file][aria-label="Ảnh nền tham chiếu"]').setInputFiles(file('cafe.png'));
   await expect(page.getByRole('img', { name: 'cafe.png' })).toBeVisible();
-  await expect(runButton(page)).toBeDisabled();
-  await expect(reasonOf(page)).toHaveText('Chọn mô tả nền hoặc ảnh nền tham chiếu, không dùng cả hai.');
-  await description.fill('');
+  // The reference photo stands in for the description: its box is off with the reason, the starters are gone and the typed words wait in it, unsent.
+  await expect(description).toBeDisabled();
+  await expect(description).toHaveAttribute('placeholder', 'Đang dùng ảnh tham chiếu');
   await expect(runButton(page)).toBeEnabled();
+  // Removing the photo gives the box back with its words intact.
+  await page.getByRole('button', { name: 'Bỏ ảnh cafe.png' }).click();
+  await expect(description).toBeEnabled();
+  await expect(description).toHaveValue('một quán cà phê đầy nắng');
+  await description.fill('');
+  await expect(page.getByRole('group', { name: 'Gợi ý nhanh' })).toBeVisible();
+  await expect(runButton(page)).toBeDisabled();
+  await expect(reasonOf(page)).toHaveText('Nhập mô tả nền mới hoặc tải lên ảnh nền tham chiếu.');
+  await page.locator('input[type=file][aria-label="Ảnh nền tham chiếu"]').setInputFiles(file('cafe.png'));
+  await expect(description).toBeDisabled();
+  await expect(page.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
 });
 
 test('a priced model: Upscale shows its price and stores the chosen resolution, Reframe offers its own ratios and stores the chosen one', async ({ page }) => {

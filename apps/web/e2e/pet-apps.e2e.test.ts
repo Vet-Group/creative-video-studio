@@ -98,12 +98,15 @@ test('mockup pack: runs one mockup per product for a design, reuses the batch, a
   await expect(page.getByRole('group', { name: 'Thiết kế' }).getByRole('img', { name: 'design.png' })).toBeVisible();
   for (const name of ['Thảm tròn 3D', 'Cốc sứ 11 oz']) await expect(products.getByRole('checkbox', { name })).toBeChecked();
 
-  // A blank is one product: two picked stop Run until one is left, and the prompt then keeps the blank as it is.
+  // A blank is one product: with two picked the first in the list stays, the other is unticked and a notice by the chips says so; a pick then replaces the one.
   await page.getByLabel('Ảnh sản phẩm trơn').setInputFiles({ name: 'blank-mug.png', mimeType: 'image/png', buffer: png() });
   await expect(page.getByRole('group', { name: 'Sản phẩm trơn (tuỳ chọn)' }).getByRole('img', { name: 'blank-mug.png' })).toBeVisible();
-  await expect(reason(page).filter({ hasText: 'Có ảnh sản phẩm trơn thì chỉ chọn một sản phẩm: đúng loại trong ảnh đó.' })).toBeVisible();
-  await expect(runButton(page)).toBeDisabled();
-  await products.getByText('Thảm tròn 3D', { exact: true }).click();
+  await expect(products.getByRole('checkbox', { name: 'Thảm tròn 3D' })).toBeChecked();
+  await expect(products.getByRole('checkbox', { name: 'Cốc sứ 11 oz' })).not.toBeChecked();
+  await expect(page.getByRole('status').filter({ hasText: 'Có ảnh sản phẩm trơn nên chỉ chọn được một sản phẩm.' })).toBeVisible();
+  await products.getByText('Cốc sứ 11 oz', { exact: true }).click();
+  await expect(products.getByRole('checkbox', { name: 'Thảm tròn 3D' })).not.toBeChecked();
+  await expect(products.getByRole('checkbox', { name: 'Cốc sứ 11 oz' })).toBeChecked();
   await expect(runButton(page)).toBeEnabled();
   await expect(preview(page)).toContainText(`Cốc sứ 11 oz: ${mockupPrompt('mug', true)}`);
   await runButton(page).click();
@@ -178,21 +181,35 @@ test('name swap: fills the names from a CSV file, the pet name column first, thr
   const names = page.getByLabel('Tên mới, mỗi dòng một tên');
   await names.fill('Old');
   const csvFile = page.getByLabel('Tệp CSV chứa tên');
-  const note = page.getByRole('status').filter({ hasText: 'Đã lấy' });
+  const note = page.getByRole('status').filter({ hasText: /^Đã (lấy|thay)/ });
 
   // An export with a byte order mark, CRLF, quoted fields with a comma or a line break, a repeat, a blank and a value that is no name.
   const csv = '﻿Name,Email,Pet Name\r\n#1001,a@e2e.test,Max\r\n#1002,b@e2e.test,"Bella"\r\n#1003,c@e2e.test,Max\r\n#1004,d@e2e.test,"Max 🐶, the dog"\r\n#1005,e@e2e.test,\r\n#1006,f@e2e.test,"Nguyễn\r\nÁnh"\r\n';
-  await csvFile.setInputFiles({ name: 'orders.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  const orders = { name: 'orders.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) };
+  // Names the member typed are replaced only after a confirm: Huỷ keeps them, Thay takes the file's, and the note says it replaced.
+  const ask = page.getByRole('dialog', { name: 'Thay 1 tên đang nhập bằng tên trong tệp?' });
+  await csvFile.setInputFiles(orders);
+  await ask.getByRole('button', { name: 'Huỷ' }).click();
+  await expect(names).toHaveValue('Old');
+  await expect(note).toHaveCount(0);
+  await csvFile.setInputFiles(orders);
+  await ask.getByRole('button', { name: 'Thay', exact: true }).click();
   await expect(select(page, 'Cột chứa tên')).toContainText('Pet Name');
   await expect(names).toHaveValue('Max\nBella\nNguyễn Ánh');
-  await expect(note).toHaveText('Đã lấy 3 tên từ cột “Pet Name” của orders.csv. Bỏ qua 1 giá trị không hợp lệ: "Max 🐶, the dog".');
+  await expect(note).toHaveText('Đã thay 1 tên bạn nhập bằng 3 tên từ cột “Pet Name” của orders.csv. Bỏ qua 1 giá trị không hợp lệ: "Max 🐶, the dog".');
   await pickModel(page, /Mock pets priced/);
   await expect(cost(page)).toHaveText('3 ảnh × $0.15 = $0.45');
 
-  // Another column: order numbers are no names, so the box empties and the note says why.
+  // Another column asks the same once the member has typed over the file's names, and asks nothing while the box is still the file's.
+  await names.fill('Rex');
   await selectText(page, 'Cột chứa tên', 'Name');
+  await ask.getByRole('button', { name: 'Huỷ' }).click();
+  await expect(names).toHaveValue('Rex');
+  await expect(select(page, 'Cột chứa tên')).toContainText('Pet Name');
+  await selectText(page, 'Cột chứa tên', 'Name');
+  await ask.getByRole('button', { name: 'Thay', exact: true }).click();
   await expect(names).toHaveValue('');
-  await expect(note).toHaveText('Đã lấy 0 tên từ cột “Name” của orders.csv. Bỏ qua 6 giá trị không hợp lệ: "#1001", "#1002", "#1003"….');
+  await expect(note).toHaveText('Đã thay 1 tên bạn nhập bằng 0 tên từ cột “Name” của orders.csv. Bỏ qua 6 giá trị không hợp lệ: "#1001", "#1002", "#1003"….');
   await expect(reason(page)).toHaveText('Nhập ít nhất một tên.');
 
   // More than 25 names: the first 25 are kept.

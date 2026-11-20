@@ -22,6 +22,8 @@ test('a member picks a style, and a mock Run sends its id while History and Reus
   await expect(grid).toBeHidden();
   const form = page.locator('.imagebar');
   await expect(form.getByRole('button', { name: 'Phong cách: Đường phố' })).toBeVisible();
+  // The style's words are added by the server, so the bar says what is added and where.
+  await expect(form.getByText('Phong cách: Đường phố · thêm vào cuối mô tả của bạn')).toBeVisible();
 
   await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a red shirt on a hanger');
   const [sent] = await Promise.all([

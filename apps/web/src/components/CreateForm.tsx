@@ -29,6 +29,7 @@ import { dropPhoto, FormContext, isPhotoDrag, type Photo, Tap, useApplier, useJo
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, PresetSections, type Proposal } from './PresetEditing';
+import { PresetOrOwn } from './PresetOrOwn';
 import { PromptComposer } from './PromptComposer';
 import { PromptPreview, PromptSections, usePromptMode } from './PromptSections';
 import { Preview } from './Preview';
@@ -474,6 +475,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   // The upload limit follows the chosen model (REA-video V02); the server caps every model at MAX_IMAGES.
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
   /** What Run sends as the free prompt: the sections composed (the body as typed while the hook and the ending are empty), or the free writing box. */
+  const typed = (sec ? hookText + prompt + ending : freeText).trim() !== ''; // words in the form, which a preset keeps but does not send
   const composed = sec ? sectionPrompt({ hook: hookText, body: prompt, ending }) : freeText;
   /** What the body may take: the model's limit less the hook and the ending around it. */
   const room = chosen && (sec ? briefRoom((b) => sectionPrompt({ hook: hookText, body: b, ending }), chosen.maxPromptChars) : chosen.maxPromptChars);
@@ -930,9 +932,21 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               </p>
             )}
 
-            {/* A preset's prompt replaces everything, so its box stands alone, read-only, without the sections. */}
+            {/* A preset's prompt replaces everything, so its box stands alone, read-only, without the sections; the card says it is the one sent and keeps the own words. */}
             {presetId !== '' ? (
-              body
+              <>
+                <PresetOrOwn
+                  noun="mẫu"
+                  chosen={current?.label ?? 'Mẫu'}
+                  onOpen={() => setPicking(true)}
+                  onDrop={() => (setPresetId(''), setTimeout(() => document.getElementById(promptId)?.focus()))}
+                  box={null}
+                  own={null}
+                  kept={typed}
+                  keptNote="Mô tả bạn đã viết được giữ lại nhưng không gửi khi dùng mẫu."
+                />
+                {body}
+              </>
             ) : (
               <PromptSections
                 feature="video"
@@ -953,7 +967,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                 }}
                 templates={PROMPT_TEMPLATES.video}
                 onTemplate={(t) => (sec ? (setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
-                filled={(sec ? hookText + prompt + ending : freeText).trim() !== ''}
+                filled={typed}
                 onRun={() => (canRun ? void run() : (reason?.text ?? false))}
               >
                 {body}

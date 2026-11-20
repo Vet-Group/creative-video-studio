@@ -125,14 +125,14 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
 
   // Beside the form the page opens on Ví dụ, even with a Marketing job (owner, 2026-11-09); History is one click away.
   const id = jobs.jobs[0]!.id;
-  const loaded = page.waitForResponse((r) => r.url().includes('/api/library?kind=marketing&example=1'));
+  const loaded = page.waitForResponse((r) => r.url().includes('/api/library?kind=marketing_ugc&example=1'));
   await page.reload();
   await loaded;
   await expect(page.getByRole('tab', { name: 'Ví dụ' })).toHaveAttribute('aria-selected', 'true');
   // Ví dụ lists only what an Admin put there: the member's own new clip is not in it yet.
   const gallery = page.getByRole('group', { name: 'Video Marketing Studio của công ty' });
   const tile = page.locator(`.gallery-use[data-from="/api/jobs/${id}"]`);
-  await expect(gallery.or(page.getByText('Chưa có video Marketing Studio nào trong công ty.'))).toBeVisible();
+  await expect(gallery.or(page.getByText('Chưa có video UGC Thử đồ nào trong công ty.'))).toBeVisible();
   await expect(tile).toHaveCount(0);
 
   // An Admin puts it there from the Library's detail view, after the check of what Ví dụ already holds.

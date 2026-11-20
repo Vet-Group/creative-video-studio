@@ -19,9 +19,11 @@ interface Props {
   own: ReactNode;
   /** There are own words, kept but not sent while the pick is in use. */
   kept: boolean;
+  /** The note under the card while `kept`, for a page where the default does not fit. */
+  keptNote?: string;
 }
 
-export function PresetOrOwn({ noun, chosen, onOpen, onDrop, box, own, kept }: Props) {
+export function PresetOrOwn({ noun, chosen, onOpen, onDrop, box, own, kept, keptNote = 'Chữ bạn tự viết vẫn được giữ, chỉ gửi khi chọn Tự viết.' }: Props) {
   const name = useId();
   const root = useRef<HTMLDivElement>(null);
   const [focusOwn, setFocusOwn] = useState(false);
@@ -64,7 +66,7 @@ export function PresetOrOwn({ noun, chosen, onOpen, onDrop, box, own, kept }: Pr
               Tự viết thay
             </button>
           </div>
-          {kept && <p className="help">Chữ bạn tự viết vẫn được giữ, chỉ gửi khi chọn Tự viết.</p>}
+          {kept && <p className="help">{keptNote}</p>}
         </div>
       )}
     </div>

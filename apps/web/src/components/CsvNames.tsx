@@ -1,23 +1,30 @@
 'use client';
 // The name swap app's names from a CSV file (a Shopify order export, a personalization app's export), read in the browser only. The member picks the column
-// (one that looks like a pet's name first), and its names fill the box through the box's own rules (csvNames).
+// (one that looks like a pet's name first), and its names fill the box through the box's own rules (csvNames); names the member typed are replaced only after a confirm.
 import { useRef, useState } from 'react';
 import { csvNames, MAX_BATCH, nameColumn } from '@/lib/apps';
 import { parseCsv } from '@/lib/csv';
+import { confirmDialog } from './Confirm';
 import { Select } from './Select';
 
 /** A CSV of orders runs to a few MB at most; a bigger file is not one. */
 const MAX_CSV_BYTES = 5 * 1024 * 1024;
 const short = (v: string) => `"${v.length > 30 ? `${v.slice(0, 29)}…` : v}"`;
 
-export function CsvNames({ disabled, onNames }: { disabled: boolean; onNames: (text: string) => void }) {
+export function CsvNames({ disabled, names, onNames }: { disabled: boolean; names: string; onNames: (text: string) => void }) {
   const input = useRef<HTMLInputElement>(null);
-  const [csv, setCsv] = useState<{ file: string; rows: string[][]; column: number } | null>(null);
+  const [csv, setCsv] = useState<{ file: string; rows: string[][]; column: number; replaced: number } | null>(null);
   const [error, setError] = useState('');
+  const placed = useRef(''); // what the file last put in the box: the box differing from it holds names the member typed
 
-  function fill(file: string, rows: string[][], column: number) {
-    setCsv({ file, rows, column });
-    onNames(csvNames(rows, column).names.join('\n'));
+  /** Fills the box from `column`, asking first when it holds names the file did not put there; the member who declines keeps them. */
+  async function fill(file: string, rows: string[][], column: number) {
+    const text = csvNames(rows, column).names.join('\n');
+    const typed = names.trim() !== '' && names !== placed.current ? names.split('\n').filter((n) => n.trim()).length : 0;
+    if (typed > 0 && !(await confirmDialog({ title: `Thay ${typed} tên đang nhập bằng tên trong tệp?`, confirmLabel: 'Thay' }))) return;
+    placed.current = text;
+    setCsv({ file, rows, column, replaced: typed });
+    onNames(text);
   }
 
   async function open(file: File | undefined) {
@@ -26,7 +33,7 @@ export function CsvNames({ disabled, onNames }: { disabled: boolean; onNames: (t
     if (file.size > MAX_CSV_BYTES) return setError('Tệp CSV tối đa 5 MB.');
     const rows = parseCsv(await file.text());
     if (rows.length < 2) return setError('Tệp CSV cần dòng tiêu đề và ít nhất một dòng tên bên dưới.');
-    fill(file.name, rows, nameColumn(rows[0]!));
+    await fill(file.name, rows, nameColumn(rows[0]!));
   }
 
   const got = csv && csvNames(csv.rows, csv.column);
@@ -57,12 +64,12 @@ export function CsvNames({ disabled, onNames }: { disabled: boolean; onNames: (t
           heading="Chọn cột chứa tên"
           value={String(csv.column)}
           options={header.map((h, i) => ({ value: String(i), label: h.trim() || `Cột ${i + 1}` }))}
-          onChange={(v) => fill(csv.file, csv.rows, Number(v))}
+          onChange={(v) => void fill(csv.file, csv.rows, Number(v))}
         />
       )}
       {got && (
         <p className="help" role="status">
-          Đã lấy {got.names.length} tên từ cột “{header[csv.column]?.trim() || `Cột ${csv.column + 1}`}” của {csv.file}.
+          {csv.replaced > 0 ? `Đã thay ${csv.replaced} tên bạn nhập bằng` : 'Đã lấy'} {got.names.length} tên từ cột “{header[csv.column]?.trim() || `Cột ${csv.column + 1}`}” của {csv.file}.
           {got.invalid.length > 0 && ` Bỏ qua ${got.invalid.length} giá trị không hợp lệ: ${got.invalid.slice(0, 3).map(short).join(', ')}${got.invalid.length > 3 ? '…' : ''}.`}
           {got.over > 0 && ` Chỉ giữ ${MAX_BATCH} tên đầu, bỏ ${got.over} tên còn lại.`}
         </p>

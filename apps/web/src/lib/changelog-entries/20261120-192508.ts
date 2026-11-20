@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-20T19:25:08+07:00', kind: 'new', title: 'Ứng dụng mới: Tạo tư thế, một ảnh người mẫu ra tối đa 4 tư thế', details: ['Chọn một ảnh người mẫu (tải lên, ảnh đã tải hoặc người mẫu AI đã lưu), rồi chọn tối đa 4 tư thế từ các ô tư thế của Thử đồ hoặc tự tả tư thế bằng lời.', 'Mỗi tư thế tạo một ảnh riêng, giữ nguyên gương mặt và trang phục; giá từng ảnh và tổng tiền hiện trước khi bấm Chạy.', 'Kết quả của Tạo người mẫu AI và Thử đồ có thêm nút "Đổi tư thế" để mở ứng dụng với ảnh đó.'], href: '/apps/pose-generator', prs: [590], audience: 'all' } satisfies ChangeEntry;

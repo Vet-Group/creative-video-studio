@@ -49,6 +49,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
   const [blocked, setBlocked] = useState<string | null>(null); // why the editor's Ctrl+Enter did not run
   const [undo, setUndo] = useState<{ before: string; after: string } | null>(null);
   const root = useRef<HTMLSpanElement>(null);
+  const translateBtn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   // An open list low in the form's scroll box would sit under Run: bring it into view, without moving the page when it already shows.
   useEffect(() => void (open && list.current?.scrollIntoView({ block: 'nearest' })), [open, ai.options.length, tr.vi]);
@@ -119,7 +120,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
       )}
       {/* Only for words that are not Vietnamese already; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
       {has('translate') && !compact && value.trim() && !isVietnamese(value) && (
-        <button type="button" className={btn} aria-label={translateLabel} aria-expanded={open === 'vi'} onClick={() => (open === 'vi' ? setOpen(null) : (setOpen('vi'), tr.translate()))}>
+        <button ref={translateBtn} type="button" className={btn} aria-label={translateLabel} aria-expanded={open === 'vi'} onClick={() => (open === 'vi' ? setOpen(null) : (setOpen('vi'), tr.translate()))}>
           <Icon name="translate" size={13} />
           Dịch
         </button>
@@ -184,6 +185,10 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
         <div ref={list} className={s.popover} role="group" aria-label="Bản dịch tiếng Việt" aria-busy={tr.busy}>
           <div className={s.popHead}>
             <span>Bản dịch tiếng Việt</span>
+            <button type="button" className={s.popAction} onClick={() => (setOpen(null), translateBtn.current?.focus())}>
+              <Icon name="x" size={12} />
+              Đóng<span className="sr-only"> bản dịch</span>
+            </button>
           </div>
           <p className={s.popNote}>Chỉ để đọc. Prompt gửi đi vẫn là tiếng Anh.</p>
           {tr.busy && (
