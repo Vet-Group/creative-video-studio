@@ -3130,6 +3130,11 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
   .imagebar-chips > * { flex-shrink: 0; }
   .imagebar-chips > :is(.field:has([aria-haspopup='dialog']), .style-pill[data-on='true']) { flex-shrink: 1; min-width: 0; }
   .imagebar-chips > .field:has([aria-haspopup='dialog']) :is(.select, .select-trigger) { min-width: 0; max-width: 100%; }
+  /* The model's name gets the room: its suggested badge stays in the model menu, and the value pills (model, ratio, resolution, thinking) show their value
+     alone; the style and more-options pills, which act, keep their icons. */
+  .imagebar-chips .select-trigger:not(dialog *) .badge-recommended { display: none; }
+  .imagebar-chips .select-trigger[aria-haspopup='listbox']:not(dialog *) > .icon:first-child,
+  .imagebar-chips > .field:has([aria-haspopup='dialog']) .select-trigger:not(dialog *) > .icon:first-child { display: none; }
   /* Toasts at the top of the screen, clear of Run at the foot. */
   body:has(.imagebar) .toasts { top: 1rem; bottom: auto; }
 }
