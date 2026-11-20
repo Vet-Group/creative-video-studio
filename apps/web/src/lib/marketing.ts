@@ -181,7 +181,8 @@ const reviewSound = (points: boolean) => `The creator speaks to the camera in a 
 
 /**
  * The one English prompt a Review run sends: the model in [Image1] reviews the product in [Image2] and talks about the member's `highlights` (1 to 3
- * lines). Sound on is speech about the points, or the exact `script` when there is one; off is silent and the points are shown instead.
+ * lines). Sound on is speech about the points, or the exact `script` when there is one (the points are then shown, so the two never disagree); off is
+ * silent and the points are shown instead.
  */
 export function reviewPrompt({ highlights, script, ...parts }: Parts & { highlights: readonly string[]; script?: string | null }, custom: CustomChoices = {}): string {
   const points = highlightLines(highlights).map((p) => p.replace(/[.;]+$/, ''));
@@ -189,8 +190,8 @@ export function reviewPrompt({ highlights, script, ...parts }: Parts & { highlig
   const head =
     `UGC product review video, ${frameOf(parts.ratio)}, filmed handheld on a phone by a real creator. ` +
     `The creator in [Image1] reviews the product in [Image2], wearing or holding it; ${KEEP_LOOKS} ` +
-    // With sound off nobody speaks, so the points are shown rather than talked about.
-    (points.length ? `${parts.audio === false ? 'The creator shows each of these points' : 'The creator talks to the camera about'}: ${points.join('; ')}. ` : '') +
+    // With sound off nobody speaks, and with a script the creator says only its words: either way the points are shown rather than talked about.
+    (points.length ? `${parts.audio === false || (parts.audio && lines) ? 'The creator shows each of these points' : 'The creator talks to the camera about'}: ${points.join('; ')}. ` : '') +
     `Show the product up close and a natural move that shows how it fits or works. Soft natural light, honest energy. ${NO_TEXT}`;
   const sound = parts.audio === undefined ? null : !parts.audio ? SILENT : lines ? `The creator says exactly: "${lines}", lip-synced, and no other spoken words.` : reviewSound(points.length > 0);
   return compose(head, parts, custom, sound);

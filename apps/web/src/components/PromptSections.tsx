@@ -13,6 +13,7 @@ import { reloadSamples, useSamples, versionedSample } from '@/lib/use-samples';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
+import { PresetOrOwn } from './PresetOrOwn';
 import { Preview } from './Preview';
 import { PromptComposer } from './PromptComposer';
 import s from './PromptComposer.module.css';
@@ -52,8 +53,8 @@ interface Part {
   text: string;
   onText: (text: string) => void;
   ask: (() => Ask) | null;
-  /** A line under the box: on Marketing Studio, that the own hook counts only while no hook is chosen. */
-  hint?: string;
+  /** A library pick that stands in for the own words (Marketing's hook): one of the two is sent, so PresetOrOwn shows one at a time. */
+  pick?: { noun: string; chosen: string | undefined; onOpen: () => void; onDrop: () => void };
   /** More fields of the section (Ending: the end frame and the end text). */
   extra?: ReactNode;
 }
@@ -111,13 +112,16 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
     if (p.text.trim() !== '' && p.text.trim() !== words && !(await confirmDialog({ title: `Thay ${what} đang viết bằng câu này?`, confirmLabel: 'Thay' }))) return;
     p.onText(words);
   }
-  const part = (id: string, label: string, p: Part, max: number, aiLabel: string, placeholder: string) => (
-    <>
-      {p.box}
-      {p.hint && <p className="help">{p.hint}</p>}
-      <PromptComposer id={id} label={label} optional feature={feature} format={format} value={p.text} onChange={p.onText} maxLength={max} onRun={onRun} placeholder={placeholder} ask={p.ask} aiLabel={aiLabel} parts={['ai', 'translate']} starters={[]} />
-    </>
-  );
+  const part = (id: string, label: string, p: Part, max: number, aiLabel: string, placeholder: string) => {
+    const own = <PromptComposer id={id} label={label} optional feature={feature} format={format} value={p.text} onChange={p.onText} maxLength={max} onRun={onRun} placeholder={placeholder} ask={p.ask} aiLabel={aiLabel} parts={['ai', 'translate']} starters={[]} />;
+    if (p.pick) return <PresetOrOwn {...p.pick} box={p.box} own={own} kept={p.text.trim() !== ''} />;
+    return (
+      <>
+        {p.box}
+        {own}
+      </>
+    );
+  };
   const recents = mode === 'sections' ? ([['Hook', 'hook', hook, 'hook'], ['Kết', 'ending', ending, 'cảnh kết']] as const).filter(([, key]) => recent[key].length > 0) : [];
   const list = (
     <>
@@ -133,17 +137,13 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
                 <span className="choice-name">{t.name}</span>
                 <span className="choice-desc">{t.desc}</span>
                 {t.needs && <span className="prompt-template-needs">{t.needs}</span>}
-                {/* Create's dialog has room for what the template opens and ends on; Marketing Studio's, taller, keeps the one line. */}
-                {feature === 'video' && (
-                  <>
-                    <span className="prompt-template-line">
-                      Hook: <span lang="en">{t.hook}</span>
-                    </span>
-                    <span className="prompt-template-line">
-                      Kết: <span lang="en">{t.ending}</span>
-                    </span>
-                  </>
-                )}
+                {/* What the template opens and ends on, one cut line each, on both pages: the name alone does not say what fills ① and ③. */}
+                <span className="prompt-template-line">
+                  Hook: <span lang="en">{t.hook}</span>
+                </span>
+                <span className="prompt-template-line">
+                  Kết: <span lang="en">{t.ending}</span>
+                </span>
               </button>
               {canEdit && <TemplateClip id={t.id} has={clip.video !== null} />}
             </div>

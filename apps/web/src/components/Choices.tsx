@@ -102,23 +102,31 @@ export const LIST_OF = { hook: 'hooks', location: 'locations', ending: 'endings'
 
 /**
  * A prompt section's library box (PromptSections.tsx): a pick, or a new hook or ending saved in the dialog, fills the section's words with its phrase,
- * which stay the member's to edit; the box names the choice while the words are its phrase, and its X empties them.
+ * which stay the member's to edit; the box names the choice while the words are its phrase (or start with it, marked edited), and its X empties them.
  */
 export function PhraseChoice({ kind, label, title, sub, choices, stores, storeId, text, onText }: { kind: 'hook' | 'ending'; label: string; title: string; sub: string; choices: ReturnType<typeof useChoiceLists>; stores: Store[]; storeId: string; text: string; onText: (text: string) => void }) {
   const [open, setOpen] = useState(false);
   const list = choices.lists?.[LIST_OF[kind]] ?? builtInChoices(kind);
-  const picked = list.filter((c) => c.phrase === text.trim());
-  const take = (phrase: string) => (onText(phrase), setOpen(false));
+  const words = text.trim();
+  const exact = list.filter((c) => c.phrase === words);
+  // Words that start with a phrase are that pick, edited: the box keeps its name, marked as edited.
+  const picked = exact.length > 0 ? exact : list.filter((c) => words.startsWith(c.phrase));
+  async function take(phrase: string) {
+    setOpen(false);
+    // Words the member wrote or edited are theirs: replacing them asks first, as the templates and recent words do (PromptSections).
+    if (words && words !== phrase && !list.some((c) => c.phrase === words) && !(await confirmDialog({ title: `Thay ${KIND_NAME[kind]} đang viết bằng câu này?`, confirmLabel: 'Thay' }))) return;
+    onText(phrase);
+  }
   function added(c: Choice) {
     choices.setLists((cur) => cur && { ...cur, [LIST_OF[kind]]: [c, ...cur[LIST_OF[kind]]] });
     if (!choices.lists) void choices.reload(); // the lists failed to load at first: fetch them, so the new one is listed
-    take(c.phrase);
+    void take(c.phrase);
   }
   return (
     <>
-      <ChoiceBox label={label} icon={kind === 'hook' ? 'film' : 'check'} value={picked[0]?.name} onOpen={() => setOpen(true)} onClear={() => onText('')} />
+      <ChoiceBox label={label} icon={kind === 'hook' ? 'film' : 'check'} value={picked[0] && (exact.length > 0 ? picked[0].name : `${picked[0].name} (đã sửa)`)} onOpen={() => setOpen(true)} onClear={() => onText('')} />
       <ChoiceDialog open={open} title={title} sub={sub} kind={kind} choices={list} often={choices.lists?.often[kind] ?? []} posters={choices.lists?.posters[kind] ?? {}} canShare={choices.lists?.canShare ?? false} stores={stores} storeId={storeId}
-        selected={picked.map((c) => c.id)} onPick={(id) => take(list.find((c) => c.id === id)?.phrase ?? '')} onAdded={added} onEdited={() => void choices.reload()} onDelete={(c) => void choices.remove(c)} onClose={() => setOpen(false)} />
+        selected={picked.map((c) => c.id)} onPick={(id) => void take(list.find((c) => c.id === id)?.phrase ?? '')} onAdded={added} onEdited={() => void choices.reload()} onDelete={(c) => void choices.remove(c)} onClose={() => setOpen(false)} />
     </>
   );
 }
@@ -300,7 +308,7 @@ function AddChoice({ kind, canShare, store, niche: initialNiche, edit, onAdded, 
  * the focus between the cards, Enter or Space picks, Escape closes. Below: the footer (the variants row), the add form, and the member's own (for a
  * template editor also the shared ones) with edit and delete buttons, as PATCH and DELETE /api/choices/:id allow; `onEdited` follows a saved edit.
  */
-export function ChoiceDialog({ open, title, sub, kind, choices, often, posters, canShare, stores, storeId, selected, onPick, onAdded, onEdited, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: ChoiceKind; choices: Choice[]; often: string[]; posters: Record<string, string>; canShare: boolean; stores: Store[]; storeId: string; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onEdited: () => void; onDelete: (c: Choice) => void; onClose: () => void; footer?: ReactNode }) {
+export function ChoiceDialog({ open, title, sub, kind, choices, often, posters, canShare, stores, storeId, selected, multi, onPick, onAdded, onEdited, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: ChoiceKind; choices: Choice[]; often: string[]; posters: Record<string, string>; canShare: boolean; stores: Store[]; storeId: string; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onEdited: () => void; onDelete: (c: Choice) => void; onClose: () => void; /** Several cards can be chosen (Marketing's hook variants). */ multi?: boolean; footer?: ReactNode }) {
   const grid = useRef<HTMLDivElement>(null);
   const addCard = useRef<HTMLButtonElement>(null);
   const formHead = useId();
@@ -403,7 +411,7 @@ export function ChoiceDialog({ open, title, sub, kind, choices, often, posters, 
       </div>
       {/* The listbox lays its cards out in the grid around it (display: contents), so the add card can close the grid without being an option. */}
       <div ref={grid} className="choice-grid">
-        <div className="choice-options" role="listbox" aria-label={title} onKeyDown={onKey}>
+        <div className="choice-options" role="listbox" aria-label={title} aria-multiselectable={multi || undefined} onKeyDown={onKey}>
           {/* As on Fash, no "none" card: the X on the chosen box clears it. */}
           {top.length > 0 && group('often', 'Hay dùng', top)}
           {groups.map((g) => group(g.key, g.title, g.list))}

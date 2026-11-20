@@ -16,7 +16,7 @@ test('the Marketing Studio guided wizard walks format → photos → content →
   await expect(steps(page)).toHaveCount(0);
 
   // Turn the guided wizard on: the four steps appear and only the first, the format step, is on show.
-  await page.getByRole('button', { name: 'Chuyển sang chế độ hướng dẫn' }).click();
+  await page.getByRole('button', { name: 'Làm từng bước' }).click();
   await expect(steps(page)).toBeVisible();
   await expect(steps(page).getByRole('listitem')).toHaveCount(4);
   await expect(page.locator('.app-head strong')).toBeVisible(); // the format banner
@@ -40,9 +40,17 @@ test('the Marketing Studio guided wizard walks format → photos → content →
   // Step 4 settings: the Run button is back and there is no Next past the last step.
   await expect(runButton(page)).toBeVisible();
   await expect(nextButton(page)).toHaveCount(0);
+  // A passed step in the list goes back to it; the steps ahead are plain text.
+  await expect(steps(page).getByRole('button')).toHaveCount(3);
+  await steps(page).getByRole('button', { name: 'Ảnh' }).click();
+  await expect(page.locator('.marketing-slots')).toBeVisible();
+  await expect(steps(page).getByRole('button')).toHaveCount(1);
+  await nextButton(page).click();
+  await nextButton(page).click();
+  await expect(runButton(page)).toBeVisible();
 
   // Switching to the full mode shows every part of the form at once, with no step list.
-  await page.getByRole('button', { name: 'Chuyển sang chế độ đầy đủ' }).click();
+  await page.getByRole('button', { name: 'Hiện cả form' }).click();
   await expect(steps(page)).toHaveCount(0);
   await expect(page.locator('.app-head strong')).toBeVisible();
   await expect(page.locator('.marketing-slots')).toBeVisible();

@@ -4,7 +4,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { MAX_HIGHLIGHT, MAX_HIGHLIGHTS } from '@/lib/marketing';
 import { Icon } from './Icon';
 
-export function Highlights({ lines, onChange }: { lines: string[]; onChange: (lines: string[]) => void }) {
+/** `use` says what the clip does with the points; it follows the script and the sound (lib/marketing.ts reviewPrompt). */
+export function Highlights({ lines, onChange, use = 'Người mẫu sẽ nói về các ý này.' }: { lines: string[]; onChange: (lines: string[]) => void; use?: string }) {
   const labelId = useId();
   const helpId = useId();
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -38,7 +39,7 @@ export function Highlights({ lines, onChange }: { lines: string[]; onChange: (li
         </button>
       )}
       <p id={helpId} className="help">
-        Cần ít nhất 1 ý, tối đa {MAX_HIGHLIGHTS} ý, mỗi ý ngắn gọn (tối đa {MAX_HIGHLIGHT} ký tự). Người mẫu sẽ nói về các ý này.
+        Cần ít nhất 1 ý, tối đa {MAX_HIGHLIGHTS} ý, mỗi ý ngắn gọn (tối đa {MAX_HIGHLIGHT} ký tự). {use}
       </p>
     </div>
   );

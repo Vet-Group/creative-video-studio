@@ -277,10 +277,11 @@ describe('reviewPrompt', () => {
     expect(reviewPrompt({ highlights: [''], ratio: '9:16', audio: true })).toBe(`${head}${tail} The creator speaks to the camera in a casual, honest tone, recorded on the phone, with no background music.`);
   });
 
-  it('speaks about the points when sound is on, says the script exactly when there is one, and is silent when off', () => {
+  it('speaks about the points when sound is on, says the script exactly when there is one and then shows the points, and is silent when off', () => {
     const base = reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16' });
     expect(reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16', audio: true })).toBe(`${base} The creator speaks to the camera in a casual, honest tone about these points, recorded on the phone, with no background music.`);
-    expect(reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16', audio: true, script: '  Mình   rất thích.  ' })).toBe(`${base} The creator says exactly: "Mình rất thích.", lip-synced, and no other spoken words.`);
+    // A script is all the creator says, so the points are shown, not talked about (the prompt never asks for both).
+    expect(reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16', audio: true, script: '  Mình   rất thích.  ' })).toBe(`${base.replace('talks to the camera about', 'shows each of these points')} The creator says exactly: "Mình rất thích.", lip-synced, and no other spoken words.`);
     // With sound off nobody speaks, so the points are shown instead of talked about.
     expect(reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16', audio: false, script: 'ignored' })).toBe(`${base.replace('talks to the camera about', 'shows each of these points')} The video is completely silent: no speech, no music and no sound.`);
   });

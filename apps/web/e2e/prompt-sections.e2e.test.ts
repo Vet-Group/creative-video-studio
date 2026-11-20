@@ -59,6 +59,8 @@ test('Create: the sections show by default, Khung prompt fills all three, the pr
   // The library fills ③ with a built-in ending's phrase and names it.
   await page.getByRole('button', { name: /^Cảnh kết có sẵn/ }).click();
   await page.getByRole('dialog', { name: 'Chọn cảnh kết' }).getByRole('option', { name: ENDINGS[2]!.name, exact: true }).click();
+  // The words in ③ came from a suggestion, not the library: the pick asks before it replaces them.
+  await page.getByRole('dialog', { name: /^Thay .+ bằng câu này\?$/ }).getByRole('button', { name: 'Thay', exact: true }).click();
   await expect(endingBox(page)).toHaveValue(ENDINGS[2]!.phrase);
   await expect(page.getByRole('button', { name: /^Cảnh kết có sẵn/ })).toContainText(ENDINGS[2]!.name);
 
@@ -127,12 +129,33 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   const location = part(page, '② Diễn biến').getByRole('button', { name: /^Bối cảnh/ });
   await expect(location).toBeVisible();
   expect((await location.boundingBox())!.y).toBeLessThan((await page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' }).boundingBox())!.y);
-  await part(page, '① Hook · 0–2 giây đầu').getByRole('button', { name: /^Hook/ }).click();
+  // One of the two shows (owner, 2026-11-20): Có sẵn opens the library, and a chosen hook folds the own box into a card that names it.
+  const hookPart = part(page, '① Hook · 0–2 giây đầu');
+  const source = hookPart.getByRole('radiogroup', { name: 'Nguồn hook' });
+  await expect(source.getByRole('radio', { name: 'Tự viết' })).toBeChecked();
+  await source.getByText('Có sẵn').click();
   await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: HOOKS[0]!.name, exact: true }).click();
-  await expect(part(page, '① Hook · 0–2 giây đầu')).toContainText('Đang dùng hook đã chọn; chữ tự viết chỉ dùng khi bỏ chọn hook đó.');
+  const inUse = hookPart.getByRole('group', { name: 'Hook đang dùng' });
+  await expect(inUse).toContainText(`Đang dùng: ${HOOKS[0]!.name}`);
+  await expect(inUse).toContainText('Chữ bạn tự viết vẫn được giữ, chỉ gửi khi chọn Tự viết.');
+  await expect(hookBox(page)).toHaveCount(0);
+  await expect(source.getByRole('radio', { name: 'Có sẵn' })).toBeChecked();
   await expect(preview(page)).toContainText(HOOKS[0]!.phrase);
   await expect(preview(page)).not.toContainText(t.hook);
+  // Tự viết thay drops the hook and gives the box back with its words, focused.
+  await inUse.getByRole('button', { name: 'Tự viết thay' }).click();
+  await expect(hookBox(page)).toBeFocused();
+  await expect(hookBox(page)).toHaveValue(t.hook);
+  await expect(inUse).toHaveCount(0);
+  await expect(preview(page)).toContainText(t.hook);
+  // Đổi hook opens the library again, and the box's clear button still lets a hook go.
+  await hookPart.getByRole('button', { name: /^Hook/ }).click();
+  await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: HOOKS[1]!.name, exact: true }).click();
+  await inUse.getByRole('button', { name: 'Đổi hook' }).click();
+  await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: HOOKS[0]!.name, exact: true }).click();
+  await expect(inUse).toContainText(`Đang dùng: ${HOOKS[0]!.name}`);
   await page.getByRole('button', { name: 'Bỏ Hook' }).click();
+  await expect(hookBox(page)).toHaveValue(t.hook);
   await expect(preview(page)).toContainText(t.hook);
 
   const shown = await preview(page).innerText();
@@ -192,13 +215,11 @@ test('at 390 px the templates open as a sheet over the Run bar with the last one
     await expect(sheet).toHaveClass(/template-sheet/);
     await expect(sheet.getByText('Điền sẵn Hook · Diễn biến · Kết để bạn sửa tiếp.')).toBeVisible();
     const last = sheet.getByRole('button', { name: new RegExp(`^${t.name}`) });
-    // Each template: its Vietnamese line; on Create also what it opens and ends on, one muted line each. Marketing Studio's taller sheet keeps the one line.
+    // Each template: its Vietnamese line, then what it opens and ends on, one muted line each, on both pages.
     for (const x of list) await expect(sheet.getByRole('button', { name: new RegExp(`^${x.name}`) })).toContainText(x.desc);
-    if (path === '/create') {
-      await expect(last).toContainText(`Hook: ${t.hook}`);
-      await expect(last).toContainText(`Kết: ${t.ending}`);
-      for (const line of await sheet.locator('.prompt-template-line').all()) expect((await line.boundingBox())!.height).toBe(18);
-    } else await expect(sheet.locator('.prompt-template-line')).toHaveCount(0);
+    await expect(last).toContainText(`Hook: ${t.hook}`);
+    await expect(last).toContainText(`Kết: ${t.ending}`);
+    for (const line of await sheet.locator('.prompt-template-line').all()) expect((await line.boundingBox())!.height).toBe(18);
     // Ten templates outgrow a phone, so the sheet scrolls; scrolled to, the last is whole on the screen and on top: nothing (the sticky Run bar) covers its middle.
     await last.scrollIntoViewIfNeeded();
     await expect(last).toBeInViewport({ ratio: 1 });
