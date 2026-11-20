@@ -88,13 +88,14 @@ export interface Pinnable<R, J extends { providerJobId: string }, S> {
   submit(req: R): Promise<{ providerJobId: string }>;
   status(job: J): Promise<S>;
   cancel(job: J): Promise<{ supported: boolean }>;
+  release?(job: J): Promise<void>;
 }
 
 const PIN = /^acct:([^|]+)\|/;
 
 /**
- * One provider over the accounts' providers (in account order): submit goes to `active()` and prefixes the id with `acct:<project>|`; status and
- * cancel go to the account the prefix names. An id without the prefix was sent before accounts existed and belongs to account 1. With no active
+ * One provider over the accounts' providers (in account order): submit goes to `active()` and prefixes the id with `acct:<project>|`; status,
+ * cancel and release go to the account the prefix names. An id without the prefix was sent before accounts existed and belongs to account 1. With no active
  * account a submit fails before any call to Google (ImageReadError, so the worker releases the estimate).
  */
 export function pinToAccounts<R, J extends { providerJobId: string }, S>(byProject: [project: string, provider: Pinnable<R, J, S>][], active: () => Promise<string | null>): Pinnable<R, J, S> {
@@ -120,6 +121,10 @@ export function pinToAccounts<R, J extends { providerJobId: string }, S>(byProje
     async cancel(job) {
       const [provider, inner] = route(job);
       return provider.cancel(inner);
+    },
+    async release(job) {
+      const [provider, inner] = route(job);
+      await provider.release?.(inner);
     },
   };
 }

@@ -85,9 +85,10 @@ describe('pinToAccounts', () => {
     submit: vi.fn(async () => ({ providerJobId: `${name}-job` })),
     status: vi.fn(async (job: { providerJobId: string }) => ({ state: 'running' as const, seen: `${name}:${job.providerJobId}` })),
     cancel: vi.fn(async () => ({ supported: false })),
+    release: vi.fn(async () => undefined),
   });
 
-  test('sends a new job to the active account and routes status and cancel by the id prefix; an id without one is account 1', async () => {
+  test('sends a new job to the active account and routes status, cancel and release by the id prefix; an id without one is account 1', async () => {
     const one = fake('one');
     const two = fake('two');
     let active: string | null = 'next-project';
@@ -99,6 +100,8 @@ describe('pinToAccounts', () => {
     expect(await p.status({ providerJobId: 'vertex-veo-v1:legacy' })).toMatchObject({ seen: 'one:vertex-veo-v1:legacy' });
     await p.cancel({ providerJobId: 'acct:next-project|two-job' });
     expect(two.cancel).toHaveBeenCalledWith({ providerJobId: 'two-job' });
+    await p.release!({ providerJobId: 'acct:next-project|two-job' });
+    expect([one.release.mock.calls, two.release.mock.calls]).toEqual([[], [[{ providerJobId: 'two-job' }]]]);
     active = 'cvs-vertex';
     expect(await p.submit('req')).toEqual({ providerJobId: 'acct:cvs-vertex|one-job' });
     await expect(p.status({ providerJobId: 'acct:gone-project|x' })).rejects.toThrow('no longer configured');

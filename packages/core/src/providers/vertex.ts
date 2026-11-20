@@ -121,8 +121,8 @@ function callFor(req: ImageSubmitRequest, images: Inline[], project: string, reg
 }
 
 /**
- * The Vertex calls are synchronous: submit makes the call and keeps the outcome until status reads it, as a data URL the worker downloads like any
- * other output. With `store` the outcome is also written there (MinIO in the worker), so a worker restart between submit and status, up to one
+ * The Vertex calls are synchronous: submit makes the call and keeps the outcome until the worker releases the job, as a data URL the worker downloads
+ * like any other output. With `store` the outcome is also written there (MinIO in the worker), so a worker restart between submit and status, up to one
  * reconcile tick, no longer loses an image Google billed. shortcut: a restart during the call itself still loses it (status reports a failure at
  * the estimate); a Cloud Storage output (storageUri) would cover that too.
  */
@@ -182,9 +182,12 @@ export function createVertexImageProvider(opts: {
       const id = job.providerJobId;
       const kept = outcomes.get(id) ?? (await opts.store?.get(keyOf(id)).then((b) => JSON.parse(new TextDecoder().decode(b)) as ProviderStatus, () => undefined));
       if (!kept) return { state: 'failed', error: 'the vertex result was lost when the worker restarted', ...imageEstimate(job) };
-      outcomes.delete(id);
-      await opts.store?.delete(keyOf(id)).catch(() => undefined);
       return kept;
+    },
+    // Not in status: a delivery that fails after a read (MinIO down for a moment, say) must find the billed image again on the next pass.
+    async release(job) {
+      outcomes.delete(job.providerJobId);
+      await opts.store?.delete(keyOf(job.providerJobId)); // a failure reaches the worker's log: nothing else removes the file
     },
     async cancel() {
       return { supported: false };

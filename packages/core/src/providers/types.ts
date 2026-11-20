@@ -71,4 +71,6 @@ export interface ImageProvider {
   submit(req: ImageSubmitRequest): Promise<{ providerJobId: string }>;
   status(job: ImageProviderJob): Promise<ProviderStatus>;
   cancel(job: ImageProviderJob): Promise<{ supported: boolean }>;
+  /** The worker has closed the job (delivered, settled or billed late): a provider that keeps the result itself (Vertex) may now forget it. Until then status answers the same. */
+  release?(job: ImageProviderJob): Promise<void>;
 }
