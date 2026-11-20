@@ -223,7 +223,7 @@ export async function readableAsset(session: Session, workspaceId: string, id: s
   if (!asset) return { error: Response.json({ error: 'not found' }, { status: 404 }) };
   if (asset.ownerId !== session.user.id && session.user.role !== 'admin') {
     const inLibrary = await pool.query(
-      `select 1 from jobs j where j.workspace_id = $3 and ${LIVE_CLIP} and ($1 in (j.output_asset_id, j.poster_asset_id) or $1 = any(j.input_asset_ids))
+      `select 1 from jobs j where j.workspace_id = $3 and ${LIVE_CLIP} and ($1 in (j.output_asset_id, j.poster_asset_id) or j.input_asset_ids @> array[$1::text])
        union all select 1 from user_choices c where c.workspace_id = $3 and c.image_asset_id = $1 and (c.is_company or c.store_id is not null)
        union all select 1 from fashion_models f where f.workspace_id = $3 and f.asset_id = $1 and f.shared and f.deleted_at is null
        union all select 1 from analyses an where an.workspace_id = $3 and an.source_key = $2 and an.shared_at is not null limit 1`,
