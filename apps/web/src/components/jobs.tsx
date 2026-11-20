@@ -485,7 +485,12 @@ export function JobsProvider({ userId, page, children }: { userId: string; page?
   const active = data.jobs.filter((j) => !FINISHED.includes(j.status)).length;
   useEffect(() => {
     const base = page ? `${page} · ${BASE_TITLE}` : BASE_TITLE;
-    document.title = news ? `Đã xong · ${base}` : active > 0 ? `Đang tạo (${active}) · ${base}` : base;
+    const want = news ? `Đã xong · ${base}` : active > 0 ? `Đang tạo (${active}) · ${base}` : base;
+    document.title = want;
+    // The layout's metadata title can land after this (Next streams it in after the page): put the page's name back when it does.
+    const watch = new MutationObserver(() => document.title === BASE_TITLE && want !== BASE_TITLE && (document.title = want));
+    watch.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => watch.disconnect();
   }, [news, active, pathname, page]);
 
   const dismiss = useCallback((id: number) => {

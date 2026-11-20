@@ -95,7 +95,8 @@ export function BrandPicker({ storeId, onStore, on, onToggle, onKit, onFailed }:
   }, []);
   const store = stores.find((s) => s.id === storeId);
   const usable = store !== undefined && hasBrand(store);
-  const why = usable ? null : store ? 'Cửa hàng này chưa có bộ nhận diện' : 'Chọn cửa hàng để dùng bộ nhận diện';
+  // Why the kit switch is off; nothing while a chosen store is still loading.
+  const why = usable ? null : store ? 'Cửa hàng này chưa có bộ nhận diện' : storeId ? null : 'Chọn cửa hàng để dùng bộ nhận diện';
   const whyId = useId();
   useEffect(() => onKit?.(on && usable ? store : null), [on, usable, store]);
   async function togglePin(id: string) {
