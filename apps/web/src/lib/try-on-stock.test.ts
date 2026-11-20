@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PORTRAITS, portraitGender, portraitName, portraitsIn, POSES, poseOf } from './try-on-stock';
+import { garmentCap, MOST_GARMENTS, PORTRAITS, portraitGender, portraitName, portraitsIn, POSES, poseOf } from './try-on-stock';
 
 describe('the Try On model catalog', () => {
   const have = new Set(PORTRAITS.map(portraitName));
@@ -22,5 +22,14 @@ describe('the Try On model catalog', () => {
     expect(poseOf('kneel')?.label).toBe('Quỳ một gối');
     expect(poseOf('cartwheel')).toBeUndefined();
     expect(poseOf(null)).toBeUndefined();
+  });
+});
+
+describe('the Try On garment cap', () => {
+  it("takes 13 garments on Nano Banana 2.1 and its Vertex twin, as Fash's About page says, and 5 on every other model or none", () => {
+    expect(MOST_GARMENTS).toBe(13);
+    expect(garmentCap('nano-banana-2.1')).toBe(13);
+    expect(garmentCap('nano-banana-2.1-vertex')).toBe(13);
+    for (const id of ['nano-banana-pro', 'nano-banana-pro-vertex', 'nano-banana-2', 'nano-banana', 'fashn-v1.6', 'nano-banana-2.1-turbo', '', undefined]) expect(garmentCap(id), String(id)).toBe(5);
   });
 });

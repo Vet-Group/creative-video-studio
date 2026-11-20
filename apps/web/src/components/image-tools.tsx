@@ -125,16 +125,19 @@ export function refillNote(asked: { ratio?: string | null; resolution?: string |
  * The model, ratio, resolution and thinking level of a Run. The chosen model stays while it is listed (until one is chosen, the recommended model that takes the inputs);
  * a ratio or resolution the model lacks falls back to its nearest, a thinking level to its first (a model with no levels has none),
  * so the options always match the model. `images` is how many inputs the Run has: a model that takes fewer is shown as not supported.
+ * `takes` adds a page's own limit (Try On's garment cap) to the automatic choice only: with no model that fits both, one that `takes` the inputs comes
+ * before the first; a model it refuses can still be picked, and the page says why it cannot run.
  * `refill` sets what a sample or job asks for, and `note` says what the model could not take until the member picks a setting.
  */
-export function useImageChoice(models: ImageModel[] | null, images: number, initialModel = '') {
+export function useImageChoice(models: ImageModel[] | null, images: number, initialModel = '', takes: (m: ImageModel) => boolean = () => true) {
   const [modelId, pickModel] = useState(initialModel);
   const [wantRatio, pickRatio] = useState('auto');
   const [wantResolution, pickResolution] = useState('1K');
   const [wantThinking, setThinking] = useState('');
   const [asked, setAsked] = useState<{ ratio: string | null; resolution: string | null; modelId: string | null; modelLabel: string | null; lost: number; extra?: Skipped['extra']; store: boolean; kept: number } | null>(null);
   const fits = (m: ImageModel) => m.maxImages >= images;
-  const chosen = models?.find((m) => m.id === modelId) ?? models?.find((m) => m.recommended && fits(m)) ?? models?.find(fits) ?? models?.[0];
+  const both = (m: ImageModel) => fits(m) && takes(m);
+  const chosen = models?.find((m) => m.id === modelId) ?? models?.find((m) => m.recommended && both(m)) ?? models?.find(both) ?? models?.find(takes) ?? models?.[0];
   const ratio = chosen ? nearestOption(chosen.ratios, wantRatio) : wantRatio;
   const resolution = chosen ? nearestOption(chosen.resolutions, wantResolution) : wantResolution;
   const thinking = chosen?.thinking.includes(wantThinking) ? wantThinking : chosen?.thinking[0];
@@ -363,13 +366,15 @@ export function pastedImages(target: { closest?: (sel: string) => unknown } | nu
  * `onPick` adds the "Ảnh đã tải" link to the label's line while the slot has room (a one-photo slot always: a pick replaces its photo); `storeId` is the page's store, its first filter.
  * `slot` is the picker's first category, for a slot whose label names another page's category (Image Generation's reference photos); by default the label's.
  * `addRef` is the add button, for a page that moves focus to it.
+ * `count` shows how many photos the slot holds of its `max` ("3/13") beside its name; more than `max` (a model with a lower cap chosen since) reads as an error.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra, count }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [cut, setCut] = useState(0); // how many files a drop or a pick kept when it had more than the slot has room for
   const labelId = useId();
+  const countId = useId();
   const full = images.length >= max;
   const offer = images.length === 0 ? samples : [];
   const box = useRef<HTMLDivElement>(null);
@@ -411,6 +416,17 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       {optional && <span className="sr-only"> (tuỳ chọn)</span>}
     </span>
   );
+  // "3/13" on screen; a screen reader hears "3 trên 13 ảnh trang phục", as a bare fraction reads badly.
+  const counter = count && images.length > 0 && (
+    <span className="slot-count" data-over={images.length > max || undefined}>
+      <span aria-hidden="true">
+        {images.length}/{max}
+      </span>
+      <span id={countId} className="sr-only">
+        {`${images.length} trên ${max} ${inputLabel.toLowerCase()}`}
+      </span>
+    </span>
+  );
   // An optional slot shows the optional pill beside its name, as the prompt boxes do.
   const name = optional ? (
     <span className="optional-head">
@@ -424,15 +440,16 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
   );
   return (
     <div className="field">
-      {onPick ? (
+      {onPick || counter ? (
         <div className="field-head">
           {name}
-          {(!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} slot={slot ?? slotOfLabel(label)} onPick={(img) => (setCut(0), onPick(img))} />}
+          {counter}
+          {onPick && (!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} slot={slot ?? slotOfLabel(label)} onPick={(img) => (setCut(0), onPick(img))} />}
         </div>
       ) : (
         name
       )}
-      <div ref={box} className="slot" role="group" aria-labelledby={labelId} data-room={room || undefined} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={onDragOver} onDragLeave={() => setOver(false)} onDrop={onDrop}>
+      <div ref={box} className="slot" role="group" aria-labelledby={labelId} aria-describedby={counter ? countId : undefined} data-room={room || undefined} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={onDragOver} onDragLeave={() => setOver(false)} onDrop={onDrop}>
         <input
           ref={input}
           type="file"
@@ -611,17 +628,21 @@ export function SizeSlider({ size, last = 2, onChange }: { size: number; last?: 
 /** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time.
  * `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser.
  * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
-type PhotoTile = { key: string; src: string; label: string; pick: () => void };
+/** A tile of a photo dialog: its photo, or with no `src` a tile of words: with a `note` line the pose step's "Không chọn tư thế", without one a pose that
+ * has no picture yet, by its name; `caption` is a name shown over the photo's foot, as Fash's model and pose names; `pressed` marks the current choice. */
+type PhotoTile = { key: string; src?: string; label: string; caption?: string; note?: string; pressed?: boolean; pick: () => void };
 
 /** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits, after an upload tile that also takes a dropped photo (with `onFile`) and an optional `create` tile (Try On's own model). A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. `filter` shows above the photos. */
 export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [], filter, create }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile?: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[]; filter?: ReactNode; create?: { label: string; onClick: () => void } }) {
   const tile = (t: PhotoTile) => (
-    <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
-      {open && <img src={t.src} alt="" />}
+    <button key={t.key} type="button" className={t.src ? undefined : t.note ? 'photo-none' : 'photo-name'} aria-label={t.label} aria-describedby={t.note ? `${ids.note}-${t.key}` : undefined} aria-pressed={t.pressed} disabled={busy} onClick={() => (onClose(), t.pick())}>
+      {t.src ? open && <img src={t.src} alt="" /> : <strong>{t.label}</strong>}
+      {t.note && <span id={`${ids.note}-${t.key}`}>{t.note}</span>}
+      {t.src && t.caption && <span className="photo-caption">{t.caption}</span>}
     </button>
   );
   const [over, setOver] = useState(false);
-  const ids = { head: useId(), upload: useId(), hint: useId() };
+  const ids = { head: useId(), upload: useId(), hint: useId(), note: useId() };
   // A drop can carry any file and still lands while busy, so it is checked here; the picker already filters on accept.
   const take = (photo: File | undefined) => {
     if (photo && !busy) (onClose(), onFile?.([photo]));
@@ -681,7 +702,7 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
 
 /** The tiles of the "Người mẫu AI" group of a photo dialog: each saved model's picture (an input asset), picked as an uploaded photo is. */
 export const fashionTiles = (models: FashionModelItem[], onPick: (img: Img) => void): PhotoTile[] =>
-  models.map((m) => ({ key: m.id, src: thumbUrl(m.assetId), label: `Dùng người mẫu AI ${m.name}`, pick: () => onPick({ id: m.assetId, filename: m.name }) }));
+  models.map((m) => ({ key: m.id, src: thumbUrl(m.assetId), label: `Dùng người mẫu AI ${m.name}`, caption: m.name, pick: () => onPick({ id: m.assetId, filename: m.name }) }));
 
 /**
  * "Ảnh đã tải": a button that opens the member's own photos uploaded on any page (GET /api/assets?recent=uploads, newest first), shared by Create, Try On,

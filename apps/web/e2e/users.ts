@@ -65,6 +65,7 @@ export const USERS = {
   costb: { email: 'costb@e2e.test', name: 'E2E Costs B', role: 'member' },
   tryposea: { email: 'tryposea@e2e.test', name: 'E2E Try On Poses', role: 'member' }, // image-pages.e2e: the model catalog and the pose step
   pickera: { email: 'pickera@e2e.test', name: 'E2E Try On Pickers', role: 'member' }, // its own Try On job gives it My models, which would hide another user's slot samples
+  garmentcap: { email: 'garmentcap@e2e.test', name: 'E2E Try On Garment Cap', role: 'member' }, // image-pages.e2e: Nano Banana 2.1's 13 garments and the slot's count
   // memory.e2e: remembered settings (rema runs, remb never does, remc runs on a model that is then switched off).
   rema: { email: 'rema@e2e.test', name: 'E2E Remember A', role: 'member' },
   remb: { email: 'remb@e2e.test', name: 'E2E Remember B', role: 'member' },

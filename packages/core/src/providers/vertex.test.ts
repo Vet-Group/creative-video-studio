@@ -2,7 +2,7 @@
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import type { ImageModelConfig } from '../models';
-import { ImageReadError } from './http';
+import { ImageReadError, MAX_INLINE_CHARS } from './http';
 import type { ImageSubmitRequest } from './types';
 import { createVertexImageProvider, serviceAccountToken } from './vertex';
 
@@ -135,6 +135,17 @@ describe('vertex failures and inputs', () => {
     const p = createVertexImageProvider({ key: KEY, project: 'proj', fetch: fn, token: async () => 'tok', readImage: async () => ({ bytes: new Uint8Array([1, 2, 3]), contentType: 'image/webp' }) });
     await p.submit(req(PRO, { imageUrls: ['asset://a1'] }));
     expect(JSON.parse(calls[0]!.body).contents[0].parts[0]).toEqual({ inlineData: { mimeType: 'image/webp', data: 'AQID' } });
+  });
+
+  test("Try On's 14 photos of about 400 KB each are inlined whole on Nano Banana 2.1: Vertex takes far more than the inline limit a Replicate reset set", async () => {
+    const { fn, calls } = fakeFetch([200, geminiAnswer]);
+    const p = createVertexImageProvider({ key: KEY, project: 'proj', fetch: fn, token: async () => 'tok', readImage: async () => ({ bytes: new Uint8Array(400_000), contentType: 'image/jpeg' }) });
+    const nb21 = model('nano-banana-2.1-vertex', 'gemini-nano-banana-2.1', { '1K': '0.034' });
+    const { providerJobId } = await p.submit(req(nb21, { imageUrls: Array.from({ length: 14 }, (_, i) => `asset://p${i}`) }));
+    const parts = JSON.parse(calls[0]!.body).contents[0].parts as { inlineData?: { data: string } }[];
+    expect(parts.filter((x) => x.inlineData)).toHaveLength(14);
+    expect(parts.reduce((n, x) => n + (x.inlineData?.data.length ?? 0), 0)).toBeGreaterThan(MAX_INLINE_CHARS); // more than the generic limit lets through
+    expect(await p.status({ providerJobId, model: nb21, resolution: '1K' })).toMatchObject({ state: 'succeeded' });
   });
 
   test('with a store, a provider started after a restart still hands back the billed image, once, and the stored copy is removed', async () => {
