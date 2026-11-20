@@ -47,7 +47,7 @@ const REST_NOTE: Record<string, string> = {
 };
 
 /** A batch app's items to pick (the pet portrait's styles, the mockup pack's products) as a row of checkbox chips, as the views and breeds are; `children` add the help and the price under them. */
-function ItemChecks({ label, items, picked, onChange, children }: { label: string; items: { id: string; label: string }[]; picked: string[]; onChange: (ids: string[]) => void; children: ReactNode }) {
+function ItemChecks({ label, items, picked, onChange, single, children }: { label: string; items: { id: string; label: string }[]; picked: string[]; onChange: (ids: string[]) => void; single?: boolean; children: ReactNode }) {
   const id = useId();
   return (
     <div className="field">
@@ -57,7 +57,7 @@ function ItemChecks({ label, items, picked, onChange, children }: { label: strin
       <div className="segmented theme-choice angle-choice" role="group" aria-labelledby={id}>
         {items.map((it) => (
           <label key={it.id}>
-            <input type="checkbox" checked={picked.includes(it.id)} onChange={() => onChange(picked.includes(it.id) ? picked.filter((x) => x !== it.id) : [...picked, it.id])} />
+            <input type="checkbox" checked={picked.includes(it.id)} onChange={() => onChange(picked.includes(it.id) ? picked.filter((x) => x !== it.id) : single ? [it.id] : [...picked, it.id])} />
             {it.label}
           </label>
         ))}
@@ -238,11 +238,18 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   // The swaps add the member's text to their fixed instruction, so it shares the model's limit with it.
   const fixed = app.prompt === 'optional' ? FEATURE_PROMPTS[app.feature]!.length + 2 : 0;
   const room = chosen && chosen.maxPromptChars - fixed;
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
+  // Background Changer: a reference photo stands in for the description, whose box is off meanwhile; its words stay in the box's state but are not used.
+  const reference = app.prompt === 'background' && images[1]!.length > 0;
+  const used = reference ? '' : prompt;
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt: used, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked }) ?? promptTooLong(chosen, used.trim() ? used.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
   /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
-  const sent = basePrompt(app.feature, appInputs(app, { images, prompt }).prompt);
+  const sent = basePrompt(app.feature, appInputs(app, { images, prompt: used }).prompt);
   const blank = app.products === true && images[1]!.length > 0; // the mockup pack's own blank product photo
+  // The blank is one product: with several ticked, the first in the list stays and the rest are unticked (the notice by the chips says so).
+  useEffect(() => {
+    if (blank && products.length > 1) setProducts(MOCKUP_PRODUCTS.filter((p) => products.includes(p.id)).slice(0, 1).map((p) => p.id));
+  }, [blank, products]);
   const pickedBreeds = DOG_BREEDS.filter((b) => breeds.includes(b));
   // A batch app sends one job per item picked, in the order of its list (PRODUCT_VIEWS, DOG_BREEDS, PET_STYLES, MOCKUP_PRODUCTS), and the name swap app one per name, or per name and breed,
   // each with the prompt its item makes (itemPrompt) but the multi-angle app's; every other app one job with none.
@@ -334,10 +341,10 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
         const body = {
           feature: app.feature,
           modelId: pick.modelId,
-          ...appInputs(app, { images, prompt }),
+          ...appInputs(app, { images, prompt: used }),
           ...(own && { prompt: own }),
           ratio: pick.ratio,
-          params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }), ...one, ...(batch && { batch }) }, // the member's own text, kept for reuse
+          params: { resolution: pick.resolution, ...(app.prompt && used.trim() && { brief: used.trim() }), ...one, ...(batch && { batch }) }, // the member's own text, kept for reuse
         };
         // As on Create's angles, the first job stands for the batch: a batch the same as the last one asks before anything is sent.
         if (done > 0) await api('/api/jobs', sendJson('POST', body));
@@ -469,7 +476,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
             )}
 
             {app.products && (
-              <ItemChecks label="Sản phẩm cần tạo" items={MOCKUP_PRODUCTS} picked={products} onChange={setProducts}>
+              <ItemChecks label="Sản phẩm cần tạo" items={MOCKUP_PRODUCTS} picked={products} onChange={setProducts} single={blank}>
+                {blank && <p className="help" role="status">Có ảnh sản phẩm trơn nên chỉ chọn được một sản phẩm.</p>}
                 <p className="help">Mỗi sản phẩm tạo một ảnh mockup riêng và tính tiền riêng. Có ảnh sản phẩm trơn thì chỉ chọn một sản phẩm, đúng loại trong ảnh đó: AI in thiết kế lên chính sản phẩm ấy.</p>
                 {runCost}
               </ItemChecks>
@@ -545,7 +553,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                 <p id={namesHelpId} className="help">
                   Tối đa {MAX_BATCH} tên, mỗi tên tối đa {MAX_NAME} ký tự: chữ cái (có dấu), chữ số, khoảng trắng, dấu nháy đơn và gạch nối. Tên trùng chỉ tạo một lần.
                 </p>
-                <CsvNames disabled={busy} onNames={setNames} />
+                <CsvNames disabled={busy} names={names} onNames={setNames} />
               </div>
             )}
 
@@ -592,7 +600,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                 onChange={setPrompt}
                 maxLength={room}
                 onRun={() => canRun && void run()}
-                placeholder={app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'}
+                disabled={reference}
+                placeholder={reference ? 'Đang dùng ảnh tham chiếu' : app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'}
                 ask={chosen ? () => ({ field: 'prompt', feature: app.feature, text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
               />
             )}
