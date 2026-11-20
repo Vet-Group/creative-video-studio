@@ -9,7 +9,8 @@ import { promisify } from 'node:util';
 import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import type { Enhancer } from '@cvs/core/enhance';
 import { cancelQueued, reserve, withTransaction } from '@cvs/core/ledger';
-import { ImageReadError } from '@cvs/core/providers/http';
+import { dailyClips } from '@cvs/core/limits';
+import { ImageReadError, ProviderHttpError } from '@cvs/core/providers/http';
 import { createVertexImageProvider } from '@cvs/core/providers/vertex';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
@@ -413,6 +414,18 @@ describe('the mock lifecycle', () => {
     await waitFor('the job to time out', async () => (await status(id)) === 'timed_out');
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: false });
   });
+
+  test('closes a job timed out over 24 h ago whose provider status keeps failing, keeping its estimate', async () => {
+    const id = await newJob('u2');
+    await pool.query(
+      `update jobs set status = 'timed_out', error = 'timed out', provider_job_id = 'mock:0:ok:x', started_at = now() - interval '26 hours', finished_at = now() - interval '25 hours', claimed_by = 'gone' where id = $1`,
+      [id],
+    );
+    await start(counting(300, (inner) => ({ ...inner, status: async () => { throw new Error('the key for this job was removed'); } })));
+    await waitFor('the 24 h close', async () => (await total(id)).is_final);
+    expect((await costs(id)).map((c) => c.kind)).toEqual(['estimate', 'actual_adjustment']);
+    expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
+  });
 });
 
 describe('Enhance', () => {
@@ -774,6 +787,57 @@ describe('a submit that pg-boss expiry or an error would orphan', () => {
     expect([j.status, j.error]).toEqual(['succeeded', null]);
     expect(j.output_asset_id).not.toBeNull();
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
+  });
+
+  test('a submit the provider refuses with a 4xx fails, releases its estimate and leaves the daily clip count, where a 408 or 429 keeps both', async () => {
+    await pool.query(`insert into users (id, email, name) values ('u4', 'u4@example.test', 'u4')`);
+    // The prompt names the HTTP status the provider answers.
+    const refusing = counting(300, (inner) => ({
+      ...inner,
+      submit: async (req) => {
+        throw new ProviderHttpError(Number(req.prompt), '{"detail":"refused"}', `fal submit: HTTP ${req.prompt} {"detail":"refused"}`);
+      },
+    }));
+    const [refused, timedOut, throttled] = [await newJob('u4', { prompt: '422' }), await newJob('u4', { prompt: '408' }), await newJob('u4', { prompt: '429' })];
+    expect((await dailyClips(pool, 'u4')).today).toBe(3);
+    await start(refusing);
+    for (const id of [refused, timedOut, throttled]) await send(id, 'u4');
+    const ended = async (id: string) => !['queued', 'submitting', 'running'].includes(await status(id));
+    await waitFor('every submit to end', async () => (await ended(refused)) && (await ended(timedOut)) && (await ended(throttled)));
+    expect([await status(refused), await status(timedOut), await status(throttled)]).toEqual(['failed', 'failed_unknown', 'failed_unknown']);
+    expect((await job(refused)).error).toMatch(/HTTP 422/);
+    expect(await total(refused)).toEqual({ usd: '0.0000', is_final: true });
+    expect([(await total(timedOut)).is_final, (await total(throttled)).is_final]).toEqual([false, false]);
+    expect((await dailyClips(pool, 'u4')).today).toBe(2);
+  });
+
+  test('a database error while saving the provider job id is tried again, so the job runs with its id instead of ending failed_unknown', async () => {
+    counting.submits = 0;
+    const id = await newJob('u1');
+    let saves = 0;
+    // The first save of the id fails, as when Postgres restarts right then.
+    const flaky = new Proxy(pool, {
+      get(t, p) {
+        if (p === 'query') {
+          return async (sql: unknown, ...a: unknown[]) => {
+            if (typeof sql === 'string' && sql.includes('set provider_job_id') && saves++ === 0) throw new Error('Connection terminated unexpectedly');
+            return (t.query as (...x: unknown[]) => unknown)(sql, ...a);
+          };
+        }
+        const v = Reflect.get(t, p, t);
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+    });
+    let held = true;
+    const holding = counting(300, (inner) => ({ ...inner, status: async (j) => (held ? { state: 'running' } : inner.status(j)) }));
+    workers.push(await startWorker({ pool: flaky, connectionString: testDb.url, providers: { mock: holding }, options: FAST }));
+    await send(id, 'u1');
+    await waitFor('the id or the loss', async () => (await job(id)).provider_job_id || (await status(id)) === 'failed_unknown');
+    const j = await job(id);
+    expect([j.status, j.provider_job_id, saves]).toEqual(['running', expect.stringMatching(/^mock:/), 2]);
+    held = false;
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    expect(counting.submits).toBe(1);
   });
 });
 

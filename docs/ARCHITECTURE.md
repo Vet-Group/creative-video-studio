@@ -57,7 +57,7 @@ Layout [proposed]: a pnpm workspace with `apps/web`, `apps/worker` and `packages
 
    It then inserts `job(queued)` and the `estimate` ledger row (the reservation), and enqueues a pg-boss job with a `singletonKey` per job. pg-boss never retries (`retryLimit: 0`).
 2. The worker enforces the per-user limit of 2 running jobs and the global limit of 5. The real guard is a re-check of the `jobs` table in one short transaction, because rows survive restarts and pg-boss state does not. It runs these steps:
-   1. Move the job `queued` → `submitting`, then call `provider.submit` once, save `provider_job_id` and mark the job `running`. It never re-sends. A crash between submit and saving the id ends as `failed_unknown`, and the estimate stays counted.
+   1. Move the job `queued` → `submitting`, then call `provider.submit` once, save `provider_job_id` and mark the job `running`. It never re-sends. A crash between submit and saving the id ends as `failed_unknown`, and the estimate stays counted. A submit the provider refuses with a 4xx other than 408 or 429 took nothing: the job fails and its estimate is released.
    2. The handler stays active until the job is final, so the pg-boss limits cover the time the provider is running.
    3. A reconcile loop (about every 15 s, and at start-up) is the only code that polls `provider.status`. A webhook can replace polling later.
    4. On success, copy the output into MinIO, check with `ffprobe` that it is at least 720p, extract a poster, write the cost rows and mark the job `succeeded`.

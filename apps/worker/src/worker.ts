@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import type { Enhancer } from '@cvs/core/enhance';
 import { bookLlm, close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
 import { type ImageModelConfig, imagePricesFor, type ModelConfig, MOTION_IMAGE_MAX_SEC, promptLimit, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
-import { ImageReadError } from '@cvs/core/providers/http';
+import { ImageReadError, ProviderHttpError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, type AnalyzeJobData, COMPRESS_QUEUE, COMPRESS_QUEUE_OPTIONS, type CompressJobData, PURGE_CRON, PURGE_QUEUE, REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS, type RemakeJobData, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
 import type { Suggester } from '@cvs/core/suggest';
@@ -292,20 +292,33 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       } catch (e) {
         // Shutting down mid-call: the row stays submitting and the next worker turns it into failed_unknown.
         if (signal.aborted) return;
-        // The adapter refused an input before any network call: nothing was submitted, so the estimate is released.
-        if (e instanceof ImageReadError) {
+        // The adapter refused an input before any network call, or the provider refused the request with a 4xx: nothing was submitted, so the
+        // estimate is released. A 408 (timeout) or 429 (rate limit) does not say the provider never took it, so those stay failed_unknown.
+        if (e instanceof ImageReadError || (e instanceof ProviderHttpError && e.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429)) {
           await release(pool, jobId, e.message);
           return;
         }
         await pool.query(`update jobs set status = 'failed_unknown', error = $2, finished_at = now() where id = $1 and status = 'submitting'`, [jobId, `submit failed: ${e instanceof Error ? e.message : e}`]);
         return;
       }
-      // The id is saved whatever the row says now (even failed_unknown), so the provider's late result can still be billed.
-      await pool.query(
-        `update jobs set provider_job_id = $2, status = case when status = 'submitting' then 'running' else status end,
-                started_at = case when status = 'submitting' then now() else started_at end where id = $1`,
-        [jobId, providerJobId],
-      );
+      // The id is saved whatever the row says now (even failed_unknown), so the provider's late result can still be billed. The provider has billed
+      // the job by now, so a database error is tried again 3 times, 2 s apart, before the row is left to end failed_unknown.
+      for (let n = 0; ; n++) {
+        try {
+          await pool.query(
+            `update jobs set provider_job_id = $2, status = case when status = 'submitting' then 'running' else status end,
+                    started_at = case when status = 'submitting' then now() else started_at end where id = $1`,
+            [jobId, providerJobId],
+          );
+          break;
+        } catch (e) {
+          if (n === 3) {
+            log(`saving provider job id ${providerJobId} of job ${jobId} (set it by hand to recover the job)`, e);
+            throw e;
+          }
+          await new Promise((r) => setTimeout(r, 2_000));
+        }
+      }
     } finally {
       submitting.delete(jobId);
     }
@@ -533,9 +546,16 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     );
     for (const row of rows) {
       try {
-        const adapter = row.provider_job_id ? await adapterFor(row) : undefined;
-        if (adapter) {
-          const status = await adapter.status();
+        let adapter: Awaited<ReturnType<typeof adapterFor>>;
+        let status: ProviderStatus | undefined;
+        // Its own try: a status that fails for good (a key removed, an account no longer configured) must not keep close24h from closing the job.
+        try {
+          adapter = row.provider_job_id ? await adapterFor(row) : undefined;
+          status = await adapter?.status();
+        } catch (e) {
+          log(`status of unresolved job ${row.id}`, e);
+        }
+        if (adapter && status) {
           if (status.state === 'succeeded' && row.fresh) {
             // Back to running for deliver and settle, keeping finished_at (see timeOut). A lost submit has no started_at: set, so pollRunning can time the row out again if this process dies mid-delivery.
             const revived = await pool.query(`update jobs set status = 'running', error = null, started_at = coalesce(started_at, now()) where id = $1 and status = $2`, [row.id, row.status]);
