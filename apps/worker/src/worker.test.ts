@@ -39,7 +39,7 @@ const pool = createPool(testDb.url, 10);
 const boss = new PgBoss({ connectionString: testDb.url, max: 3 });
 const mockDir = join(tmpdir(), `cvs-mock-${randomBytes(6).toString('hex')}`);
 
-const FAST: Partial<WorkerOptions> = { admissionSleepMs: 100, waitPollMs: 100, reconcileEveryMs: 200, heartbeatEveryMs: 200, resendAfterMs: 0, pollingIntervalSeconds: 0.5 };
+const FAST: Partial<WorkerOptions> = { admissionSleepMs: 100, waitPollMs: 100, reconcileEveryMs: 200, heartbeatEveryMs: 200, resendAfterMs: 0, pollingIntervalSeconds: 0.5, drainMs: 500 };
 const workers: RunningWorker[] = [];
 const run = promisify(execFile);
 
@@ -827,6 +827,49 @@ describe('restarts', () => {
     await waitFor('failed_unknown', async () => (await status(id)) === 'failed_unknown');
     expect(counting.submits).toBe(1); // the second worker never submits it again
     expect(await total(id)).toEqual({ usd: '2.5000', is_final: false });
+  });
+
+  test('stop() lets a submit in flight finish and save its id, so the next worker delivers the job instead of losing it', async () => {
+    counting.submits = 0;
+    const id = await newJob('u3');
+    const slow = counting(300, (inner) => ({ ...inner, submit: async (req) => { const out = await inner.submit(req); await new Promise((r) => setTimeout(r, 800)); return out; } }));
+    const first = await start(slow, { drainMs: 10_000 });
+    await send(id, 'u3');
+    await waitFor('the submit', async () => counting.submits === 1 && (await status(id)) === 'submitting');
+    await first.stop();
+    const j = await job(id);
+    expect([j.status, j.provider_job_id]).toEqual(['running', expect.stringMatching(/^mock:/)]);
+
+    await start(counting(300));
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    expect(counting.submits).toBe(1);
+  });
+
+  test('a job claimed after stop() began is not submitted: it goes back to queued, and the next worker runs it once', async () => {
+    counting.submits = 0;
+    const first = await start(counting(300), { reconcileEveryMs: 60_000, drainMs: 10_000 });
+    await first.reconcile(); // the start-up pass, so the only session waiting for the admission lock below is this job's admission
+    const id = await newJob('u1'); // after that pass, which would have sent it a second time
+    const lock = await pool.connect();
+    let stopped!: Promise<void>;
+    try {
+      await lock.query('begin');
+      await lock.query(`select pg_advisory_xact_lock(hashtext('video-admission'))`);
+      await send(id, 'u1');
+      const waiting = async () => (await pool.query(`select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query like '%video-admission%'`)).rows[0].n;
+      await waitFor('the admission to wait for the lock', async () => (await waiting()) === 1);
+      stopped = first.stop();
+      await new Promise((r) => setTimeout(r, 200));
+    } finally {
+      await lock.query('commit');
+      lock.release();
+    }
+    await stopped;
+    expect([await status(id), (await job(id)).claimed_by, counting.submits]).toEqual(['queued', null, 0]);
+
+    await start(counting(300));
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    expect(counting.submits).toBe(1);
   });
 
   test('re-sends a queued job whose pg-boss job was deleted, and runs it exactly once', async () => {

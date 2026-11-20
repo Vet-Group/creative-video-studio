@@ -47,6 +47,8 @@ export interface WorkerOptions {
   perUserLimit: number;
   globalLimit: number;
   pollingIntervalSeconds: number;
+  /** How long stop() waits for the submits in flight before it cuts them: a submit cut short is a provider job that is billed and lost. */
+  drainMs: number;
 }
 
 export const DEFAULT_OPTIONS: WorkerOptions = {
@@ -62,6 +64,8 @@ export const DEFAULT_OPTIONS: WorkerOptions = {
   perUserLimit: 2,
   globalLimit: 5,
   pollingIntervalSeconds: 2,
+  // Vertex's longest submit: 4 calls of 300 s with up to three 60 s waits after a 429 (vertex.ts), 1,380 s. cvs-worker.service's TimeoutStopSec (1,500 s) is above it.
+  drainMs: 1_400_000,
 };
 
 export interface WorkerDeps {
@@ -126,6 +130,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   const db = createDb(pool);
   const id = `worker-${randomUUID()}`;
   const stopping = new AbortController();
+  /** Aborted when stop() begins: nothing new is admitted, reconciled or converted, while the submits in flight get drainMs before `stopping` cuts them. */
+  const draining = new AbortController();
   /** Jobs this process is submitting right now. */
   const submitting = new Set<string>();
 
@@ -307,13 +313,22 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   async function handle(job: Job<VideoJobData>): Promise<void> {
     const { jobId } = job.data;
-    const signal = AbortSignal.any([job.signal, stopping.signal]);
+    const signal = AbortSignal.any([job.signal, draining.signal]);
     for (;;) {
       if (signal.aborted) return;
       const admission = await admit(jobId);
       if (admission === 'gone') return; // already handled: a duplicate pg-boss job does nothing
       if (admission === 'claimed') break;
       await sleep(o.admissionSleepMs, signal);
+    }
+    // stop() began while the job was being claimed: the provider has not been called, so it goes back to queued for the next worker (resendQueued).
+    if (draining.signal.aborted) {
+      try {
+        await pool.query(`update jobs set status = 'queued', claimed_by = null where id = $1 and status = 'submitting' and claimed_by = $2`, [jobId, id]);
+      } finally {
+        submitting.delete(jobId);
+      }
+      return;
     }
     // Only a shutdown may cut a submit short: pg-boss's expiry covers the admission wait too, and an aborted submit loses a billed provider job.
     await submit(jobId, stopping.signal);
@@ -349,7 +364,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       // Whichever model made it, the stored clip is 8-bit H.264 (a browser without an HEVC decoder cannot play fal's Seedance 2.5 1080p); the size, length, poster and compress below read that file.
       // A shutdown throws here: the job stays running and the next worker delivers it again (pollRunning). A real failure keeps the clip as it came, with a warning for the Admin.
       video = await ensureH264(video, join(dir, 'h264.mp4'), {
-        signal: stopping.signal,
+        // Not `stopping`: systemd sends ffmpeg the SIGTERM too, while the drain runs, and that is no reason to store the clip unconverted.
+        signal: draining.signal,
         onFail: (e) => {
           warnings.push(`the clip was not converted to H.264 and may not play in every browser: ${e instanceof Error ? e.message : e}`.slice(0, 500));
           log(`h264 conversion ${job.id}`, e);
@@ -489,7 +505,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       } catch (e) {
         log(`running job ${row.id}`, e);
         // A delivery or status call that keeps failing must not keep the job running past its limit; lateBill or close24h finalize it from timed_out. Not on a shutdown, though: a delivery cut short by it stays running for the next worker.
-        if (row.expired && !stopping.signal.aborted) await timeOut(row.id).catch((err) => log(`time out ${row.id}`, err));
+        if (row.expired && !draining.signal.aborted) await timeOut(row.id).catch((err) => log(`time out ${row.id}`, err));
       }
     }
   }
@@ -619,7 +635,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   let reconcileTimer: NodeJS.Timeout | undefined;
   const loop = async () => {
     await reconcile();
-    if (!stopping.signal.aborted) reconcileTimer = setTimeout(loop, o.reconcileEveryMs);
+    if (!draining.signal.aborted) reconcileTimer = setTimeout(loop, o.reconcileEveryMs);
   };
   reconcileTimer = setTimeout(loop, 0);
 
@@ -627,9 +643,14 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     id,
     reconcile,
     async stop() {
+      draining.abort();
+      clearTimeout(reconcileTimer);
+      // The heartbeat goes on meanwhile, so no other worker takes these submits for lost.
+      const deadline = Date.now() + o.drainMs;
+      while (submitting.size > 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
+      if (submitting.size > 0) console.error(`worker: stopping with ${submitting.size} submit(s) still in flight after ${o.drainMs} ms; they end as failed_unknown`);
       stopping.abort();
       clearInterval(heartbeat);
-      clearTimeout(reconcileTimer);
       await reconciling;
       await boss.stop({ graceful: true, timeout: 5_000 });
     },
