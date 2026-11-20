@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-20T22:30:00+07:00', kind: 'improved', title: 'Cùng một tên cho cùng một thứ ở mọi công cụ', details: ['Marketing Studio: phần ② là "Diễn biến" cả ở tiêu đề lẫn ô nhập, phần ③ là "Cảnh kết" ở mọi chỗ. Mẫu có sẵn của Tạo video giờ gọi là "Mẫu chuyển động", ở Tạo video, Khám phá và Thư viện.', 'Tab Ví dụ của Marketing Studio giờ lọc cả các video mẫu cố định theo định dạng đang làm; chọn "Tất cả định dạng" để xem hết.', 'Thanh bên giữ cùng độ rộng ở trang Ứng dụng, nên menu không còn xô lệch khi chuyển giữa các công cụ.'], href: '/marketing-studio', prs: [599], audience: 'all' } satisfies ChangeEntry;
