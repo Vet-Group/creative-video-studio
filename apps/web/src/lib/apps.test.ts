@@ -2,7 +2,7 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, parseNames, PET_STYLES, petPortraitPrompt, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, parseNames, PET_STYLES, petPortraitPrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -117,6 +117,30 @@ describe('filterApps', () => {
     expect(filterApps('all', 'xoá nền').map((a) => a.slug)).toContain('background-remover');
     expect(filterApps('photo', 'khuôn mặt')).toHaveLength(0);
     expect(filterApps('all', 'không có gì cả')).toHaveLength(0);
+  });
+
+  it('finds an app by the English name staff use', () => {
+    expect(filterApps('all', 'swap').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'breed-swap', 'name-swap']);
+    expect(filterApps('all', 'Try On').map((a) => a.slug)).toEqual(['jewelry-try-on', 'lingerie-try-on']);
+    expect(filterApps('all', 'try-on').map((a) => a.slug)).toEqual(['jewelry-try-on', 'lingerie-try-on']);
+    expect(filterApps('all', 'upscale').map((a) => a.slug)).toEqual(['image-upscale']);
+    expect(filterApps('all', 'thu do').map((a) => a.slug)).toEqual(['jewelry-try-on', 'lingerie-try-on', 'ai-fashion-model']);
+  });
+});
+
+describe('unsentPicks', () => {
+  it('keeps picked only the items of the jobs a stopped batch Run did not send', () => {
+    const runs = [{ breed: 'Pug' }, { breed: 'Boxer' }, { breed: 'Beagle' }];
+    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Boxer', 'Beagle'], style: [], product: [], name: [], left: [] });
+    expect(unsentPicks([{ view: 'back' }, { view: 'left' }], 1)).toMatchObject({ view: ['left'], left: [] });
+    expect(unsentPicks([{ name: 'Max' }, { name: 'Bella' }], 1)).toMatchObject({ name: ['Bella'], breed: [], left: [] });
+  });
+
+  it('drops a name whose breeds were partly sent and names its jobs not sent instead, so nothing is sent twice', () => {
+    const runs = ['Max', 'Bella'].flatMap((name) => ['Pug', 'Boxer'].map((breed) => ({ name, breed })));
+    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Pug', 'Boxer'], style: [], product: [], name: ['Bella'], left: [{ name: 'Max', breed: 'Boxer' }] });
+    expect(unsentPicks(runs, 2)).toMatchObject({ name: ['Bella'], breed: ['Pug', 'Boxer'], left: [] });
+    expect(unsentPicks(runs, 3)).toEqual({ view: [], breed: [], style: [], product: [], name: [], left: [{ name: 'Bella', breed: 'Boxer' }] });
   });
 });
 

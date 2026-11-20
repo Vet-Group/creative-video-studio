@@ -8,7 +8,7 @@ import type { AppConfig } from '@/lib/apps';
 import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, type FashionTraits, fashionModelName, fashionModelPrompt, MAX_EXTRA, mentionsMinor, MINOR_REASON, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, withNiche } from '@/lib/fashion-model';
 import { MAX_NAME } from '@/lib/fashion-models';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AppAbout, AppHeader, AppHistoryArt, TAB_LABEL, type Tab } from './AppPage';
 import s from './FashionModelApp.module.css';
@@ -24,8 +24,6 @@ import { Tray } from './Shell';
 type FashionTab = Tab | 'models';
 const LABEL: Record<FashionTab, string> = { ...TAB_LABEL, models: 'Đã lưu' };
 const MAX_IMAGES = 4;
-/** A price without trailing zeros: 0.0670 is $0.067. */
-const usd = (n: number) => String(Number(n.toFixed(4)));
 
 type Key = Exclude<keyof FashionTraits, 'extra'>;
 const FIELDS: { key: Key; label: string }[] = [
@@ -104,7 +102,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
   const set = (key: Key) => (id: string) => setTraits((t) => ({ ...t, [key]: id }));
 
   async function run() {
-    if (!(await confirmRun(total))) return;
+    if (!(await confirmRun(total, `Tạo lượt này với giá ${usd(total)}?`))) return; // the price as the button shows it
     setRunning(true);
     setError('');
     setNotice('');
@@ -206,7 +204,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
               </div>
               {chosen && (
                 <p className={s.cost} role="status">
-                  {count} ảnh × ${usd(price)} = ${usd(total)}
+                  {count} ảnh × {usd(price)} = {usd(total)}
                 </p>
               )}
             </div>
@@ -229,7 +227,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={minor || reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {running ? <span className="run-cost">· Đang gửi…</span> : chosen && <span className="run-cost">· ${usd(total)}</span>}
+              {running ? <span className="run-cost">· Đang gửi…</span> : chosen && <span className="run-cost">· {usd(total)}</span>}
             </button>
           </div>
         </div>

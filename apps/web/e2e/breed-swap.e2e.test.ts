@@ -29,8 +29,8 @@ test('picks three breeds for a picture with a dog, sees the price of one image p
   // A priced model: the line and the Run button show one image's price per breed, and the preview the first breed's prompt.
   await pickModel(page, /Mock breeds priced/);
   for (const name of ['Golden Retriever', 'Pug', 'Australian Shepherd']) await breeds(page).getByText(name, { exact: true }).click();
-  await expect(cost(page)).toHaveText('3 ảnh × $0.0400 = $0.1200');
-  await expect(runButton(page)).toContainText('$0.1200');
+  await expect(cost(page)).toHaveText('3 ảnh × $0.04 = $0.12');
+  await expect(runButton(page)).toContainText('$0.12');
   await expect(page.getByRole('group', { name: 'Bản cuối gửi cho mô hình' })).toContainText('Golden Retriever: Replace only the dog in the image with a Golden Retriever,');
   await expect(page.getByText('2 giống còn lại dùng prompt như trên, chỉ khác tên giống.')).toBeVisible();
 
@@ -55,5 +55,5 @@ test('picks three breeds for a picture with a dog, sees the price of one image p
   await expect(page.getByRole('group', { name: 'Ảnh gốc' }).getByRole('img', { name: 'rug.png' })).toBeVisible();
   for (const name of ['Golden Retriever', 'Pug', 'Australian Shepherd']) await expect(breeds(page).getByRole('checkbox', { name })).toBeChecked();
   await expect(breeds(page).getByRole('checkbox', { name: 'Beagle' })).not.toBeChecked();
-  await expect(cost(page)).toHaveText('3 ảnh × $0.0000 = $0.0000');
+  await expect(cost(page)).toHaveText('3 ảnh × $0.00 = $0.00');
 });

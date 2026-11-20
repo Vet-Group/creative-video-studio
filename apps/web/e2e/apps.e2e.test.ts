@@ -153,7 +153,7 @@ test('Background Remover (one slot): Run needs the image, a mock job reaches His
   await page.getByLabel('Ảnh cần xoá nền').setInputFiles(file('product.png'));
   await expect(page.getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(runButton(page)).toBeEnabled();
-  await expect(runButton(page)).toContainText('$0.0000'); // a mock model books nothing
+  await expect(runButton(page)).toContainText('$0.00'); // a mock model books nothing
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
@@ -347,9 +347,9 @@ test('a priced model: Upscale shows its price and stores the chosen resolution, 
   await page.getByLabel('Ảnh cần tăng độ phân giải').setInputFiles(file('small.png'));
   await expectOptions(page, 'Độ phân giải', ['2K', '4K']);
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
-  await expect(runButton(page)).toContainText('$0.0800');
+  await expect(runButton(page)).toContainText('$0.08');
   await selectValue(page, 'Độ phân giải', '4K');
-  await expect(runButton(page)).toContainText('$0.0800');
+  await expect(runButton(page)).toContainText('$0.08');
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect.poll(async () => (await jobs()).filter((j) => j.feature === 'image_upscale').map((j) => j.resolution)).toEqual(['4K']);
@@ -359,7 +359,7 @@ test('a priced model: Upscale shows its price and stores the chosen resolution, 
   await expectOptions(page, 'Tỉ lệ', ['1:1', '16:9']); // no "Tự động": Reframe needs a target ratio
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await page.getByLabel('Ảnh cần đổi khung').setInputFiles(file('photo.png'));
-  await expect(runButton(page)).toContainText('$0.0800');
+  await expect(runButton(page)).toContainText('$0.08');
   await selectValue(page, 'Tỉ lệ', '16:9');
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
@@ -520,6 +520,7 @@ test('Motion Control: the image and the reference video, a length check, and a R
   await page.getByLabel('Ảnh nhân vật').setInputFiles(file('dancer.png'));
   await expect(page.getByRole('img', { name: 'dancer.png' })).toBeVisible();
   await expect(reasonOf(page)).toHaveText('Tải lên video chuyển động.');
+  await expect(runButton(page)).toContainText('$0.13/giây'); // before a video, the Standard model's price per second
 
   await page.getByLabel('Tệp video chuyển động').setInputFiles({ name: 'short.mp4', mimeType: 'video/mp4', buffer: mp4(1900) });
   await expect(page.getByText('short.mp4 · 1.9 giây')).toBeVisible();
@@ -530,7 +531,7 @@ test('Motion Control: the image and the reference video, a length check, and a R
   await page.getByLabel('Tệp video chuyển động').setInputFiles({ name: 'dance.mp4', mimeType: 'video/mp4', buffer: mp4(5400) });
   await expect(page.getByText('dance.mp4 · 5.4 giây')).toBeVisible();
   await expect(reasonOf(page)).toHaveCount(0);
-  await expect(runButton(page)).toHaveText(/\$0\.7560/); // the recommended Standard model, 6 s
+  await expect(runButton(page)).toHaveText(/\$0\.76/); // the recommended Standard model, 6 s
   // The long model name stays inside the form: the picker is a grid item, which would otherwise grow to its text.
   const picker = (await page.locator('.select-trigger').boundingBox())!;
   const form = (await page.locator('.form-scroll').boundingBox())!;

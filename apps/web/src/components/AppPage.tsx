@@ -5,10 +5,10 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, type AppCategory, BATCH_FEATURES, type BatchItem, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MOCKUP_PRODUCTS, motionReason, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, type AppCategory, BATCH_FEATURES, type BatchItem, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MOCKUP_PRODUCTS, motionReason, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { alignInputs, placesOf, type Skipped, skippedNote } from '@/lib/reuse';
-import { confirmRun, sendRun } from '@/lib/run-guard';
+import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
@@ -226,13 +226,14 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
             ? parseNames(names).names.flatMap((name) => (pickedBreeds.length > 0 ? pickedBreeds.map((breed) => ({ name, breed })) : [{ name }]))
             : [{}];
   const batchApp = BATCH_FEATURES.includes(app.feature);
-  const estimate = batchApp ? runTotal(pick.estimate, runs.length) : pick.estimate;
+  // Nothing picked yet on a batch app shows no price rather than a free-looking $0.0000.
+  const estimate = batchApp ? (runs.length > 0 ? runTotal(pick.estimate, runs.length) : undefined) : pick.estimate;
   // The item prompts differ only in their item, so the preview shows the first one.
   const first = runs[0] && itemPrompt(app.feature, runs[0], blank);
   const prompts = first ? [first] : sent ? [sent] : [];
   const runCost = runs.length > 0 && pick.estimate !== undefined && (
     <p className="help" role="status">
-      {runs.length} ảnh × ${pick.estimate} = ${estimate}
+      {runs.length} ảnh × {usd(pick.estimate)} = {usd(estimate!)}
     </p>
   );
 
@@ -269,7 +270,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const stock = picker === null ? [] : stockGroups(app.slots[picker]!, have);
 
   async function run() {
-    if (!(await confirmRun(estimate))) return;
+    if (!(await confirmRun(estimate, `Tạo lượt này với giá ${usd(estimate ?? 0)}?`))) return; // the price as the button shows it
     setBusy(true);
     setError('');
     setNotice('');
@@ -296,7 +297,18 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
       if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
-      setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${done > 0 ? ` Đã gửi ${done}/${runs.length} ảnh.` : ''}`);
+      let sent = '';
+      if (done > 0) {
+        // What was sent is unticked, so Run again sends only the rest instead of every item a second time.
+        const p = unsentPicks(runs, done);
+        if (app.views) setViews(p.view);
+        if (app.breeds || app.names) setBreeds(p.breed);
+        if (app.styles) setStyles(p.style);
+        if (app.products) setProducts(p.product);
+        if (app.names) setNames(p.name.join('\n'));
+        sent = ` Đã gửi ${done}/${runs.length} ảnh và bỏ chọn các mục đã gửi.${p.left.length > 0 ? ` Chưa gửi: ${p.left.map(itemLabel).join(', ')}.` : ''}`;
+      }
+      setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${sent}`);
       if (done > 0) await refresh();
     } finally {
       setBusy(false);
@@ -464,7 +476,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {busy ? <span className="run-cost">· Đang gửi…</span> : estimate !== undefined && <span className="run-cost">· ${estimate}</span>}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : estimate !== undefined && <span className="run-cost">· {usd(estimate)}</span>}
             </button>
           </div>
         </div>
@@ -612,7 +624,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   }
 
   async function run() {
-    if (!(await confirmRun(chosen?.estimateUsd))) return;
+    if (!(await confirmRun(chosen?.estimateUsd, `Tạo lượt này với giá ${usd(chosen?.estimateUsd ?? 0)}?`))) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -718,7 +730,8 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {busy ? <span className="run-cost">· Đang gửi…</span> : video && chosen && <span className="run-cost">· ${chosen.estimateUsd}</span>}
+              {/* Before a video the price is per second (the 5 s estimate over 5), so the member knows what a clip will cost; then the video's total. */}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : chosen && <span className="run-cost">· {video ? usd(chosen.estimateUsd) : `${usd(Number(chosen.estimateUsd) / seconds)}/giây`}</span>}
             </button>
           </div>
         </div>

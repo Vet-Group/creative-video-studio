@@ -7,7 +7,7 @@ import { api, errorText, type JobStatus, sendJson, thumbUrl } from '@/lib/api';
 import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, type FashionTraits, MAX_EXTRA, mentionsMinor, MINOR_REASON } from '@/lib/fashion-model';
 import type { FashionModelItem } from '@/lib/fashion-models';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRun, usd } from '@/lib/run-guard';
 import { type Img, nearestOption, useImageChoice, useImageModels } from './image-tools';
 import { useJobs } from './jobs';
 import { Select } from './Select';
@@ -52,7 +52,7 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
     offered === null ? 'Đang tải danh sách mô hình...' : failed ? 'Không tải được danh sách mô hình.' : !chosen ? 'Admin chưa bật mô hình nào cho Tạo người mẫu AI.' : mentionsMinor(traits.extra) ? MINOR_REASON : promptTooLong(chosen, prompt.length);
 
   async function run() {
-    if (!(await confirmRun(pick.estimate))) return;
+    if (!(await confirmRun(pick.estimate, `Tạo lượt này với giá ${usd(pick.estimate ?? 0)}?`))) return; // the price as the button shows it
     setRunning(true);
     setError('');
     try {
@@ -130,7 +130,7 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
       )}
       <button type="button" className="primary" disabled={reason !== null || running} aria-describedby={reason ? ids.reason : undefined} onClick={() => void run()}>
         Tạo người mẫu
-        {running ? <span className="run-cost">· Đang tạo…</span> : pick.estimate !== undefined && <span className="run-cost">· ${Number(pick.estimate)}</span>}
+        {running ? <span className="run-cost">· Đang tạo…</span> : pick.estimate !== undefined && <span className="run-cost">· {usd(pick.estimate)}</span>}
       </button>
     </div>
   );
