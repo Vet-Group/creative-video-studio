@@ -40,6 +40,14 @@ describe('tryOnPrompt', () => {
     expect(p).toContain("Keep the person's face and identity exactly unchanged, and show them in this pose and framing: standing facing the camera with one hand on the hip");
     expect(p).not.toContain('pose and body exactly unchanged');
     expect(tryOnPrompt(1, false, '', 'cartwheel')).toBeUndefined();
-    expect(tryOnPrompt(2, false, 'red', null)).toContain("Keep the person's face, pose and body exactly unchanged.");
+    expect(tryOnPrompt(2, false, '', null)).toContain("Keep the person's face, pose and body exactly unchanged.");
+  });
+
+  it('stops keeping the pose when the member wrote text and chose none, so the text can ask for one', () => {
+    const p = tryOnPrompt(1, false, 'sitting on a chair')!;
+    expect(p).toContain("Keep the person's face and body exactly unchanged.");
+    expect(p).not.toContain('pose');
+    expect(p.endsWith(' sitting on a chair')).toBe(true);
+    expect(tryOnPrompt(1, false, 'red', 'hand-on-hip')).toContain("Keep the person's face and identity exactly unchanged, and show them in this pose");
   });
 });

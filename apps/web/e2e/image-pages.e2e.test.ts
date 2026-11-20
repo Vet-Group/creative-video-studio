@@ -816,12 +816,22 @@ test("Try On, as Fash's model catalog: the filter chips narrow the named portrai
     const job = (await (await page.request.get(`/api/jobs/${sent.id}`)).json()) as { prompt: string; pose: string };
     expect(job.pose).toBe('hand-on-hip');
     expect(job.prompt).toContain('show them in this pose and framing: standing facing the camera with one hand on the hip');
+    // Words beside a chosen pose: the help line says the pose wins.
+    const words = page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' });
+    const poseWins = page.getByText('Tư thế đã chọn ở ô Người mẫu sẽ được ưu tiên.');
+    await expect(poseWins).toHaveCount(0);
+    await words.fill('sitting on a chair');
+    await expect(poseWins).toBeVisible();
 
     // The chip's x drops the pose and keeps the focus on the chip, which offers a pose again.
     await page.getByRole('button', { name: 'Bỏ tư thế' }).click();
     await expect(poseChip).toHaveAttribute('data-value', '');
     await expect(poseChip).toHaveAccessibleName('Tư thế: Chọn tư thế');
     await expect(poseChip).toBeFocused();
+    // With no pose the words may ask for one: the line goes, and the prompt no longer keeps the model's pose.
+    await expect(poseWins).toHaveCount(0);
+    await expect(page.locator('.prompt-preview p')).toContainText("Keep the person's face and body exactly unchanged.");
+    await words.fill('');
     // From the keyboard, the chip opens the pose step's pictures for the photo already in the slot: a pick sets the pose and copies no photo again.
     const copies: string[] = [];
     page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/assets/samples' && copies.push(r.url())));
