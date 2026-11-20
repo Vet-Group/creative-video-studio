@@ -123,7 +123,7 @@ export function ReferenceVideoSlot({ video, busy, onFile, onHistory, onRemove, l
             <span>Tải lên</span>
           </button>
         )}
-        <span className="slot-hint">{video ? `${video.filename} · ${(video.durationMs / 1000).toFixed(1)} giây` : (hint ?? `Video MP4 hoặc MOV (tối đa ${MAX_VIDEO_BYTES / 1024 / 1024} MB) cho chuyển động, góc máy và nhịp. Hoặc dùng video ở tab Ví dụ.`)}</span>
+        <span className="slot-hint">{video ? `${video.filename}${video.durationMs ? ` · ${(video.durationMs / 1000).toFixed(1)} giây` : ''}` :(hint ?? `Video MP4 hoặc MOV (tối đa ${MAX_VIDEO_BYTES / 1024 / 1024} MB) cho chuyển động, góc máy và nhịp. Hoặc dùng video ở tab Ví dụ.`)}</span>
       </div>
       <PhotoDialog
         open={picking}

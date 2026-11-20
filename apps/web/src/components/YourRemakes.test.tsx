@@ -24,3 +24,10 @@ test('shows at most 10 remakes, and nothing at all when there are none to show',
   expect(renderToStaticMarkup(<YourRemakes slug="smart-remake" initial={[]} />)).toBe('');
   expect(renderToStaticMarkup(<YourRemakes slug="smart-remake" exclude="a1" initial={[row('r1', 'a1')]} />)).toBe('');
 });
+
+test('says it is loading before the first answer, and that only the 10 newest show when there are more', () => {
+  expect(renderToStaticMarkup(<YourRemakes slug="smart-remake" />)).toContain('Đang tải…');
+  const many = Array.from({ length: 12 }, (_, i) => row(`r${i}`, `a${i}`));
+  expect(renderToStaticMarkup(<YourRemakes slug="smart-remake" initial={many} />)).toContain('Chỉ hiện 10 video mới nhất.');
+  expect(renderToStaticMarkup(<YourRemakes slug="smart-remake" initial={many.slice(0, 3)} />)).not.toContain('Chỉ hiện');
+});

@@ -1,6 +1,6 @@
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { expect, test } from 'vitest';
-import { analysisFormat, clock, frameTime, frameTimes, mergeShots, roleLabel, scriptPrompt, scriptText, sharpness, timeRange } from './analyze';
+import { analysisError, analysisFormat, clock, frameTime, frameTimes, mergeShots, roleLabel, scriptPrompt, scriptText, sharpness, timeRange } from './analyze';
 
 test('shot roles read in Vietnamese, in any case, and an unknown role stays as the model wrote it', () => {
   expect(roleLabel('hook')).toBe('Mở đầu');
@@ -99,4 +99,12 @@ test('a still with edges scores sharper than the same still blurred, and a flat 
   expect(edges).toBeGreaterThan(blurred);
   expect(blurred).toBeGreaterThan(0);
   expect(still(() => 90)).toBe(0);
+});
+
+test('a failed analysis reads why in words a member can act on, and anything unknown or hidden as the general retry', () => {
+  expect(analysisError('could not queue the analysis')).toContain('đang bận');
+  expect(analysisError('Command failed: rea-video decompose x.mp4\n[mov] moov atom not found')).toContain('Không đọc được video này');
+  expect(analysisError('Invalid data found when processing input')).toContain('Không đọc được video này');
+  expect(analysisError('boom')).toBe('Phân tích không thành công. Hãy thử lại với video khác.');
+  expect(analysisError(null)).toBe('Phân tích không thành công. Hãy thử lại với video khác.');
 });

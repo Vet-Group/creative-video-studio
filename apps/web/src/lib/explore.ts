@@ -68,8 +68,11 @@ export function typicalLabel(job: TypicalJob, jobs: readonly PastJob[]): string 
  */
 export function waitProgress(job: TypicalJob & { createdAt: string; startedAt?: string | null }, jobs: readonly PastJob[], now = Date.now()): { fraction: number; label: string } | null {
   const t = typicalRun(job, jobs);
-  if (!t) return null;
-  const elapsed = Math.max(0, (now - runStart(job)) / 1000);
+  return t && runProgress(Math.max(0, (now - runStart(job)) / 1000), t);
+}
+
+/** The bar and caption for `elapsed` seconds of a run against a known usual run time (waitProgress's, or a fixed one such as an analysis'). */
+export function runProgress(elapsed: number, t: { p50: number; p75: number }): { fraction: number; label: string } {
   const span = typicalSpan(t);
   return {
     fraction: 0.9 * (1 - Math.exp((-1.6 * elapsed) / t.p50)),

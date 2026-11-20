@@ -2,7 +2,7 @@
 // The History tab list on the analyze page: loading, a load error with retry, the empty state, and a card per analysis. A
 // card opens only when its analysis succeeded; a running or failed one says why it does not. Split out of AnalyzeView so
 // these states are rendered from plain props and tested.
-import { analysisFormat, mergeShots } from '@/lib/analyze';
+import { analysisError, analysisFormat, mergeShots } from '@/lib/analyze';
 import type { AnalysisRow } from './AnalyzeView';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
@@ -18,11 +18,12 @@ function Card({ a }: { a: AnalysisRow }) {
         {a.sourceAssetId ? <video src={`/api/assets/${a.sourceAssetId}/content#t=0.1`} muted playsInline preload="metadata" tabIndex={-1} /> : <Icon name="film" size={20} />}
       </span>
       <span className="analysis-card-body">
-        <strong>{r ? analysisFormat(r) : 'Video'}</strong>
+        {/* Many rows share a format, so the summary leads and the format is a tag. */}
+        <strong className="analysis-card-title">{r ? r.vi?.summary || r.summary || analysisFormat(r) : 'Video'}</strong>
         {r ? (
           <>
             <span className="muted">
-              {r.durationS ? `${r.durationS.toFixed(1)} giây · ` : ''}
+              {(r.vi?.summary || r.summary) && <span className="analysis-role">{analysisFormat(r)}</span>} {r.durationS ? `${r.durationS.toFixed(1)} giây · ` : ''}
               {mergeShots(r).shots.length} cảnh
             </span>
             <span className="analysis-hook">{r.vi?.hook || r.hook}</span>
@@ -32,7 +33,7 @@ function Card({ a }: { a: AnalysisRow }) {
             <span className="analysis-chip" data-tone={waiting ? 'wait' : 'fail'}>
               {waiting ? 'Đang phân tích…' : 'Không thành công'}
             </span>
-            <span className="muted">{waiting ? 'Chưa mở được, kết quả sẽ có ở đây khi phân tích xong.' : 'Phân tích này không ra kết quả nên không có gì để mở. Hãy thử lại với video khác.'}</span>
+            <span className="muted">{waiting ? 'Chưa mở được, kết quả sẽ có ở đây khi phân tích xong.' : analysisError(a.error)}</span>
           </>
         )}
         {a.creatorName && <span className="muted">Người tạo: {a.creatorName}</span>}
@@ -59,6 +60,7 @@ export function AnalysisHistory({
   currentId,
   onRetry,
   onPick,
+  onReuse,
   onDelete,
 }: {
   loading: boolean;
@@ -68,6 +70,8 @@ export function AnalysisHistory({
   currentId?: string | null;
   onRetry: () => void;
   onPick: (a: AnalysisRow) => void;
+  /** Put a failed analysis' video (of the caller's own, still there) back in the form, to analyse again. */
+  onReuse?: (a: AnalysisRow) => void;
   /** Delete a finished (succeeded or failed) analysis of the caller's own (none is offered for another member's); the caller confirms. */
   onDelete: (a: AnalysisRow) => void;
 }) {
@@ -91,6 +95,11 @@ export function AnalysisHistory({
             <div className="analysis-card" data-status={a.status}>
               <Card a={a} />
             </div>
+          )}
+          {onReuse && a.status === 'failed' && a.sourceAssetId && !a.creatorName && (
+            <button type="button" className="link-button" onClick={() => onReuse(a)}>
+              Dùng video này lại
+            </button>
           )}
           {(a.status === 'succeeded' || a.status === 'failed') && !a.creatorName && (
             <button type="button" className="analysis-delete" aria-label="Xoá phân tích" title="Xoá phân tích" onClick={() => onDelete(a)}>

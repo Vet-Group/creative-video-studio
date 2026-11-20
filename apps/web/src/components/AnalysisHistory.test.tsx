@@ -52,11 +52,26 @@ test('a succeeded row is a card button with its format, length, shots and hook; 
 test('a failed or running row is not a button and says why it cannot be opened', () => {
   const html = render({ items: [row({ id: 'a2', status: 'failed', result: null, error: 'boom' }), row({ id: 'a3', status: 'running', result: null, sourceAssetId: null })] });
   expect(html).toContain('Không thành công');
-  expect(html).toContain('không có gì để mở');
+  expect(html).toContain('Phân tích không thành công. Hãy thử lại với video khác.'); // the reason, mapped from the raw error
   expect(html).toContain('Đang phân tích…');
   expect(html).toContain('Chưa mở được');
   expect(html).not.toContain('<button type="button" class="analysis-card"'); // no card is a button
   expect(html.match(/<video/g)).toHaveLength(1); // the running row's source asset is gone: a placeholder icon, not a player
+});
+
+test('a failed row says the mapped reason and, with onReuse, offers its own video again; not for another member’s row or a deleted video', () => {
+  const failed = row({ id: 'a2', status: 'failed', result: null, error: 'could not queue the analysis' });
+  const html = render({ items: [failed, row({ id: 'a3', status: 'failed', result: null, sourceAssetId: null }), row({ id: 'a4', status: 'failed', result: null, creatorName: 'Lan' })], onReuse: () => undefined });
+  expect(html).toContain('Máy chủ phân tích đang bận');
+  expect(html.match(/>Dùng video này lại<\/button>/g)).toHaveLength(1);
+  expect(render({ items: [failed] })).not.toContain('Dùng video này lại'); // without onReuse
+});
+
+test('a succeeded row leads with its summary, its format a tag beside the length', () => {
+  const html = render({ items: [row()] });
+  expect(html).toContain('<strong class="analysis-card-title">A model wears a plain white t-shirt in a studio.</strong>');
+  expect(html).toContain('<span class="analysis-role">Giới thiệu sản phẩm</span>');
+  expect(render({ items: [row({ result: { ...result, summary: '' } })] })).toContain('<strong class="analysis-card-title">Giới thiệu sản phẩm</strong>');
 });
 
 test('a finished row, succeeded or failed, has a delete button, and a queued or running one does not', () => {

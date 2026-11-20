@@ -208,6 +208,9 @@ export function RemakePanel({ row, initialProduct, initialChosen, note, productF
   const toggle = (index: number) => setChosen((c) => (c.includes(index) ? c.filter((n) => n !== index) : [...c, index]));
   const picked = scenes.shots.filter((_, i) => chosen.includes(scenes.first[i]!)); // whole scenes, as the API prices them
   const frames = useFrames(row.sourceAssetId ? `/api/assets/${row.sourceAssetId}/content` : undefined, scenes.shots, pickBox); // null when there is no video or it will not decode
+  // Why the button is off, shown under it as on the other tools' Run.
+  const reason = !product[0] ? 'Thêm 1 ảnh sản phẩm để tạo video.' : running ? 'Đang có 1 video đang tạo. Chờ video đó xong rồi tạo tiếp.' : chosen.length === 0 ? 'Chọn ít nhất 1 cảnh.' : null;
+  const full = chosen.length >= REMAKE_MAX_SHOTS;
 
   return (
     <section className="remake-panel" aria-labelledby={`remake-${row.id}`}>
@@ -224,18 +227,28 @@ export function RemakePanel({ row, initialProduct, initialChosen, note, productF
           const on = chosen.includes(index);
           return (
             <label key={index}>
-              <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= REMAKE_MAX_SHOTS)} onChange={() => toggle(index)} />
+              <input type="checkbox" checked={on} disabled={busy || (!on && full)} aria-describedby={!on && full ? `remake-full-${row.id}` : undefined} onChange={() => toggle(index)} />
               {frames && (frames[i] ? <img className="analysis-frame" src={frames[i]} alt="" /> : <span className="analysis-frame" aria-hidden="true" />)}
               Cảnh {s.index}
               <span className="muted">{timeRange(s.start, s.end)}</span>
             </label>
           );
         })}
+        {full && (
+          <p className="help" id={`remake-full-${row.id}`}>
+            Đã chọn tối đa {REMAKE_MAX_SHOTS} cảnh. Bỏ chọn một cảnh để chọn cảnh khác.
+          </p>
+        )}
       </fieldset>
-      <button type="button" className="primary" disabled={busy || running || !product[0] || chosen.length === 0} onClick={() => void remake()}>
+      <button type="button" className="primary" disabled={busy || reason !== null} aria-describedby={reason ? `remake-reason-${row.id}` : undefined} onClick={() => void remake()}>
         Tạo video với sản phẩm
         {chosen.length > 0 && <span className="run-cost"> · ${remakeEstimate(picked)}</span>}
       </button>
+      {reason && (
+        <p className="help" id={`remake-reason-${row.id}`} role="status">
+          {reason}
+        </p>
+      )}
       {error && (
         <p className="error" role="alert">
           {error}
