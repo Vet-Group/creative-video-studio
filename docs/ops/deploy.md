@@ -68,8 +68,9 @@ without it they stay on fal (`FAL_KEY`). After adding or removing the key, resta
 1. Refuses (exit 1, nothing changed) if any of ports 3400, 5435, 9400 or 9401 is taken (`ss -ltnH`), then takes the same
    `~/.local/state/creative-video-studio/ops.lock` that `cvs-backup` uses (waits up to 40 minutes).
 2. Clones or fast-forwards the repo into `/opt/creative-video-studio` over a read-only deploy key. Only the key's path is
-   used; its content is never read or printed. A detached checkout (what the gate's `deploy <commit>` leaves, a rollback too)
-   keeps its commit: only a checkout on a branch is fetched and fast-forwarded.
+   used; its content is never read or printed. A detached checkout (what the gate's `deploy <commit>` leaves) keeps its commit:
+   only a checkout on a branch is fetched and fast-forwarded. The gate runs the installer of the commit it deploys, so a rollback
+   to a commit older than this rule still fast-forwards to the tip of `main`.
 3. Installs the pinned Node (**24.22.1**, inside the root `engines` range) into `/opt/creative-video-studio/node`. The tarball is
    downloaded from `https://nodejs.org/dist/v24.22.1/` and checked with `sha256sum -c` against that release's `SHASUMS256.txt`.
    Then pnpm at the `packageManager` version is installed next to it.
@@ -103,7 +104,7 @@ Vet-Group organization had deploy keys disabled and the new VET host (192.168.1.
 
 A state file means the next `install.sh` is an update, and it works without uninstalling (which would delete the tunnel and the
 DNS record): ports held by this install's own compose project (`docker compose -p creative-video-studio ps -q` is not empty) or
-by `cvs-web` are not counted as taken, the repo is fast-forwarded, and a recorded tunnel is kept, but only when its DNS record id
+by `cvs-web` are not counted as taken, the repo is fast-forwarded when it is on a branch (a detached checkout keeps its commit), and a recorded tunnel is kept, but only when its DNS record id
 and both `cloudflared/` files exist. After the build, an update restarts `cvs-web` and `cvs-worker` so they run the new code. A tunnel recorded without them (a run that stopped in step 7) is refused with
 "run uninstall.sh first". A run that stopped after `compose up` can be undone with `uninstall.sh`, because the compose line was
 recorded before `up`.
