@@ -516,7 +516,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     </div>
                   )}
                   {/* Try On's pose pictures as toggles: each pose's picture on that gender, or its name until one is uploaded; a picked one carries the check mark. */}
-                  <div className="choice-grid model-grid" role="group" aria-labelledby={posesId}>
+                  <div className="choice-grid model-grid pose-grid" role="group" aria-labelledby={posesId}>
                     {POSES.map((p) => {
                       const file = `try-on-pose-${gender}-${p.value}.jpg`;
                       return (
