@@ -26,6 +26,8 @@ export const isImpersonated = (session: Session): boolean => Boolean(session.ses
 export const impersonationRefusal = () => Response.json({ error: 'not_allowed_while_impersonating' }, { status: 403 });
 
 const IMPERSONATION_MAX_MS = 60 * 60 * 1000;
+/** The only writes an Admin signed in as another Admin may send (guard). */
+const IMPERSONATED_ADMIN_WRITES = new Set(['/api/me/stop-impersonating', '/api/me/workspace']);
 
 const cookieValue = (headers: Headers, name: string): string | null => {
   for (const part of (headers.get('cookie') ?? '').split(';')) {
@@ -100,7 +102,7 @@ export function crossOrigin(request: Request): boolean {
  * For API routes: 401 without a valid session (or a banned user), 403 while the user must first replace an Admin's temporary password
  * (only /api/auth stays open, for /change-password; an Admin signed in as the user is not held up by it), 403 `no_workspace` for a user in no active
  * workspace, 403 when an Admin (or a template editor, isEditor) is required and the user is not one, 403 `forbidden origin` for a write another origin sent
- * (crossOrigin), and 409 `workspace_changed` for a write sent by a tab that rendered another workspace than the one this request resolves to (no header:
+ * (crossOrigin), 403 `not_allowed_while_impersonating` for a write by an Admin signed in as another Admin, and 409 `workspace_changed` for a write sent by a tab that rendered another workspace than the one this request resolves to (no header:
  * no check, as from a tab opened before workspaces).
  */
 export async function guard(request: Request, role: 'member' | 'editor' | 'admin'): Promise<Guard> {
@@ -113,8 +115,9 @@ export async function guard(request: Request, role: 'member' | 'editor' | 'admin
   const write = request.method !== 'GET' && request.method !== 'HEAD';
   // A page on a sibling subdomain gets the cookie (SameSite=Lax is per site) and a text/plain body needs no preflight, so the browser's own word decides.
   if (write && crossOrigin(request)) return { error: Response.json({ error: 'forbidden origin' }, { status: 403 }) };
-  // An Admin signed in as an Admin only looks: a change made here would be logged under that Admin's name.
-  if (role === 'admin' && isImpersonated(session) && write) return { error: impersonationRefusal() };
+  // An Admin signed in as an Admin only looks, on every route (member routes have Admin branches too): a change made here would be logged under that
+  // Admin's name. Ending the impersonation and switching between the workspaces both share stay open.
+  if (write && isImpersonated(session) && session.user.role === 'admin' && !IMPERSONATED_ADMIN_WRITES.has(new URL(request.url).pathname)) return { error: impersonationRefusal() };
   const rendered = request.headers.get(WORKSPACE_HEADER);
   if (write && rendered && rendered !== workspace.workspaceId) return { error: Response.json({ error: 'workspace_changed' }, { status: 409 }) };
   return { session, ...workspace };

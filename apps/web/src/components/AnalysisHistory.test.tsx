@@ -44,7 +44,8 @@ test('a succeeded row is a card button with its format, length, shots and hook; 
   expect(html).toContain('Giới thiệu sản phẩm');
   expect(html).toContain('11.4 giây · 1 cảnh');
   expect(html).toContain('Clean apparel presentation.');
-  expect(html).toContain('/api/assets/v1/content#t=0.1'); // the source video's first frame is the poster
+  expect(html.match(/<video[^>]*preload="metadata"/g)).toHaveLength(2); // the source video's first frame is the poster…
+  expect(html).not.toContain('/content'); // …fetched only once its card scrolls into view: up to 50 rows open no stream before then
   expect(html.match(/<button type="button" class="analysis-card"/g)).toHaveLength(2); // a card per row, each a button to open it
   expect(html.match(/aria-current="true"/g)).toHaveLength(1);
 });

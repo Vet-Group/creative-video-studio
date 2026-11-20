@@ -91,6 +91,34 @@ test("queues an analysis of the caller's own video with its team and source key"
   expect(row).toEqual({ user_id: userId, team_id: team, store_id: 'store-ok', source_key: 's3/v1', status: 'queued' });
 });
 
+/** Finishes the member's unfinished analyses, so the next one may start. */
+const settle = () => pool.query(`update analyses set status = 'succeeded', finished_at = now() where user_id = $1 and status in ('queued', 'running')`, [userId]);
+
+test('refuses a new analysis while the member already has one queued or running, in words for the member (429)', async () => {
+  const queued = await post({ sourceAssetId: 'v1' });
+  expect(queued.status).toBe(429);
+  expect(await errorOf(queued)).toBe('Bạn đang có một phân tích chưa xong. Hãy đợi nó xong rồi phân tích video tiếp theo.');
+  await pool.query(`update analyses set status = 'running' where user_id = $1 and status = 'queued'`, [userId]);
+  expect((await post({ sourceAssetId: 'v1' })).status).toBe(429);
+  await settle();
+  // Two quick sends: the per-member lock lets only one through.
+  const both = await Promise.all([post({ sourceAssetId: 'v1' }), post({ sourceAssetId: 'v1' })]);
+  expect(both.map((r) => r.status).sort()).toEqual([201, 429]);
+  expect((await pool.query(`select count(*)::int as n from analyses where user_id = $1 and status = 'queued'`, [userId])).rows[0].n).toBe(1);
+  // A queued row older than the queue's expiry lost its queue job (nothing ever starts it), so it no longer holds the member back.
+  await pool.query(`update analyses set created_at = now() - interval '1 hour' where user_id = $1 and status = 'queued'`, [userId]);
+  expect((await post({ sourceAssetId: 'v1' })).status).toBe(201);
+  // Another member is not held back by this one's analysis.
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ('v-other', $1, 'input', 's3/other', 'o.mp4', 'video/mp4', 1000, 5000, 'ws_vet')`, [otherId]);
+  const otherCookie = (await auth.api.signInEmail({ body: { email: 'other@example.test', password: PASSWORD }, asResponse: true })).headers
+    .getSetCookie()
+    .map((c) => c.split(';')[0])
+    .join('; ');
+  expect((await POST(call('/api/analyses', 'POST', { sourceAssetId: 'v-other' }, otherCookie))).status).toBe(201);
+  await pool.query(`delete from analyses where user_id = $1`, [otherId]);
+  await settle();
+});
+
 test('refuses a video that is not the caller’s, a non-video asset, a missing asset and a hidden store', async () => {
   expect((await post({ sourceAssetId: 'v-theirs' })).status).toBe(403); // another user's video, not in the caller's library: readableAsset refuses it
   expect(await errorOf(await post({ sourceAssetId: 'img' }))).toBe('sourceAssetId must be a video');
@@ -109,7 +137,9 @@ test('refuses another billing team’s store to a member of a billing team (docs
     expect([refused.status, ((await refused.json()) as { code: string }).code]).toEqual([403, 'store_not_in_team']);
     expect((await post({ sourceAssetId: 'v1', storeId: 'store-ok' })).status).toBe(403); // a store of no team is not the team's either
     expect((await post({ sourceAssetId: 'v1', storeId: 'an-st-a' })).status).toBe(201);
+    await settle();
     expect((await post({ sourceAssetId: 'v1' })).status).toBe(201);
+    await settle();
   } finally {
     await pool.query('update users set team_id = $2 where id = $1', [userId, team]);
   }
@@ -125,9 +155,12 @@ test('polls one of the caller’s analyses and hides another user’s', async ()
 });
 
 test('lists the caller’s analyses newest first', async () => {
-  const list = (await (await LIST(call('/api/analyses'))).json()) as { analyses: { id: string; status: string }[] };
+  const list = (await (await LIST(call('/api/analyses'))).json()) as { analyses: { id: string; status: string; createdAt: string }[] };
   expect(list.analyses.length).toBeGreaterThanOrEqual(2);
-  expect(list.analyses.every((a) => a.status === 'queued')).toBe(true);
+  expect(list.analyses[0]!.status).toBe('queued'); // the one the previous test sent
+  const times = list.analyses.map((a) => Date.parse(a.createdAt));
+  expect(times).toEqual([...times].sort((a, b) => b - a));
+  expect(list.analyses.some((a) => a.id === 'an-theirs')).toBe(false);
 });
 
 const remove = (id: string) => REMOVE(call(`/api/analyses/${id}`, 'DELETE'), { params: Promise.resolve({ id }) });

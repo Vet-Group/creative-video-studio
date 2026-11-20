@@ -22,7 +22,7 @@ import { AnalysisHistory, EveryoneChoice } from './AnalysisHistory';
 import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
 import { RemakePanel } from './RemakePanel';
-import { SharedVideos, ShareControl } from './SharedVideos';
+import { type SharedVideo, SharedVideos, ShareControl } from './SharedVideos';
 
 type Tab = 'result' | 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { result: 'Kết quả', create: 'Phân tích', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
@@ -283,8 +283,9 @@ function Examples({ busy, onUse }: { busy: boolean; onUse: (video: string) => vo
 /** The address follows the analysis on view, without a navigation or a scroll. */
 const syncUrl = (id: string | null) => window.history.replaceState(null, '', id ? `/analyze?analysis=${id}` : '/analyze');
 
-/** `remakeEnabled`: REA_REMAKE_ENABLED, which adds Smart Remake under a finished analysis and the shared reference videos on the Examples tab. `isAdmin` adds the share control, and History's choice to list every member's analyses (view only). */
-export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false }: { initialId?: string; remakeEnabled?: boolean; isAdmin?: boolean }) {
+/** `remakeEnabled`: REA_REMAKE_ENABLED, which adds Smart Remake under a finished analysis and the shared reference videos on the Examples tab, `initialShared`
+ * their list as the page loaded it. `isAdmin` adds the share control, and History's choice to list every member's analyses (view only). */
+export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false, initialShared }: { initialId?: string; remakeEnabled?: boolean; isAdmin?: boolean; initialShared?: SharedVideo[] }) {
   const narrow = useMediaQuery(NARROW);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else the result when there is one, else Examples)
   const [video, setVideo] = useState<RefVideo | null>(null);
@@ -506,7 +507,7 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
             </section>
           ) : shown === 'examples' ? (
             <>
-              {remakeEnabled && <SharedVideos busy={busy} currentId={current?.id} onPick={(id) => api<AnalysisRow>(`/api/analyses/${encodeURIComponent(id)}`).then(pick)} />}
+              {remakeEnabled && <SharedVideos busy={busy} currentId={current?.id} initial={initialShared} onPick={(id) => api<AnalysisRow>(`/api/analyses/${encodeURIComponent(id)}`).then(pick)} />}
               <Examples busy={busy} onUse={(name) => void takeSample(name)} />
             </>
           ) : (

@@ -36,3 +36,31 @@ test('a client the server drops while idle is logged, not thrown as an uncaught 
     await own.end();
   }
 });
+
+test('opens up to 15 connections by default', async () => {
+  const own = createPool(url);
+  try {
+    expect(own.options.max).toBe(15);
+  } finally {
+    await own.end();
+  }
+});
+
+test('a query that finds every connection held waits 10 s at most, then rejects instead of hanging', async () => {
+  const own = createPool(url, 1);
+  const held = await own.connect();
+  try {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const waiting = own.query('select 1').then(
+      () => 'ran',
+      (e: Error) => e.message,
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+    vi.useRealTimers();
+    expect(await Promise.race([waiting, new Promise((resolve) => setTimeout(resolve, 200, 'still waiting'))])).toBe('timeout exceeded when trying to connect');
+  } finally {
+    vi.useRealTimers();
+    held.release();
+    await own.end();
+  }
+});

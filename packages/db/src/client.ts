@@ -22,8 +22,9 @@ export function databaseUrl(): string {
   return url;
 }
 
-export function createPool(connectionString: string, max = 5): pg.Pool {
-  const pool = new pg.Pool({ connectionString, max });
+export function createPool(connectionString: string, max = 15): pg.Pool {
+  // A query that finds every connection held fails after 10 s instead of queueing forever behind them (a batch of Runs waiting on the caps lock).
+  const pool = new pg.Pool({ connectionString, max, connectionTimeoutMillis: 10_000 });
   // The pool emits 'error' for an idle client the server drops (restart, terminated backend, a database dropped while its pool is still closing its
   // sockets); with no listener that is an uncaught exception. The pool has already discarded the client and opens a new one on demand.
   pool.on('error', (e) => console.error('pg pool: idle client dropped:', e.message));

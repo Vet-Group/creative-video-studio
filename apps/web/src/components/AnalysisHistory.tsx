@@ -2,6 +2,7 @@
 // The History tab list on the analyze page: loading, a load error with retry, the empty state, and a card per analysis. A
 // card opens only when its analysis succeeded; a running or failed one says why it does not. Split out of AnalyzeView so
 // these states are rendered from plain props and tested.
+import { useEffect, useRef, useState } from 'react';
 import { analysisError, analysisFormat, mergeShots } from '@/lib/analyze';
 import type { AnalysisRow } from './AnalyzeView';
 import { Icon } from './Icon';
@@ -9,13 +10,31 @@ import { LoadError } from './LoadError';
 
 const WHEN: Intl.DateTimeFormatOptions = { dateStyle: 'short', timeStyle: 'short' };
 
+/** A card's first frame. An uploaded video has no poster, so its src is attached only once the card scrolls into view: a list of 50 no longer opens 50
+ * streams through the app at once. */
+export function CardVideo({ assetId }: { assetId: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    if (!ref.current) return;
+    const watch = new IntersectionObserver(([e]) => {
+      if (!e?.isIntersecting) return;
+      setSeen(true);
+      watch.disconnect();
+    });
+    watch.observe(ref.current);
+    return () => watch.disconnect();
+  }, []);
+  return <video ref={ref} src={seen ? `/api/assets/${assetId}/content#t=0.1` : undefined} muted playsInline preload="metadata" tabIndex={-1} />;
+}
+
 function Card({ a }: { a: AnalysisRow }) {
   const r = a.result;
   const waiting = a.status === 'queued' || a.status === 'running';
   return (
     <>
       <span className="analysis-poster" aria-hidden="true">
-        {a.sourceAssetId ? <video src={`/api/assets/${a.sourceAssetId}/content#t=0.1`} muted playsInline preload="metadata" tabIndex={-1} /> : <Icon name="film" size={20} />}
+        {a.sourceAssetId ? <CardVideo assetId={a.sourceAssetId} /> : <Icon name="film" size={20} />}
       </span>
       <span className="analysis-card-body">
         {/* Many rows share a format, so the summary leads and the format is a tag. */}
