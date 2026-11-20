@@ -47,6 +47,13 @@ test('a counted slot shows "3/13" and says "3 trên 13 ảnh trang phục" to a 
   expect(html).toContain(`aria-describedby="${id}"`);
 });
 
+test('an empty counted slot shows no count, unless it counts always, as Image Generation\'s strip, which shows "0/14"', () => {
+  const html = (count: true | 'always') => renderToStaticMarkup(<Slot label="Ảnh tham chiếu" empty="Tối đa 14 ảnh tham chiếu" inputLabel="Ảnh tham chiếu" images={[]} max={14} count={count} busy={false} onAdd={() => undefined} onRemove={() => undefined} />);
+  expect(html(true)).not.toContain('slot-count');
+  expect(html('always')).toContain('<span aria-hidden="true">0/14</span>');
+  expect(html('always')).toContain('0 trên 14 ảnh tham chiếu');
+});
+
 test('an empty slot shows a picture by default and the icon it is given, as the plus on the Advanced wide slot', () => {
   const slot = (icon?: 'plus') => renderToStaticMarkup(<Slot label="Ảnh tham chiếu" empty="Tối đa 7 ảnh tham chiếu" inputLabel="Ảnh tham chiếu" images={[]} max={7} busy={false} onAdd={() => undefined} onRemove={() => undefined} icon={icon} />);
   const picture = 'M2 3h12v10H2z', plus = 'd="M8 3v10 M3 8h10"';

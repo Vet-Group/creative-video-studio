@@ -98,13 +98,19 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
   await expect(reason).not.toHaveAttribute('data-quiet');
   expect((await reason.boundingBox())!.width).toBeGreaterThan(100);
 
-  // A reference photo shows as a thumbnail in the bar with its remove button, and the strip counts them against the model's limit.
+  // A reference photo shows as a thumbnail in the bar with its remove button, and the strip counts them against the model's limit: Slot's count,
+  // shown from 0 on, at the strip's right past the uploaded-photos link, and read as the strip's description.
+  const count = bar.locator('.slot-count > [aria-hidden="true"]');
+  await expect(count).toHaveText('0/4');
   await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('bar-ref.png'));
   const thumb = bar.getByRole('list', { name: 'Ảnh tham chiếu: ảnh đã chọn' }).getByRole('img', { name: 'bar-ref.png' });
   await expect(thumb).toBeVisible();
   await expect(thumb).toBeInViewport();
-  await expect(bar.locator('.imagebar-count')).toHaveText('1/4 ảnh tham chiếu');
-  expect((await bar.locator('.imagebar-count').boundingBox())!.width).toBeGreaterThan(10);
+  await expect(count).toHaveText('1/4');
+  await expect(bar.getByRole('group', { name: /^Ảnh tham chiếu/ })).toHaveAccessibleDescription('1 trên 4 ảnh tham chiếu');
+  const [c, link] = [(await count.boundingBox())!, (await bar.getByRole('button', { name: 'Ảnh đã tải cho Ảnh tham chiếu' }).boundingBox())!];
+  expect(c.width).toBeGreaterThan(10);
+  expect(c.x, 'the count right of the uploaded-photos link').toBeGreaterThan(link.x + link.width);
   await prompt.fill('a linen shirt on a wooden chair');
   await expect(run).toBeEnabled();
   await expect(run).not.toHaveAttribute('aria-describedby');
@@ -351,8 +357,8 @@ test('a photo file dropped anywhere on the bar goes into the strip, and the page
   await expect(bar.locator('.slot')).toHaveAttribute('data-over', 'false');
 
   // A dialog opened from the bar sits inside it: a file dropped there does not land in the strip behind it.
-  const count = bar.locator('.imagebar-count');
-  await expect(count).toHaveText('1/4 ảnh tham chiếu');
+  const count = bar.locator('.slot-count > [aria-hidden="true"]');
+  await expect(count).toHaveText('1/4');
   await bar.getByRole('button', { name: 'Ảnh đã tải cho Ảnh tham chiếu' }).click();
   const photos = page.getByRole('dialog', { name: 'Ảnh đã tải' });
   await expect(photos).toBeVisible();
@@ -361,17 +367,17 @@ test('a photo file dropped anywhere on the bar goes into the strip, and the page
   await photos.dispatchEvent('drop', { dataTransfer: data });
   await page.keyboard.press('Escape');
   await expect(photos).toBeHidden();
-  await expect(count).toHaveText('1/4 ảnh tham chiếu');
+  await expect(count).toHaveText('1/4');
 
   // A full strip shows no drop outline, and a drop on it says why nothing was added.
   await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles([2, 3, 4].map((n) => file(`full-${n}.png`)));
-  await expect(count).toHaveText('4/4 ảnh tham chiếu');
+  await expect(count).toHaveText('4/4');
   await box.dispatchEvent('dragover', { dataTransfer: data });
   await expect(bar.locator('.slot')).toHaveAttribute('data-over', 'false');
   expect(await bar.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none');
   await box.dispatchEvent('drop', { dataTransfer: data });
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Tối đa 4 ảnh')).toBeVisible();
-  await expect(count).toHaveText('4/4 ảnh tham chiếu');
+  await expect(count).toHaveText('4/4');
   await expect(page).toHaveURL(/\/image-generation$/);
 });
 

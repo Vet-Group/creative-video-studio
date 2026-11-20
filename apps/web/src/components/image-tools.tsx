@@ -369,10 +369,11 @@ type Drag = { preventDefault(): void; dataTransfer: DataTransfer };
  * `onPick` adds the "Ảnh đã tải" link to the label's line while the slot has room (a one-photo slot always: a pick replaces its photo); `storeId` is the page's store, its first filter.
  * `slot` is the picker's first category, for a slot whose label names another page's category (Image Generation's reference photos); by default the label's.
  * `addRef` is the add button, for a page that moves focus to it.
- * `count` shows how many photos the slot holds of its `max` ("3/13") beside its name; more than `max` (a model with a lower cap chosen since) reads as an error.
+ * `count` shows how many photos the slot holds of its `max` ("3/13") beside its name once it holds one, or from "0/14" on with 'always' (Image
+ * Generation's strip, where the count is the only sign of the limit); more than `max` (a model with a lower cap chosen since) reads as an error.
  * `zone` widens the drop target to a box around the slot (Image Generation's whole prompt bar), so a file dropped beside the small tile is not lost.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra, count, zone }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean; zone?: RefObject<HTMLElement | null> }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra, count, zone }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean | 'always'; zone?: RefObject<HTMLElement | null> }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -438,7 +439,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
     </span>
   );
   // "3/13" on screen; a screen reader hears "3 trên 13 ảnh trang phục", as a bare fraction reads badly.
-  const counter = count && images.length > 0 && (
+  const counter = count && (images.length > 0 || count === 'always') && (
     <span className="slot-count" data-over={images.length > max || undefined}>
       <span aria-hidden="true">
         {images.length}/{max}
