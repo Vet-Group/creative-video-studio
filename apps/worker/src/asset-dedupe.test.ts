@@ -1,7 +1,7 @@
 // The duplicate-upload sweep against a disposable database on the compose Postgres (`pnpm services:up`); object reads are stubbed.
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { afterAll, beforeAll, expect, onTestFinished, test } from 'vitest';
 import { dedupeTick, hashInputs, removeDuplicateInputs, sha256, UNREADABLE } from './asset-dedupe';
 
 const testDb = await createTestDatabase();
@@ -61,6 +61,39 @@ test("keeps an analysis' reference video and a remake's product image even when 
   await pool.query(`delete from remakes`);
   await pool.query(`delete from analyses`);
   await pool.query(`delete from assets where id like 'v-%' or id like 'p-%'`);
+});
+
+test('ranks only the files that have another live copy, so a sweep reads jobs per copy and not per input', async () => {
+  // Audit 2026-11-20: ranking every live input made each tick read jobs once per input, though nearly every input has no copy.
+  onTestFinished(() => pool.query(`delete from assets where id like 's-%'`).then(() => {}));
+  for (let i = 0; i < 40; i++) await input(`s-${i}`, `photo ${i}`, 20 + i);
+  await input('s-new', 'sock', 1);
+  await input('s-old', 'sock', 2);
+  await hashInputs(pool, read);
+
+  type PlanNode = { 'Relation Name'?: string; 'Actual Loops': number; Plans?: PlanNode[] };
+  let plan: PlanNode | undefined;
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    // The sweep's own statement, run under explain analyze and rolled back.
+    await removeDuplicateInputs({
+      query: async (text: string) => {
+        const r = await client.query(`explain (analyze, format json) ${text}`);
+        plan = r.rows[0]['QUERY PLAN'][0].Plan;
+        return r;
+      },
+      connect: () => pool.connect(),
+    });
+  } finally {
+    await client.query('rollback');
+    client.release();
+  }
+  const jobReads = (n: PlanNode): number => (n['Relation Name'] === 'jobs' ? n['Actual Loops'] : 0) + (n.Plans ?? []).reduce((s, p) => s + jobReads(p), 0);
+  // At most three reads of jobs for each of the two copies (the two ranking checks and the final one); the 40 files without a copy add none.
+  expect(jobReads(plan!)).toBeLessThanOrEqual(6);
+
+  expect(await removeDuplicateInputs(pool)).toEqual(['s-old']);
 });
 
 test('hashes old inputs, keeps the newest copy of a file the purge will not take and every copy something uses, and removes the rest', async () => {
