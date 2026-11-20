@@ -2743,8 +2743,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 /* Phones: a 44 px hit area around the controls that draw smaller, which keep their look. Each control's own ::after is its hit area, so none reaches under another control:
    the image tile's actions get the gap that makes room for it, and the Library's two view buttons split the gap between them and use the free side. */
 @media (max-width: 480px) {
-  .explore-start-head .link-button, .library .segmented button, .card-actions > *, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-back, .fb-admin-note-head .link-button { position: relative; }
-  :is(.tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .theme-choice label, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-thumbs button, .fb-back, .fb-admin-note-head .link-button)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .tabs button, .remake-item > .link-button, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-back, .fb-admin-note-head .link-button { position: relative; }
+  :is(.tabs button, .remake-item > .link-button, .tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .theme-choice label, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-thumbs button, .fb-back, .fb-admin-note-head .link-button)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
   .fb-thumbs button { z-index: 1; } /* its hit area lies over the next photo, which takes no tap */
   .fb-form .fb-uploads { gap: 18px; } /* a photo's remove hit area ends where the attach button begins */
   .fb-admin .fb-admin-note { gap: 10px; } /* the preview toggle's hit area ends where the reply box begins */
@@ -2754,6 +2754,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   .prompt-preview + .templates { margin-top: 26px; } /* an app form without a field between them: the summary's hit area ends where the buttons' begins */
   .wizard-toggle { margin: 10px 0; } /* room for its hit area: the scrolling form clips above it, and the format card below is drawn over it */
   .card-actions { gap: 14px; }
+  .remake-item { gap: 20px; } /* each link's hit area ends where the next row's begins */
   .library .segmented button:first-child::after { right: -1px; left: -12px; }
   .library .segmented button:last-child::after { right: -12px; left: -1px; }
   /* Fields, the pills and the Library's toolbar draw at 44 px instead: they sit in rows and scrolling strips, where a wider hit area would reach under the next control or be clipped. */

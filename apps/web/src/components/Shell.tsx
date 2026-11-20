@@ -399,12 +399,12 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
             </button>
           )}
           {job.status === 'succeeded' && reuseHref(job) && (
-            <button type="button" className="job-reuse" disabled={sending} onClick={() => void rerun()}>
+            <button type="button" className="job-reuse" title="Chạy lại: gửi ngay với cùng cài đặt" disabled={sending} onClick={() => void rerun()}>
               <Icon name="arrow" /> Chạy lại
             </button>
           )}
           {reuseHref(job) && (
-            <Recreate href={reuseHref(job)!} from={refillFrom({ reuse: job.id })!} className={out ? 'job-reuse job-primary' : 'job-reuse'}>
+            <Recreate href={reuseHref(job)!} from={refillFrom({ reuse: job.id })!} className={out ? 'job-reuse job-primary' : 'job-reuse'} title="Dùng lại: điền lại form để sửa">
               <Icon name="copy" /> Dùng lại
             </Recreate>
           )}
@@ -667,6 +667,7 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/image-generation', 'Tạo ảnh'],
   ['/create', 'Tạo video'],
   ['/marketing-studio', 'Marketing Studio'],
+  ['/analyze', 'Phân tích'],
   ['/apps', 'Ứng dụng'],
   ['/library', 'Thư viện'],
   ['/changelog', 'Có gì mới'],
@@ -852,9 +853,11 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
   const accountMenu = (variant: 'chip' | 'avatar') => (
     <AccountMenu name={userName} email={account.email} color={userAvatarColor(userName, account.avatarColor)} variant={variant} onSettings={setSettings} />
   );
-  const title = PAGE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? 'Creative Video Studio';
+  // An app page is named by its app (Smart Remake), the other pages by PAGE_TITLES; the tab title carries the same name.
+  const page = (pathname.startsWith('/apps/') ? appBySlug(pathname.split('/')[2]!)?.name : undefined) ?? PAGE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1];
+  const title = page ?? 'Creative Video Studio';
   return (
-    <JobsProvider userId={userId}>
+    <JobsProvider userId={userId} page={page}>
       <AdminContext value={isAdmin}>
         <OpenToolGuide value={openGuide}>
           <div className="app" data-collapsed={collapsed}>
