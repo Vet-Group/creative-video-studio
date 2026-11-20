@@ -122,6 +122,11 @@ describe('run timeout', () => {
     expect(DEFAULT_OPTIONS.runTimeoutMs).toBe(20 * 60_000);
     expect(DEFAULT_OPTIONS.runTimeoutMs).toBeGreaterThan(627_000);
   });
+
+  test('systemd waits longer for the worker to stop than the worker waits for its submits in flight', async () => {
+    const unit = await readFile(new URL('../../../deploy/linux/cvs-worker.service', import.meta.url), 'utf8');
+    expect(Number(/^TimeoutStopSec=(\d+)$/m.exec(unit)?.[1]) * 1000).toBeGreaterThan(DEFAULT_OPTIONS.drainMs);
+  });
 });
 
 describe('the mock lifecycle', () => {
