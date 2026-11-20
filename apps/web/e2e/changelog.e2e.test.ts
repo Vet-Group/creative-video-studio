@@ -51,10 +51,16 @@ test('a first visit shows the dot for the newest day but no popup; the page list
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
-test('unseen entries show the dot and the Explore card, one popup a day that "Để sau" closes, and opening the page clears the dot', async ({ page }) => {
+test('unseen entries show the dot and the Explore card, one popup a day on Explore only that "Để sau" closes, and opening the page clears the dot', async ({ page }) => {
   await signIn(page, 'chga');
   await unseen(page);
-  await page.goto('/explore');
+  // Another page first: no popup over what the member came to do, only the dot.
+  await page.goto('/library');
+  await expect(page.getByRole('heading', { level: 1, name: 'Thư viện' })).toBeVisible();
+  await expect(dot(page)).toBeVisible();
+  await expect(popup(page)).toHaveCount(0);
+  await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Khám phá' }).click();
+  await expect(page).toHaveURL(/\/explore$/);
 
   // The popup lists the three newest unseen entries, once.
   await expect(popup(page)).toBeVisible();
