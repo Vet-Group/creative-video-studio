@@ -176,6 +176,10 @@ test('Dịch shows a Vietnamese reading of English words under the box, asks onc
   await translate.click();
   await expect(reading.getByText('Translation: slow turn in window light')).toBeVisible();
   expect(asks).toBe(1);
+  // The reading has a close button of its own, which hands the focus back to the translate button.
+  await reading.getByRole('button', { name: 'Đóng bản dịch' }).click();
+  await expect(reading).toHaveCount(0);
+  await expect(translate).toBeFocused();
   // New words close the reading; Vietnamese words need none.
   await box.fill('xoay chậm dưới ánh nắng');
   await expect(reading).toHaveCount(0);
