@@ -3058,7 +3058,7 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 .imagebar-top { display: flex; flex-direction: column; gap: 12px; }
 /* The reference strip: Slot's thumbnails and add tile at 48 px, scrolling past two rows, the uploaded-photos link above them and the count at the right. */
 .imagebar-refs { position: relative; }
-.imagebar-count { position: absolute; top: 0; right: 0; color: var(--text-muted); font-size: 12px; line-height: 21px; font-variant-numeric: tabular-nums; }
+.imagebar .slot-count:not(dialog *) { order: 1; margin: 0 0 0 auto; font-size: 12px; line-height: 21px; }
 .imagebar .field-head:not(dialog *) { justify-content: flex-start; min-height: 21px; }
 .imagebar .slot:not(dialog *) { gap: 6px; width: max-content; max-width: 100%; max-height: 122px; min-height: 0; padding: 6px 6px 0 0; overflow-y: auto; border: 0; border-radius: 0; scrollbar-width: thin; }
 .imagebar .slot:not(dialog *):hover { background: transparent; }
@@ -3103,7 +3103,7 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
   .imagebar .slot-thumbs button:not(dialog *) { top: 2px; right: 2px; }
   .imagebar .slot-thumbs button:not(dialog *)::after { content: ''; position: absolute; inset: -12px; }
   .imagebar .field-head:not(dialog *) { min-height: 44px; }
-  .imagebar-count { line-height: 44px; }
+  .imagebar .slot-count:not(dialog *) { line-height: 44px; }
   .imagebar-foot { row-gap: 12px; } /* a wrapped link's hit area ends where the row above begins */
 }
 @media (min-width: 1024px) {
@@ -3124,7 +3124,7 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
   .imagebar-top > :last-child { flex: 1; min-width: 0; }
   .imagebar .slot:not(dialog *) { max-width: 162px; }
   .imagebar .field-head:not(dialog *) { min-height: 18px; }
-  .imagebar-count { line-height: 18px; }
+  .imagebar .slot-count:not(dialog *) { line-height: 18px; }
   /* One row, Run at its end: on a narrow column the model's name and a chosen style's give way, cut with an ellipsis (the plain style pill keeps its one word). */
   .imagebar-chips { flex-wrap: nowrap; }
   .imagebar-chips > * { flex-shrink: 0; }
@@ -3148,5 +3148,5 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 }
 @media (min-width: 1024px) and (pointer: coarse) {
   .imagebar .field-head:not(dialog *) { min-height: 44px; }
-  .imagebar-count { line-height: 44px; }
+  .imagebar .slot-count:not(dialog *) { line-height: 44px; }
 }
