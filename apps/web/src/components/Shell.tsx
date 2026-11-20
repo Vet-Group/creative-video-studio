@@ -499,12 +499,12 @@ function HistoryEmpty({ feature }: { feature: string }) {
 }
 
 /** The "My jobs" list. It opens in the drawer of a page without its own History, or sits in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation).
- * Beside a form (FormContext), the cards' chips set their value on it and Dùng lại refills it in place. */
-export function Tray({ feature }: { feature?: string }) {
+ * Beside a form (FormContext), the cards' chips set their value on it and Dùng lại refills it in place. With `format` (Marketing Studio's), only that format's jobs; UGC's carry none. */
+export function Tray({ feature, format }: { feature?: string; format?: string }) {
   const isAdmin = useContext(AdminContext);
   const all = useJobs();
   const { workerOffline, loaded, failed, refresh, queue } = all;
-  const jobs = feature ? all.jobs.filter((j) => j.feature === feature) : all.jobs;
+  const jobs = feature ? all.jobs.filter((j) => j.feature === feature && (format === undefined || (j.format ?? 'ugc') === format)) : all.jobs;
   const zip = useZipDownload();
   // A batch app's card offers its Run when the list shows another result of it. The Run's results are read from the job, as a Run can hold more than the 20 latest jobs.
   const inBatch = (j: TrayJob) => !!j.batch && jobs.some((b) => b.id !== j.id && b.batch === j.batch && b.status === 'succeeded' && b.outputAssetId);

@@ -975,7 +975,8 @@ export function TileImg(props: ImgHTMLAttributes<HTMLImageElement> & { alt: stri
   return <img {...props} className={loaded ? 'tile-img loaded' : 'tile-img'} onLoad={() => setLoaded(true)} onError={() => setLoaded(true)} />;
 }
 
-export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
+/** `feature` is the page's own feature when `kind` is a narrower Library kind (Marketing Studio's format), which the Admin's example order still goes by. */
+export function Gallery({ kind, feature = kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; feature?: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
   const have = useSamples();
   const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
   /** Every sample opens in place (SampleDetail); the ones with a details file show its prompt and settings too. */
@@ -1048,7 +1049,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   return (
     <>
       {!narrow && <SizeSlider size={size} onChange={resize} />}
-      {admin && items.length > 1 && <ExampleOrder feature={kind} onSaved={() => void load(0)} />}
+      {admin && items.length > 1 && <ExampleOrder feature={feature} onSaved={() => void load(0)} />}
       <ProductTypeFilter items={items} value={type} onChange={setChosenType} />
       <div className="masonry" role="group" aria-label={label}>
         {Array.from({ length: columns }, (_, c) => (

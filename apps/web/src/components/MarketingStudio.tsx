@@ -177,6 +177,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   const choices = useChoiceLists(pf);
   const { lists: custom, setLists: setCustom, reload: loadChoices, remove: removeChoice } = choices;
   const [picker, setPicker] = useState<'hook' | 'location' | 'format' | 'model' | 'product' | null>(null);
+  const [allFormats, setAllFormats] = useState(false); // History and Examples: this format's only, or every format's
   /** The member's past UGC product photos (Fash's My Products), offered by the product slot. */
   const [myProducts, setMyProducts] = useState<Img[]>([]);
   const [prompt, setPrompt, clearBodyDraft] = useDraftState(`${pf ? `marketing-${pf}` : 'marketing'}.body`, reuse !== undefined);
@@ -876,16 +877,27 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         </div>
 
         <div className={!narrow && historySize === 0 ? 'side history-small' : 'side'} id={`marketing-panel-${panel}`} role="tabpanel" aria-labelledby={`marketing-tab-${panel}`} hidden={narrow && shown === 'create'}>
+          {/* History and Examples follow this page's format unless the member asks for all of them. */}
+          {shown !== 'about' && (
+            <div className="kinds kinds-wrap" role="group" aria-label="Lọc theo định dạng">
+              {([false, true] as const).map((all) => (
+                <button key={String(all)} type="button" aria-pressed={allFormats === all} onClick={() => setAllFormats(all)}>
+                  {all ? 'Tất cả định dạng' : name}
+                </button>
+              ))}
+            </div>
+          )}
           {shown === 'examples' ? (
             <FormContext.Provider value={actions}>
-              <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
+              {/* The fixed sample clips carry their format only in a details file, so they show under both. */}
+              <Gallery kind={allFormats ? 'marketing' : `marketing_${format}`} feature="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText={allFormats ? 'Chưa có video Marketing Studio nào trong công ty.' : `Chưa có video ${name} nào trong công ty.`} />
             </FormContext.Provider>
           ) : shown === 'about' ? (
             <About page={advanced ? 'advanced' : unboxing ? 'unboxing' : review ? 'review' : 'marketing'} />
           ) : (
             <FormContext.Provider value={actions}>
               {!narrow && <SizeSlider size={historySize} last={1} onChange={resizeHistory} />}
-              <Tray feature="marketing" />
+              <Tray feature="marketing" format={allFormats ? undefined : format} />
             </FormContext.Provider>
           )}
         </div>
