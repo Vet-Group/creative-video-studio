@@ -908,6 +908,11 @@ describe('POST /api/jobs for an image feature', () => {
       expect([ok.status, ok.job]).toEqual([201, { feature: 'pose_generator', model: 'app-poses', prompt: kneel.prompt, aspect: 'auto', params: { resolution: '1K', pose: 'kneel', batch: BATCH }, workspace_id: 'ws_vet' }]);
       const words = 'x'.repeat(199) + 'ồ'; // 200 characters, a Vietnamese letter last
       expect(await post(own(words), 1)).toMatchObject({ status: 201, job: { prompt: posePrompt(words), params: { poseText: words, batch: BATCH } } });
+      // A Run makes at most 4 poses, as the page lets the member pick: two more pass, a 5th of the same Run is refused and nothing is made.
+      for (const more of ['ngồi trên ghế', 'đứng dựa tường']) expect((await post(own(more), 1)).status).toBe(201);
+      const count = await jobCount();
+      expect((await post(own('ngồi xổm'), 1)).error).toBe('a pose generator Run (params.batch) takes at most 4 poses');
+      expect(await jobCount()).toBe(count);
     });
 
     test("History's list names a pose generator job's pose or own words, and not a Try On job's pose", async () => {

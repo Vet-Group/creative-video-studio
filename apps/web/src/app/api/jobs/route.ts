@@ -13,7 +13,7 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
-import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MOCKUP_PRODUCTS, nameOk, PET_STYLES } from '@/lib/apps';
+import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES } from '@/lib/apps';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
@@ -132,7 +132,7 @@ export async function GET(request: Request) {
  * `pose_generator` takes exactly one image (the person) and one of `params.pose` (a value of POSES) or `params.poseText` (the member's own words, clean as a name is, 1 to
  * MAX_POSE_TEXT characters), not both, with exactly the prompt posePrompt makes of it: one job per pose.
  * The batch apps (BATCH_FEATURES) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again. As on the pages, a Run
- * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs, and a mockup pack Run with a blank product photo one job (400 for one more).
+ * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs (a pose generator Run MAX_POSES), and a mockup pack Run with a blank product photo one job (400 for one more).
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * A store of another team than the caller's billing team is refused with 403 and `code` STORE_TEAM_CODE (lib/billing.ts); not naming a store stays allowed.
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
@@ -369,6 +369,7 @@ export async function POST(request: Request) {
         )
       ).rows[0] as { jobs: number; blanks: number };
       if (sent.jobs >= MAX_BATCH) return bad(`a Run (params.batch) takes at most ${MAX_BATCH} jobs`);
+      if (spec.feature === 'pose_generator' && sent.jobs >= MAX_POSES) return bad(`a pose generator Run (params.batch) takes at most ${MAX_POSES} poses`);
       if (sent.jobs > 0 && (sent.blanks > 0 || (spec.feature === 'mockup_pack' && spec.assetIds.length > 1))) return bad('with a blank product photo the mockup pack makes one product per Run');
     }
     // The model, preset, store and assets are read under the lock, so one disabled or hidden meanwhile is refused.
