@@ -557,14 +557,17 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
   const rerun = async () => {
     setRerunning(true); // from the click on, so a double click cannot send two paid jobs
     await act(async () => {
-      if (await confirmRerun(clip.costUsd, (usd) => (usd ? `Chạy lại với giá khoảng $${usd}?` : 'Chạy lại?'), (maxUsd) => api('/api/jobs', sendJson('POST', { rerunOf: clip.id, maxUsd })))) setNote('Đã gửi lượt chạy lại. Theo dõi trong Lịch sử của ứng dụng.');
+      if (await confirmRerun(clip.costUsd, (usd) => (usd ? `Chạy lại với giá khoảng $${usd}?` : 'Chạy lại?'), (maxUsd) => api('/api/jobs', sendJson('POST', { rerunOf: clip.id, maxUsd })))) {
+        setNote('Đã gửi lượt chạy lại. Theo dõi trong Lịch sử của ứng dụng.');
+        void refresh(); // the tray watches the new job at once
+      }
     }, 'Không chạy lại được.');
     setRerunning(false);
   };
   const copy = () => act(async () => (await navigator.clipboard.writeText(copyText ?? ''), setNote('Đã sao chép.')), 'Không sao chép được.');
   // Fash's "Use this frame": the video stops on the frame shown, which goes up as a photo and opens Create video as its first image.
   const router = useRouter();
-  const { notify } = useJobs();
+  const { notify, refresh } = useJobs();
   const [grabbing, setGrabbing] = useState(false);
   const takeFrame = async () => {
     const v = media.current;
