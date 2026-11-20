@@ -143,8 +143,14 @@ run mkdir -p "$app"
 export GIT_SSH_COMMAND="ssh -i $deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 say "git uses the deploy key at $deploy_key"
 if [ -d "$app/.git" ]; then
-  run git -C "$app" fetch --quiet --no-tags origin "$repo_ref"
-  run git -C "$app" merge --ff-only --quiet "refs/remotes/origin/$repo_ref" # the full ref: a tag of the same name cannot stand in
+  # A detached HEAD is the commit cvs-run-gate checked out (deploy <sha>, a rollback too): a fast-forward would move it to the tip of
+  # $repo_ref, so only a checkout on a branch follows it. The check only reads, so it is not under run.
+  if git -C "$app" symbolic-ref -q HEAD > /dev/null; then
+    run git -C "$app" fetch --quiet --no-tags origin "$repo_ref"
+    run git -C "$app" merge --ff-only --quiet "refs/remotes/origin/$repo_ref" # the full ref: a tag of the same name cannot stand in
+  else
+    say "HEAD is detached at $(git -C "$app" rev-parse --short HEAD): keeping that commit, not fast-forwarding to origin/$repo_ref"
+  fi
 else
   run git -C "$app" init --quiet
   run git -C "$app" remote add origin "$repo_url"
