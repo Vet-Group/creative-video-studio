@@ -31,7 +31,7 @@ export function Changelog({ entries, isAdmin }: { entries: ChangeEntry[]; isAdmi
     <section aria-labelledby="changelog-title" className="changelog">
       <h1 id="changelog-title">Có gì mới</h1>
       <p className="muted changelog-sub">Những thay đổi của Video Studio theo từng ngày: có gì mới, từ khi nào và dùng để làm gì.</p>
-      <div className="kinds" role="group" aria-label="Loại thay đổi">
+      <div className="kinds kinds-wrap" role="group" aria-label="Loại thay đổi">
         {kinds.map((k) => (
           <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>
             {k === 'all' ? 'Tất cả' : KIND_LABEL[k]}

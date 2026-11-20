@@ -1336,7 +1336,10 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
 .lightbox-back { position: absolute; top: 12px; left: 12px; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px 0 8px; border: 0; border-radius: 999px; background: rgb(var(--shade) / .7); color: var(--on-dark); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .lightbox-back:hover { background: rgb(var(--shade) / .85); }
 @media (pointer: coarse) { .lightbox-back { height: 44px; } }
-.lightbox-back:focus-visible, .lightbox-step:focus-visible { outline-color: var(--on-dark); } /* the default dark ring vanishes on the dark picture (1.04:1 measured) */
+.lightbox-back:focus-visible, .lightbox-step:focus-visible, .lightbox-skip:focus-visible { outline-color: var(--on-dark); } /* the default dark ring vanishes on the dark picture (1.04:1 measured) */
+/* A clip's first Tab stop, over the picture's corner only while focused: it skips the player's own controls. */
+.lightbox-skip { position: absolute; top: 12px; left: 12px; z-index: 1; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: rgb(var(--shade) / .7); color: var(--on-dark); font: inherit; font-size: 13px; font-weight: 600; }
+.lightbox-skip:not(:focus) { width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .job-inputs button.tap { border-radius: 6px; }
 .job-inputs button.tap[aria-pressed] { cursor: zoom-in; } /* the Library detail's inputs show in place of the result */
 .job-inputs .tap[aria-pressed='true'] img { outline: 2px solid var(--ink-strong); outline-offset: 1px; }
@@ -1347,6 +1350,12 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
 @media (pointer: coarse) { .lightbox-tools .lightbox-result { height: 44px; } }
 .lightbox-side > * { flex: none; } /* a long side scrolls; its buttons keep their height (the Reuse link drew 24 px tall on a phone) */
 .lightbox-reuse { display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 8px; background: var(--ink-strong); color: var(--on-ink); font-size: 13px; font-weight: 600; text-decoration: none; }
+/* The marks and Reuse at the bottom of the side while the recipe above scrolls; the negative margins reach over the side's padding, which a sticky box stays inside. */
+.lightbox-foot { position: sticky; bottom: -16px; z-index: 1; display: grid; gap: 8px; margin: auto -16px -16px; padding: 12px 16px 16px; border-top: 1px solid var(--hairline); background: var(--surface); }
+.lightbox-foot:empty { display: none; }
+.lightbox-foot-actions { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 8px; }
+.lightbox-reuse.lightbox-rerun { border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink-strong); } /* a new paid job: never the same weight as Reuse */
+.job-actions .icon-button.labelled { gap: 6px; width: auto; padding: 0 10px; font: inherit; font-size: 12px; font-weight: 500; }
 .lightbox-step { position: fixed; top: 50%; display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; background: rgb(var(--shade) / 70%); color: var(--on-dark); transform: translateY(-50%); }
 .lightbox-prev { left: 24px; }
 .lightbox-next { right: 24px; }
@@ -1958,6 +1967,11 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .library-chip:hover { border-color: var(--ink); color: inherit; }
 .library-chip > span[aria-hidden] { font-size: 14px; line-height: 1; opacity: .55; }
 .library-chip:hover > span[aria-hidden] { opacity: 1; }
+/* A phone's filter sheet: one filter per row across the sheet, then Done. */
+.library-sheet h2 { margin: 0 40px 12px 0; font-size: 16px; line-height: 24px; font-weight: 600; }
+.library-sheet-fields { display: grid; gap: 8px; margin: 0 0 16px; }
+.library-sheet-fields .library-field :is(select, input) { flex: 1; }
+.library-sheet .primary { width: 100%; height: 44px; }
 /* Select mode: a checkbox in the corner of each item with a result, and the bar that downloads the picked ones as one .zip. */
 .library-tools .zip-toggle { height: 36px; margin: 0 0 0 auto; padding: 0 14px; border-color: rgb(var(--tint) / .1); font-size: 13px; line-height: 34px; font-weight: 500; }
 .zip-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 12px 0 0; }
@@ -2354,8 +2368,8 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .marketing-head { position: relative; justify-content: center; align-items: center; min-height: 130px; text-align: center; cursor: pointer; }
 @media (max-width: 1023.98px) { .marketing-head { min-height: 100px; } } /* Fash's format card is 100 px tall on a phone (measured at 390), 130 px on desktop */
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; }
-/* Library kinds: one scrolling row of pills. */
-.library .kinds { margin: 0 0 12px; gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding-right: 24px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 24px), transparent); } /* one scrolling row, as on Fash, instead of a lone pill on a second line; the faded padding hints at more pills without covering the last one when all fit */
+/* Library kinds: the pills wrap on a wide screen, so none is cut at the edge (the Apps pill was, at 1440 px); below 640 px they scroll under a fade. */
+.library .kinds { margin: 0 0 12px; gap: 6px; }
 .library .kinds button { padding: 0 12px; }
 .explore-sub { margin: -12px 0 20px; }
 /* Below 1024 px: smaller Explore headings; tablets keep model, ratio and size on one row, as on Fash. */
@@ -2511,12 +2525,16 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
   /* A half-width card has about 155 px for the three marks: Pass keeps 44 px, and Featured and Fail share the rest, Fail on two lines. */
   .library .card .actions .verdict-buttons { display: grid; grid-template-columns: minmax(44px, auto) minmax(0, 1fr) minmax(0, 1fr); }
   .library .card .actions .verdict-buttons button { line-height: 16px; white-space: normal; }
-  /* One scrolling row, like the type pills above, instead of three rows that pushed the first result down; the padding keeps the focus ring. */
-  .library-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -4px; padding: 4px 24px 4px 4px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 24px), transparent); }
-  .library-active { order: -1; margin: 0 4px 0 0; }
+  /* One scrolling row of pills: four wrapped rows pushed the first result down. The wide fade cuts into the last pill on screen, so more pills read as more. */
+  .library .kinds { flex-wrap: nowrap; overflow-x: auto; padding-right: 48px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 48px), transparent); }
+  /* The filters open in a sheet (Library.tsx): the row keeps its button and the active chips, on one scrolling row as before; the padding keeps the focus ring. */
+  .library-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -4px; padding: 4px 48px 4px 4px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 48px), transparent); }
+  .library-active { margin: 0; }
   .lib-row .actions { flex-basis: 100%; padding-left: 68px; }
   .zip-float { bottom: 12px; }
 }
+/* Up to 420 px a grid card's Fail mark shows its first word only (screen readers still get both), so no mark wraps to a second line. */
+@media (max-width: 420px) { .library .card .verdict-more { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }
 /* Touch phones: the 44 px action targets overlap the row's gap and padding, so the icons sit under the text and the row stays short. */
 @media (max-width: 639.98px) and (pointer: coarse) {
   .lib-row { row-gap: 4px; padding: 8px 12px; }
@@ -2579,7 +2597,9 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .lightbox-side h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .lightbox-side h2 .lib-mark { margin-left: 0; }
 .recipe-text h3 { margin: 0 0 4px; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 600; }
-.recipe-text p { max-height: 160px; margin: 0; overflow-y: auto; color: var(--ink); font-size: 13px; line-height: 19px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.recipe-text p { margin: 0; color: var(--ink); font-size: 13px; line-height: 19px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.recipe-text p[data-clamped] { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 4; } /* a long text's first lines, until its show-more button */
+.recipe-text .link-button { margin-top: 2px; font-size: 12px; }
 .recipe-sent summary { color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer; }
 .recipe-sent p { max-height: 160px; margin: 6px 0 0; overflow-y: auto; color: var(--text-2); font-size: 12px; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .recipe { display: grid; gap: 6px; margin: 0; padding-top: 12px; border-top: 1px solid var(--hairline); }
