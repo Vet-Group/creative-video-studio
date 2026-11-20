@@ -25,7 +25,7 @@ export async function bestClips(workspaceId: string): Promise<Map<string, { vide
        from jobs j
        join verdicts v on v.job_id = j.id and v.verdict = 'pass'
        join assets o on o.id = j.output_asset_id
-      where j.workspace_id = $1 and ${LIVE_CLIP} and not j.is_mock and j.feature in ('video', 'image') and (o.mime like 'video/%' or o.mime like 'image/%')
+      where j.workspace_id = $1 and ${LIVE_CLIP} and ${LIBRARY_LISTED} and not j.is_mock and j.feature in ('video', 'image') and (o.mime like 'video/%' or o.mime like 'image/%')
       order by j.model, v.featured desc, (select count(*) from favorites f where f.job_id = j.id) desc, j.created_at desc, j.id desc`,
     [workspaceId],
   );

@@ -87,6 +87,24 @@ describe('/api/admin/users', () => {
     expect((await pool.query(`select email_verified from users where email = 'verified@example.test'`)).rows[0].email_verified).toBe(true);
   });
 
+  test('audits an account creation once, with who, what and whether a password was set, and never the password', async () => {
+    const body = JSON.stringify({ email: 'audited@example.test', name: 'Audited', password: PASSWORD, teamId: 'team-unassigned', outsideLark: true });
+    const { id } = (await (await POST(req(adminCookie, { method: 'POST', body }))).json()) as { id: string };
+    const rows = (await pool.query('select actor_id, action, old_value, new_value from audit_entries where target = $1', [`user:${id}`])).rows;
+    expect(rows).toEqual([
+      {
+        actor_id: (await pool.query(`select id from users where email = 'admin@example.test'`)).rows[0].id,
+        action: 'user.create',
+        old_value: null,
+        new_value: { email: 'audited@example.test', name: 'Audited', role: 'member', teamId: 'team-unassigned', outsideLark: true, passwordSet: true },
+      },
+    ]);
+    expect(JSON.stringify(rows)).not.toContain(PASSWORD);
+    const bare = JSON.stringify({ email: 'bare@example.test', name: 'Bare', teamId: 'team-unassigned' });
+    const bareId = ((await (await POST(req(adminCookie, { method: 'POST', body: bare }))).json()) as { id: string }).id;
+    expect((await pool.query('select new_value from audit_entries where target = $1', [`user:${bareId}`])).rows[0].new_value).toMatchObject({ outsideLark: false, passwordSet: false });
+  });
+
   test('lets an Admin create a user without a password, who then cannot sign in by email', async () => {
     const body = JSON.stringify({ email: 'lark-only@example.test', name: 'Lark Only', teamId: 'team-unassigned' });
     const res = await POST(req(adminCookie, { method: 'POST', body }));

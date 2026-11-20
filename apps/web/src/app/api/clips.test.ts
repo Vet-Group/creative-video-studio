@@ -1136,6 +1136,20 @@ describe('bestClips', () => {
     await pool.query('update jobs set poster_asset_id = null where id = $1', [image]); // an image from before previews shows itself
     expect((await bestClips('ws_vet')).get('best-image')).toEqual({ video: null, poster: `/api/assets/${image}-video/thumb` });
   });
+
+  test('a clip made by a system account is no model card clip unless an Admin made it an example, like the Library', async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values
+         ('best-system', 'fal', 'x', 'Best system', '{9:16}', '{8}', 2, '720p', 0.2, '{}', true)`,
+    );
+    const robot = await newUser('best-system@example.test', 'Best robot');
+    await pool.query('update users set system = true where id = $1', [robot.id]);
+    const own = await clip(robot.id, { model: 'best-system', createdAt: '2026-03-01T00:00:00Z' });
+    await pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, marked_by) values ($1, $1, $2, 'pass', $3)`, [own, `${own}-video`, admin.id]);
+    expect((await bestClips('ws_vet')).has('best-system')).toBe(false);
+    await pool.query('insert into examples (job_id, added_by) values ($1, $2)', [own, admin.id]);
+    expect((await bestClips('ws_vet')).get('best-system')?.video).toBe(`/api/assets/${own}-video/content`);
+  });
 });
 
 describe('system accounts in the Library (owner decision 2026-11-20)', () => {
