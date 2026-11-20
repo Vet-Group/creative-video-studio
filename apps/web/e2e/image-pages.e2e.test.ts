@@ -832,6 +832,7 @@ test("Try On, as Fash's model catalog: the filter chips narrow the named portrai
     await expect(poseWins).toHaveCount(0);
     await expect(page.locator('.prompt-preview p')).toContainText("Keep the person's face and body exactly unchanged.");
     await words.fill('');
+    await poseChip.focus(); // the keyboard step below starts on the chip
     // From the keyboard, the chip opens the pose step's pictures for the photo already in the slot: a pick sets the pose and copies no photo again.
     const copies: string[] = [];
     page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/assets/samples' && copies.push(r.url())));

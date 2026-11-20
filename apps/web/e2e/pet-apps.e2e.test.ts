@@ -181,7 +181,7 @@ test('name swap: fills the names from a CSV file, the pet name column first, thr
   const names = page.getByLabel('Tên mới, mỗi dòng một tên');
   await names.fill('Old');
   const csvFile = page.getByLabel('Tệp CSV chứa tên');
-  const note = page.getByRole('status').filter({ hasText: 'Đã lấy' });
+  const note = page.getByRole('status').filter({ hasText: /^Đã (lấy|thay)/ });
 
   // An export with a byte order mark, CRLF, quoted fields with a comma or a line break, a repeat, a blank and a value that is no name.
   const csv = '﻿Name,Email,Pet Name\r\n#1001,a@e2e.test,Max\r\n#1002,b@e2e.test,"Bella"\r\n#1003,c@e2e.test,Max\r\n#1004,d@e2e.test,"Max 🐶, the dog"\r\n#1005,e@e2e.test,\r\n#1006,f@e2e.test,"Nguyễn\r\nÁnh"\r\n';
@@ -209,7 +209,7 @@ test('name swap: fills the names from a CSV file, the pet name column first, thr
   await selectText(page, 'Cột chứa tên', 'Name');
   await ask.getByRole('button', { name: 'Thay', exact: true }).click();
   await expect(names).toHaveValue('');
-  await expect(note).toHaveText('Đã lấy 0 tên từ cột “Name” của orders.csv. Bỏ qua 6 giá trị không hợp lệ: "#1001", "#1002", "#1003"….');
+  await expect(note).toHaveText('Đã thay 1 tên bạn nhập bằng 0 tên từ cột “Name” của orders.csv. Bỏ qua 6 giá trị không hợp lệ: "#1001", "#1002", "#1003"….');
   await expect(reason(page)).toHaveText('Nhập ít nhất một tên.');
 
   // More than 25 names: the first 25 are kept.
