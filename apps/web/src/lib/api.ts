@@ -66,8 +66,12 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-/** A readable message for a failed call; the server's text is shown only for the cap refusals, which are written for Members. */
-export const errorText = (e: unknown, fallback: string): string => (e instanceof ApiError && e.status === 429 ? e.message : fallback);
+/** The member's words for a Run refused because its store is another team's (lib/billing.ts STORE_TEAM_CODE). */
+export const STORE_TEAM_TEXT = 'Cửa hàng này thuộc team khác. Bạn chỉ tạo được cho cửa hàng của team mình: hãy chọn lại cửa hàng hoặc để trống.';
+
+/** A readable message for a failed call; the server's text is shown only for the cap refusals, which are written for Members, and a store of another team is said so. */
+export const errorText = (e: unknown, fallback: string): string =>
+  e instanceof ApiError && e.status === 429 ? e.message : e instanceof ApiError && e.code === 'store_not_in_team' ? STORE_TEAM_TEXT : fallback;
 
 /** An image asset's small JPEG for tiles, or with `w` (1600, the one other size the route serves) its larger preview; open or download the original through `/content`. */
 export const thumbUrl = (id: string, w?: number) => `/api/assets/${id}/thumb${w ? `?w=${w}` : ''}`;

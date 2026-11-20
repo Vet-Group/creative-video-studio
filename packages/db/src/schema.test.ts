@@ -1059,3 +1059,21 @@ describe('migration 0110 workspace contract', () => {
     await expect(pool.query(`insert into stores (id, name, code) values ('no-ws', 'No workspace', 'NO-WS')`)).rejects.toThrow(/null value in column "workspace_id"/);
   });
 });
+
+describe('migration 0111 billing teams', () => {
+  test('teams are not billable with a 20 USD allowance by default, refuse a negative one, and a store loses its team when the team goes', async () => {
+    await pool.query(`insert into teams (id, name) values ('bill-t', 'Sales')`);
+    expect((await pool.query(`select billable, free_monthly_usd::text as free from teams where id = 'bill-t'`)).rows[0]).toEqual({ billable: false, free: '20.0000' });
+    await expect(pool.query(`update teams set free_monthly_usd = -1 where id = 'bill-t'`)).rejects.toThrow(/teams_free_monthly_usd_check/);
+    await pool.query(`insert into stores (id, name, code, workspace_id, team_id) values ('bill-s', 'Shop', 'BILL-S', 'ws_vet', 'bill-t')`);
+    await pool.query(`delete from teams where id = 'bill-t'`);
+    expect((await pool.query(`select team_id from stores where id = 'bill-s'`)).rows[0].team_id).toBeNull();
+  });
+
+  test('a month close takes one row per month in the ledger format', async () => {
+    const close = (month: string) => pool.query(`insert into billing_month_closes (month, as_of, buckets, lines, totals) values ($1, 0, '[]', '[]', '{}')`, [month]);
+    await close('2026-11');
+    await expect(close('2026-11')).rejects.toThrow(/billing_month_closes_pkey/);
+    await expect(close('2026-13')).rejects.toThrow(/billing_month_closes_month_check/);
+  });
+});

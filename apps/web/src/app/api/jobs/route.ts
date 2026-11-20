@@ -7,6 +7,7 @@ import { ASPECTS, COMPANY_WORKSPACE_ID, FEATURES } from '@cvs/db';
 import { fillInputSlots } from '@cvs/db/assets';
 import { pool } from '@/lib/auth';
 import { CAP_MESSAGES } from '@/lib/caps';
+import { STORE_TEAM_CODE, storeAllowed } from '@/lib/billing';
 import { mp4VideoInfo, readJson } from '@/lib/assets';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
@@ -129,10 +130,11 @@ export async function GET(request: Request) {
  * The batch apps (BATCH_FEATURES) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again. As on the pages, a Run
  * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs, and a mockup pack Run with a blank product photo one job (400 for one more).
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
+ * A store of another team than the caller's billing team is refused with 403 and `code` STORE_TEAM_CODE (lib/billing.ts); not naming a store stays allowed.
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
- * original (the body may carry just `retryOf`), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
+ * original (the body may carry just `retryOf`; a store a member of a billing team may no longer pick, another team's, is dropped), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
  * only for a job BytePlus refused for a real person in its photo or for the sound it made (`failureReason` real_person or output_audio), which the dearer fal twin may make.
- * `rerunOf` (with `maxUsd`, the price the member was shown, a number) runs the caller's own succeeded job again as a NEW job (404 for anyone else's): the same inputs, model, prompt, ratio, duration and params, and the store unless it is hidden now, through this same path, so the caps, the estimate at the model's current price, the ledger and the daily clip count apply as to any Run (no retry semantics: it can be rerun again, and the job has no `retry_of`).
+ * `rerunOf` (with `maxUsd`, the price the member was shown, a number) runs the caller's own succeeded job again as a NEW job (404 for anyone else's): the same inputs, model, prompt, ratio, duration and params, and the store unless it is hidden now or the caller may no longer pick it (lib/billing.ts), through this same path, so the caps, the estimate at the model's current price, the ledger and the daily clip count apply as to any Run (no retry semantics: it can be rerun again, and the job has no `retry_of`).
  * It is refused with 409 when an input asset was deleted or purged, or (with the new `estimateUsd`, nothing reserved) when the estimate is above `maxUsd`, and as a Run is when its model is no longer enabled or its prompt is over the limit. A new Run may not name the dearer row of a pair of duplicate models while its twin can serve, nor the twin that cannot while the dearer one can (lib/model-twins.ts).
  */
 export async function POST(request: Request) {
@@ -380,8 +382,10 @@ export async function POST(request: Request) {
         modelId = twin.id;
       }
       // A rerun is a new Run: it names the cheaper row of a pair (the job may have run on the dearer one), and a store hidden since is dropped, as Reuse does.
+      // A retry or a rerun also drops a store the caller may no longer pick (another billing team's, lib/billing.ts), so the job never bills that team.
       if (rerunOf !== null && o.retry_of === null) modelId = (await tx.query('select coalesce(twin_of, id) as id from model_configs where id = $1', [o.model])).rows[0]?.id ?? o.model;
-      const storeId = rerunOf !== null && o.store_id !== null && !(await tx.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [o.store_id, g.workspaceId])).rowCount ? null : o.store_id;
+      const keepStore = o.store_id === null || (await tx.query(`select 1 from stores s where s.id = $1 and s.workspace_id = $2 and ($3 or not s.hidden) and ${storeAllowed('s', '$4')}`, [o.store_id, g.workspaceId, rerunOf === null, userId])).rowCount;
+      const storeId = keepStore ? o.store_id : null;
       s = { assetIds: o.input_asset_ids, modelId, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId, feature: o.feature, params: o.params, enhance: o.enhance, useBrand: false };
       original = o;
     }
@@ -453,8 +457,9 @@ export async function POST(request: Request) {
         if (preset === undefined) return bad('the preset does not exist or is not enabled');
         prompt = isImage ? `${freePrompt}\n\n${preset}` : preset;
       }
-      const store = storeId === null ? null : (await tx.query(`select brand_voice as "brandVoice", brand_colors as "brandColors", brand_tagline as "brandTagline" from stores where id = $1 and workspace_id = $2 and not hidden`, [storeId, g.workspaceId])).rows[0];
+      const store = storeId === null ? null : (await tx.query(`select brand_voice as "brandVoice", brand_colors as "brandColors", brand_tagline as "brandTagline", ${storeAllowed('s', '$3')} as allowed from stores s where id = $1 and workspace_id = $2 and not hidden`, [storeId, g.workspaceId, userId])).rows[0];
       if (storeId !== null && !store) return bad('the store does not exist or is hidden');
+      if (store && !store.allowed) return Response.json({ error: 'a member of a billing team runs jobs only for the stores of their team', code: STORE_TEAM_CODE }, { status: 403 });
       // The brand kit goes after the member's words and the style, into the stored prompt, so History, Retry and the worker all see what the provider got;
       // `params.brand` marks it for the switch's memory, and on Image Generation the member's own words stay the one brief (a style already set it).
       const branded = useBrand && store && prompt ? withBrand(prompt, store, feature) : prompt;

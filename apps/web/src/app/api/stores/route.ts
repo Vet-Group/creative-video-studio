@@ -1,8 +1,10 @@
 import { pool } from '@/lib/auth';
+import { storeAllowed } from '@/lib/billing';
 import { guard, isEditor } from '@/lib/session';
 
 /**
  * The store picker: the active workspace's stores that are not closed (hidden), each with its brand kit, and `canEdit` when the caller may edit the kits (isEditor).
+ * A member of a billing team (an Admin too) gets only their team's stores, the only ones a Run of theirs may take (lib/billing.ts storeAllowed).
  * A store the caller pins or an Admin assigns to them is `mine` and comes first; the rest follow by how recently the caller used them
  * (`lastUsedAt`), then paused stores (with a Vietnamese "paused" mark after the name), then by name.
  */
@@ -16,7 +18,7 @@ export async function GET(request: Request) {
             (coalesce(us.pinned, false) or coalesce(us.assigned, false)) as mine, us.last_used_at as "lastUsedAt"
        from stores s
        left join user_stores us on us.store_id = s.id and us.user_id = $1
-      where s.workspace_id = $2 and not s.hidden
+      where s.workspace_id = $2 and not s.hidden and ${storeAllowed('s', '$1')}
       order by coalesce(us.pinned, false) desc, coalesce(us.assigned, false) desc, us.last_used_at desc nulls last, s.paused, s.name, s.id`,
     [g.session.user.id, g.workspaceId],
   );

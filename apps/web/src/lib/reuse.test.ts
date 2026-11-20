@@ -53,9 +53,9 @@ test('a refill that left something out names each part with its reason, in one l
   expect(skippedNote(1, { model: { label: 'Nano Banana', instead: 'Seedream' } })).toBe('Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: mô hình Nano Banana (đã tắt hoặc không còn dùng ở trang này, đã chọn Seedream).');
   expect(skippedNote(0, { model: { label: null, instead: null } })).toBe('Đã điền lại phần còn lại. Không dùng lại được: mô hình đã dùng (đã tắt hoặc không còn dùng ở trang này).');
   expect(skippedNote(1, { extra: { count: 2, max: 1 } })).toBe('Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: 2 ảnh thừa (chỗ này chỉ nhận 1 ảnh).');
-  expect(skippedNote(3, { store: true })).toBe('Đã điền lại 3 ảnh và phần còn lại. Không dùng lại được: cửa hàng (đã bị ẩn).');
+  expect(skippedNote(3, { store: true })).toBe('Đã điền lại 3 ảnh và phần còn lại. Không dùng lại được: cửa hàng (đã bị ẩn hoặc không thuộc team của bạn).');
   expect(skippedNote(1, { lost: 1, extra: { count: 1, max: 2 }, store: true, model: { label: 'X', instead: 'Y' } })).toBe(
-    'Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: mô hình X (đã tắt hoặc không còn dùng ở trang này, đã chọn Y); 1 ảnh đầu vào (đã bị xoá); 1 ảnh thừa (chỗ này chỉ nhận 2 ảnh); cửa hàng (đã bị ẩn).',
+    'Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: mô hình X (đã tắt hoặc không còn dùng ở trang này, đã chọn Y); 1 ảnh đầu vào (đã bị xoá); 1 ảnh thừa (chỗ này chỉ nhận 2 ảnh); cửa hàng (đã bị ẩn hoặc không thuộc team của bạn).',
   );
   expect(skippedNote(2, {})).toBe(''); // nothing was left out: no note
   expect(skippedNote(2, { lost: 0 })).toBe('');
