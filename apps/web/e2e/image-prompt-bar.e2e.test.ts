@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { modelButton, openMore, openTab, png, select, selectText, signIn } from './support.test';
+import { modelButton, openMore, openTab, pickModel, png, select, selectText, signIn } from './support.test';
 
 // Image Generation's prompt bar, as Fash's: on a wide screen it floats at the foot of the screen over the full-width tabs and gallery, and holds every
 // control of the old left form; below 1024 px it is the Create tab's card, in the page's flow.
@@ -290,6 +290,35 @@ test('the bar stays compact with a long prompt and 3 photos: Run on the chip row
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(bar).not.toHaveAttribute('data-tall');
   expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe('sticky');
+});
+
+// On prod the suggested Nano Banana 2.1 shows its "Đề xuất" badge and a thinking pill, which once squeezed its name to one letter in the chip row.
+test('a suggested model with thinking levels keeps its name readable in the chip row; its badge stays in the model menu', async ({ page }) => {
+  await page.route('**/api/image-models?feature=image', async (route) => {
+    const res = await route.fetch();
+    const body = (await res.json()) as { models: { id: string; label: string; isMock: boolean; recommended: boolean }[] };
+    body.models = body.models.map((m) => (m.id === 'mock-image-solo' ? { ...m, label: 'Nano Banana 2.1', isMock: false, recommended: true } : { ...m, recommended: false }));
+    await route.fulfill({ response: res, json: body });
+  });
+  await signIn(page, 'pbark');
+  for (const [width, height] of [[1440, 900], [1024, 768]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto('/image-generation');
+    const bar = barOf(page);
+    await pickModel(page, /Nano Banana 2.1/); // pickModel types the pattern's source into the search box, so no escape
+    await expect(select(page, 'Mức suy luận')).toHaveAttribute('data-value', 'minimal');
+    const trigger = modelButton(page);
+    await expect(trigger.locator('.badge-recommended')).toBeHidden();
+    const name = trigger.locator('.select-value-text');
+    const [w, full] = await name.evaluate((e) => [e.getBoundingClientRect().width, e.scrollWidth]);
+    if (width === 1440) expect(w, 'the whole name at 1440').toBeGreaterThanOrEqual(full - 1);
+    // At 1024 the mock's auto ratio pill is wider than prod's 1:1, so this only guards against the one-letter squeeze (prod shows about 67 px).
+    else expect(w, 'more than a letter of the name at 1024').toBeGreaterThanOrEqual(24);
+    const [b, run] = [(await bar.boundingBox())!, (await bar.getByRole('button', { name: /^Tạo ảnh/ }).boundingBox())!];
+    expect(run.x + run.width, `Run inside the bar at ${width}`).toBeLessThanOrEqual(b.x + b.width - 16);
+  }
+  await modelButton(page).click();
+  await expect(page.getByRole('dialog', { name: 'Chọn mô hình' }).locator('.badge-recommended').first()).toBeVisible();
 });
 
 test('a photo file dropped anywhere on the bar goes into the strip, and the page stays put', async ({ page }) => {
