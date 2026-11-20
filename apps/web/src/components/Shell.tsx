@@ -424,11 +424,16 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
               <Icon name="right" /> Dùng kết quả
             </button>
           )}
-          {out && image && form?.saveModel && (
-            <button type="button" className="job-reuse job-primary" onClick={() => form.saveModel!(out, job.traits)}>
-              <Icon name="plus" /> Lưu làm người mẫu
-            </button>
-          )}
+          {out && image && form?.saveModel &&
+            (form.savedModel?.(out) ? (
+              <button type="button" className="job-reuse" disabled>
+                <Icon name="check" /> Đã lưu
+              </button>
+            ) : (
+              <button type="button" className="job-reuse job-primary" onClick={() => form.saveModel!(out, job.traits)}>
+                <Icon name="plus" /> Lưu làm người mẫu
+              </button>
+            ))}
           {/* Fash's Generate Video on an image: Create video opens with the picture as its first image. */}
           {out && image && (
             <Link href={`/create?image=${out}`} className="job-reuse">

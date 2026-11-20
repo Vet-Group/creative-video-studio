@@ -145,6 +145,13 @@ export function fashionModelName(t: FashionTraits): string {
   return (['gender', 'age', 'ethnicity'] as const).map((k) => optionOf(k, t[k]).label).join(' · ').slice(0, 60);
 }
 
+/** `name`, or with the first free number after it (" 2", " 3") when a saved model already has it, so two saves of like traits can be told apart; within 60 characters. */
+export function freeName(name: string, taken: readonly string[]): string {
+  let out = name;
+  for (let n = 2; taken.includes(out); n++) out = `${name.slice(0, 60 - String(n).length - 1)} ${n}`;
+  return out;
+}
+
 /** Lower case without accents or stroked d, so Vietnamese typed with or without diacritics matches. */
 const plain = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd');
 /** Words (English and Vietnamese, folded) that name a minor. shortcut: a keyword match, so "kid" in a surname or "teenage-style font" also blocks; use a classifier if that costs real Runs. */

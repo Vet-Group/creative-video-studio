@@ -5,15 +5,17 @@
 import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import type { AppConfig } from '@/lib/apps';
-import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, type FashionTraits, fashionModelName, fashionModelPrompt, MAX_EXTRA, mentionsMinor, MINOR_REASON, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, withNiche } from '@/lib/fashion-model';
+import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, type FashionTraits, fashionModelName, fashionModelPrompt, freeName, MAX_EXTRA, mentionsMinor, MINOR_REASON, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, withNiche } from '@/lib/fashion-model';
 import { MAX_NAME } from '@/lib/fashion-models';
+import { useFashionModels } from '@/lib/use-fashion-models';
+import { waitLabel } from '@/lib/explore';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AppAbout, AppHeader, AppHistoryArt, TAB_LABEL, type Tab } from './AppPage';
 import s from './FashionModelApp.module.css';
 import { FashionModelList } from './FashionModelList';
-import { FormNotice, nearestOption, useImageChoice, useImageModels, WorkTabs } from './image-tools';
+import { copyError, FormNotice, nearestOption, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, useJobs } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -58,22 +60,26 @@ function Choice({ label, options, value, onChange }: { label: string; options: {
   );
 }
 
-/** The name a save starts with: from the job's own traits, else a plain default. */
-function savedName(json: string | null): string {
+/** A job's own traits (JSON); null when they cannot be read. */
+function traitsOf(json: string | null | undefined): FashionTraits | null {
   try {
-    const traits = parseFashionTraits(JSON.parse(json ?? 'null'));
-    if (traits) return fashionModelName(traits);
+    return parseFashionTraits(JSON.parse(json ?? 'null'));
   } catch {
-    // unreadable traits: the default below
+    return null;
   }
-  return 'Người mẫu AI';
 }
 
-export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boolean }) {
+/** The name a save starts with: from the job's own traits, else a plain default. */
+function savedName(json: string | null): string {
+  const traits = traitsOf(json);
+  return traits ? fashionModelName(traits) : 'Người mẫu AI';
+}
+
+export function FashionModelApp({ app, isAdmin, reuse }: { app: AppConfig; isAdmin: boolean; reuse?: string }) {
   const { refresh } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [traits, setTraits] = useState<FashionTraits>(DEFAULT_FASHION_TRAITS);
-  const [count, setCount] = useState(2);
+  const [count, setCount] = useState(1); // one image a click, as nothing else on the page asks before Run spends
   const [tab, setTab] = useState<FashionTab | null>(null); // null: the default for the width (the form below 1024 px, else About)
   const [running, setRunning] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
@@ -83,6 +89,8 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
   const [saving, setSaving] = useState<{ assetId: string; name: string; shared: boolean } | null>(null);
   const [saveError, setSaveError] = useState('');
   const [version, setVersion] = useState(0); // bumped when the saved models change, so the list and the pickers read them again
+  // shortcut: the results saved in this page load only, as a saved model keeps a copy of the picture and not its source; store the source asset on the model if a reload must know.
+  const [savedAssets, setSavedAssets] = useState<string[]>([]);
   const extraId = useId();
   const reasonId = useId();
   const nameId = useId();
@@ -91,6 +99,19 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
   const offered = models?.filter((m) => m.textToImage) ?? (models === null ? null : []);
   const pick = useImageChoice(offered, 0);
   const { chosen } = pick;
+  // Dùng lại: the job's traits back on the form for one more image, and its model; the ratio is the page's own.
+  const recreate = useReuse(
+    reuse,
+    app.feature,
+    (j) => {
+      const t = traitsOf(j.traits);
+      if (!t) return setError('Không đọc được đặc điểm của lượt tạo này.');
+      setTraits(t);
+      setCount(1);
+      pick.refill({ ...j, ratio: null });
+    },
+    (e) => setError(copyError(e, 'Không tìm thấy lượt tạo để dùng lại.')),
+  );
   const prompt = fashionModelPrompt(traitsForImage(traits, 0)); // the preview and the length check use the first image's ethnicity
   const portrait = chosen?.ratios.filter((r) => r !== 'auto') ?? [];
   const ratio = portrait.length > 0 ? nearestOption(portrait, '3:4') : 'auto';
@@ -128,6 +149,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
     setSaveError('');
     try {
       await api('/api/fashion-models', sendJson('POST', { assetId: saving.assetId, name: saving.name.trim(), shared: saving.shared }));
+      setSavedAssets((cur) => [...cur, saving.assetId]);
       setSaving(null);
       setVersion((v) => v + 1);
       setNotice('Đã lưu người mẫu. Xem trong tab "Đã lưu".');
@@ -140,6 +162,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
 
   const tabs: FashionTab[] = narrow ? ['create', 'history', 'models', 'about'] : ['history', 'models', 'about'];
   const shown: FashionTab = narrow ? (tab ?? 'create') : tab === 'history' || tab === 'models' ? tab : 'about';
+  const { models: savedModels } = useFashionModels(shown === 'history', version); // the names taken, so a save of like traits starts with another
   const panel = shown === 'create' ? 'about' : shown;
 
   return (
@@ -227,14 +250,14 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={minor || reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {running ? <span className="run-cost">· Đang gửi…</span> : chosen && <span className="run-cost">· {usd(total)}</span>}
+              {running ? <span className="run-cost">· Đang gửi…</span> : chosen && <span className="run-cost">· {usd(total)}{chosen.typicalSec && ` · ${waitLabel(chosen.typicalSec)}`}</span>}
             </button>
           </div>
         </div>
 
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'history' && (
-            <FormContext.Provider value={{ recreate: () => undefined, saveModel: (assetId, jobTraits) => (setSaveError(''), setSaving({ assetId, name: savedName(jobTraits), shared: false })) }}>
+            <FormContext.Provider value={{ recreate: (from) => (recreate(from), narrow && setTab('create')), saveModel: (assetId, jobTraits) => (setSaveError(''), setSaving({ assetId, name: freeName(savedName(jobTraits), savedModels?.map((m) => m.name) ?? []), shared: false })), savedModel: (assetId) => savedAssets.includes(assetId) }}>
               <AppHistoryArt app={app}>
                 <Tray feature={app.feature} />
               </AppHistoryArt>

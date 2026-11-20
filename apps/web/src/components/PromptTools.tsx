@@ -30,12 +30,14 @@ interface Props {
   parts?: readonly PromptPart[];
   /** Round icons for the Image Generation bar instead of the toolbar's labelled buttons. */
   compact?: boolean;
+  /** The Translate button's name where a page has two (the prompt preview's), so each is told apart. */
+  translateLabel?: string;
 }
 
 /** The three directions the options take, in the order the worker writes them (core/suggest.ts DIRECTIONS); the first is named for a plain take when the box was empty. */
 const DIRECTION_LABELS = ['Sát ý bạn', 'Sáng tạo', 'Nổi bật'];
 
-export function PromptTools({ feature, format, value, onChange, maxLength, onRun, ask, aiLabel = 'Gợi ý AI', parts = ['ai', 'recent', 'translate', 'clear', 'expand'], compact }: Props) {
+export function PromptTools({ feature, format, value, onChange, maxLength, onRun, ask, aiLabel = 'Gợi ý AI', parts = ['ai', 'recent', 'translate', 'clear', 'expand'], compact, translateLabel }: Props) {
   const { jobs } = useJobs();
   const ai = useSuggest();
   const tr = useTranslate(value.trim());
@@ -116,7 +118,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
       )}
       {/* Only for words that are not Vietnamese already; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
       {has('translate') && !compact && value.trim() && !isVietnamese(value) && (
-        <button type="button" className={btn} aria-expanded={open === 'vi'} onClick={() => (open === 'vi' ? setOpen(null) : (setOpen('vi'), tr.translate()))}>
+        <button type="button" className={btn} aria-label={translateLabel} aria-expanded={open === 'vi'} onClick={() => (open === 'vi' ? setOpen(null) : (setOpen('vi'), tr.translate()))}>
           <Icon name="translate" size={13} />
           Dịch
         </button>

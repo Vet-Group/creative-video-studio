@@ -32,7 +32,7 @@ import { PageHint } from './ToolGuide';
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 
-export function TryOn({ reuse }: { reuse?: string }) {
+export function TryOn({ reuse, model }: { reuse?: string; model?: Img }) {
   const { refresh, notify, loading } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [garments, setGarments] = useState<Img[]>([]);
@@ -69,7 +69,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const [own, setOwn] = useState(false);
   const [saved, setSaved] = useState(0);
   const aiModels = usable(useFashionModels(true, saved).models ?? []);
-  const [person, setPerson] = useState<Img[]>([]);
+  const [person, setPerson] = useState<Img[]>(model ? [model] : []); // `model`: a saved AI model the page opened with (?model=)
   const [background, setBackground] = useState<Img[]>([]);
   const [prompt, setPrompt, clearDraft] = useDraftState('try-on', reuse !== undefined);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples)

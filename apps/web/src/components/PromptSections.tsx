@@ -294,7 +294,7 @@ export function PromptPreview({ feature, prompts, labels, limit, note, check, fo
       {/* Only while open: the closed fold keeps the page to one Translate button, the prompt box's. */}
       {open && (
         <div className="prompt-preview-foot">
-          <PromptTools feature={feature} value={prompts[0] ?? ''} onChange={() => undefined} onRun={() => false} parts={['translate']} />
+          <PromptTools feature={feature} value={prompts[0] ?? ''} onChange={() => undefined} onRun={() => false} parts={['translate']} translateLabel="Dịch prompt gửi đi" />
           {check && prompts[0]?.trim() && <PromptCheck key={prompts[0]} text={prompts[0]} ask={check} />}
         </div>
       )}

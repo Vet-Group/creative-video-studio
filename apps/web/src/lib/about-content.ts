@@ -1660,18 +1660,18 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Đổi nhân vật bằng AI là gì?',
         blocks: [
-          'Đổi nhân vật là ứng dụng thay toàn bộ người trong một ảnh bằng một người khác. Bạn tải ảnh Nhân vật mới và Ảnh đích, và AI chuyển khuôn mặt, dáng người và trang phục của người mới vào ảnh đích trong khi bối cảnh giữ nguyên.',
+          'Đổi nhân vật là ứng dụng thay toàn bộ người trong một ảnh bằng một người khác. Bạn tải ảnh Nhân vật mới và Ảnh cần thay người, và AI chuyển khuôn mặt, dáng người và trang phục của người mới vào ảnh đích trong khi bối cảnh giữ nguyên.',
           `Ứng dụng làm cho ảnh thời trang và marketing, khi người cần đổi mà cảnh thì không. Một lần bấm Chạy là bắt đầu đổi. ${APP_COST}`,
         ],
       },
       {
         title: 'Đổi nhân vật trong 3 bước',
-        lead: 'Tải nhân vật mới, tải ảnh đích, rồi bấm Chạy.',
+        lead: 'Tải nhân vật mới, tải ảnh cần thay người, rồi bấm Chạy.',
         blocks: [
           {
             steps: [
               { title: 'Tải nhân vật mới', text: 'Thêm ảnh người sẽ xuất hiện trong kết quả vào ô Nhân vật mới. Khuôn mặt, dáng người và trang phục trong kết quả đều lấy từ ảnh này.' },
-              { title: 'Tải ảnh đích', text: 'Thêm ảnh có người cần thay vào ô Ảnh đích. Kết quả giữ bối cảnh của ảnh này. Muốn dặn thêm thì viết một câu vào ô Mô tả (tuỳ chọn).' },
+              { title: 'Tải ảnh cần thay người', text: 'Thêm ảnh có người cần thay vào ô Ảnh cần thay người. Kết quả giữ bối cảnh của ảnh này. Muốn dặn thêm thì viết một câu vào ô Mô tả (tuỳ chọn).' },
               { title: 'Chạy', text: 'Bấm Chạy. AI thay cả người trong ảnh đích bằng nhân vật mới; ảnh mới nằm trong tab Lịch sử và trong Thư viện, mục Ứng dụng.' },
             ],
           },
@@ -1703,7 +1703,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             cards: [
               { title: 'Tư thế và góc máy giống nhau', text: 'Hai ảnh có tư thế và góc máy giống nhau để AI ít phải diễn giải lại. Nhân vật nhìn thẳng hợp với ảnh đích nhìn thẳng, ảnh nghiêng hợp với ảnh nghiêng.' },
-              { title: 'Toàn thân hay nửa người', text: 'Trang phục trong kết quả lấy từ ảnh nhân vật mới, nên ảnh đó phải thấy bộ đồ bạn muốn. Ảnh đích toàn thân đi với nhân vật toàn thân; ảnh đích nửa người đi với nhân vật nửa người hoặc toàn thân. Ảnh chân dung không cho thấy trang phục cần chuyển sang.' },
+              { title: 'Toàn thân hay nửa người', text: 'Trang phục trong kết quả lấy từ ảnh nhân vật mới, nên ảnh đó phải thấy bộ đồ bạn muốn. Ảnh cần thay người toàn thân đi với nhân vật toàn thân; ảnh đích nửa người đi với nhân vật nửa người hoặc toàn thân. Ảnh chân dung không cho thấy trang phục cần chuyển sang.' },
               { title: 'Ánh sáng', text: 'Ánh sáng đều và mềm giúp khuôn mặt, da và chất vải dễ đọc. Bóng gắt, ám màu mạnh và ảnh tối che mất chi tiết cần tái tạo.' },
               { title: 'Độ phân giải', text: 'Ảnh nét, độ phân giải cao cho kết quả tốt nhất. Ảnh mờ hoặc nén nặng mất chi tiết khuôn mặt và chất vải, và AI chỉ làm được với chi tiết nó nhìn thấy.' },
             ],
@@ -1741,18 +1741,18 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Đổi người mẫu bằng AI là gì?',
         blocks: [
-          'Đổi người mẫu là ứng dụng thay người trong một ảnh thời trang bằng một người mẫu mới trong khi bộ đồ giữ nguyên. Bạn tải ảnh Người mẫu mới và Ảnh đích; AI đổi khuôn mặt, màu da và dáng người, còn trang phục, phụ kiện, tư thế và bối cảnh giữ đúng như cũ.',
+          'Đổi người mẫu là ứng dụng thay người trong một ảnh thời trang bằng một người mẫu mới trong khi bộ đồ giữ nguyên. Bạn tải ảnh Người mẫu mới và Ảnh cần thay người mẫu; AI đổi khuôn mặt, màu da và dáng người, còn trang phục, phụ kiện, tư thế và bối cảnh giữ đúng như cũ.',
           `Ứng dụng làm cho thời trang: một buổi chụp sản phẩm dùng lại được với nhiều người mẫu khác nhau. ${APP_COST}`,
         ],
       },
       {
         title: 'Đổi người mẫu trong ảnh thời trang trong 3 bước',
-        lead: 'Tải người mẫu mới, tải ảnh đích, rồi bấm Chạy.',
+        lead: 'Tải người mẫu mới, tải ảnh cần thay người mẫu, rồi bấm Chạy.',
         blocks: [
           {
             steps: [
               { title: 'Tải người mẫu mới', text: 'Thêm ảnh người có khuôn mặt, màu da và dáng người sẽ xuất hiện trong kết quả vào ô Người mẫu mới.' },
-              { title: 'Tải ảnh đích', text: 'Thêm ảnh sản phẩm có người mẫu cần thay vào ô Ảnh đích. Kết quả giữ trang phục, phụ kiện, tư thế và bối cảnh của ảnh này. Muốn dặn thêm thì viết một câu vào ô Mô tả (tuỳ chọn).' },
+              { title: 'Tải ảnh cần thay người mẫu', text: 'Thêm ảnh sản phẩm có người mẫu cần thay vào ô Ảnh cần thay người mẫu. Kết quả giữ trang phục, phụ kiện, tư thế và bối cảnh của ảnh này. Muốn dặn thêm thì viết một câu vào ô Mô tả (tuỳ chọn).' },
               { title: 'Chạy', text: 'Bấm Chạy. AI đặt người mẫu mới vào ảnh đích, và bộ đồ giữ đúng như lúc chụp.' },
             ],
           },
@@ -1804,7 +1804,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
             cards: [
               { title: 'Tư thế và khung hình giống nhau', text: 'Ảnh người mẫu mới có tư thế và khung hình gần với ảnh đích cho AI một điểm khớp gần. Tư thế trong kết quả lấy từ ảnh đích, nên người mẫu nhìn thẳng hợp nhất với ảnh đích nhìn thẳng.' },
               { title: 'Khuôn mặt rõ trong ảnh người mẫu mới', text: 'Khuôn mặt trong kết quả lấy từ ảnh Người mẫu mới, nên khuôn mặt đó phải thấy rõ. Dùng ảnh nét, sáng đều, không bị tóc, tay, kính râm hay bóng tối che.' },
-              { title: 'Ảnh đích độ phân giải cao', text: 'Ảnh đích mang trang phục, phụ kiện và bối cảnh vào kết quả, nên file nét, độ phân giải cao giữ được chất vải và chi tiết. Dù là ảnh studio hay ảnh chiến dịch có sẵn, hãy dùng file lớn nhất bạn có.' },
+              { title: 'Ảnh cần thay người mẫu độ phân giải cao', text: 'Ảnh cần thay người mẫu mang trang phục, phụ kiện và bối cảnh vào kết quả, nên file nét, độ phân giải cao giữ được chất vải và chi tiết. Dù là ảnh studio hay ảnh chiến dịch có sẵn, hãy dùng file lớn nhất bạn có.' },
             ],
           },
           'Tải người mẫu mới và ảnh sản phẩm ở bên cạnh để đổi người mẫu trong một lần chạy.',
@@ -2708,18 +2708,18 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Đổi khuôn mặt bằng AI là gì?',
         blocks: [
-          'Đổi khuôn mặt là ứng dụng thay khuôn mặt trong một ảnh bằng khuôn mặt từ ảnh khác. Bạn tải Khuôn mặt nguồn và Ảnh đích, và AI hoà khuôn mặt mới vào, khớp màu da và ánh sáng, trong khi tóc, dáng người, trang phục và bối cảnh không bị động đến.',
+          'Đổi khuôn mặt là ứng dụng thay khuôn mặt trong một ảnh bằng khuôn mặt từ ảnh khác. Bạn tải Khuôn mặt nguồn và Ảnh cần đổi khuôn mặt, và AI hoà khuôn mặt mới vào, khớp màu da và ánh sáng, trong khi tóc, dáng người, trang phục và bối cảnh không bị động đến.',
           `Ứng dụng làm việc trên ảnh và bắt đầu bằng một lần bấm Chạy. Thương hiệu và người sáng tạo nội dung dùng nó để đổi người xuất hiện trong ảnh trong khi cách phối, trang phục và bối cảnh giữ đúng như lúc chụp. ${APP_COST}`,
         ],
       },
       {
         title: 'Đổi khuôn mặt trong ảnh',
-        lead: 'Tải khuôn mặt nguồn, tải ảnh đích, rồi bấm Chạy.',
+        lead: 'Tải khuôn mặt nguồn, tải ảnh cần đổi khuôn mặt, rồi bấm Chạy.',
         blocks: [
           {
             steps: [
               { title: 'Tải khuôn mặt nguồn', text: 'Thêm ảnh khuôn mặt sẽ xuất hiện trong kết quả vào ô Khuôn mặt nguồn. Ảnh rõ, nhìn thẳng là tốt nhất.' },
-              { title: 'Tải ảnh đích', text: 'Thêm ảnh có khuôn mặt cần thay vào ô Ảnh đích. Tóc, dáng người, trang phục và bối cảnh của ảnh này được giữ trong kết quả.' },
+              { title: 'Tải ảnh cần đổi khuôn mặt', text: 'Thêm ảnh có khuôn mặt cần thay vào ô Ảnh cần đổi khuôn mặt. Tóc, dáng người, trang phục và bối cảnh của ảnh này được giữ trong kết quả.' },
               { title: 'Chạy', text: 'Bấm Chạy. AI hoà khuôn mặt nguồn vào ảnh đích và khớp với màu da và ánh sáng của cảnh; ảnh mới nằm trong tab Lịch sử.' },
             ],
           },
@@ -2762,7 +2762,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
               { title: 'Khuôn mặt nguồn nhìn thẳng', text: 'Khuôn mặt nhìn thẳng cho thấy mắt, mũi và miệng rõ và cân. Tránh ảnh nguồn quay đi, bị cắt hay bị tóc, tay hoặc kính râm che một phần.' },
               { title: 'Góc đầu giống nhau', text: 'Khuôn mặt mới phải vừa với đầu trong ảnh đích. Khuôn mặt nguồn có góc đầu giống ảnh đích, như thẳng với thẳng hay ba phần tư với ba phần tư, cho AI điểm khớp gần hơn.' },
               { title: 'Ánh sáng tốt', text: 'Ánh sáng đều và mềm trên khuôn mặt nguồn cho thấy rõ các đường nét. Bóng gắt hay ánh màu mạnh che mất chi tiết AI cần, dù kết quả vẫn được khớp với ánh sáng của ảnh đích.' },
-              { title: 'Độ phân giải cao', text: 'Ảnh đích quyết định chất lượng ảnh cuối, nên hãy dùng file nét nhất, lớn nhất bạn có. Muốn kết quả nét hơn nữa, chạy nó qua Tăng độ phân giải.' },
+              { title: 'Độ phân giải cao', text: 'Ảnh cần đổi khuôn mặt quyết định chất lượng ảnh cuối, nên hãy dùng file nét nhất, lớn nhất bạn có. Muốn kết quả nét hơn nữa, chạy nó qua Tăng độ phân giải.' },
             ],
           },
         ],
@@ -2785,7 +2785,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         blocks: [
           {
             faq: [
-              ['Đổi khuôn mặt sang một ảnh khác thế nào?', 'Tải khuôn mặt muốn dùng vào ô Khuôn mặt nguồn và ảnh muốn đổi vào ô Ảnh đích, rồi bấm Chạy. AI hoà khuôn mặt mới vào ảnh đích và khớp màu da và ánh sáng. Chỉ dùng ảnh công ty có quyền và có sự đồng ý của người trong ảnh.'],
+              ['Đổi khuôn mặt sang một ảnh khác thế nào?', 'Tải khuôn mặt muốn dùng vào ô Khuôn mặt nguồn và ảnh muốn đổi vào ô Ảnh cần đổi khuôn mặt, rồi bấm Chạy. AI hoà khuôn mặt mới vào ảnh đích và khớp màu da và ánh sáng. Chỉ dùng ảnh công ty có quyền và có sự đồng ý của người trong ảnh.'],
               ['Đổi khuôn mặt có đổi tóc hay quần áo không?', 'Không. Chỉ khuôn mặt đổi. Tóc, dáng người, trang phục và bối cảnh trong ảnh đích giữ nguyên. Muốn đổi cả dáng người thì dùng Đổi người mẫu; đổi cả bộ đồ thì dùng Đổi nhân vật.'],
               ['Điều gì làm ảnh đổi khuôn mặt trông thật?', 'Khớp màu da và ánh sáng giữa khuôn mặt mới và ảnh đích làm kết quả đọc như một bức ảnh, và AI lo cả hai. Đầu vào tốt cũng giúp: khuôn mặt nguồn nhìn thẳng, góc đầu giống nhau, ánh sáng đều và file độ phân giải cao.'],
               ['Dùng ảnh đổi khuôn mặt cho marketing được không?', 'Được, khi công ty có quyền với cả hai ảnh và có sự đồng ý của mọi người có khuôn mặt hay hình ảnh được dùng. Giữ giấy đồng ý và thoả thuận sử dụng, và không bao giờ dùng để mạo danh hay đánh lừa khách hàng.'],

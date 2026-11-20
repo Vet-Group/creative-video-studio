@@ -40,9 +40,9 @@ test('a breed swap batch downloads as a ZIP named by breed, and Xoá nền on a 
     ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string; status: string; breed: string | null }[] }).jobs.filter((j) => j.feature === 'breed_swap');
   await expect.poll(async () => (await mine()).map((j) => [j.breed, j.status]).sort(), { timeout: 90_000 }).toEqual([['Golden Retriever', 'succeeded'], ['Pug', 'succeeded']]);
 
-  // An image card offers the two photo tools beside the video link.
+  // An image card offers the photo tools beside the video link.
   const golden = card(page, 'Đổi giống chó · Golden Retriever');
-  for (const name of ['Tạo video', 'Xoá nền', 'Tăng độ phân giải']) await expect(golden.getByRole(name === 'Tạo video' ? 'link' : 'button', { name })).toBeVisible();
+  for (const name of ['Tạo video', 'Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']) await expect(golden.getByRole(name === 'Tạo video' ? 'link' : 'button', { name })).toBeVisible();
 
   // The ZIP: one file per breed, named by its day, creator and breed.
   await history(page).getByRole('button', { name: 'Chọn', exact: true }).click();

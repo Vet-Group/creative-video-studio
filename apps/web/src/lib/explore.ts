@@ -51,6 +51,9 @@ function typicalSpan({ p50, p75 }: { p50: number; p75: number }): string | null 
   return `${lo === hi ? lo : `${lo}–${hi}`} phút`;
 }
 
+/** A model's usual run time as a form shows it before Run, next to the price: a range of minutes, or under a minute. */
+export const waitLabel = (t: { p50: number; p75: number }): string => (typicalSpan(t) ? `~${typicalSpan(t)}` : 'dưới 1 phút');
+
 /** What a submitting or running job usually takes, as a range of minutes (see `typicalRun`). */
 export function typicalLabel(job: TypicalJob, jobs: readonly PastJob[]): string | null {
   const t = typicalRun(job, jobs);

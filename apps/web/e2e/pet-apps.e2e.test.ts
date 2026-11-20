@@ -127,6 +127,10 @@ test('name swap: checks the names, prices names times breeds, runs one job per n
   // The names are held to what may go into a prompt, as the server holds them.
   await names.fill('Max\nBella 🐶');
   await expect(reason(page)).toHaveText('Tên "Bella 🐶" chỉ được có chữ cái, chữ số, khoảng trắng, dấu nháy đơn và gạch nối.');
+  // The box says so itself, and no price counts the bad name.
+  await expect(names).toHaveAttribute('aria-invalid', 'true');
+  await expect(names).toHaveAccessibleDescription(/^Tên "Bella 🐶" chỉ được có chữ cái/);
+  await expect(cost(page)).toHaveCount(0);
   await names.fill('x'.repeat(21));
   await expect(reason(page)).toHaveText(`Tên "${'x'.repeat(21)}" dài quá 20 ký tự.`);
   await names.fill(Array.from({ length: 13 }, (_, i) => `Dog ${i + 1}`).join('\n'));
@@ -136,6 +140,7 @@ test('name swap: checks the names, prices names times breeds, runs one job per n
 
   // Two names (a repeat and spaces dropped) times two breeds.
   await names.fill('Max\nNguyễn Ánh\n  Max ');
+  await expect(names).not.toHaveAttribute('aria-invalid');
   await pickModel(page, /Mock pets priced/);
   await expect(cost(page)).toHaveText('4 ảnh × $0.15 = $0.60');
   await expect(preview(page)).toContainText(`Max · Beagle: ${nameSwapPrompt('Max', 'Beagle')}`);

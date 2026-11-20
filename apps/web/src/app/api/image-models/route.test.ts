@@ -21,7 +21,7 @@ async function newUser(email: string, role: 'member' | 'admin') {
   return res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
 }
 const call = (cookie: string | undefined, query: string) => GET(new Request(`http://localhost/api/image-models${query}`, { headers: cookie ? { cookie } : {} }));
-type Model = { id: string; label: string; isMock: boolean; ratios: string[]; resolutions: string[]; prices: Record<string, string>; maxImages: number; maxPromptChars: number; textToImage: boolean; thinking: string[]; thinkingPrices: Record<string, Record<string, string>>; score: number; recommended: boolean; isNew: boolean; creditShown: boolean };
+type Model = { id: string; label: string; isMock: boolean; ratios: string[]; resolutions: string[]; prices: Record<string, string>; maxImages: number; maxPromptChars: number; textToImage: boolean; thinking: string[]; thinkingPrices: Record<string, Record<string, string>>; score: number; recommended: boolean; isNew: boolean; creditShown: boolean; typicalSec: { p50: number; p75: number } | null };
 const list = async (feature: string, cookie = memberCookie) => ((await (await call(cookie, `?feature=${feature}`)).json()) as { models: Model[] }).models;
 const setEnabled = (id: string, enabled: boolean) => pool.query('update model_configs set enabled = $2 where id = $1', [id, enabled]);
 
@@ -60,10 +60,10 @@ describe('GET /api/image-models', () => {
   test('lists the enabled image models of a feature, by label, with ratios, resolutions, prices, the image limit and the thinking levels with their prices (a level without its own at image_prices)', async () => {
     const unscored = { passRate: null, reliability: 1, score: 50, passes: 0, total: 0, recommended: false }; // equal scores: no badge
     expect(await list('image')).toEqual([
-      { id: 't-image', label: 'A image only', provider: 'fal', isMock: false, ratios: ['auto'], resolutions: ['1K'], prices: { '1K': '0.0400' }, maxImages: 2, maxPromptChars: 2000, textToImage: true, thinking: [], thinkingPrices: {}, isNew: true, creditUsd: null, creditShown: false, ...unscored }, // its endpoint has a text-to-image twin
+      { id: 't-image', label: 'A image only', provider: 'fal', isMock: false, ratios: ['auto'], resolutions: ['1K'], prices: { '1K': '0.0400' }, maxImages: 2, maxPromptChars: 2000, textToImage: true, thinking: [], thinkingPrices: {}, isNew: true, creditUsd: null, creditShown: false, typicalSec: null, ...unscored }, // its endpoint has a text-to-image twin
       { id: 't-both', label: 'B both', provider: 'fal', isMock: false, ratios: ['auto', '1:1'], resolutions: ['1K', '2K'], prices: { '1K': '0.1500', '2K': '0.3000' }, maxImages: 4, maxPromptChars: 5000, textToImage: false, thinking: ['minimal', 'medium', 'high'],
-        thinkingPrices: { minimal: { '1K': '0.1500', '2K': '0.3000' }, medium: { '1K': '0.1500', '2K': '0.3000' }, high: { '1K': '0.2318', '2K': '0.3940' } }, isNew: true, creditUsd: null, creditShown: false, ...unscored }, // 50000 in its schema, under the ceiling
-      { id: 't-mock', label: 'D mock', provider: 'mock', isMock: true, ratios: ['auto', '3:4'], resolutions: ['1K'], prices: { '1K': '0.0000' }, maxImages: 4, maxPromptChars: 4096, textToImage: true, thinking: [], thinkingPrices: {}, isNew: true, creditUsd: null, creditShown: false, ...unscored },
+        thinkingPrices: { minimal: { '1K': '0.1500', '2K': '0.3000' }, medium: { '1K': '0.1500', '2K': '0.3000' }, high: { '1K': '0.2318', '2K': '0.3940' } }, isNew: true, creditUsd: null, creditShown: false, typicalSec: null, ...unscored }, // 50000 in its schema, under the ceiling
+      { id: 't-mock', label: 'D mock', provider: 'mock', isMock: true, ratios: ['auto', '3:4'], resolutions: ['1K'], prices: { '1K': '0.0000' }, maxImages: 4, maxPromptChars: 4096, textToImage: true, thinking: [], thinkingPrices: {}, isNew: true, creditUsd: null, creditShown: false, typicalSec: null, ...unscored },
     ]);
     expect((await list('try_on')).map((m) => m.id)).toEqual(['t-both', 't-tryon', 't-mock']);
   });
@@ -122,6 +122,31 @@ describe('GET /api/image-models', () => {
       await pool.query(`delete from vertex_accounts where project_id = 't-paid'`);
       await pool.query(`delete from model_configs where id = 't-vertex'`);
       await pool.query(`update model_configs set pass_seed_passes = null, pass_seed_total = null where id = 't-both'`);
+    }
+  });
+
+  test("gives a model its usual run time from its latest succeeded real jobs of the feature, any member's, once it has three", async () => {
+    const memberId = (await pool.query(`select id from users where email = 'member@example.test'`)).rows[0].id;
+    // Run times of 60, 120, 180 and 600 s (one queued 5 minutes first, which does not count), a failed job and a try-on job that do not count either.
+    const job = (id: string, secs: number, o: { status?: string; feature?: string; queued?: number } = {}) =>
+      pool.query(
+        `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, status, workspace_id, created_at, started_at, finished_at)
+         values ($1, $2, 'team-unassigned', $3, 't-both', 'fal', 'p', 'auto', 0, '{}', $4, 'ws_vet', now() - make_interval(secs => $5::float8 + $6::float8), now() - make_interval(secs => $5::float8), now())`,
+        [id, memberId, o.feature ?? 'image', o.status ?? 'succeeded', secs, o.queued ?? 0],
+      );
+    const wait = async () => (await list('image')).find((m) => m.id === 't-both')!.typicalSec;
+    try {
+      await job('rt-1', 60);
+      await job('rt-2', 120, { queued: 300 });
+      expect(await wait()).toBeNull(); // two runs say nothing yet
+      await job('rt-3', 180);
+      await job('rt-4', 600);
+      await job('rt-5', 5000, { status: 'failed' });
+      await job('rt-6', 5000, { feature: 'try_on' });
+      expect(await wait()).toEqual({ p50: 120, p75: 180 });
+      expect((await list('image')).find((m) => m.id === 't-image')!.typicalSec).toBeNull();
+    } finally {
+      await pool.query(`delete from jobs where id like 'rt-%'`);
     }
   });
 

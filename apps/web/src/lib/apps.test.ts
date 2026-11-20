@@ -154,7 +154,7 @@ describe('appReason', () => {
 
   it('asks for each required slot in order and lets a complete form run', () => {
     expect(reason('face-swap', [[], []])).toBe('Tải lên ảnh: Khuôn mặt nguồn.');
-    expect(reason('face-swap', [['a'], []])).toBe('Tải lên ảnh: Ảnh đích.');
+    expect(reason('face-swap', [['a'], []])).toBe('Tải lên ảnh: Ảnh cần đổi khuôn mặt.');
     expect(reason('face-swap', [['a'], ['b']])).toBeNull();
     expect(reason('background-remover', [[]])).toBe('Tải lên ảnh: Ảnh.');
     expect(reason('background-remover', [['a']])).toBeNull();

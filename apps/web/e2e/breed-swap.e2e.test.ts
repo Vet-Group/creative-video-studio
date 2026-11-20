@@ -31,6 +31,7 @@ test('picks three breeds for a picture with a dog, sees the price of one image p
   for (const name of ['Golden Retriever', 'Pug', 'Australian Shepherd']) await breeds(page).getByText(name, { exact: true }).click();
   await expect(cost(page)).toHaveText('3 ảnh × $0.04 = $0.12');
   await expect(runButton(page)).toContainText('$0.12');
+  await expect(page.getByText('3 đã chọn')).toBeVisible();
   await expect(page.getByRole('group', { name: 'Bản cuối gửi cho mô hình' })).toContainText('Golden Retriever: Replace only the dog in the image with a Golden Retriever,');
   await expect(page.getByText('2 giống còn lại dùng prompt như trên, chỉ khác tên giống.')).toBeVisible();
 
@@ -56,4 +57,9 @@ test('picks three breeds for a picture with a dog, sees the price of one image p
   for (const name of ['Golden Retriever', 'Pug', 'Australian Shepherd']) await expect(breeds(page).getByRole('checkbox', { name })).toBeChecked();
   await expect(breeds(page).getByRole('checkbox', { name: 'Beagle' })).not.toBeChecked();
   await expect(cost(page)).toHaveText('3 ảnh × $0.00 = $0.00');
+
+  // One click unticks every breed.
+  await page.getByRole('button', { name: 'Bỏ chọn hết' }).click();
+  await expect(breeds(page).getByRole('checkbox', { checked: true })).toHaveCount(0);
+  await expect(page.locator('.form-message').getByRole('status')).toHaveText('Chọn ít nhất một giống chó.');
 });

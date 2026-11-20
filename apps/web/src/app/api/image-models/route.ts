@@ -1,7 +1,7 @@
 import { imagePricesFor, promptLimit, textToImage } from '@cvs/core/models';
 import { COMPANY_WORKSPACE_ID, FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
-import { modelStats, rank, scoreOf } from '@/lib/model-scores';
+import { modelStats, rank, runTimes, scoreOf } from '@/lib/model-scores';
 import { onePerPair, vertexOnCredits } from '@/lib/model-twins';
 import { falBalance, falCreditUsd } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
@@ -10,7 +10,7 @@ import { guard } from '@/lib/session';
  * The model picker of an image page (`?feature=try_on` or `?feature=image`, or any feature other than video and marketing): the enabled image models that
  * list the feature, with their ratios, resolutions (the keys of `image_prices`), the price of one image per resolution as a 4-decimal string, and
  * `maxImages`, `maxPromptChars` (the model's prompt limit under the ceiling), `textToImage` (it takes a job with no input image), `thinking` (its thinking levels, the first the default; empty for none), `thinkingPrices` (level to the prices at that level, as `prices` is at the default level; empty for none) and `isNew` (added in the last 14 days). A mock model prices every resolution at 0, as its jobs book 0 USD. Each model carries its recommendation score for this feature
- * (lib/model-scores.ts), and the best (the cheaper on a tie) is flagged `recommended` unless all score the same; for `?feature=image` (Create Image) while the active Vertex
+ * (lib/model-scores.ts) and its usual run time `typicalSec` (runTimes; null with too few runs), and the best (the cheaper on a tie) is flagged `recommended` unless all score the same; for `?feature=image` (Create Image) while the active Vertex
  * account runs on credits alone (vertexOnCredits), the best Vertex model is flagged instead, whatever the others score. `creditUsd` is what the model's provider can still
  * spend (lib/provider-credit.ts; fal only, null otherwise): the picker locks a model whose price at the chosen resolution is over it. Of a pair of duplicate models (`twin_of`, migration 0075) one is listed:
  * the cheaper, or the dearer in its place while the cheaper cannot serve (lib/model-twins.ts). Members and Admins. The balance is the company's figure:
@@ -25,13 +25,14 @@ export async function GET(request: Request) {
     return Response.json({ error: 'feature must be an image feature such as try_on or image' }, { status: 400 });
   }
   const fal = await falBalance();
-  const [{ rows }, stats, falCredit] = await Promise.all([
+  const [{ rows }, stats, falCredit, times] = await Promise.all([
     pool.query(
       `select id, label, provider, endpoint, ratios, thinking_levels, max_images, max_prompt_chars, image_prices, thinking_prices, created_at > now() - interval '14 days' as is_new, twin_of from model_configs where enabled and kind = 'image' and $1 = any(features) order by label, id`,
       [feature],
     ),
     modelStats(feature),
     falCreditUsd(pool, fal),
+    runTimes(feature),
   ]);
   // One model of each duplicate pair (lib/model-twins.ts). No fal row has a twin among the image models, so fal's credit lock never swaps one.
   const models = (await onePerPair(pool, rows)).map((r) => {
@@ -57,6 +58,7 @@ export async function GET(request: Request) {
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,
+      typicalSec: times.get(r.id) ?? null,
     };
   });
   const ranking = models.map((m) => ({ id: m.id, score: m.score, usd: Math.min(...Object.values(m.prices).map(Number)), vertex: m.provider === 'vertex' }));

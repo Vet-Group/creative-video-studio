@@ -56,6 +56,8 @@ export interface ImageModel {
   creditShown: boolean;
   /** How many marks the score rests on. */
   total: number;
+  /** The usual run time in seconds (median and 75th percentile of recent runs, any member's); null with too few. */
+  typicalSec?: { p50: number; p75: number } | null;
 }
 export interface Img {
   id: string;
@@ -189,6 +191,8 @@ export interface ReuseJob {
   modelId: string | null;
   /** Motion Control's character orientation. */
   orientation?: string | null;
+  /** The AI model generator's traits (JSON). */
+  traits?: string | null;
   /** The multi-angle app's view. */
   view?: string | null;
   /** The breed swap app's breed (and the name swap app's). */

@@ -70,7 +70,7 @@ export const APPS: AppConfig[] = [
     category: 'fashion',
     slots: [
       { label: 'Nhân vật mới', inputLabel: 'Ảnh nhân vật mới', empty: 'Thêm 1 ảnh người sẽ xuất hiện trong kết quả' },
-      { label: 'Ảnh đích', inputLabel: 'Ảnh đích', empty: 'Thêm 1 ảnh có người cần thay' },
+      { label: 'Ảnh cần thay người', inputLabel: 'Ảnh cần thay người', empty: 'Thêm 1 ảnh có người cần thay' },
     ],
     prompt: 'optional',
   },
@@ -83,7 +83,7 @@ export const APPS: AppConfig[] = [
     category: 'fashion',
     slots: [
       { label: 'Người mẫu mới', inputLabel: 'Ảnh người mẫu mới', empty: 'Thêm 1 ảnh người mẫu mới' },
-      { label: 'Ảnh đích', inputLabel: 'Ảnh đích', empty: 'Thêm 1 ảnh sản phẩm có người mẫu cần thay' },
+      { label: 'Ảnh cần thay người mẫu', inputLabel: 'Ảnh cần thay người mẫu', empty: 'Thêm 1 ảnh sản phẩm có người mẫu cần thay' },
     ],
     prompt: 'optional',
   },
@@ -129,7 +129,7 @@ export const APPS: AppConfig[] = [
     category: 'fashion',
     slots: [
       { label: 'Khuôn mặt nguồn', inputLabel: 'Ảnh khuôn mặt nguồn', empty: 'Thêm 1 ảnh có khuôn mặt muốn dùng' },
-      { label: 'Ảnh đích', inputLabel: 'Ảnh đích', empty: 'Thêm 1 ảnh cần đổi khuôn mặt' },
+      { label: 'Ảnh cần đổi khuôn mặt', inputLabel: 'Ảnh cần đổi khuôn mặt', empty: 'Thêm 1 ảnh có khuôn mặt cần thay' },
     ],
   },
   {
