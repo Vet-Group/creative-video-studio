@@ -3260,12 +3260,13 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
   /* Toasts at the top of the screen, clear of Run at the foot. */
   body:has(.imagebar) .toasts { top: 1rem; bottom: auto; }
 }
-/* A narrow wide screen (1024 to 1279 px): the pills drop their leading icon, so the row keeps Run, most of the model's name and the more-options pill's
-   name (what it folds away is otherwise unknown). */
+/* A narrow wide screen (1024 to 1279 px): the pills drop their leading icon, the more-options pill shows its icon alone (its name is for screen readers and
+   its tooltip), so the row keeps Run and most of the model's name. */
 @media (min-width: 1024px) and (max-width: 1279px) {
   .imagebar-chips { gap: 6px; }
   .imagebar-chips .select-trigger:not(.imagebar-more, dialog *) { padding: 0 10px; }
   .imagebar-chips .select-trigger:not(.imagebar-more, dialog *) > .icon:first-child { display: none; }
+  .imagebar-more .select-value { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 @media (min-width: 1024px) and (pointer: coarse) {
   .imagebar .field-head:not(dialog *) { min-height: 44px; }
