@@ -778,6 +778,13 @@
 			"when": 1796300000000,
 			"tag": "0111_billing_teams",
 			"breakpoints": true
+		},
+		{
+			"idx": 111,
+			"version": "7",
+			"when": 1796400000000,
+			"tag": "0112_pose_generator",
+			"breakpoints": true
 		}
 	]
 }

@@ -18,7 +18,7 @@ const { GET: listJobs, POST } = await import('./route');
 const { GET } = await import('../stores/route');
 const { settle } = await import('@cvs/core/ledger');
 const { FEATURE_PROMPTS } = await import('@cvs/core/models');
-const { breedSwapPrompt, mockupPrompt, nameSwapPrompt, petPortraitPrompt } = await import('@/lib/apps');
+const { breedSwapPrompt, mockupPrompt, nameSwapPrompt, petPortraitPrompt, posePrompt } = await import('@/lib/apps');
 const { forgetFalBalance } = await import('@/lib/provider-credit');
 
 const PASSWORD = 'correct-horse-battery';
@@ -704,6 +704,7 @@ describe('POST /api/jobs for an image feature', () => {
       ['app-char', 'character_swap', 2, 'auto'], ['app-model', 'model_swap', 2, 'auto'], ['app-bg', 'background_changer', 2, 'auto'], ['app-reframe', 'reframe', 1, '1:1,16:9'],
       ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 4, 'auto'], ['app-lingerie', 'lingerie_try_on', 4, 'auto'], ['app-fashion', 'fashion_model', 1, '3:4,auto'],
       ['app-angles', 'multi_angle', 1, 'auto'], ['app-breeds', 'breed_swap', 1, 'auto'], ['app-pets', 'pet_portrait', 1, 'auto'], ['app-mockups', 'mockup_pack', 3, 'auto'], ['app-names', 'name_swap', 1, 'auto'],
+      ['app-poses', 'pose_generator', 2, 'auto'],
     ];
     beforeAll(async () => {
       for (const [id, feature, max, ratios] of appModels) {
@@ -883,6 +884,48 @@ describe('POST /api/jobs for an image feature', () => {
       expect(await post(named('Nguyễn Ánh'))).toMatchObject({ status: 201, job: { prompt: nameSwapPrompt('Nguyễn Ánh'), params: { name: 'Nguyễn Ánh', batch: BATCH } } });
       const ok = await post(named("O'Brien", 'Pug'));
       expect([ok.status, ok.job]).toEqual([201, { feature: 'name_swap', model: 'app-names', prompt: nameSwapPrompt("O'Brien", 'Pug'), aspect: 'auto', params: { resolution: '1K', name: "O'Brien", breed: 'Pug', batch: BATCH }, workspace_id: 'ws_vet' }]);
+    });
+
+    test('the pose generator takes one photo and one known pose or own words per job, never both, with exactly the prompt the pose makes', async () => {
+      const post = await runner('pose_generator', 2);
+      const kneel = { prompt: posePrompt('kneeling on one knee and facing the camera, full body'), params: { resolution: '1K', pose: 'kneel', batch: BATCH } };
+      const own = (poseText: string) => ({ prompt: posePrompt(poseText), params: { resolution: '1K', poseText, batch: BATCH } });
+      const before = await jobCount();
+      expect((await post({ ...kneel, params: { ...kneel.params, pose: 'cartwheel' } }, 1)).error).toMatch(/^params.pose must be one of front, hand-on-hip, three-quarter, /);
+      expect((await post({ ...kneel, params: { ...kneel.params, poseText: 'ngồi trên ghế' } }, 1)).error).toBe('the pose generator takes params.pose or params.poseText, not both and not neither');
+      expect((await post({ prompt: kneel.prompt, params: { resolution: '1K', batch: BATCH } }, 1)).error).toBe('the pose generator takes params.pose or params.poseText, not both and not neither');
+      // Over 200 characters, empty, untrimmed, two spaces, a line break and a control character: the page sends its words clean.
+      const refused = 'params.poseText must be the pose in your own words, trimmed, 1 to 200 characters';
+      for (const bad of ['x'.repeat(201), '', ' ngồi', 'ngồi  xổm', 'ngồi\nxổm', 'ngồi\u0007']) expect([bad, (await post(own(bad), 1)).error]).toEqual([bad, refused]);
+      expect((await post({ ...kneel, prompt: posePrompt('standing straight') }, 1)).error).toBe('the prompt must be the one the pose makes');
+      expect((await post({ ...kneel, prompt: `${kneel.prompt} Make her smile.` }, 1)).error).toBe('the prompt must be the one the pose makes');
+      expect((await post({ params: kneel.params }, 1)).error).toBe('the prompt must be the one the pose makes');
+      expect((await post(kneel, 0)).error).toMatch(/^assetIds must list 1 to /);
+      expect((await post(kneel, 2)).error).toBe('the pose generator takes exactly one image: the person');
+      expect((await post({ ...kneel, params: { ...kneel.params, garments: '1' } }, 1)).error).toMatch(/^params may hold only resolution, quality, thinking, brief, pose, poseText and batch/);
+      expect(await jobCount()).toBe(before);
+      const ok = await post(kneel, 1);
+      expect([ok.status, ok.job]).toEqual([201, { feature: 'pose_generator', model: 'app-poses', prompt: kneel.prompt, aspect: 'auto', params: { resolution: '1K', pose: 'kneel', batch: BATCH }, workspace_id: 'ws_vet' }]);
+      const words = 'x'.repeat(199) + 'ồ'; // 200 characters, a Vietnamese letter last
+      expect(await post(own(words), 1)).toMatchObject({ status: 201, job: { prompt: posePrompt(words), params: { poseText: words, batch: BATCH } } });
+      // A Run makes at most 4 poses, as the page lets the member pick: two more pass, a 5th of the same Run is refused and nothing is made.
+      for (const more of ['ngồi trên ghế', 'đứng dựa tường']) expect((await post(own(more), 1)).status).toBe(201);
+      const count = await jobCount();
+      expect((await post(own('ngồi xổm'), 1)).error).toBe('a pose generator Run (params.batch) takes at most 4 poses');
+      expect(await jobCount()).toBe(count);
+    });
+
+    test("History's list names a pose generator job's pose or own words, and not a Try On job's pose", async () => {
+      const m = await newMember();
+      const pose = (params: Record<string, string>, prompt: string) => run(m.cookie, { assetIds: [m.asset], modelId: 'app-poses', feature: 'pose_generator', ratio: 'auto', prompt, params: { resolution: '1K', batch: BATCH, ...params } });
+      expect((await pose({ pose: 'front' }, posePrompt('standing straight and facing the camera, arms relaxed at the sides, full body'))).status).toBe(201);
+      expect((await pose({ poseText: 'ngồi trên ghế' }, posePrompt('ngồi trên ghế'))).status).toBe(201);
+      await insertAsset(`${m.id}-g1`, m.id);
+      expect((await runImage(m, { feature: 'try_on', prompt: undefined, assetIds: [m.asset, `${m.id}-g1`], params: { resolution: '1K', garments: '1', pose: 'kneel' } })).status).toBe(201);
+      expect(await error(await runImage(m, { feature: 'try_on', prompt: undefined, assetIds: [m.asset, `${m.id}-g1`], params: { resolution: '1K', garments: '1', poseText: 'ngồi' } }))).toMatch(/^params may hold only resolution, quality, thinking, brief, garments and pose,/); // own pose words are the pose generator's
+      const mine = (await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: m.cookie } }))).json()) as { jobs: { feature: string; pose: string | null; poseText: string | null; text: string | null }[] };
+      // The own words are the card's text too, so two own-pose Runs read apart.
+      expect(mine.jobs.map((j) => [j.feature, j.pose, j.poseText, j.text])).toEqual([['try_on', null, null, null], ['pose_generator', null, 'ngồi trên ghế', 'ngồi trên ghế'], ['pose_generator', 'front', null, null]]);
     });
 
     test('the multi-angle app keeps the batch id of its Run too, and an app that is not a batch app takes none', async () => {

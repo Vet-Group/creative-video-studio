@@ -2645,6 +2645,48 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'pose-generator': {
+    title: 'Một người mẫu, nhiều tư thế',
+    sections: [
+      {
+        title: 'Tạo tư thế người mẫu là gì?',
+        blocks: [
+          'Từ một ảnh người mẫu, ứng dụng tạo lại đúng người đó trong các tư thế bạn chọn: đứng thẳng, chống hông, quay lưng, ngồi, cận mặt và nhiều tư thế khác, hoặc một tư thế bạn tự tả. Mỗi tư thế là một ảnh riêng.',
+          `AI giữ nguyên khuôn mặt, tóc, dáng người, trang phục, ánh sáng và nền của ảnh gốc, chỉ đổi tư thế và khung hình. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Tạo tư thế trong 3 bước',
+        lead: 'Chọn ảnh người mẫu, chọn tư thế, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Chọn ảnh người mẫu', text: 'Tải lên một ảnh rõ mặt, thấy người, hoặc chọn trong Ảnh đã tải hay một người mẫu AI đã lưu. Trên kết quả của Tạo người mẫu AI và Thử đồ, nút Đổi tư thế mở sẵn ảnh đó ở đây.' },
+              { title: 'Chọn tư thế', text: 'Chọn tối đa 4 tư thế trong thư viện, hoặc tả tư thế trong ô Tư thế tự tả; ô này tính là một tư thế. Mỗi tư thế tạo một ảnh riêng và tính tiền riêng; tổng tiền hiện trước khi chạy.' },
+              { title: 'Chạy', text: 'Bấm Chạy. Mỗi tư thế là một lượt trong tab Lịch sử; "Chọn cả lô" trên một thẻ chọn mọi ảnh của lần chạy đó để tải về một tệp .zip.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Giới hạn',
+        blocks: [
+          'Tư thế càng khác ảnh gốc, AI càng phải đoán phần không thấy trong ảnh, như mặt sau của trang phục khi quay lưng. Hãy so từng ảnh với ảnh gốc trước khi dùng.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Mỗi tư thế tốn bao nhiêu?', `${APP_COST} Mỗi tư thế là một ảnh nên tổng tiền bằng giá một ảnh nhân số tư thế đã chọn.`],
+              ['Chọn tư thế trong thư viện và tự tả cùng lúc thì sao?', 'Mỗi tư thế chạy thành một ảnh riêng, nên tư thế tự tả không làm đổi các tư thế đã chọn.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'smart-remake': {
     title: 'Làm lại video mẫu với sản phẩm của bạn',
     sections: [

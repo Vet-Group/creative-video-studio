@@ -31,7 +31,8 @@ const READERS: Record<string, string[]> = {
   batchItems: ['components/AppPage.tsx'], // every item of a batch app's Run
   ratio: ['components/image-tools.tsx', 'components/CreateForm.tsx', 'components/MarketingStudio.tsx'],
   garments: ['components/TryOn.tsx'],
-  pose: ['components/TryOn.tsx'],
+  pose: ['components/TryOn.tsx', 'components/AppPage.tsx'], // Try On's pose and the pose generator's
+  poseText: ['components/AppPage.tsx'], // the pose generator's own words
   format: ['components/MarketingStudio.tsx'],
   hook: ['components/MarketingStudio.tsx'],
   location: ['components/MarketingStudio.tsx'],

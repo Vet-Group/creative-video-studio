@@ -379,7 +379,8 @@ describe('settings', () => {
     };
     expect(before).toMatchObject({ featuresMonthlyCapUsd: '260.0000', memberDailyUsdCap: '10.0000', memberMonthlyUsdCap: '50.0000' });
     expect(before.featureCaps.find((c) => c.feature === 'motion_control')).toEqual({ feature: 'motion_control', monthlyUsd: '40.0000' });
-    expect(before.featureCaps).toHaveLength(18);
+    expect(before.featureCaps.find((c) => c.feature === 'pose_generator')).toEqual({ feature: 'pose_generator', monthlyUsd: '50.0000' }); // 0112
+    expect(before.featureCaps).toHaveLength(19);
 
     expect((await put({ featuresMonthlyCapUsd: '310', memberDailyUsdCap: '12.5', featureCaps: [{ feature: 'image', monthlyUsd: '150' }, { feature: 'reframe', monthlyUsd: '5' }] })).status).toBe(200);
     const after = (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as typeof before;

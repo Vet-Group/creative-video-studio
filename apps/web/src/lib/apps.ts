@@ -2,6 +2,7 @@
 // The rules mirror POST /api/jobs: the swaps and Face Swap take exactly 2 images, Jewelry Try-On 2 or more (the pieces, then the person); Background Changer takes a prompt with 1 image, or a reference image as the 2nd, not both and not neither.
 
 import { MOTION_IMAGE_MAX_SEC } from '@cvs/core/models';
+import { poseOf, POSES } from './try-on-stock';
 
 export type AppCategory = 'fashion' | 'photo' | 'video' | 'utility';
 export const CATEGORIES: { id: AppCategory | 'all'; label: string }[] = [
@@ -23,6 +24,8 @@ export interface AppSlot {
   many?: boolean;
   /** Stock photos the slot offers in a dialog, from the samples an Admin uploaded: the ones named `<prefix>NN.jpg` of each group, a group with a `label` under its own heading. */
   stock?: { title: string; groups: { label?: string; prefix: string }[] };
+  /** Its tile also offers the saved AI models the member may use (the AI model group of Try On's model picker), when there are any. */
+  aiModels?: boolean;
 }
 
 export interface AppConfig {
@@ -51,6 +54,9 @@ export interface AppConfig {
   products?: boolean;
   /** Shows the names box and the breeds as an option (the name swap app): Run sends one job per name, or per name and breed, each with its `params.name` (and `params.breed`) and the prompt nameSwapPrompt makes. */
   names?: boolean;
+  /** Shows the poses (POSES, by their pictures) and a box for the member's own words, up to MAX_POSES in all (the pose generator): Run sends one job per pose, each with its
+   * `params.pose` or `params.poseText` and the prompt posePrompt makes. */
+  poses?: boolean;
   /** An app that is not built yet: its page says so, and why. */
   soon?: string;
 }
@@ -258,6 +264,17 @@ export const APPS: AppConfig[] = [
     names: true,
   },
   {
+    // Ours too (owner-approved 2026-11-20): one model photo, the same person in other poses, one job per pose; a fashion app beside the AI model generator, whose models it poses.
+    slug: 'pose-generator',
+    feature: 'pose_generator',
+    name: 'Tạo tư thế người mẫu',
+    description: 'Từ một ảnh người mẫu, tạo cùng người mẫu ấy trong tối đa 4 tư thế, mỗi tư thế một ảnh riêng, giữ nguyên người và trang phục.',
+    keywords: 'pose, pose generator, model poses',
+    category: 'fashion',
+    slots: [{ label: 'Người mẫu', inputLabel: 'Ảnh người mẫu', empty: 'Ảnh người mẫu (rõ mặt, thấy người)', aiModels: true }],
+    poses: true,
+  },
+  {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
     // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
     slug: 'smart-remake',
@@ -303,6 +320,8 @@ export interface AppDraft {
   products?: number;
   /** The names box, on an app with `names`. */
   names?: string;
+  /** How many poses are picked, the member's own words counting as one, on an app with `poses`. */
+  poses?: number;
 }
 
 /** The first thing that stops Run, in the order the form is filled; null when it can go. */
@@ -318,6 +337,8 @@ export function appReason(app: AppConfig, d: AppDraft): string | null {
   if (app.breeds && !d.breeds) return 'Chọn ít nhất một giống chó.';
   if (app.styles && !d.styles) return 'Chọn ít nhất một phong cách.';
   if (app.products && !d.products) return 'Chọn ít nhất một sản phẩm.';
+  if (app.poses && !d.poses) return 'Chọn ít nhất một tư thế, hoặc tự tả một tư thế.';
+  if (app.poses && d.poses! > MAX_POSES) return `Tối đa ${MAX_POSES} tư thế mỗi lần chạy, đang là ${d.poses}: bỏ bớt một tư thế.`;
   // The blank is one product, so its mockup is that one only.
   if (app.products && d.images[1]!.length > 0 && d.products! > 1) return 'Có ảnh sản phẩm trơn thì chỉ chọn một sản phẩm: đúng loại trong ảnh đó.';
   if (app.names) {
@@ -419,7 +440,7 @@ export const breedSwapPrompt = (breed: string): string =>
   'A photo stays a photo and an illustration stays an illustration in the same style. Do not add any text, logos or watermarks.';
 
 /** The batch apps: a Run sends one job per item picked, all with one `params.batch` id (a UUID), by which History's Reuse and "Chọn cả lô" find the whole Run. */
-export const BATCH_FEATURES = ['multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap'];
+export const BATCH_FEATURES = ['multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator'];
 export const isBatchId = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s);
 
 /** The most jobs one Run of a batch app sends (the name swap app's names, or its names times its breeds, can reach it); POST /api/jobs holds every Run to it. */
@@ -444,6 +465,18 @@ export const petPortraitPrompt = (style: string): string =>
   'Show this one pet only, centered, with nothing of its head or ears cut off. ' +
   'Use a plain pure white background with no scenery, shadow or vignette. No text, no letters, no frame, no border, no signature and no watermark. ' +
   'Clean, sharp edges, ready to print on a product.';
+
+/** The most poses one Run of the pose generator makes, its own words included. */
+export const MAX_POSES = 4;
+/** The longest own words for a pose, in characters. */
+export const MAX_POSE_TEXT = 200;
+/** What the pose generator calls a job of the member's own words, on its box and on the job's History card. */
+export const OWN_POSE = 'Tư thế tự tả';
+
+/** The prompt of one pose generator job: the person of the photo, unchanged, in the pose `words` say (a pose's of POSES, or the member's own). POST /api/jobs takes no other. */
+export const posePrompt = (words: string): string =>
+  "Keep the person's face, identity, hair, skin, body shape and outfit, and the photo's lighting and background, exactly unchanged, " +
+  `and show the same person in this pose and framing: ${words}. Photorealistic, with the same camera quality as the photo. Do not add any text, logos or watermarks.`;
 
 /** The products of the mockup pack: the id a job keeps as `params.product`, the page's label, what the product is and the scene of its mockup. */
 export const MOCKUP_PRODUCTS: { id: string; label: string; product: string; scene: string }[] = [
@@ -519,42 +552,48 @@ export const nameSwapPrompt = (name: string, breed?: string): string =>
   (breed ? `Also replace the dog with ${/^[AEIOU]/.test(breed) ? 'an' : 'a'} ${breed}, with the coat, colours and markings typical of the breed, in the same pose, at the same size and in the same position, facing the same way. ` : '') +
   'Keep everything else exactly unchanged: the artwork, every other text and number, the layout, the background, the product and its shape, the lighting and the style. Do not add any other text, logos or watermarks.';
 
-/** One job of a batch app, as its params keep it: the view, breed, style, product or name it made. */
+/** One job of a batch app, as its params keep it: the view, breed, style, product, name or pose (one of POSES, or the member's own words) it made. */
 export interface BatchItem {
   view?: string | null;
   breed?: string | null;
   style?: string | null;
   product?: string | null;
   name?: string | null;
+  pose?: string | null;
+  poseText?: string | null;
 }
 
 /**
  * What stays picked after a batch Run stopped once `done` of its `runs` were sent, so Run again sends only the rest: each key's items of the jobs not sent.
  * A name with some of its breeds sent is dropped too (picking it again would resend those), and its jobs not sent come back in `left` for the page to name.
  */
-export function unsentPicks(runs: BatchItem[], done: number): Record<'view' | 'breed' | 'style' | 'product' | 'name', string[]> & { left: BatchItem[] } {
+export function unsentPicks(runs: BatchItem[], done: number): Record<'view' | 'breed' | 'style' | 'product' | 'name' | 'pose' | 'poseText', string[]> & { left: BatchItem[] } {
   const started = new Set(runs.slice(0, done).map((r) => r.name).filter(Boolean));
   const rest = runs.slice(done);
   const kept = rest.filter((r) => !r.name || !started.has(r.name));
   const all = (k: keyof BatchItem) => [...new Set(kept.map((r) => r[k]).filter((v): v is string => !!v))];
-  return { view: all('view'), breed: all('breed'), style: all('style'), product: all('product'), name: all('name'), left: rest.filter((r) => !kept.includes(r)) };
+  return { view: all('view'), breed: all('breed'), style: all('style'), product: all('product'), name: all('name'), pose: all('pose'), poseText: all('poseText'), left: rest.filter((r) => !kept.includes(r)) };
 }
 
-/** What one job of a batch app made, for its History card's title: the view's, style's or product's label, the name (with its breed) or the breed; null for any other job. */
+/** What one job of a batch app made, for its History card's title: the view's, style's, product's or pose's label (OWN_POSE for the member's own words), the name (with its breed)
+ * or the breed; null for any other job. */
 export const itemLabel = (p: BatchItem): string | null =>
   (p.view && VIEW_LABELS[p.view]) ||
   (p.style && PET_STYLES.find((s) => s.id === p.style)?.label) ||
   (p.product && MOCKUP_PRODUCTS.find((m) => m.id === p.product)?.label) ||
+  (p.pose && poseOf(p.pose)?.label) ||
+  (p.poseText && OWN_POSE) ||
   (p.name && [p.name, p.breed].filter(Boolean).join(' · ')) ||
   p.breed ||
   null;
 
-/** The prompt of one job of an app that writes its own (breed swap, pet portrait, mockup pack, name swap), which POST /api/jobs holds the job to; undefined for any other app.
+/** The prompt of one job of an app that writes its own (breed swap, pet portrait, mockup pack, name swap, pose generator), which POST /api/jobs holds the job to; undefined for any other app.
  * `blank`: the mockup pack's job has the member's blank product photo. */
 export function itemPrompt(feature: string, p: BatchItem, blank = false): string | undefined {
   if (feature === 'breed_swap') return breedSwapPrompt(p.breed!);
   if (feature === 'pet_portrait') return petPortraitPrompt(p.style!);
   if (feature === 'mockup_pack') return mockupPrompt(p.product!, blank);
   if (feature === 'name_swap') return nameSwapPrompt(p.name!, p.breed ?? undefined);
+  if (feature === 'pose_generator') return posePrompt(poseOf(p.pose)?.words ?? p.poseText!);
   return undefined;
 }
