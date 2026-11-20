@@ -6,6 +6,7 @@ import { checkCaps } from '@cvs/core/limits';
 import { REMAKE_QUEUE } from '@cvs/core/queue';
 import { readableAsset, readJson } from '@/lib/assets';
 import { pool } from '@/lib/auth';
+import { storeAllowed } from '@/lib/billing';
 import { CAP_MESSAGES } from '@/lib/caps';
 import { boss } from '@/lib/queue';
 import { REMAKE_COLUMNS, reaRemakeEnabled, spendOf } from '@/lib/remake';
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
 }
 
 /** Queues a Smart Remake: one of the caller's own images put into chosen shots of one of their finished analyses, or of one an Admin shared in their workspace, on the worker.
- * A remake of their own analysis takes its store; one of a shared analysis has none, as the sharer's store is not the caller's. Answers with the new remake id to poll. */
+ * A remake of their own analysis takes its store, unless the caller may no longer pick it (another billing team's, lib/billing.ts); one of a shared analysis has none, as the sharer's store is not the caller's. Answers with the new remake id to poll. */
 export async function POST(request: Request) {
   if (!reaRemakeEnabled()) return notHere();
   const g = await guard(request, 'member');
@@ -36,7 +37,12 @@ export async function POST(request: Request) {
 
   const userId = g.session.user.id;
   const analysis = (
-    await pool.query('select status, result, store_id, user_id = $2 as own from analyses where id = $1 and workspace_id = $3 and (user_id = $2 or shared_at is not null)', [
+    // The analysis' store goes with the remake only while the caller may still pick it (another billing team's is dropped, lib/billing.ts).
+    await pool.query(
+      `select status, result, store_id, user_id = $2 as own,
+              (store_id is null or exists (select 1 from stores s where s.id = analyses.store_id and ${storeAllowed('s', '$2')})) as store_ok
+         from analyses where id = $1 and workspace_id = $3 and (user_id = $2 or shared_at is not null)`,
+      [
       analysisId,
       userId,
       g.workspaceId,
@@ -76,7 +82,7 @@ export async function POST(request: Request) {
     await tx.query(
       `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots, workspace_id)
          values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6, $7)`,
-      [id, userId, analysis.own ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots), g.workspaceId],
+      [id, userId, analysis.own && analysis.store_ok ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots), g.workspaceId],
     );
     return null;
   });

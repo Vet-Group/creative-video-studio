@@ -83,6 +83,20 @@ test("queues a remake of the caller's own analysis and image, with the analysis'
   expect(row).toEqual({ user_id: userId, team_id: team, store_id: 'store-ok', analysis_id: 'an-ok', product_asset_id: 'img', shots: [1, 3], status: 'queued' });
 });
 
+test('drops the analysis’ store when the caller, now in a billing team, may no longer pick it (docs/BILLING.md)', async () => {
+  const team = (await pool.query('select team_id from users where id = $1', [userId])).rows[0].team_id;
+  await pool.query(`insert into teams (id, name, billable) values ('rm-sales', 'Sales', true)`);
+  await pool.query(`update users set team_id = 'rm-sales' where id = $1`, [userId]);
+  try {
+    const res = await post(ok);
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select store_id from remakes where id = $1', [id])).rows[0].store_id).toBeNull(); // 'store-ok' belongs to no team
+  } finally {
+    await pool.query('update users set team_id = $2 where id = $1', [userId, team]);
+  }
+});
+
 test('refuses another member’s or an unfinished analysis, shots it does not have or too many, and an image that is not the caller’s', async () => {
   expect(await errorOf(await post({}))).toBe('analysisId, productAssetId and shots are required');
   const theirs = await post({ ...ok, analysisId: 'an-theirs' });

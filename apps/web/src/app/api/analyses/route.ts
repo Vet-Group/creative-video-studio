@@ -5,6 +5,7 @@ import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { reaAnalyzeEnabled } from '@/lib/analyze';
 import { readableAsset, readJson } from '@/lib/assets';
 import { pool } from '@/lib/auth';
+import { STORE_TEAM_CODE, storeAllowed } from '@/lib/billing';
 import { boss } from '@/lib/queue';
 import { guard } from '@/lib/session';
 
@@ -61,8 +62,9 @@ export async function POST(request: Request) {
 
   const userId = g.session.user.id;
   if (storeId !== null) {
-    const store = (await pool.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [storeId, g.workspaceId])).rows[0];
+    const store = (await pool.query(`select ${storeAllowed('s', '$3')} as allowed from stores s where s.id = $1 and s.workspace_id = $2 and not s.hidden`, [storeId, g.workspaceId, userId])).rows[0];
     if (!store) return bad('the store does not exist or is hidden');
+    if (!store.allowed) return Response.json({ error: 'a member of a billing team runs jobs only for the stores of their team', code: STORE_TEAM_CODE }, { status: 403 });
   }
 
   const id = randomUUID();

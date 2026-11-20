@@ -99,6 +99,22 @@ test('refuses a video that is not the caller’s, a non-video asset, a missing a
   expect(await errorOf(await post({}))).toBe('sourceAssetId, and an optional storeId, are required');
 });
 
+test('refuses another billing team’s store to a member of a billing team (docs/BILLING.md)', async () => {
+  const team = (await pool.query('select team_id from users where id = $1', [userId])).rows[0].team_id;
+  await pool.query(`insert into teams (id, name, billable) values ('an-sales-a', 'Sales A', true), ('an-sales-b', 'Sales B', true)`);
+  await pool.query(`insert into stores (id, name, code, workspace_id, team_id) values ('an-st-a', 'A', 'ANA', 'ws_vet', 'an-sales-a'), ('an-st-b', 'B', 'ANB', 'ws_vet', 'an-sales-b')`);
+  await pool.query(`update users set team_id = 'an-sales-a' where id = $1`, [userId]);
+  try {
+    const refused = await post({ sourceAssetId: 'v1', storeId: 'an-st-b' });
+    expect([refused.status, ((await refused.json()) as { code: string }).code]).toEqual([403, 'store_not_in_team']);
+    expect((await post({ sourceAssetId: 'v1', storeId: 'store-ok' })).status).toBe(403); // a store of no team is not the team's either
+    expect((await post({ sourceAssetId: 'v1', storeId: 'an-st-a' })).status).toBe(201);
+    expect((await post({ sourceAssetId: 'v1' })).status).toBe(201);
+  } finally {
+    await pool.query('update users set team_id = $2 where id = $1', [userId, team]);
+  }
+});
+
 test('polls one of the caller’s analyses and hides another user’s', async () => {
   const { id } = (await (await post({ sourceAssetId: 'v1' })).json()) as { id: string };
   const got = await ONE(call(`/api/analyses/${id}`), { params: Promise.resolve({ id }) });
