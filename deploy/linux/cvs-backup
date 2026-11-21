@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Usage: cvs-backup [--drill | --weekly-copy]
-#   (none)         nightly: pg_dump -Fc + counts.txt + the MinIO volume into the LOCAL restic repo, keep 14 dailies.
+#   (none)         nightly: pg_dump -Fc + counts.txt + the MinIO volume + the BETTER_AUTH_SECRET line of .env (secrets/auth.env)
+#                  into the LOCAL restic repo, keep 14 dailies.
 #   --drill        restore the latest snapshot into a scratch DB and a scratch MinIO and compare it with counts.txt.
 #   --weekly-copy  copy the latest snapshot to the R2 repo (CVS_R2_*), keep 14 dailies and 8 weeklies. Needs R2 credentials.
 #                  Runs daily since 2026-11-01 (cvs-backup-weekly.timer keeps its old name).
@@ -149,8 +150,20 @@ if [ "$mode" = backup ]; then
   objects="$(bucket_counts "$minio")" || fail counts "listing bucket $bucket failed"
   echo "objects $bucket $objects" >> "$staging/counts.txt"
   mounts=(-v "$(native "$staging"):/backup/staging:ro" -v "${project}_minio-data:/backup/minio:ro")
-  out="$(restic backup --host "$restic_host" /backup 2>&1)" || { printf '%s\n' "$out"; fail backup "$(last_line "$out")"; }
+  # BETTER_AUTH_SECRET decrypts the stored 2FA secrets, so a restore onto a new host needs it (Fable audit 2026-11-20, reliability #11).
+  # Only the encrypted snapshot gets it: the restic container writes it to a tmpfs of its own, never to this disk or the log.
+  args=()
+  if CVS_AUTH_LINE="$(grep -m 1 '^BETTER_AUTH_SECRET=.' .env 2> /dev/null)"; then
+    export CVS_AUTH_LINE
+    mounts+=(--tmpfs /backup/secrets:mode=0700 -e CVS_AUTH_LINE --entrypoint sh)
+    # shellcheck disable=SC2016 # the $VARS expand inside the restic container, not here
+    args=(-c 'umask 077 && printf "%s\n" "$CVS_AUTH_LINE" > /backup/secrets/auth.env && exec restic "$@"' sh)
+  else
+    say "warning: .env has no BETTER_AUTH_SECRET, so this snapshot holds none"
+  fi
+  out="$(restic "${args[@]}" backup --host "$restic_host" /backup 2>&1)" || { printf '%s\n' "$out"; fail backup "$(last_line "$out")"; }
   mounts=()
+  unset CVS_AUTH_LINE
   prune=(); [ "$(date +%u)" != 7 ] || prune=(--prune)
   out="$(restic forget --host "$restic_host" --keep-daily 14 "${prune[@]}" 2>&1)" || { printf '%s\n' "$out"; fail forget "$(last_line "$out")"; }
   rm -rf "$staging"; say "backup done${prune:+ (pruned)}"; exit 0
