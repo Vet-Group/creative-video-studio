@@ -134,6 +134,18 @@ test('streams the source video to disk without reading it into memory', async ()
   expect((await row(id)).status).toBe('succeeded');
 });
 
+test('raises cost_usd with each booked call, before its clip is stored, so the caps never count a booked call twice (limits.ts openRemakes)', async () => {
+  const id = await queued([1, 2]);
+  const seen: (string | null)[] = [];
+  const write = async (key: string, body: Uint8Array) => {
+    seen.push((await row(id)).cost_usd);
+    stored[key] = body;
+  };
+  await runRemake(pool, id, seams({ write }));
+  expect(seen.slice(0, 2)).toEqual(['0.200000', '0.400000']); // as shot 1's clip is stored, then shot 2's
+  expect((await row(id)).cost_usd).toBe('0.400000');
+});
+
 test('a shot whose paid call fails still books what fal billed, and the remake delivers the other shots as partial', async () => {
   const id = await queued([1, 2]);
   await runRemake(

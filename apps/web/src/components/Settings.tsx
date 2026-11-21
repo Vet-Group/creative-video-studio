@@ -128,7 +128,7 @@ function Limits({ usage }: { usage: Usage | null | 'failed' }) {
         <Meter label="Clip video hôm nay" used={clips.used} cap={clips.cap} text={`${clips.used} / ${clips.cap} clip`} left={`Còn ${clips.cap - clips.used} clip`} alone={`${clips.used} clip`} />
         {dayUsd && (
           <Meter
-            label="Ảnh và ứng dụng hôm nay"
+            label="Ảnh, ứng dụng và Smart Remake hôm nay"
             used={Number(dayUsd.used)}
             cap={Number(dayUsd.cap)}
             text={`${usd(dayUsd.used)} / ${usd(dayUsd.cap)}`}
@@ -138,7 +138,7 @@ function Limits({ usage }: { usage: Usage | null | 'failed' }) {
         )}
         {monthUsd && (
           <Meter
-            label="Ảnh và ứng dụng tháng này"
+            label="Ảnh, ứng dụng và Smart Remake tháng này"
             used={Number(monthUsd.used)}
             cap={Number(monthUsd.cap)}
             text={`${usd(monthUsd.used)} / ${usd(monthUsd.cap)}`}
@@ -173,7 +173,7 @@ function Today({ usage, onMore }: { usage: Usage | null | 'failed'; onMore: () =
   const cells = usage && [
     ['Clip video', usage.clips.used, usage.clips.cap, usage.clips.cap >= NO_CAP ? `${usage.clips.used}` : `${usage.clips.used} / ${usage.clips.cap}`],
     ...(usage.dayUsd
-      ? ([['Ảnh và ứng dụng', Number(usage.dayUsd.used), Number(usage.dayUsd.cap), Number(usage.dayUsd.cap) >= NO_CAP ? usd(usage.dayUsd.used) : `${usd(usage.dayUsd.used)} / ${usd(usage.dayUsd.cap)}`]] as const)
+      ? ([['Ảnh, ứng dụng và Smart Remake', Number(usage.dayUsd.used), Number(usage.dayUsd.cap), Number(usage.dayUsd.cap) >= NO_CAP ? usd(usage.dayUsd.used) : `${usd(usage.dayUsd.used)} / ${usd(usage.dayUsd.cap)}`]] as const)
       : []),
   ] as const;
   return (

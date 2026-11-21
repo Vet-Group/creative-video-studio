@@ -1,0 +1,2 @@
+-- A Smart Remake's estimate when the API admitted it: the member and company caps hold it, less what it has booked, while it runs (owner decision, 2026-11-21). Null on older rows.
+ALTER TABLE "remakes" ADD COLUMN "estimate_usd" numeric(12, 4);

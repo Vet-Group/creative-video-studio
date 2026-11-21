@@ -226,7 +226,7 @@ test('Settings shows the profile, the own caps, the sign-in summary, the support
   await expect(settings.getByText('Chưa phân team')).toBeVisible();
   await settings.getByRole('button', { name: 'Hạn mức', exact: true }).click(); // the profile also has a see-limits link with that word
   await expect(settings.getByRole('meter', { name: 'Clip video hôm nay' })).toHaveAttribute('aria-valuemax', '1000'); // serve.ts sets the daily clip cap
-  await expect(settings.getByRole('meter', { name: 'Ảnh và ứng dụng tháng này' })).toBeVisible();
+  await expect(settings.getByRole('meter', { name: 'Ảnh, ứng dụng và Smart Remake tháng này' })).toBeVisible();
   await expect(settings.getByText('Hạn mức ngày đặt lại lúc 0:00 giờ Việt Nam', { exact: false })).toBeVisible();
   await settings.getByRole('button', { name: 'Bảo mật' }).click();
   await expect(settings.getByText('Đã đặt', { exact: true })).toBeVisible();
