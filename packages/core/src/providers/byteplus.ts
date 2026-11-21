@@ -40,7 +40,8 @@ const IMAGE_PIXELS: Record<string, number> = { '1K': 1_100_000, '2K': 4_000_000 
 /**
  * A create call BytePlus answers with a 400 refused the request before making anything (an image outside the aspect ratio 0.4 to 2.5 or under 300 px,
  * a model that is not activated), and only a successful generation is billed: the refusal is an ImageReadError, which the worker releases at once,
- * instead of a failed_unknown job that would keep its estimate for a day. 401, 403, 429 and 5xx say nothing about the request, so they stay as they are.
+ * instead of a failed_unknown job that would keep its estimate for a day. The worker releases any other 4xx the same way, except 408 and 429; those
+ * and a 5xx do not say BytePlus made nothing, so they stay as they are.
  */
 async function create(f: Fetch, what: string, url: string, init: RequestInit): Promise<unknown> {
   try {
