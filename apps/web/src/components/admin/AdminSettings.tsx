@@ -16,6 +16,7 @@ interface Model {
 interface Settings {
   monthlyCapUsd: string;
   memberDailyClipCap: number;
+  memberDailyAnalysisCap: number;
   featuresMonthlyCapUsd: string;
   memberDailyUsdCap: string;
   memberMonthlyUsdCap: string;
@@ -66,6 +67,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
   const { problem, pending, run } = useAction(reload);
   const [monthly, setMonthly] = useState(plain(settings.monthlyCapUsd));
   const [daily, setDaily] = useState(String(settings.memberDailyClipCap));
+  const [analyses, setAnalyses] = useState(String(settings.memberDailyAnalysisCap));
   const [features, setFeatures] = useState(plain(settings.featuresMonthlyCapUsd));
   const [memberDay, setMemberDay] = useState(plain(settings.memberDailyUsdCap));
   const [memberMonth, setMemberMonth] = useState(plain(settings.memberMonthlyUsdCap));
@@ -86,6 +88,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
   const dirty =
     differs(monthly, settings.monthlyCapUsd) ||
     differs(daily, settings.memberDailyClipCap) ||
+    differs(analyses, settings.memberDailyAnalysisCap) ||
     differs(features, settings.featuresMonthlyCapUsd) ||
     differs(memberDay, settings.memberDailyUsdCap) ||
     differs(memberMonth, settings.memberMonthlyUsdCap) ||
@@ -102,6 +105,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
   function undo() {
     setMonthly(plain(settings.monthlyCapUsd));
     setDaily(String(settings.memberDailyClipCap));
+    setAnalyses(String(settings.memberDailyAnalysisCap));
     setFeatures(plain(settings.featuresMonthlyCapUsd));
     setMemberDay(plain(settings.memberDailyUsdCap));
     setMemberMonth(plain(settings.memberMonthlyUsdCap));
@@ -120,6 +124,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
           sendJson('PUT', {
             monthlyCapUsd: monthly,
             memberDailyClipCap: Number(daily),
+            memberDailyAnalysisCap: Number(analyses),
             featuresMonthlyCapUsd: features,
             memberDailyUsdCap: memberDay,
             memberMonthlyUsdCap: memberMonth,
@@ -156,6 +161,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
             hint="Trần chung của cả công ty. Chạm mức (tính cả tiền đang tạm giữ) thì không ai bấm Tạo video được tới ngày 1 tháng sau. 200 USD ≈ 350 clip Kling 5 giây."
           />
           <Field label="Số clip tối đa mỗi thành viên mỗi ngày" unit="clip" numeric value={daily} onChange={setDaily} hint="Clip lỗi không mất tiền thì không tính." />
+          <Field label="Số lượt phân tích video tối đa mỗi thành viên mỗi ngày" unit="lượt" numeric value={analyses} onChange={setAnalyses} hint="Tính mọi lượt đã bắt đầu phân tích, kể cả lượt lỗi. 0 là tắt phân tích." />
         </div>
       </fieldset>
       <fieldset>
@@ -292,7 +298,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
               <button type="button" onClick={undo}>
                 Hoàn tác
               </button>
-              <button type="button" className="primary" disabled={pending || [monthly, daily, features, memberDay, memberMonth, ...Object.values(soft)].some((v) => v.trim() === '')} onClick={() => void save()}>
+              <button type="button" className="primary" disabled={pending || [monthly, daily, analyses, features, memberDay, memberMonth, ...Object.values(soft)].some((v) => v.trim() === '')} onClick={() => void save()}>
                 Lưu cài đặt
               </button>
             </>

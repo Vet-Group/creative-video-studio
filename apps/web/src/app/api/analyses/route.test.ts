@@ -1,6 +1,7 @@
 // The reference-video analysis API: the feature flag gate, who may analyse which video, and the queued row it writes,
 // against a disposable database on the compose Postgres. No S3 or rea-video binary: the worker consumes the queue.
 import { randomBytes } from 'node:crypto';
+import { ANALYZE_QUEUE } from '@cvs/core/queue';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -12,7 +13,7 @@ process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 process.env.REA_ANALYZE_ENABLED = '1';
 
 const { auth, pool } = await import('@/lib/auth');
-const { stopBoss } = await import('@/lib/queue');
+const { boss, stopBoss } = await import('@/lib/queue');
 const { GET: LIST, POST } = await import('./route');
 const { GET: ONE, DELETE: REMOVE } = await import('./[id]/route');
 const { PUT: SHARE, DELETE: UNSHARE } = await import('./[id]/share/route');
@@ -91,6 +92,73 @@ test("queues an analysis of the caller's own video with its team and source key"
   expect(row).toEqual({ user_id: userId, team_id: team, store_id: 'store-ok', source_key: 's3/v1', status: 'queued' });
 });
 
+/** Finishes the member's unfinished analyses, so the next one may start. */
+const settle = () => pool.query(`update analyses set status = 'succeeded', finished_at = now() where user_id = $1 and status in ('queued', 'running')`, [userId]);
+
+test('refuses a new analysis while the member already has one queued or running, in words for the member (429)', async () => {
+  const queued = await post({ sourceAssetId: 'v1' });
+  expect(queued.status).toBe(429);
+  expect(await errorOf(queued)).toBe('Bạn đang có một phân tích chưa xong. Hãy đợi nó xong rồi phân tích video tiếp theo.');
+  await pool.query(`update analyses set status = 'running' where user_id = $1 and status = 'queued'`, [userId]);
+  expect((await post({ sourceAssetId: 'v1' })).status).toBe(429);
+  await settle();
+  // Two quick sends: the per-member lock lets only one through.
+  const both = await Promise.all([post({ sourceAssetId: 'v1' }), post({ sourceAssetId: 'v1' })]);
+  expect(both.map((r) => r.status).sort()).toEqual([201, 429]);
+  expect((await pool.query(`select count(*)::int as n from analyses where user_id = $1 and status = 'queued'`, [userId])).rows[0].n).toBe(1);
+  // A queued row older than the queue's expiry still holds the member back while its queue job waits (a backed-up queue, a stopped worker)…
+  await pool.query(`update analyses set created_at = now() - interval '1 hour' where user_id = $1 and status = 'queued'`, [userId]);
+  expect((await post({ sourceAssetId: 'v1' })).status).toBe(429);
+  // …and no longer once that job is gone: a worker stopped between taking it and starting it, and the queue never retries one.
+  const waiting = (await pool.query(`select id from analyses where user_id = $1 and status = 'queued'`, [userId])).rows[0].id;
+  const b = await boss();
+  for (const j of await b.findJobs(ANALYZE_QUEUE, { data: { analysisId: waiting } })) await b.cancel(ANALYZE_QUEUE, j.id);
+  expect((await post({ sourceAssetId: 'v1' })).status).toBe(201);
+  // Another member is not held back by this one's analysis.
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ('v-other', $1, 'input', 's3/other', 'o.mp4', 'video/mp4', 1000, 5000, 'ws_vet')`, [otherId]);
+  const otherCookie = (await auth.api.signInEmail({ body: { email: 'other@example.test', password: PASSWORD }, asResponse: true })).headers
+    .getSetCookie()
+    .map((c) => c.split(';')[0])
+    .join('; ');
+  expect((await POST(call('/api/analyses', 'POST', { sourceAssetId: 'v-other' }, otherCookie))).status).toBe(201);
+  await pool.query(`delete from analyses where user_id = $1`, [otherId]);
+  await settle();
+});
+
+test('refuses the 21st analysis of the ICT day (the daily cap, 20 by default), not counting one that failed before it started or one from yesterday', async () => {
+  const { user } = await auth.api.createUser({ body: { email: 'daily@example.test', name: 'Daily', password: PASSWORD, role: 'member' } });
+  const dailyCookie = (await auth.api.signInEmail({ body: { email: 'daily@example.test', password: PASSWORD }, asResponse: true })).headers
+    .getSetCookie()
+    .map((c) => c.split(';')[0])
+    .join('; ');
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ('v-daily', $1, 'input', 's3/daily', 'd.mp4', 'video/mp4', 1000, 5000, 'ws_vet')`, [user.id]);
+  const add = (name: string, n: number, status: string, created = 'now()') =>
+    pool.query(
+      `insert into analyses (id, user_id, team_id, source_key, status, workspace_id, created_at) select $2 || '-' || g, u.id, u.team_id, 's3/daily', $3, 'ws_vet', ${created}
+         from users u, generate_series(1, $4::int) g where u.id = $1`,
+      [user.id, name, status, n],
+    );
+  const send = () => POST(call('/api/analyses', 'POST', { sourceAssetId: 'v-daily' }, dailyCookie));
+  await add('daily-done', 18, 'succeeded');
+  await add('daily-ran', 1, 'failed'); // failed after the worker started it, its model calls likely paid: it counts
+  await pool.query(`update analyses set started_at = now() where id = 'daily-ran-1'`);
+  await add('daily-unsent', 3, 'failed'); // failed before it started (the queue refused it): free, not counted
+  await add('daily-yesterday', 5, 'succeeded', `now() - interval '1 day'`); // the ICT day before
+  expect((await send()).status).toBe(201); // the 20th of today
+  await pool.query(`update analyses set status = 'succeeded' where user_id = $1 and status = 'queued'`, [user.id]);
+  const refused = await send();
+  expect(refused.status).toBe(429);
+  expect(await errorOf(refused)).toBe('Hôm nay bạn đã dùng hết 20 lượt phân tích. Mai bạn dùng tiếp được.');
+  // A cap of 0 turns analysis off, which the member is told as such.
+  await pool.query('update settings set member_daily_analysis_cap = 0 where id = 1');
+  try {
+    expect(await errorOf(await send())).toBe('Phân tích video đang tạm tắt.');
+  } finally {
+    await pool.query('update settings set member_daily_analysis_cap = 20 where id = 1');
+  }
+  expect((await pool.query(`select count(*)::int as n from analyses where user_id = $1`, [user.id])).rows[0].n).toBe(28);
+});
+
 test('refuses a video that is not the caller’s, a non-video asset, a missing asset and a hidden store', async () => {
   expect((await post({ sourceAssetId: 'v-theirs' })).status).toBe(403); // another user's video, not in the caller's library: readableAsset refuses it
   expect(await errorOf(await post({ sourceAssetId: 'img' }))).toBe('sourceAssetId must be a video');
@@ -109,7 +177,9 @@ test('refuses another billing team’s store to a member of a billing team (docs
     expect([refused.status, ((await refused.json()) as { code: string }).code]).toEqual([403, 'store_not_in_team']);
     expect((await post({ sourceAssetId: 'v1', storeId: 'store-ok' })).status).toBe(403); // a store of no team is not the team's either
     expect((await post({ sourceAssetId: 'v1', storeId: 'an-st-a' })).status).toBe(201);
+    await settle();
     expect((await post({ sourceAssetId: 'v1' })).status).toBe(201);
+    await settle();
   } finally {
     await pool.query('update users set team_id = $2 where id = $1', [userId, team]);
   }
@@ -125,9 +195,12 @@ test('polls one of the caller’s analyses and hides another user’s', async ()
 });
 
 test('lists the caller’s analyses newest first', async () => {
-  const list = (await (await LIST(call('/api/analyses'))).json()) as { analyses: { id: string; status: string }[] };
+  const list = (await (await LIST(call('/api/analyses'))).json()) as { analyses: { id: string; status: string; createdAt: string }[] };
   expect(list.analyses.length).toBeGreaterThanOrEqual(2);
-  expect(list.analyses.every((a) => a.status === 'queued')).toBe(true);
+  expect(list.analyses[0]!.status).toBe('queued'); // the one the previous test sent
+  const times = list.analyses.map((a) => Date.parse(a.createdAt));
+  expect(times).toEqual([...times].sort((a, b) => b - a));
+  expect(list.analyses.some((a) => a.id === 'an-theirs')).toBe(false);
 });
 
 const remove = (id: string) => REMOVE(call(`/api/analyses/${id}`, 'DELETE'), { params: Promise.resolve({ id }) });
@@ -243,7 +316,7 @@ describe('shared reference videos', () => {
     await pool.query(`update assets set deleted_at = now() where id = 'v-later'`);
     const list = await shared();
     expect(list.map((a) => a.id)).toEqual(['an-share', 'an-mine-shared']);
-    expect(list[0]).toEqual({ id: 'an-share', title: 'Tee', sharedAt: expect.any(String), sourceAssetId: 'v-shared', durationS: 8, sceneCount: 2 }); // no owner, cost or result
+    expect(list[0]).toEqual({ id: 'an-share', title: 'Tee', sourceAssetId: 'v-shared', durationS: 8, sceneCount: 2 }); // no owner, cost or result
     const own = ((await (await LIST(call('/api/analyses'))).json()) as { analyses: { id: string; sharedTitle: string | null }[] }).analyses;
     expect(own.some((a) => a.id === 'an-share')).toBe(false); // the own list stays the caller's
     expect(own.find((a) => a.id === 'an-mine-shared')?.sharedTitle).toBe('Mine');

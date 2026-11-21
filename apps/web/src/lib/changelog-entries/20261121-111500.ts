@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-21T11:15:00+07:00', kind: 'improved', title: 'Trang Phân tích video mở gọn hơn, có hạn mức lượt phân tích mỗi ngày', details: ['Trên máy tính, danh sách Video mẫu hiện ngay khi trang mở, nên các ví dụ bên dưới không còn bị đẩy xuống sau một nhịp.', 'Mỗi người phân tích một video tại một thời điểm, và tối đa 20 lượt mỗi ngày (Admin chỉnh được trong Cài đặt); lượt đã bắt đầu phân tích thì tính, kể cả khi lỗi. Khi chạm giới hạn, bấm Phân tích sẽ báo rõ lý do, và Smart Remake có nút Thử phân tích lại.', 'Hình đầu video ở Lịch sử và Video mẫu chỉ tải khi bạn cuộn tới, nên danh sách mở nhanh hơn.'], href: '/analyze', prs: [607], audience: 'all' } satisfies ChangeEntry;

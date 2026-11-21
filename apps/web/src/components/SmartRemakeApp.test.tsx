@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest';
 import { appBySlug } from '@/lib/apps';
 import { scenePicks } from '@/lib/analyze';
 import { api } from '@/lib/api';
-import { pickNote, remakeHref, savedProduct, SmartRemakeApp } from './SmartRemakeApp';
+import { offersRetry, pickNote, remakeHref, savedProduct, SmartRemakeApp } from './SmartRemakeApp';
 
 // The video slot lists the member's recent clips, which the app shell's jobs provider holds.
 vi.mock('./jobs', async (original) => ({ ...(await original<typeof import('./jobs')>()), useJobs: () => ({ jobs: [] }) }));
@@ -62,4 +62,12 @@ test("a reload sets the product again only while it is still one of the member's
   read.mockClear();
   expect(await savedProduct(undefined)).toBeNull();
   expect(read).not.toHaveBeenCalled(); // no product in the address, nothing read
+});
+
+test('"Thử phân tích lại" is offered for a failed analysis and for one the server refused to start (a 429), which leaves no analysis on view', () => {
+  expect(offersRetry({ status: 'failed' }, false)).toBe(true);
+  expect(offersRetry(null, true)).toBe(true);
+  expect(offersRetry(null, false)).toBe(false);
+  expect(offersRetry({ status: 'queued' }, false)).toBe(false);
+  expect(offersRetry({ status: 'succeeded' }, false)).toBe(false);
 });

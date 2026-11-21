@@ -799,6 +799,13 @@
 			"when": 1796600000000,
 			"tag": "0114_jobs_retry_of_idx",
 			"breakpoints": true
+		},
+		{
+			"idx": 114,
+			"version": "7",
+			"when": 1796700000000,
+			"tag": "0115_member_daily_analysis_cap",
+			"breakpoints": true
 		}
 	]
 }

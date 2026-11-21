@@ -419,6 +419,8 @@ export const settings = pgTable(
     id: integer('id').primaryKey().default(1),
     monthlyCapUsd: numeric('monthly_cap_usd', { precision: 12, scale: 4 }).notNull().default('200'),
     memberDailyClipCap: integer('member_daily_clip_cap').notNull().default(5),
+    /** How many reference-video analyses (POST /api/analyses) a member may start on one ICT day; a failed one with no cost booked does not count. */
+    memberDailyAnalysisCap: integer('member_daily_analysis_cap').notNull().default(20),
     /** Hard caps on the image and apps features (FEATURE_BUDGET): the month for all members, and each member's ICT day and month. */
     featuresMonthlyCapUsd: numeric('features_monthly_cap_usd', { precision: 12, scale: 4 }).notNull().default('260'),
     memberDailyUsdCap: numeric('member_daily_usd_cap', { precision: 12, scale: 4 }).notNull().default('10'),

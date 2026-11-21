@@ -67,7 +67,7 @@ const sameCredits = (a: VertexCredits, b: VertexCredits) =>
   a.creditCurrency === b.creditCurrency && a.creditExpiresOn === b.creditExpiresOn && a.stopWhenCreditsEnd === b.stopWhenCreditsEnd;
 
 /**
- * Admin: the caps (video month, daily clips, the image and apps month, each member's USD day and month), the balance warning threshold, the
+ * Admin: the caps (video month, daily clips, daily analyses, the image and apps month, each member's USD day and month), the balance warning threshold, the
  * soft per-feature caps, every model but the dearer row of a pair of duplicates (`twin_of`, migration 0075: the owner keeps only the cheaper one on offer), and the Vertex accounts: the configured ones in order (`configured`), then any other with credits on record, and the active one.
  */
 export async function GET(request: Request) {
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
   if (g.error) return g.error;
   const caps = (
     await pool.query(
-      `select monthly_cap_usd::text as "monthlyCapUsd", member_daily_clip_cap as "memberDailyClipCap", features_monthly_cap_usd::text as "featuresMonthlyCapUsd",
+      `select monthly_cap_usd::text as "monthlyCapUsd", member_daily_clip_cap as "memberDailyClipCap", member_daily_analysis_cap as "memberDailyAnalysisCap", features_monthly_cap_usd::text as "featuresMonthlyCapUsd",
               member_daily_usd_cap::text as "memberDailyUsdCap", member_monthly_usd_cap::text as "memberMonthlyUsdCap", vertex_active_project as "vertexActiveProject",
               balance_warning_usd::text as "balanceWarningUsd"
          from settings where id = 1`,
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * Admin: change `monthlyCapUsd`, `memberDailyClipCap`, `featuresMonthlyCapUsd`, `memberDailyUsdCap`, `memberMonthlyUsdCap`, `balanceWarningUsd`,
+ * Admin: change `monthlyCapUsd`, `memberDailyClipCap`, `memberDailyAnalysisCap`, `featuresMonthlyCapUsd`, `memberDailyUsdCap`, `memberMonthlyUsdCap`, `balanceWarningUsd`,
  * `featureCaps` (a list of `{ feature, monthlyUsd }`), `models` (a list of `{ id, enabled }`) and/or `vertexAccounts` (a list of `{ projectId, creditTotal, creditCurrency,
  * creditExpiresOn, stopWhenCreditsEnd }`, total and date nullable). All or nothing. Changed caps are audited as settings.update, each changed
  * soft cap as feature_cap.update, each changed model as model.set_enabled and each changed Vertex account as vertex_account.update. `byteplusPack` sets the BytePlus
@@ -113,7 +113,7 @@ export async function PUT(request: Request) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
   const body = (await readBody(request)) ?? {};
-  const { monthlyCapUsd, memberDailyClipCap, models, featureCaps } = body;
+  const { monthlyCapUsd, memberDailyClipCap, memberDailyAnalysisCap, models, featureCaps } = body;
   const vertexList = body.vertexAccounts === undefined ? [] : body.vertexAccounts;
   const credits = Array.isArray(vertexList) ? vertexList.map(vertexCredits) : [null];
   if (credits.some((c) => c === null)) {
@@ -138,10 +138,13 @@ export async function PUT(request: Request) {
   if (memberDailyClipCap !== undefined && !(Number.isInteger(memberDailyClipCap) && (memberDailyClipCap as number) >= 0 && (memberDailyClipCap as number) <= 100_000)) {
     return bad('memberDailyClipCap must be a whole number of 0 or more');
   }
+  if (memberDailyAnalysisCap !== undefined && !(Number.isInteger(memberDailyAnalysisCap) && (memberDailyAnalysisCap as number) >= 0 && (memberDailyAnalysisCap as number) <= 100_000)) {
+    return bad('memberDailyAnalysisCap must be a whole number of 0 or more');
+  }
   const list = models === undefined ? [] : models;
   if (!Array.isArray(list) || list.some((m) => typeof m?.id !== 'string' || typeof m?.enabled !== 'boolean')) return bad('models must be a list of { id, enabled }');
-  if ([monthlyCapUsd, memberDailyClipCap, models, featureCaps, body.vertexAccounts, body.byteplusPack, ...MEMBER_CAPS.map((k) => body[k])].every((v) => v === undefined)) {
-    return bad(`give at least one of monthlyCapUsd, memberDailyClipCap, ${MEMBER_CAPS.join(', ')}, featureCaps, models, vertexAccounts, byteplusPack`);
+  if ([monthlyCapUsd, memberDailyClipCap, memberDailyAnalysisCap, models, featureCaps, body.vertexAccounts, body.byteplusPack, ...MEMBER_CAPS.map((k) => body[k])].every((v) => v === undefined)) {
+    return bad(`give at least one of monthlyCapUsd, memberDailyClipCap, memberDailyAnalysisCap, ${MEMBER_CAPS.join(', ')}, featureCaps, models, vertexAccounts, byteplusPack`);
   }
   const features = [...new Set((softCaps as { feature: string }[]).map((c) => c.feature))];
   if (features.length !== softCaps.length) return bad('featureCaps must name each feature once');
@@ -153,13 +156,14 @@ export async function PUT(request: Request) {
 
   try {
     return await withTransaction(pool, async (tx): Promise<Response> => {
-      const old = (await tx.query('select monthly_cap_usd::text as usd, member_daily_clip_cap as daily from settings where id = 1 for update')).rows[0];
-      const next = { usd: usd ?? old.usd, daily: (memberDailyClipCap as number | undefined) ?? old.daily };
-      if (Number(next.usd) !== Number(old.usd) || next.daily !== old.daily) {
-        await tx.query('update settings set monthly_cap_usd = $1, member_daily_clip_cap = $2, updated_at = now() where id = 1', [next.usd, next.daily]);
+      const old = (await tx.query('select monthly_cap_usd::text as usd, member_daily_clip_cap as daily, member_daily_analysis_cap as analyses from settings where id = 1 for update')).rows[0];
+      const next = { usd: usd ?? old.usd, daily: (memberDailyClipCap as number | undefined) ?? old.daily, analyses: (memberDailyAnalysisCap as number | undefined) ?? old.analyses };
+      if (Number(next.usd) !== Number(old.usd) || next.daily !== old.daily || next.analyses !== old.analyses) {
+        await tx.query('update settings set monthly_cap_usd = $1, member_daily_clip_cap = $2, member_daily_analysis_cap = $3, updated_at = now() where id = 1', [next.usd, next.daily, next.analyses]);
         await audit(tx, {
           actorId, action: 'settings.update', target: 'settings:1',
-          oldValue: { monthlyCapUsd: old.usd, memberDailyClipCap: old.daily }, newValue: { monthlyCapUsd: next.usd, memberDailyClipCap: next.daily },
+          oldValue: { monthlyCapUsd: old.usd, memberDailyClipCap: old.daily, memberDailyAnalysisCap: old.analyses },
+          newValue: { monthlyCapUsd: next.usd, memberDailyClipCap: next.daily, memberDailyAnalysisCap: next.analyses },
         });
       }
       const oldCaps = (

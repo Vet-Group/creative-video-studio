@@ -2,8 +2,8 @@
 // the cards where only a succeeded analysis opens.
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, test } from 'vitest';
-import { AnalysisHistory, EveryoneChoice } from './AnalysisHistory';
+import { afterEach, expect, test, vi } from 'vitest';
+import { AnalysisHistory, EveryoneChoice, whenSeen } from './AnalysisHistory';
 import type { AnalysisRow } from './AnalyzeView';
 
 const result: Analysis = {
@@ -44,7 +44,8 @@ test('a succeeded row is a card button with its format, length, shots and hook; 
   expect(html).toContain('Giới thiệu sản phẩm');
   expect(html).toContain('11.4 giây · 1 cảnh');
   expect(html).toContain('Clean apparel presentation.');
-  expect(html).toContain('/api/assets/v1/content#t=0.1'); // the source video's first frame is the poster
+  expect(html.match(/<video[^>]*preload="metadata"/g)).toHaveLength(2); // the source video's first frame is the poster…
+  expect(html).not.toContain('/content'); // …fetched only once its card scrolls into view: up to 50 rows open no stream before then
   expect(html.match(/<button type="button" class="analysis-card"/g)).toHaveLength(2); // a card per row, each a button to open it
   expect(html.match(/aria-current="true"/g)).toHaveLength(1);
 });
@@ -94,4 +95,34 @@ test('the Admin choice is a labelled checkbox that follows its state', () => {
   expect(off).toContain('type="checkbox"');
   expect(off).not.toContain('checked');
   expect(renderToStaticMarkup(<EveryoneChoice checked onChange={() => undefined} />)).toContain('checked=""');
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
+test("a card's video is told to load once its card first scrolls into view, and at once where the browser has no IntersectionObserver", () => {
+  let fire: (entries: { isIntersecting: boolean }[]) => void = () => undefined;
+  const disconnect = vi.fn();
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      constructor(cb: typeof fire) {
+        fire = cb;
+      }
+      observe() {}
+      disconnect = disconnect;
+    },
+  );
+  const seen = vi.fn();
+  const stop = whenSeen({} as Element, seen);
+  fire([{ isIntersecting: false }]);
+  expect(seen).not.toHaveBeenCalled(); // still off screen: no src yet
+  fire([{ isIntersecting: true }]);
+  expect(seen).toHaveBeenCalledTimes(1); // CardVideo sets its src now
+  expect(disconnect).toHaveBeenCalled(); // watched once
+  stop();
+
+  vi.stubGlobal('IntersectionObserver', undefined);
+  const now = vi.fn();
+  whenSeen({} as Element, now)();
+  expect(now).toHaveBeenCalledTimes(1);
 });

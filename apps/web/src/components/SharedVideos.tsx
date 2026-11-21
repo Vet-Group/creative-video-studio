@@ -4,19 +4,11 @@
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { MAX_SHARED_TITLE } from '@/lib/analyze';
 import { api, ApiError, errorText, sendJson } from '@/lib/api';
+import type { SharedVideo } from '@/lib/remake';
+import { CardVideo } from './AnalysisHistory';
 import type { AnalysisRow } from './AnalyzeView';
 import { confirmDialog } from './Confirm';
 import { Modal } from './Modal';
-
-/** One card of the shelf, as the shared list gives it (only analyses whose source video is still there). */
-export interface SharedVideo {
-  id: string;
-  title: string;
-  sharedAt: string;
-  sourceAssetId: string;
-  durationS: number | null;
-  sceneCount: number;
-}
 
 /**
  * The shelf: nothing while none is shared or the list does not load. `onPick` opens the analysis (the page fetches it, so a video the member chose
@@ -65,7 +57,7 @@ export function SharedVideos({ busy, currentId, onPick, initial = [] }: { busy: 
           <li key={v.id} className="analysis-item">
             <button type="button" className="analysis-card" aria-current={v.id === currentId ? 'true' : undefined} disabled={busy || opening} onClick={() => void open(v.id)}>
               <span className="analysis-poster" aria-hidden="true">
-                <video src={`/api/assets/${v.sourceAssetId}/content#t=0.1`} muted playsInline preload="metadata" tabIndex={-1} />
+                <CardVideo assetId={v.sourceAssetId} />
               </span>
               <span className="analysis-card-body">
                 <strong>{v.title}</strong>

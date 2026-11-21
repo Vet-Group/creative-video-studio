@@ -2,7 +2,8 @@ import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
-import { AnalysisPanel, AnalysisResult, AnalysisWithSource, type AnalysisRow } from './AnalyzeView';
+import { AnalysisPanel, AnalysisResult, AnalysisWithSource, type AnalysisRow, AnalyzeView } from './AnalyzeView';
+import { JobsProvider } from './jobs';
 
 const analysis: Analysis = {
   durationS: 11.4,
@@ -146,4 +147,16 @@ test("an Admin viewing another member's analysis sees who made it, and no share 
   expect(shared).toContain('Smart Remake');
   expect(shared).not.toContain('Gỡ khỏi video mẫu');
   expect(renderToStaticMarkup(<AnalysisPanel row={base} onClose={() => undefined} onShared={() => undefined} />)).not.toContain('Người tạo');
+});
+
+test('on a wide screen the shared videos the page loaded render above the Examples from the first paint, so the Examples do not jump down when the list arrives', () => {
+  const tee = { id: 'an-1', title: 'Áo thun trơn', sourceAssetId: 'vid-1', durationS: 11.4, sceneCount: 3 };
+  const html = renderToStaticMarkup(
+    <JobsProvider userId="u1">
+      <AnalyzeView remakeEnabled initialShared={[tee]} />
+    </JobsProvider>,
+  );
+  expect(html).toContain('Áo thun trơn');
+  expect(html.indexOf('Video mẫu')).toBeGreaterThan(-1);
+  expect(html.indexOf('Video mẫu')).toBeLessThan(html.indexOf('class="analysis-examples"'));
 });

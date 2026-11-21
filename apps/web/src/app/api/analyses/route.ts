@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
-import { ANALYZE_QUEUE } from '@cvs/core/queue';
+import { withTransaction } from '@cvs/core/ledger';
+import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS } from '@cvs/core/queue';
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { reaAnalyzeEnabled } from '@/lib/analyze';
 import { readableAsset, readJson } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { STORE_TEAM_CODE, storeAllowed } from '@/lib/billing';
 import { boss } from '@/lib/queue';
+import { sharedVideos } from '@/lib/remake';
 import { guard } from '@/lib/session';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
@@ -20,19 +21,8 @@ export async function GET(request: Request) {
   const all = params.get('scope') === 'all';
   const g = await guard(request, all ? 'admin' : 'member');
   if (g.error) return g.error;
+  if (params.get('shared') === '1') return Response.json({ analyses: await sharedVideos(pool, g.workspaceId) });
   const source = `(select a.id from assets a where a.s3_key = analyses.source_key and a.workspace_id = analyses.workspace_id) as "sourceAssetId"`;
-  if (params.get('shared') === '1') {
-    // One whose source video was deleted cannot be remade, so it leaves the shelf.
-    const { rows } = await pool.query(
-      `select id, shared_title as title, shared_at as "sharedAt", result, ${source} from analyses
-        where workspace_id = $1 and shared_at is not null and exists (select 1 from assets a where a.s3_key = analyses.source_key and a.workspace_id = $1 and a.deleted_at is null)
-        order by shared_at desc limit 50`,
-      [g.workspaceId],
-    );
-    return Response.json({
-      analyses: rows.map(({ result, ...r }) => ({ ...r, durationS: (result as Analysis).durationS ?? null, sceneCount: mergeShots(result as Analysis).shots.length })),
-    });
-  }
   const rows = (
     await pool.query(
       `select id, status, provider, model, result, case when $3 = $4 then cost_usd end as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt", shared_title as "sharedTitle", ${source},
@@ -45,7 +35,7 @@ export async function GET(request: Request) {
 }
 
 /** Queues an analysis of one of the caller's own videos (an upload, a History clip or an Example, each already copied to
- * their own input): rea-video decomposes it on the worker. Answers with the new analysis id to poll. */
+ * their own input): rea-video decomposes it on the worker. Answers with the new analysis id to poll, or 429 while the caller has one unfinished or has used the day's cap (settings.member_daily_analysis_cap). */
 export async function POST(request: Request) {
   if (!reaAnalyzeEnabled()) return notHere();
   const g = await guard(request, 'member');
@@ -68,11 +58,47 @@ export async function POST(request: Request) {
   }
 
   const id = randomUUID();
-  await pool.query(
-    `insert into analyses (id, user_id, team_id, store_id, source_key, workspace_id)
-       values ($1, $2, (select team_id from users where id = $2), $3, $4, $5)`,
-    [id, userId, storeId, found.asset.s3Key, g.workspaceId],
-  );
+  // Refusals members read (errorText).
+  const refused = await withTransaction(pool, async (tx): Promise<Response | null> => {
+    await tx.query(`select pg_advisory_xact_lock(hashtext('analyses:' || $1))`, [userId]); // two quick sends cannot both pass the checks
+    // A running row holds the next analysis back (a stale one is closed by the worker), and so does a queued row while its queue job waits, however long
+    // (a backed-up queue, a stopped worker). A queued row with no waiting job lost it: a worker stopped between taking the job and starting the row, and the
+    // queue never retries one, nor can the member delete a queued row. Within the queue's expiry a queued row holds anyway (its job may not be sent yet).
+    const unfinished = (
+      await tx.query(`select id, status, created_at > now() - $2 * interval '1 second' as young from analyses where user_id = $1 and status in ('queued', 'running')`, [
+        userId,
+        ANALYZE_QUEUE_OPTIONS.expireInSeconds,
+      ])
+    ).rows as { id: string; status: string; young: boolean }[];
+    for (const a of unfinished) {
+      if (a.status === 'running' || a.young || (await (await boss()).findJobs(ANALYZE_QUEUE, { data: { analysisId: a.id }, queued: true })).length) {
+        return bad('Bạn đang có một phân tích chưa xong. Hãy đợi nó xong rồi phân tích video tiếp theo.', 429);
+      }
+    }
+    // The member's analyses of this ICT day, as a range on the bare created_at like the daily clip cap (dayClips, packages/core/src/limits.ts). Every one
+    // the worker started counts, failed or not, as its model calls may have been paid; only one that failed before it started (the queue refused it) is free.
+    const day = (
+      await tx.query(
+        `select (select count(*) from analyses a
+                  where a.user_id = $1
+                    and not (a.status = 'failed' and a.started_at is null)
+                    and a.created_at >= (date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh') at time zone 'Asia/Ho_Chi_Minh')
+                    and a.created_at < ((date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh') + interval '1 day') at time zone 'Asia/Ho_Chi_Minh'))::int as today,
+                s.member_daily_analysis_cap as cap
+           from settings s where s.id = 1`,
+        [userId],
+      )
+    ).rows[0] as { today: number; cap: number };
+    if (day.cap === 0) return bad('Phân tích video đang tạm tắt.', 429);
+    if (day.today >= day.cap) return bad(`Hôm nay bạn đã dùng hết ${day.cap} lượt phân tích. Mai bạn dùng tiếp được.`, 429);
+    await tx.query(
+      `insert into analyses (id, user_id, team_id, store_id, source_key, workspace_id)
+         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5)`,
+      [id, userId, storeId, found.asset.s3Key, g.workspaceId],
+    );
+    return null;
+  });
+  if (refused) return refused;
   try {
     await (await boss()).send(ANALYZE_QUEUE, { analysisId: id });
   } catch (e) {
