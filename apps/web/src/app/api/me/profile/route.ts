@@ -16,6 +16,8 @@ import { emailOf, onCompanyDomain } from '@/lib/workspaces';
  * else's address does not hand them this account. Linked Lark and Google accounts and passkeys keep working; an Admin's change verifies it.
  * Outside the company's workspace a new address on the company's email domains is refused (403 company_email), before the uniqueness check: a partner
  * may neither pre-claim a staff member's address (and block their first Lark sign-in) nor learn which staff addresses exist (docs/WORKSPACES.md §4).
+ * In the company's workspace too (owner, 2026-11-21, over the 11-11 rule), one that no account has is refused, after the uniqueness check, with the
+ * member's words and code company_email: only an Admin sets a staff address (PATCH /api/admin/users/[id]).
  */
 export async function PATCH(request: Request) {
   const g = await guard(request, 'member');
@@ -32,6 +34,9 @@ export async function PATCH(request: Request) {
   if (typeof newEmail === 'string' && g.workspaceId !== COMPANY_WORKSPACE_ID && newEmail !== g.session.user.email.toLowerCase() && onCompanyDomain(newEmail)) return bad('company_email', 403);
   if (typeof newEmail === 'string' && (await pool.query('select 1 from users where lower(email) = $1 and id <> $2', [newEmail, userId])).rowCount) {
     return bad('another user has this email', 409);
+  }
+  if (typeof newEmail === 'string' && newEmail !== g.session.user.email.toLowerCase() && onCompanyDomain(newEmail)) {
+    return Response.json({ error: 'Bạn không tự đổi sang email công ty được. Hãy nhờ Admin đổi giúp.', code: 'company_email' }, { status: 403 });
   }
   const profile = await withTransaction(pool, async (tx) => {
     const old = (await tx.query('select name, avatar_color, email from users where id = $1 for update', [userId])).rows[0] as { name: string; avatar_color: string | null; email: string };
