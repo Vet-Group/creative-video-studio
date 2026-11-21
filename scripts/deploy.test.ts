@@ -45,7 +45,7 @@ case "$n" in
     esac ;;
   docker) case " $* " in *" ps -q "*) printf '%s' "\${STUB_PS_Q:-}" ;; esac ;;
   systemctl) case " $* " in *" is-active "*) exit "\${STUB_WEB_ACTIVE:-3}" ;; esac ;;
-  git) case " $* " in *" remote get-url "*) printf '%s\\n' "\${STUB_GIT_REMOTE:-}" ;; esac ;;
+  git) case " $* " in *" remote get-url "*) printf '%s\\n' "\${STUB_GIT_REMOTE:-}" ;; *" rev-parse "*) printf '%s\\n' "\${STUB_GIT_HEAD:-}" ;; esac ;;
 esac
 exit 0
 `;
@@ -167,6 +167,10 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     // The R2 copy runs daily (at most 1 day lost off-host), after the 03:30 nightly backup.
     expect(readFileSync(join(root, 'deploy/linux/cvs-backup-weekly.timer'), 'utf8')).toMatch(/^OnCalendar=\*-\*-\* 04:30:00$/m);
     expect(r.out).toContain('record unit=cvs-drill.timer');
+    // The web unit names the directory the build wrote, a new one per run.
+    const dist = /CVS_DIST_DIR=(\.next-\d{14}) pnpm --filter @cvs\/web build/.exec(r.out)?.[1];
+    expect(dist).toBeDefined();
+    expect(r.out).toContain(`Environment=CVS_DIST_DIR=${dist}\n`);
     // Nothing was created or written.
     expect(s.left()).toEqual([]);
   });
@@ -472,6 +476,61 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     // Without a state file nothing is "ours", even when the stubs claim the project is up.
     const fresh = sandbox(all);
     expect(run(installSh, ['--dry-run'], { ...fresh.env, STUB_PS_Q: 'abc123', STUB_WEB_ACTIVE: '0' }).status).toBe(1);
+  });
+
+  // A real update run with node, pnpm and git stubbed. cvs-web serves .next-live; .next and .next-older are older builds.
+  // The pnpm stub's build makes the directory Next would (CVS_DIST_DIR under apps/web) and then exits with STUB_BUILD_EXIT.
+  function realUpdate(buildExit: number) {
+    const s = sandbox(undefined, `CVS_RESTIC_PASSWORD=${secrets.restic}\n`);
+    const web = join(s.appDir, 'apps', 'web');
+    for (const d of ['.next', '.next-older', '.next-live']) {
+      mkdirSync(join(web, d), { recursive: true });
+      writeFileSync(join(web, d, 'BUILD_ID'), d);
+    }
+    const unitFile = join(s.dir, 'home', '.config', 'systemd', 'user', 'cvs-web.service');
+    mkdirSync(join(unitFile, '..'), { recursive: true });
+    writeFileSync(unitFile, 'Environment=CVS_DIST_DIR=.next-live\n');
+    mkdirSync(join(s.appDir, 'node', 'bin'), { recursive: true });
+    writeFileSync(join(s.appDir, 'node', 'bin', 'node'), '#!/usr/bin/env bash\necho v24.22.1\n', { mode: 0o755 });
+    writeFileSync(join(s.appDir, 'package.json'), '{ "packageManager": "pnpm@12.14.0" }\n');
+    const pnpm = `#!/usr/bin/env bash
+printf 'pnpm %s CVS_DIST_DIR=%s\\n' "$*" "\${CVS_DIST_DIR:-}" >> "$STUB_LOG"
+case "$*" in
+  --version) echo 12.14.0 ;;
+  *"@cvs/web build"*) mkdir -p "apps/web/$CVS_DIST_DIR/static" && exit ${buildExit} ;;
+esac
+`;
+    writeFileSync(join(s.dir, 'stubs', 'pnpm'), pnpm, { mode: 0o755 });
+    writeFileSync(s.stateFile, 'compose=creative-video-studio\n');
+    const r = run(installSh, [], { ...s.env, CLOUDFLARE_API_TOKEN: '', STUB_PS_Q: 'abc123', STUB_WEB_ACTIVE: '0', STUB_GIT_HEAD: 'abcd1234' });
+    const builds = () => readdirSync(web).sort();
+    return { ...s, r, web, unit: () => readFileSync(unitFile, 'utf8'), builds };
+  }
+
+  test('l. a failed web build leaves the running build, its unit and the older builds as they were, and exits non-zero', () => {
+    const u = realUpdate(1);
+    expect(u.r.status, u.r.out).toBe(1);
+    expect(u.r.out).toContain('error: the web build failed, so nothing was switched or restarted: cvs-web keeps running apps/web/.next-live');
+    expect(u.unit()).toBe('Environment=CVS_DIST_DIR=.next-live\n');
+    expect(u.builds()).toEqual(['.next', '.next-live', '.next-older']); // the partial build is gone
+    expect(readFileSync(join(u.web, '.next-live', 'BUILD_ID'), 'utf8')).toBe('.next-live');
+    expect(u.calls()).toMatch(/pnpm --filter @cvs\/web build CVS_DIST_DIR=\.next-\d{14}-abcd1234\n/);
+    for (const later of ['up -d', 'migrate', 'daemon-reload', 'restart']) expect(u.calls()).not.toContain(later);
+  });
+
+  test('l2. a successful build switches cvs-web to its own directory at the restart, then keeps only it and the previous one', () => {
+    const u = realUpdate(0);
+    expect(u.r.status, u.r.out).toBe(0);
+    const dist = /^Environment=CVS_DIST_DIR=(\.next-\d{14}-abcd1234)$/m.exec(u.unit())?.[1];
+    expect(dist, u.unit()).toBeDefined();
+    expect(u.calls()).toContain(`pnpm --filter @cvs/web build CVS_DIST_DIR=${dist}\n`);
+    expect(u.builds()).toEqual([dist!, '.next-live'].sort());
+    expect(readFileSync(join(u.web, '.next-live', 'BUILD_ID'), 'utf8')).toBe('.next-live');
+    // Old builds go only after the restart moved cvs-web off them.
+    const restart = u.r.out.indexOf('==> systemctl --user restart cvs-web.service cvs-worker.service');
+    expect(restart).toBeGreaterThan(-1);
+    expect(u.r.out.indexOf(`==> rm -rf ${u.app}/apps/web/.next\n`)).toBeGreaterThan(restart);
+    expect(u.r.out.indexOf(`==> rm -rf ${u.app}/apps/web/.next-older\n`)).toBeGreaterThan(restart);
   });
 
   test('k. real uninstall: the token goes over stdin only, state lines go as their resources go, compose keeps the volumes', () => {

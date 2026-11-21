@@ -75,7 +75,9 @@ without it they stay on fal (`FAL_KEY`). After adding or removing the key, resta
    downloaded from `https://nodejs.org/dist/v24.22.1/` and checked with `sha256sum -c` against that release's `SHASUMS256.txt`.
    Then pnpm at the `packageManager` version is installed next to it.
 4. `pnpm install --frozen-lockfile` and `pnpm --filter @cvs/web build`. These, and the migrations, run without
-   `CLOUDFLARE_API_TOKEN`, `CVS_R2_*` and `CVS_RESTIC_PASSWORD` in their environment.
+   `CLOUDFLARE_API_TOKEN`, `CVS_R2_*` and `CVS_RESTIC_PASSWORD` in their environment. The build goes into a new directory,
+   `apps/web/.next-<UTC time>-<commit>` (see [Web builds and rollback](#web-builds-and-rollback)); when it fails, the script removes
+   that directory and exits 1 with "the web build failed, so nothing was switched or restarted", and `cvs-web` keeps running its build.
 5. Records `compose=creative-video-studio` in the state file, then `docker compose -p creative-video-studio up -d --wait`, creates the MinIO bucket (`S3_BUCKET`, default `cvs-media`; the
    production worker does not create it) and runs `pnpm --filter @cvs/db migrate`. The seed rows (the default team, the
    model configs, the presets) are part of the migrations, so there is no separate seed step. Then, when `CVS_ADMIN_EMAIL` and
@@ -105,13 +107,40 @@ Vet-Group organization had deploy keys disabled and the new VET host (192.168.1.
 A state file means the next `install.sh` is an update, and it works without uninstalling (which would delete the tunnel and the
 DNS record): ports held by this install's own compose project (`docker compose -p creative-video-studio ps -q` is not empty) or
 by `cvs-web` are not counted as taken, the repo is fast-forwarded when it is on a branch (a detached checkout keeps its commit), and a recorded tunnel is kept, but only when its DNS record id
-and both `cloudflared/` files exist. After the build, an update restarts `cvs-web` and `cvs-worker` so they run the new code. The worker first lets the provider calls in flight finish, so its restart can take up to about 23 minutes (`TimeoutStopSec=1500`) when an image is being made. A tunnel recorded without them (a run that stopped in step 7) is refused with
+and both `cloudflared/` files exist. After the build, an update restarts `cvs-web` and `cvs-worker` so they run the new code (`cvs-web` on the new build directory). The worker first lets the provider calls in flight finish, so its restart can take up to about 23 minutes (`TimeoutStopSec=1500`) when an image is being made. A tunnel recorded without them (a run that stopped in step 7) is refused with
 "run uninstall.sh first". A run that stopped after `compose up` can be undone with `uninstall.sh`, because the compose line was
 recorded before `up`.
 
+### Web builds and rollback
+
+Each run builds the web into its own directory, set through Next's `distDir` (`CVS_DIST_DIR`, read by `apps/web/next.config.ts`):
+`apps/web/.next-<UTC time>-<commit>`, for example `.next-20261121093000-f267e7de`. The running `cvs-web` keeps serving the
+directory its unit names (`Environment=CVS_DIST_DIR=` in `~/.config/systemd/user/cvs-web.service`) for the whole build, so a
+failed build changes nothing it serves. Only after a successful build does step 8 write the unit with the new directory, and the
+restart moves `cvs-web` to it. After that restart the script deletes the older build directories, keeping two: the one `cvs-web`
+now runs and the previous one. Before this change the build lived in `apps/web/.next`; the first such deploy keeps it as the previous one.
+
+What it does not cover: the gate's `git checkout` and `pnpm install` still change the source tree and `node_modules` in place
+before the build (the running processes have their code loaded already), and a failure after the build (the migrations, the
+tunnel step) still stops the script with the new build unused.
+
+Fast web-only rollback to the previous build, as root on the host (`bash scripts/run/vet.sh status` prints the `web build` line
+with both directories):
+
+```
+cd /opt/creative-video-studio/apps/web && ls -d .next-*
+sed -i 's|^Environment=CVS_DIST_DIR=.*|Environment=CVS_DIST_DIR=<previous directory>|' ~/.config/systemd/user/cvs-web.service
+XDG_RUNTIME_DIR=/run/user/0 systemctl --user daemon-reload
+XDG_RUNTIME_DIR=/run/user/0 systemctl --user restart cvs-web.service
+```
+
+This swaps only the web build: the checkout, `node_modules`, the worker and the database stay at the new commit. Use it when both
+commits have the same lockfile (in particular the same `next`) and no migration the old code cannot run with; otherwise roll back
+with `bash scripts/run/vet.sh deploy <older commit>`, which builds that commit the same way. The next deploy rewrites the unit anyway.
+
 ## Status
 
-`bash scripts/run/vet.sh status` runs `deploy/linux/status.sh` on VET (read-only): the commit, the `cvs-*` units, the compose
+`bash scripts/run/vet.sh status` runs `deploy/linux/status.sh` on VET (read-only): the commit, the web build directory `cvs-web` runs and the ones on disk, the `cvs-*` units, the compose
 containers, the answer of `https://video.vetgroup.net/privacy`, the last backup log line, and `perf` lines that tell a slow app from a
 slow line: `/login` and a static file served on the server itself and through the tunnel, the server's download and upload speed to
 Cloudflare, the tunnel's protocol and edge, and the CPU, load and memory. They add a few seconds and about 15 MB of traffic.

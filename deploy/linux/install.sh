@@ -199,7 +199,15 @@ fi
 
 # 6. Dependencies, build, data services, bucket, migrations (the seed rows are part of the migrations).
 app_run "${scrub[@]}" pnpm install --frozen-lockfile
-app_run "${scrub[@]}" pnpm --filter @cvs/web build
+# The web builds into a new directory (Next's distDir) and cvs-web moves to it only when step 9 restarts it, so a failed build
+# leaves the running web and its build untouched. Step 9 then keeps this build and the previous one, for a fast rollback.
+prev_dist="$(sed -n 's/^Environment=CVS_DIST_DIR=//p' "$unit_dir/cvs-web.service" 2> /dev/null || true)"
+commit="$(git -C "$app" rev-parse --short=8 HEAD 2> /dev/null || true)"
+dist=".next-$(date -u +%Y%m%d%H%M%S)${commit:+-$commit}"
+if ! app_run "${scrub[@]}" CVS_DIST_DIR="$dist" pnpm --filter @cvs/web build; then
+  rm -rf "$app/apps/web/$dist"
+  fail "the web build failed, so nothing was switched or restarted: cvs-web keeps running apps/web/${prev_dist:-.next}"
+fi
 record "compose=$project" # before `up`, so a failed or half-done start can still be undone with uninstall.sh
 app_run docker compose -p "$project" up -d --wait
 bucket="${S3_BUCKET:-cvs-media}"
@@ -317,7 +325,7 @@ fi
 # 9. Units. The backup units name /opt/creative-video-studio; it is rewritten when CVS_APP_DIR differs.
 run mkdir -p "$unit_dir"
 for name in "${units[@]}"; do
-  filled="$(sed -e "s|@APP@|$app|g" -e "s|/opt/creative-video-studio|$app|g" -e "s|@CLOUDFLARED@|${cloudflared_bin:-/usr/bin/cloudflared}|g" "$units_src/$name")"
+  filled="$(sed -e "s|@APP@|$app|g" -e "s|/opt/creative-video-studio|$app|g" -e "s|@CLOUDFLARED@|${cloudflared_bin:-/usr/bin/cloudflared}|g" -e "s|@DIST@|$dist|g" "$units_src/$name")"
   if [ "$dry" = 1 ]; then
     printf '[dry-run] write %s/%s:\n%s\n\n' "$unit_dir" "$name" "$filled"
   else
@@ -333,4 +341,8 @@ run systemctl --user daemon-reload
 run systemctl --user enable --now "${enable[@]}"
 # enable --now leaves a unit that is already running on its old code, so an update restarts the app units after the new build.
 if [ ${#own[@]} -gt 0 ]; then run systemctl --user restart cvs-web.service cvs-worker.service; fi
+# cvs-web now runs the new build: older ones go, except the previous one (a rollback, docs/ops/deploy.md).
+for d in "$app"/apps/web/.next "$app"/apps/web/.next-*; do
+  case "$(basename "$d")" in "$dist" | "${prev_dist:-.next}") ;; *) if [ -d "$d" ]; then run rm -rf "$d"; fi ;; esac
+done
 say "done. State: $state_file; undo with $here/uninstall.sh"

@@ -23,6 +23,7 @@ apps/web/src/lib/changelog-entries/index.ts
 
 # Files deploy/linux/install.sh creates inside the app directory on the host.
 /node/
+/apps/web/.next-*/
 /cloudflared/
 /install.state
 /backups/
