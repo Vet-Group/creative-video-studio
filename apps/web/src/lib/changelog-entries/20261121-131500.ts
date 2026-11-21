@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-21T12:01:00+07:00',
+  at: '2026-11-21T13:15:00+07:00',
   kind: 'new',
   title: 'Đổi nền, Xoá nền, Tăng độ phân giải: chạy tối đa 25 ảnh một lượt',
   details: [
