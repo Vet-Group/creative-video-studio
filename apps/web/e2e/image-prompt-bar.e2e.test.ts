@@ -300,6 +300,33 @@ test('the bar stays compact with a long prompt and 3 photos: Run on the chip row
   expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe('sticky');
 });
 
+test('a Run of 4 pictures is priced four times on Run and sends four image jobs under one batch id', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'pbarn');
+  await page.goto('/image-generation');
+  const bar = barOf(page);
+  await expect(modelButton(page)).toContainText('Mock image E2E');
+  const cost = bar.getByRole('button', { name: /^Tạo ảnh/ }).locator('.run-cost');
+  await expect(cost).toHaveText(/^· \$\d+\.\d{4}$/);
+  const one = Number((await cost.textContent())!.replace('· $', ''));
+  await expect(select(page, 'Số ảnh')).toBeHidden(); // under the more-options pill, as the chip row has no room for it
+  await openMore(page);
+  await expect(select(page, 'Số ảnh')).toHaveAttribute('data-value', '1');
+  await expect(bar.getByText(/^\d ảnh × /)).toHaveCount(0); // one picture is priced as before
+  await selectText(page, 'Số ảnh', '4 ảnh');
+  await expect(bar.locator('.imagebar-more-on')).toContainText('1'); // the pill counts it as an option in use
+  await expect(cost).toHaveText(`· $${(one * 4).toFixed(4)}`);
+  await expect(bar.getByText(/^4 ảnh × \$[\d.]+ = \$[\d.]+$/)).toBeVisible();
+
+  await bar.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen dress on a hanger');
+  await bar.getByRole('button', { name: /^Tạo ảnh/ }).click();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
+  const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; batch: string | null }[] };
+  expect(jobs.jobs.map((j) => j.feature)).toEqual(['image', 'image', 'image', 'image']);
+  expect(new Set(jobs.jobs.map((j) => j.batch)).size).toBe(1);
+  expect(jobs.jobs[0]!.batch).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+});
+
 // On prod the suggested Nano Banana 2.1 shows its "Đề xuất" badge and a thinking pill, which once squeezed its name to one letter in the chip row.
 test('a suggested model with thinking levels keeps its name readable in the chip row; its badge stays in the model menu', async ({ page }) => {
   await page.route('**/api/image-models?feature=image', async (route) => {
