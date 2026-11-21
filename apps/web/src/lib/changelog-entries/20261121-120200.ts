@@ -10,6 +10,6 @@ export default {
     'Trong Lịch sử, "Chọn cả lô" chọn và tải về cả lượt.',
   ],
   href: '/image-generation',
-  prs: [0],
+  prs: [618],
   audience: 'all',
 } satisfies ChangeEntry;
