@@ -379,7 +379,7 @@ type Drag = { preventDefault(): void; dataTransfer: DataTransfer };
  * Generation's strip, where the count is the only sign of the limit); more than `max` (a model with a lower cap chosen since) reads as an error.
  * `zone` widens the drop target to a box around the slot (Image Generation's whole prompt bar), so a file dropped beside the small tile is not lost.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra, count, zone }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean | 'always'; zone?: RefObject<HTMLElement | null> }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra, count, zone, one }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean | 'always'; zone?: RefObject<HTMLElement | null>; one?: boolean }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -387,6 +387,8 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
   const labelId = useId();
   const countId = useId();
   const full = images.length >= max;
+  // A one-photo slot, or a slot of several holding one with `one` (a bulk app's), shows it whole; the latter keeps a small add tile in its corner.
+  const whole = images.length === 1 && (max === 1 || !!one);
   const offer = images.length === 0 ? samples : [];
   const box = useRef<HTMLDivElement>(null);
   const room = hydrated && !full && !busy;
@@ -445,7 +447,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
     </span>
   );
   // "3/13" on screen; a screen reader hears "3 trên 13 ảnh trang phục", as a bare fraction reads badly.
-  const counter = count && (images.length > 0 || count === 'always') && (
+  const counter = count && !whole && (images.length > 0 || count === 'always') && (
     <span className="slot-count" data-over={images.length > max || undefined}>
       <span aria-hidden="true">
         {images.length}/{max}
@@ -477,7 +479,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       ) : (
         name
       )}
-      <div ref={box} className="slot" role="group" aria-labelledby={labelId} aria-describedby={counter ? countId : undefined} data-room={room || undefined} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} {...(!zone && { onDragOver, onDragLeave: () => setOver(false), onDrop })}>
+      <div ref={box} className="slot" role="group" aria-labelledby={labelId} aria-describedby={counter ? countId : undefined} data-room={(room && !(one && images.length > 0)) || undefined} data-over={over} data-one={whole || undefined} {...(!zone && { onDragOver, onDragLeave: () => setOver(false), onDrop })}>
         <input
           ref={input}
           type="file"
@@ -497,7 +499,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
             {images.map((i) => (
               <li key={i.id}>
                 <img src={i.url ?? thumbUrl(i.id)} alt={i.filename} />
-                {max === 1 && (
+                {whole && (
                   <span className="slot-chip" aria-hidden="true">
                     {label}
                   </span>

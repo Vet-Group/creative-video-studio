@@ -3,7 +3,7 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
 import { POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, posePrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, jobImages, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, posePrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -88,6 +88,8 @@ describe('Jewelry Try-On pieces', () => {
   it('takes as many pieces as the model allows beside the person, and one image in every other slot', () => {
     expect([slotMax(jewelry, 0, 4), slotMax(jewelry, 1, 4), slotMax(jewelry, 0, 2)]).toEqual([3, 1, 1]);
     expect(slotMax(appBySlug('face-swap')!, 0, 4)).toBe(1);
+    // A bulk app's first slot takes a Run's worth of photos, one per job; its reference slot still one.
+    expect([slotMax(appBySlug('background-changer')!, 0, 2), slotMax(appBySlug('background-changer')!, 1, 2), slotMax(appBySlug('image-upscale')!, 0, 1)]).toEqual([25, 1, 25]);
     expect(reason('jewelry-try-on', [['a', 'b', 'c'], ['p']], '', 4)).toBeNull();
     expect(reason('jewelry-try-on', [['a', 'b', 'c'], ['p']], '', 3)).toBe('Mô hình này nhận tối đa 3 ảnh.');
     expect(appInputs(jewelry, { images: [[img('a'), img('b')], [img('p')]], prompt: '' })).toEqual({ assetIds: ['a', 'b', 'p'] });
@@ -181,6 +183,15 @@ describe('appReason', () => {
 
   it('refuses more images than the model takes', () => {
     expect(reason('character-swap', [['a'], ['b']], '', 1)).toBe('Mô hình này nhận tối đa 1 ảnh.');
+  });
+
+  it("counts one photo of a bulk app's first slot per job, so many photos fit a model that takes one or two", () => {
+    expect(reason('background-remover', [['a', 'b', 'c']], '', 1)).toBeNull();
+    expect(reason('background-changer', [['a', 'b', 'c'], ['r']], '', 2)).toBeNull();
+    expect(reason('background-changer', [['a', 'b'], ['r']], '', 1)).toBe('Mô hình này nhận tối đa 1 ảnh.');    // The model choice counts the same way, so two photos do not lock a one-image model.
+    expect(jobImages(appBySlug('background-remover')!, [[img('a'), img('b')]])).toBe(1);
+    expect(jobImages(appBySlug('background-changer')!, [[img('a'), img('b')], [img('r')]])).toBe(2);
+    expect(jobImages(appBySlug('face-swap')!, [[img('a')], [img('b')]])).toBe(2);
   });
 });
 
@@ -433,8 +444,9 @@ describe('the batch apps', () => {
     expect(itemPrompt('reframe', {})).toBeUndefined();
   });
 
-  it('are the apps that pick items, and their Run id is a UUID', () => {
-    expect(APPS.filter((a) => a.views || a.breeds || a.styles || a.products || a.names || a.poses).map((a) => a.feature)).toEqual(BATCH_FEATURES);
+  it('are the apps that pick items or take many photos, and their Run id is a UUID', () => {
+    expect(APPS.filter((a) => a.views || a.breeds || a.styles || a.products || a.names || a.poses || a.bulk).map((a) => a.feature).sort()).toEqual([...BATCH_FEATURES].sort());
+    expect(APPS.filter((a) => a.bulk).map((a) => a.slug)).toEqual(['background-changer', 'image-upscale', 'background-remover']);
     expect(isBatchId('7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11')).toBe(true);
     for (const bad of ['', 'batch-1', '7D0E2F54-3C55-4A0E-9A59-2F3F0C8B1A11', '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11 ']) expect(isBatchId(bad)).toBe(false);
   });

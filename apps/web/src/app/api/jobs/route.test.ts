@@ -805,6 +805,17 @@ describe('POST /api/jobs for an image feature', () => {
       };
     }
 
+    test('the bulk photo apps take the batch id of a Run of many photos, still one photo per job; a one-photo app does not', async () => {
+      for (const feature of ['background_remover', 'image_upscale']) {
+        const post = await runner(feature, 2);
+        const ok = await post({ params: { resolution: '1K', batch: BATCH } }, 1);
+        expect([ok.status, ok.job?.params]).toEqual([201, { resolution: '1K', batch: BATCH }]);
+        expect((await post({ params: { resolution: '1K', batch: BATCH } }, 2)).status).toBe(400);
+      }
+      const reframe = await runner('reframe');
+      expect((await reframe({ ratio: '1:1', params: { resolution: '1K', batch: BATCH } })).error).toMatch(/^params may hold only resolution, quality, thinking and brief/);
+    });
+
     test('the pet portrait app takes one known style per job, with exactly the prompt that style makes and the batch id of its Run', async () => {
       const post = await runner('pet_portrait');
       const oil = { prompt: petPortraitPrompt('oil'), params: { resolution: '1K', style: 'oil', batch: BATCH } };
@@ -930,7 +941,7 @@ describe('POST /api/jobs for an image feature', () => {
 
     test('the multi-angle app keeps the batch id of its Run too, and an app that is not a batch app takes none', async () => {
       expect((await app('multi_angle', 1, { params: { resolution: '1K', view: 'back', batch: BATCH } })).job?.params).toEqual({ resolution: '1K', view: 'back', batch: BATCH });
-      expect((await app('image_upscale', 1, { params: { resolution: '1K', batch: BATCH } })).error).toMatch(/^params may hold only resolution, quality, thinking and brief, as text/);
+      expect((await app('face_swap', 2, { params: { resolution: '1K', batch: BATCH } })).error).toMatch(/^params may hold only resolution, quality, thinking and brief, as text/);
     });
 
     test('a batch app job in a partner seller\'s workspace is filed in that workspace', async () => {
