@@ -16,6 +16,9 @@ import { probeSeconds, requireFfmpeg } from './media';
 import { closeStaleRemakes, PaidCallError, type RemakeSeams, reaRemakeEnabled, runRemake, settleFal, takeOverRemakes } from './remake';
 
 vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
+// The object store, for the one test without a read seam.
+const storage = vi.hoisted(() => ({ getObject: vi.fn(), downloadObject: vi.fn() }));
+vi.mock('./storage', async (importOriginal) => ({ ...(await importOriginal<typeof import('./storage')>()), ...storage }));
 
 const run = promisify(execFile);
 const testDb = await createTestDatabase();
@@ -119,6 +122,16 @@ test('remakes every chosen shot from its own clip, joins the clips with a before
     { ref: `llm:remake:${id}:1:video`, kind: 'llm', usd: '0.2000', user_id: 'u1', team_id: 'team-unassigned', provider: 'fal', model: 'fal-ai/wan/v2.7/edit-video', is_final: true },
     { ref: `llm:remake:${id}:2:video`, kind: 'llm', usd: '0.2000', user_id: 'u1', team_id: 'team-unassigned', provider: 'fal', model: 'fal-ai/wan/v2.7/edit-video', is_final: true },
   ]);
+});
+
+test('streams the source video to disk without reading it into memory', async () => {
+  storage.getObject.mockImplementation(async () => PRODUCT);
+  storage.downloadObject.mockImplementation(async (_key: string, file: string) => writeFile(file, sourceVideo));
+  const id = await queued([1]);
+  await runRemake(pool, id, seams({ read: undefined }));
+  expect(storage.getObject).not.toHaveBeenCalledWith('sources/ref.mp4');
+  expect(storage.downloadObject).toHaveBeenCalledWith('sources/ref.mp4', expect.stringMatching(/source\.mp4$/));
+  expect((await row(id)).status).toBe('succeeded');
 });
 
 test('a shot whose paid call fails still books what fal billed, and the remake delivers the other shots as partial', async () => {

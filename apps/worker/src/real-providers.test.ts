@@ -1,5 +1,5 @@
 // The real adapters are wired by key, and read input assets from the bucket; fetch is faked, so no test reaches a provider.
-import { BAKEOFF_MODELS } from '@cvs/core/models';
+import { BAKEOFF_MODELS, type ImageModelConfig } from '@cvs/core/models';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { generateKeyPairSync } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -134,6 +134,23 @@ describe('realProviders', () => {
     expect(out).toEqual({ providerJobId: '5:req-1' });
     expect(calls).toEqual([{ url: 'https://queue.fal.run/fal-ai/kling-video/o3/pro/reference-to-video', body: expect.objectContaining({ image_urls: [SMALL_URL], duration: '5' }) }]);
     expect(read).toHaveBeenCalledWith('inputs/a1');
+  });
+
+  test('every fal video and image provider sends the start timeout it is given, so fal drops a request no runner started by then', async () => {
+    const sent: { auth?: string; start?: string }[] = [];
+    vi.stubGlobal('fetch', async (_url: string, init: { headers: Record<string, string> }) => {
+      sent.push({ auth: init.headers.Authorization, start: init.headers['X-Fal-Request-Start-Timeout'] });
+      return new Response(JSON.stringify({ request_id: 'r' }));
+    });
+    const image = { id: 'nb', provider: 'fal', endpoint: 'fal-ai/nano-banana-pro/edit', label: 'NB', ratios: ['1:1'], maxImages: 4, imagePrices: { '1K': '0.15' }, features: ['image'] } as ImageModelConfig;
+    // FAL_KEY's account, then the team's (FAL_KEY_NEXT once settings.fal_next_at is set: the stub pool answers every query with the row).
+    for (const [env, row] of [[{ FAL_KEY: 'k' }, asset], [{ FAL_KEY: 'k', FAL_KEY_NEXT: 'n' }, { ...asset, s: true }]] as const) {
+      const { providers, imageProviders } = realProviders(pool([row]), env, read, undefined, undefined, 7200);
+      await providers.fal!.submit({ model: BAKEOFF_MODELS[0]!, prompt: 'p', imageUrls: ['asset://a1'], ratio: '9:16', durationSec: 5 });
+      await imageProviders!.fal!.submit({ model: image, prompt: 'p', imageUrls: ['asset://a1'], ratio: '1:1', resolution: '1K' });
+    }
+    const start = '7200';
+    expect(sent).toEqual([{ auth: 'Key k', start }, { auth: 'Key k', start }, { auth: 'Key n', start }, { auth: 'Key n', start }]);
   });
 });
 

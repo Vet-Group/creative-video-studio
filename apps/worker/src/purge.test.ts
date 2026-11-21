@@ -161,4 +161,13 @@ describe('purgeDeletedClips', () => {
     expect(await keys()).toContain('assets/keep-template');
     expect(await keys()).not.toContain('assets/keep-solo');
   });
+
+  test('keeps an input that is still the source video of an analysis', async () => {
+    await asset('an-source', 'input');
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ('an', 'u1', 'team-unassigned', 'assets/an-source', 'succeeded', 'ws_vet')`);
+    await clip('an-clip', ['an-source'], 31);
+    expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(1);
+    expect((await pool.query(`select id from assets where id = 'an-source'`)).rows).toEqual([{ id: 'an-source' }]);
+    expect(await keys()).toContain('assets/an-source');
+  });
 });

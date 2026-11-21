@@ -12,7 +12,7 @@ import { realProviders } from './real-providers';
 import { fakeSuggester } from './suggest';
 import { ensureBucket } from './storage';
 import { VERTEX_TICK_MS, vertexTick, vertexTicker } from './vertex-accounts';
-import { startWorker } from './worker';
+import { DEFAULT_OPTIONS, startWorker } from './worker';
 
 const connectionString = databaseUrl();
 const pool = createPool(connectionString);
@@ -24,7 +24,9 @@ const larkAppConfig = larkApp();
 const lark = larkAppConfig ? larkSender(larkAppConfig) : undefined;
 // Set below with the Vertex guard, which needs the providers' accounts; a Vertex billing refusal runs it at once instead of waiting for the hour.
 let vertexGuard: () => Promise<unknown> = async () => undefined;
-const real = realProviders(pool, process.env, undefined, lark, () => vertexGuard());
+// A request fal starts within lateDeliveryMs still finishes about inside the window the worker delivers in (run timeout plus lateDeliveryMs); a later start would be billed and dropped.
+const FAL_START_TIMEOUT_SEC = DEFAULT_OPTIONS.lateDeliveryMs / 1000;
+const real = realProviders(pool, process.env, undefined, lark, () => vertexGuard(), FAL_START_TIMEOUT_SEC);
 const worker = await startWorker({
   pool,
   connectionString,

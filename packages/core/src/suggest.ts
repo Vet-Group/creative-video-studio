@@ -351,45 +351,75 @@ const SYSTEMS: Record<SuggestInput['field'], string> = {
 
 const sum = (costs: (number | null)[]): number | null => (costs.every((c) => c === null) ? null : costs.reduce<number>((a, c) => a + (c ?? 0), 0));
 
+/** A run that failed after some of its calls answered: `call` is what they cost, which the provider billed all the same. */
+export class PaidSuggestError extends Error {
+  constructor(
+    cause: unknown,
+    readonly call: { costUsd: number | null; provider: string; model: string },
+  ) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+  }
+}
+
 /**
  * The run: a translation is one call, and so is a preset prompt from its clip's stills; otherwise one call per direction, all at once (one answer each reaches the length far more often than three
- * in one answer), and a second call for an option still short of the range. Any failed call fails the run, so option i is always direction i.
+ * in one answer), and a second call for an option still short of the range. Any failed call fails the run, so option i is always direction i; it fails once every direction has settled, with
+ * the cost of each call that answered (PaidSuggestError).
  */
-async function suggestWith(chat: Chat, input: SuggestInput, frames: string[] = []): Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null }> {
+async function suggestWith(chat: Chat, by: { provider: string; model: string }, input: SuggestInput, frames: string[] = []): ReturnType<Suggester> {
   const system = SYSTEMS[input.field];
+  // A call that answered was billed, so an answer that cannot be read fails the run with that call's cost.
+  const billed = <T>(costUsd: number | null, parse: () => T): T => {
+    try {
+      return parse();
+    } catch (e) {
+      throw new PaidSuggestError(e, { costUsd, ...by });
+    }
+  };
   if (input.field === 'video') {
     if (!frames.length) throw new Error('suggest: no stills of the clip');
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.4, 800, frames);
-    return { options: [parseVideoAnswer(text, input.max)], costUsd };
+    return { options: [billed(costUsd, () => parseVideoAnswer(text, input.max))], costUsd, ...by };
   }
   if (input.field === 'scenes') {
     const count = input.times?.length ?? 0;
     if (!count || frames.length !== count + 1) throw new Error('suggest: the product and one still per scene are needed');
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0, 800, frames);
-    return { options: parseScenes(text, count).map(String), costUsd };
+    return { options: billed(costUsd, () => parseScenes(text, count)).map(String), costUsd, ...by };
   }
   if (input.field === 'check') {
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.2, 1200);
-    const issues = parseCheck(text);
-    return { options: issues.map((x) => x.issue), meanings: issues.map((x) => x.fix), costUsd };
+    const issues = billed(costUsd, () => parseCheck(text));
+    return { options: issues.map((x) => x.issue), meanings: issues.map((x) => x.fix), costUsd, ...by };
   }
   if (input.field === 'translate') {
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.2, maxTokens(input));
-    return { options: [parseOption(text, input.max).text], costUsd };
+    return { options: [billed(costUsd, () => parseOption(text, input.max)).text], costUsd, ...by };
   }
   const { low, max } = targetRange(input);
-  const answers = await Promise.all(
+  // Each direction's answered calls, in order, kept apart from its result: a call billed before its direction failed still counts.
+  const costs = DIRECTIONS.map((): (number | null)[] => []);
+  const paid = async (d: number, ...a: Parameters<Chat>) => {
+    const out = await chat(...a);
+    costs[d]!.push(out.costUsd);
+    return out;
+  };
+  const settled = await Promise.allSettled(
     DIRECTIONS.map(async (_, d) => {
-      const first = await chat(system, suggestPrompt(input, d), 0.9, maxTokens(input));
+      const first = await paid(d, system, suggestPrompt(input, d), 0.9, maxTokens(input));
       const option = parseOption(first.text, max);
-      if (option.text.length >= low) return { ...option, costs: [first.costUsd] };
-      const second = await chat(system, lengthenPrompt(input, option.text), 0.7, maxTokens(input));
+      if (option.text.length >= low) return option;
+      const second = await paid(d, system, lengthenPrompt(input, option.text), 0.7, maxTokens(input));
       const longer = parseOption(second.text, max);
       // A rewrite that came back shorter still is no better: keep the first.
-      return { ...(longer.text.length > option.text.length ? longer : option), costs: [first.costUsd, second.costUsd] };
+      return longer.text.length > option.text.length ? longer : option;
     }),
   );
-  return { options: answers.map((a) => a.text), meanings: answers.map((a) => a.vi), costUsd: sum(answers.flatMap((a) => a.costs)) };
+  const costUsd = sum(costs.flat());
+  const failed = settled.find((s) => s.status === 'rejected');
+  if (failed) throw new PaidSuggestError(failed.reason, { costUsd, ...by });
+  const answers = settled.flatMap((s) => (s.status === 'fulfilled' ? [s.value] : []));
+  return { options: answers.map((a) => a.text), meanings: answers.map((a) => a.vi), costUsd, ...by };
 }
 
 export function createFalSuggester({ apiKey, fetch: f = fetch, model = ENHANCE_MODEL }: { apiKey: string; fetch?: Fetch; model?: string }): Suggester {
@@ -406,11 +436,11 @@ export function createFalSuggester({ apiKey, fetch: f = fetch, model = ENHANCE_M
     const cost = Number(out.usage?.cost);
     return { text: typeof out.output === 'string' ? out.output : '', costUsd: Number.isFinite(cost) ? cost : null };
   };
-  return async (input, frames) => ({ ...(await suggestWith(chat, input, frames)), provider: 'fal', model });
+  return (input, frames) => suggestWith(chat, { provider: 'fal', model }, input, frames);
 }
 
 /** The OpenAI twin of createFalSuggester, with the same prompts, limits and parsing. */
 export function createOpenAiSuggester({ apiKey, fetch: f = fetch, model = OPENAI_MODEL }: { apiKey: string; fetch?: Fetch; model?: string }): Suggester {
   const chat: Chat = (system, user, temperature, maxTokens, images) => openAiChat(f, 'openai suggest', apiKey, model, system, user, temperature, maxTokens, images);
-  return async (input, frames) => ({ ...(await suggestWith(chat, input, frames)), provider: 'openai', model });
+  return (input, frames) => suggestWith(chat, { provider: 'openai', model }, input, frames);
 }

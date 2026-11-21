@@ -18,7 +18,7 @@ import { byteplusReaVlm, pickReaVlm, reaVlmEnv, vertexReaVlm } from '@cvs/core/p
 import { serviceAccountToken } from '@cvs/core/providers/vertex';
 import { vertexAccounts } from '@cvs/core/providers/vertex-accounts';
 import { ANALYZE_QUEUE_OPTIONS } from '@cvs/core/queue';
-import { getObject, putObject } from './storage';
+import { downloadObject, getObject, putObject } from './storage';
 import type { WorkerDeps } from './worker';
 
 const run = promisify(execFile);
@@ -137,7 +137,6 @@ export async function analysisFromBreakdown(
  * call more than once for the same id: only a `queued` row is claimed. */
 export async function runReaAnalyze(pool: Pool, analysisId: string, seams: AnalyzeSeams = {}, signal?: AbortSignal): Promise<void> {
   const decompose = seams.decompose ?? realDecompose;
-  const read = seams.read ?? getObject;
   const write = seams.write ?? putObject;
   const vlmEnv = seams.vlmEnv ?? defaultVlmEnv;
   const translate = seams.translate ?? defaultTranslate();
@@ -151,7 +150,9 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
   const dir = await mkdtemp(join(tmpdir(), 'cvs-analyze-'));
   try {
     const video = join(dir, 'source.mp4');
-    await writeFile(video, await read(row.source_key));
+    // Streamed to disk: the source can be 500 MB, which in memory would share the worker's 2G with rea-video.
+    if (seams.read) await writeFile(video, await seams.read(row.source_key));
+    else await downloadObject(row.source_key, video, signal);
     const out = join(dir, 'out');
     const { env, provider, model } = await vlmEnv();
     await decompose(video, out, env, signal);
