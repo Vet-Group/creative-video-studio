@@ -322,18 +322,61 @@ describe('LLM calls', () => {
     await pool.query('update settings set features_monthly_cap_usd = 260, member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
   });
 
-  test('a Smart Remake’s fal calls, booked as llm rows, are video spend: they count toward the company month, not the image and apps caps', async () => {
+  test('a Smart Remake’s fal calls, booked as llm rows, are video spend that counts toward the company month and the member’s day and month, not the image and apps month', async () => {
     await setCaps('10', 5);
     await pool.query('update settings set features_monthly_cap_usd = 10, member_daily_usd_cap = 10, member_monthly_usd_cap = 10');
     const u = await member();
     await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, created_at, workspace_id) values ('limits-an', $1, 'team-b', 's', 'succeeded', '2032-06-10T03:00:00Z', 'ws_vet')`, [u]);
-    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, created_at, workspace_id) values ('limits-rm', $1, 'team-b', 'limits-an', '[1]', '2032-06-10T03:00:00Z', 'ws_vet')`, [u]);
+    await pool.query(
+      `insert into remakes (id, user_id, team_id, analysis_id, shots, status, cost_usd, created_at, workspace_id) values ('limits-rm', $1, 'team-b', 'limits-an', '[1]', 'succeeded', 4, '2032-06-10T03:00:00Z', 'ws_vet')`,
+      [u],
+    );
     await bookLlm(pool, { remake: 'limits-rm', step: '1:video' }, { costUsd: 4, provider: 'fal', model: 'm' });
     const when = at('2032-06-10T04:00:00Z');
     expect(await checkCaps(pool, u, '6.0000', when)).toBeNull(); // video month: 4 + 6 = 10
     expect(await checkCaps(pool, u, '6.0001', when)).toBe('monthly_usd');
-    expect(await checkCaps(pool, u, '10.0000', when, 'image')).toBeNull(); // not image and apps spend
+    expect(await checkCaps(pool, u, '6.0000', when, 'image')).toBeNull(); // member day: 4 + 6 = 10
+    expect(await checkCaps(pool, u, '6.0001', when, 'image')).toBe('member_daily_usd');
+    const usage = await memberUsage(pool, u, when);
+    expect([usage.dayUsd.used, usage.monthUsd.used]).toEqual(['4.0000', '4.0000']);
+    await pool.query('update settings set member_daily_usd_cap = 1, member_monthly_usd_cap = 1');
+    expect(await checkCaps(pool, u, '6.0000', when)).toBeNull(); // a video job's caps are the clips and the company month only
+    await pool.query('update settings set member_daily_usd_cap = 100, member_monthly_usd_cap = 100');
+    expect(await checkCaps(pool, u, '10.0000', when, 'image')).toBeNull(); // the image and apps month: 0 + 10 = 10
     await setCaps('200');
     await pool.query('update settings set features_monthly_cap_usd = 260, member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
+  });
+
+  test('a new Smart Remake counts what the open remakes have yet to book: the caller’s in their day and month, everyone’s in the company month', async () => {
+    await setCaps('20', 5);
+    await pool.query('update settings set member_daily_usd_cap = 10, member_monthly_usd_cap = 100');
+    const [u, other] = [await member(), await member()];
+    for (const [id, user] of [['limits-an-u', u], ['limits-an-o', other]]) {
+      await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, created_at, workspace_id) values ($1, $2, 'team-b', 's', 'succeeded', '2032-07-10T03:00:00Z', 'ws_vet')`, [id, user]);
+    }
+    // u's open remake has booked $1 of its 2 shots, each held at the longest a shot is billed ($2.00): $3 more to come. other's holds $2.
+    await pool.query(
+      `insert into remakes (id, user_id, team_id, analysis_id, shots, status, cost_usd, created_at, workspace_id) values
+         ('limits-rm-u', $1, 'team-b', 'limits-an-u', '[1, 2]', 'running', 1, '2032-07-10T03:00:00Z', 'ws_vet'),
+         ('limits-rm-o', $2, 'team-b', 'limits-an-o', '[1]', 'queued', null, '2032-07-10T03:00:00Z', 'ws_vet')`,
+      [u, other],
+    );
+    await bookLlm(pool, { remake: 'limits-rm-u', step: '1:video' }, { costUsd: 1, provider: 'fal', model: 'm' });
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, status, cost_usd, created_at, workspace_id) values ('limits-rm-u0', $1, 'team-b', 'limits-an-u', '[1]', 'succeeded', 5, '2032-07-09T03:00:00Z', 'ws_vet')`, [u]);
+    await bookLlm(pool, { remake: 'limits-rm-u0', step: '1:video' }, { costUsd: 5, provider: 'fal', model: 'm' }); // yesterday: the month only
+    const when = at('2032-07-10T04:00:00Z');
+    expect(await checkCaps(pool, u, '6.0000', when, 'remake')).toBeNull(); // u's day: 1 booked + 3 held + 6 = 10
+    expect(await checkCaps(pool, u, '6.0001', when, 'remake')).toBe('member_daily_usd');
+    await pool.query('update settings set member_daily_usd_cap = 100, member_monthly_usd_cap = 12');
+    expect(await checkCaps(pool, u, '3.0000', when, 'remake')).toBeNull(); // u's month: 5 + 1 + 3 + 3 = 12
+    expect(await checkCaps(pool, u, '3.0001', when, 'remake')).toBe('member_monthly_usd');
+    await pool.query('update settings set member_monthly_usd_cap = 100');
+    expect(await checkCaps(pool, u, '9.0000', when, 'remake')).toBeNull(); // company month: 6 booked + 3 + 2 held + 9 = 20
+    expect(await checkCaps(pool, u, '9.0001', when, 'remake')).toBe('monthly_usd');
+    expect(await memberUsage(pool, u, when)).toMatchObject({ dayUsd: { used: '4.0000' }, monthUsd: { used: '9.0000' } });
+    for (let i = 0; i < 5; i++) await newJob(u, '2032-07-10T03:30:00Z');
+    expect(await checkCaps(pool, u, '0.0000', when, 'remake')).toBe('daily_clips'); // the daily clips still hold a remake back, as before
+    await setCaps('200');
+    await pool.query('update settings set member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
   });
 });

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
-import { REMAKE_MAX_SECONDS, remakeScene, remakeShotsProblem, remakeShotUsd } from '@cvs/core/analysis/remake';
+import { remakeScene, remakeShotsProblem, remakeShotUsd } from '@cvs/core/analysis/remake';
 import { withTransaction } from '@cvs/core/ledger';
 import { checkCaps } from '@cvs/core/limits';
 import { REMAKE_QUEUE } from '@cvs/core/queue';
@@ -64,20 +64,11 @@ export async function POST(request: Request) {
   // The clips are joined in shot order, whatever order they were picked in.
   const shots = [...(b!.shots as number[])].sort((x, y) => x - y);
   const cap = await withTransaction(pool, async (tx) => {
-    // One writer at a time, as for a Run, so two remakes cannot both take the last dollars of the month.
+    // One writer at a time, as for a Run, so two remakes cannot both take the last dollars of the month or of the member's caps.
     await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
-    // A remake is video spend (limits.ts capRow). Open remakes have booked only the calls made so far, so the rest of their estimate counts too.
-    // shortcut: an open remake's shots count at the longest a shot is billed (REMAKE_MAX_SECONDS), which only holds back a little more for the few
-    // minutes it runs; store each remake's estimate if that ever refuses a remake near the month's cap.
-    const thisOne = shots.reduce((sum, index) => sum + remakeShotUsd(remakeScene(result, index)!), 0);
-    const estimate = (
-      await tx.query(
-        `select (coalesce(sum(greatest(jsonb_array_length(shots) * $1::numeric - coalesce(cost_usd, 0), 0)), 0) + $2::numeric)::text as usd
-           from remakes where status in ('queued', 'running')`,
-        [remakeShotUsd({ start: 0, end: REMAKE_MAX_SECONDS }).toFixed(6), thisOne.toFixed(6)],
-      )
-    ).rows[0].usd as string;
-    const refused = await checkCaps(tx, userId, estimate, undefined, 'video');
+    // checkCaps adds what the open remakes have yet to book: they have booked only the calls made so far.
+    const estimate = shots.reduce((sum, index) => sum + remakeShotUsd(remakeScene(result, index)!), 0);
+    const refused = await checkCaps(tx, userId, estimate.toFixed(6), undefined, 'remake');
     if (refused) return refused;
     await tx.query(
       `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots, workspace_id)

@@ -52,6 +52,8 @@ beforeAll(async () => {
   // Shots 1 and 2 share a prompt and a role, so they are one scene (mergeShots).
   const merged = JSON.stringify({ shots: [1, 2, 3].map((index) => ({ index, start: index - 1, end: index, role: 'r', prompt: index < 3 ? 'same' : 'other' })) });
   await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result, workspace_id) select 'an-merged', u.id, u.team_id, 's3/vid', 'succeeded', $2::jsonb, 'ws_vet' from users u where u.id = $1`, [userId, merged]);
+  // The remakes these tests leave open count toward the member's caps; only the member cap test sets them low.
+  await pool.query('update settings set member_daily_usd_cap = 1000, member_monthly_usd_cap = 1000 where id = 1');
 });
 
 afterAll(async () => {
@@ -135,6 +137,22 @@ test('counts the open remakes against the company month and refuses one that wou
     expect((await post({ ...ok, shots: [1, 2] })).status).toBe(201); // exactly the cap
   } finally {
     await pool.query('update settings set monthly_cap_usd = $1 where id = 1', [prev]);
+  }
+});
+
+test('counts the caller’s open remakes against their own daily cap and refuses one that would pass it, queuing nothing', async () => {
+  const mine = (await pool.query(`select coalesce(sum(jsonb_array_length(shots)), 0)::int as n from remakes where user_id = $1 and status in ('queued', 'running')`, [userId])).rows[0].n as number;
+  const count = async () => (await pool.query('select count(*)::int as n from remakes')).rows[0].n as number;
+  // As above: $2.00 held per open shot, $0.40 per 1 s shot of this one, so the caller has room for 2 more shots today.
+  await pool.query('update settings set member_daily_usd_cap = $1 where id = 1', [(mine * 2 + 2 * 0.4).toFixed(4)]);
+  try {
+    const before = await count();
+    const over = await post({ ...ok, shots: [1, 2, 3] });
+    expect([over.status, await over.json()]).toEqual([429, { error: 'Bạn đã dùng hết hạn mức chi phí hôm nay' }]);
+    expect(await count()).toBe(before);
+    expect((await post({ ...ok, shots: [1, 2] })).status).toBe(201); // exactly the cap
+  } finally {
+    await pool.query('update settings set member_daily_usd_cap = 1000 where id = 1');
   }
 });
 

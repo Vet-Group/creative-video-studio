@@ -36,7 +36,7 @@ The per-feature caps only warn, because hard caps at p95 for ten features would 
 
 A billing team's free monthly allowance (docs/BILLING.md) is not a cap: it never refuses a Run, it only decides what the team is billed past it.
 
-The hard caps are checked in `packages/core/src/limits.ts` (`checkCaps` with the job's `feature`), in the same transaction and advisory lock as the job insert. The image and apps budget sums the ledger rows of jobs whose `feature` is not `video` or `marketing`. Shared rows (bake-off, adjustments, invoice differences) stay in the video budget. Admins change every cap on the Settings page; each change is audited.
+The hard caps are checked in `packages/core/src/limits.ts` (`checkCaps` with the job's `feature`), in the same transaction and advisory lock as the job insert. The image and apps budget sums the ledger rows of jobs whose `feature` is not `video` or `marketing`. Shared rows (bake-off, adjustments, invoice differences) stay in the video budget. A Smart Remake (`checkCaps` with `remake`) is video spend that also counts toward its member's day and month caps, with what their open remakes have yet to book (owner decision, 2026-11-21); a video job does not. Admins change every cap on the Settings page; each change is audited.
 
 ## Image models and jobs (migration 0007)
 
