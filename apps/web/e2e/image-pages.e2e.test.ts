@@ -158,6 +158,9 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   const mine = page.getByRole('article').filter({ hasText: 'E2E Member 9' });
   await expect(mine).toHaveCount(2);
   await expect(mine.first().locator('img.output')).toBeVisible();
+  // The first row's pictures load at once, the first one first: it is the page's LCP.
+  await expect(page.locator('img.output').first()).not.toHaveAttribute('loading', 'lazy');
+  await expect(page.locator('img.output').first()).toHaveAttribute('fetchpriority', 'high');
   // The Library detail of a Try On image switches between the result and the before/after slider.
   await mine.first().getByRole('button', { name: 'Xem chi tiết' }).click();
   const lightbox = page.getByRole('dialog', { name: /^Chi tiết: / });

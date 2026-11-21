@@ -216,7 +216,7 @@ const verdictClass = (v: NonNullable<Clip['verdict']>) => (v.verdict === 'fail' 
  * A grid card puts the result first: its type and length on the media, the mark in its corner, the actions over it on hover (always on touch), two short lines under it and the marks for whoever may edit; Reuse and the store live in the detail view. A `list` row keeps the clip actions and the marks.
  * On both, the picture opens the detail (`onOpen`); while `selecting`, the page makes that click pick the item instead (owner, 2026-11-18), and the checkbox in the picture's corner stays the control a keyboard or screen reader uses.
  */
-export function ClipCard({ clip, view, index, select, selecting = false, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; index?: number; select?: ReactNode; selecting?: boolean; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
+export function ClipCard({ clip, view, index, lead = false, select, selecting = false, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; index?: number; lead?: boolean; select?: ReactNode; selecting?: boolean; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [problem, setProblem] = useState('');
   const [saving, setSaving] = useState(false);
@@ -370,7 +370,7 @@ export function ClipCard({ clip, view, index, select, selecting = false, onChang
             src={thumbUrl(clip.posterAssetId ?? clip.videoAssetId)}
             alt={clip.downloadName}
             loading={index !== undefined && index < FIRST_ROW ? undefined : 'lazy'}
-            fetchPriority={index === 0 ? 'high' : undefined}
+            fetchPriority={lead ? 'high' : undefined}
             decoding="async"
           />
         ) : (
@@ -1040,6 +1040,8 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   const [size, setSize] = useState(1);
   const [clips, setClips] = useState<Clip[]>([]);
   // The day groups of what is loaded; the Examples' own order (as GET /api/library sorts it) is not by date, so it stays one flat grid.
+  // The first row's first picture (a video shows its poster instead) is fetched before the rest: the likely LCP.
+  const lead = clips.slice(0, FIRST_ROW).findIndex((c) => c.mediaType === 'image');
   const groups = filters.examplesOnly && filters.sort === 'newest' && Object.hasOwn(GALLERY_SAMPLES, filters.kind) ? [{ day: '', label: '', start: 0, items: clips }] : dayGroups(clips);
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
   const [storeNames, setStoreNames] = useState<{ id: string; name: string }[]>([]); // the stores with a live item, for the store filter
@@ -1558,6 +1560,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
                     clip={c}
                     view={view}
                     index={g.start + j}
+                    lead={g.start + j === lead}
                     select={zip.check(c.id, clipLabel(c))}
                     selecting={zip.active}
                     onChange={update}

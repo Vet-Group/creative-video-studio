@@ -118,6 +118,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     const id = done ?? j.input_id;
     return id ? thumbUrl(id) : null;
   };
+  const firstPicture = recent.findIndex((j) => jobPicture(j));
   /** The recent-job note props: the finish label and the server-rendered note (shown until the leaf mounts and ticks the elapsed time). */
   const noteProps = (j: (typeof recent)[number]) => {
     const job = { status: j.status, error: j.error, created_at: j.created_at, started_at: j.started_at, finished_at: j.finished_at };
@@ -174,8 +175,8 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
               return (
                 <li key={j.id}>
                   <Link href={j.status === 'succeeded' ? `/library?item=${j.id}` : (pageOf(j.feature) ?? '/library')} className="explore-job" data-status={isRunning(j) ? 'running' : j.status}>
-                    {/* At most four, all in the first row on a desktop: they load at once, the first (the page's LCP, measured 2026-11-21) first. */}
-                    <span className="explore-job-media">{picture ? <img src={picture} alt="" fetchPriority={i === 0 ? 'high' : undefined} decoding="async" /> : <span className="banner-empty" aria-hidden="true" />}</span>
+                    {/* At most four, all in the first row on a desktop: they load at once, the first picture (the page's LCP, measured 2026-11-21) first. */}
+                    <span className="explore-job-media">{picture ? <img src={picture} alt="" fetchPriority={i === firstPicture ? 'high' : undefined} decoding="async" /> : <span className="banner-empty" aria-hidden="true" />}</span>
                     <strong>{featureLabel(j.feature)}</strong>
                     {/* What tells two jobs of one tool apart: the model, and the member's own words, as the Library's OWN_PROMPT picks them (a composed prompt is left out). */}
                     {j.model_label && <span className="explore-job-model" title={j.model_label}>{j.model_label}</span>}
