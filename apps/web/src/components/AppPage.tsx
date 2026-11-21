@@ -265,8 +265,11 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
             ? parseNames(names).names.flatMap((name) => (pickedBreeds.length > 0 ? pickedBreeds.map((breed) => ({ name, breed })) : [{ name }]))
             : app.poses
               ? [...POSES.filter((p) => poses.includes(p.value)).map((p) => ({ pose: p.value })), ...(ownPose ? [{ poseText: ownPose }] : [])]
-              : [{}];
-  const batchApp = BATCH_FEATURES.includes(app.feature);
+              : app.bulk
+                ? images[0]!.map(() => ({})) // one job per photo of the first slot
+                : [{}];
+  // A bulk app with one photo runs as before: one job, no batch.
+  const batchApp = BATCH_FEATURES.includes(app.feature) && !(app.bulk && runs.length < 2);
   // What is wrong with the typed names, said under the box; an empty box only waits, as the reason under Run says.
   const namesProblem = app.names && names.trim() ? parseNames(names).problem : null;
   // Nothing picked yet on a batch app, or names it cannot run, show no price rather than a free-looking $0.00 or one that counts the bad names.
@@ -304,7 +307,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     setError('');
     try {
       const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
-      setImages((cur) => cur.map((list, i) => (i === into ? (slotMax(app, i, chosen?.maxImages ?? 1) === 1 ? [img] : [...list, img]) : list)));
+      setImages((cur) => cur.map((list, i) => (i === into ? (slotMax(app, i, chosen?.maxImages ?? 1) === 1 || app.bulk ? [img] : [...list, img]) : list)));
       notify(`Đã dùng kết quả cho ô ${app.slots[into]!.label}`);
       if (narrow) setTab('create');
     } catch (e) {
@@ -336,12 +339,12 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     let done = 0;
     const batch = batchApp ? crypto.randomUUID() : undefined; // one id on every job of this Run, by which History's Reuse and "Chọn cả lô" find it again
     try {
-      for (const one of runs) {
+      for (const [n, one] of runs.entries()) {
         const own = itemPrompt(app.feature, one, blank);
         const body = {
           feature: app.feature,
           modelId: pick.modelId,
-          ...appInputs(app, { images, prompt: used }),
+          ...appInputs(app, { images: app.bulk ? images.map((list, i) => (i === 0 ? [list[n]!] : list)) : images, prompt: used }),
           ...(own && { prompt: own }),
           ratio: pick.ratio,
           params: { resolution: pick.resolution, ...(app.prompt && used.trim() && { brief: used.trim() }), ...one, ...(batch && { batch }) }, // the member's own text, kept for reuse
@@ -357,7 +360,11 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
       await refresh();
     } catch (e) {
       let sent = '';
-      if (done > 0) {
+      if (done > 0 && app.bulk) {
+        // The photos sent leave the slot, so Run again sends only the rest.
+        setImages((cur) => cur.map((list, i) => (i === 0 ? list.slice(done) : list)));
+        sent = ` Đã gửi ${done}/${runs.length} ảnh và bỏ các ảnh đã gửi khỏi ô Ảnh.`;
+      } else if (done > 0) {
         // What was sent is unticked, so Run again sends only the rest instead of every item a second time.
         const p = unsentPicks(runs, done);
         if (app.views) setViews(p.view);
@@ -409,7 +416,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     inputLabel={s.inputLabel}
                     images={images[i]!}
                     max={max}
-                    count={s.many}
+                    count={s.many || (app.bulk && i === 0)}
+                    one={app.bulk && i === 0}
                     busy={busy}
                     onAdd={add(i)}
                     onRemove={(id) => setImages((cur) => cur.map((list, j) => (j === i ? list.filter((x) => x.id !== id) : list)))}
@@ -419,6 +427,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                 );
               })}
             </div>
+            {app.bulk && runs.length > 1 && runCost}
             <PhotoDialog
               open={picker !== null}
               title={picker === null ? '' : (app.slots[picker]!.stock?.title ?? 'Chọn người mẫu')}

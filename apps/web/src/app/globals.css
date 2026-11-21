@@ -2236,6 +2236,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 /* The X mirrors the chip, as on Fash: a dark tab flush in the top-right corner with only its inner corner rounded. */
 .app-slots .slot[data-one] .slot-thumbs button, .marketing-slots .choice-clear { top: 0; right: 0; width: 24px; height: 22px; border-radius: 0 17px 0 8px; background: rgb(var(--shade) / .75); color: var(--on-dark); }
 .marketing-slots .choice-clear { top: 1px; right: 1px; } /* outside the box, so inside its 1 px dashed edge by hand */
+.app-slots .slot[data-one] .slot-add { position: absolute; right: 0; bottom: 0; z-index: 1; width: 44px; height: 44px; border: 0; border-radius: 12px 0 17px 0; background: rgb(var(--shade) / .75); color: var(--on-dark); } /* a bulk app's one photo: more go in from its corner */
 /* Advanced with references, as on Fash: no outer box, three square dashed tiles per row (the photo inside, X top right) and a plus tile of the same size. */
 .marketing-slots .slot-wide .slot:has(.slot-thumbs) { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; min-height: 0; padding: 0; border: 0; }
 .marketing-slots .slot-wide .slot-thumbs { display: contents; }

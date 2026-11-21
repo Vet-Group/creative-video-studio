@@ -140,6 +140,29 @@ test('Media Optimizer: removing the image during a run frees the form instead of
   await expect(runButton(page)).toBeEnabled(); // the next image runs again
 });
 
+test('Background Remover takes several photos: one shows whole with a corner tile to add more, and Run sends one job per photo under one batch id', async ({ page }) => {
+  await signIn(page, 'bulka');
+  await openApp(page, 'Xoá nền', 'background-remover');
+  const slot = page.getByRole('group', { name: 'Ảnh', exact: true });
+  await page.getByLabel('Ảnh cần xoá nền').setInputFiles(file('product.png'));
+  await expect(slot.getByRole('img', { name: 'product.png' })).toBeVisible();
+  await expect(page.locator('.slot[data-one]')).toHaveCount(1); // one photo shows whole, as on a one-photo app
+  await expect(slot.getByRole('button', { name: 'Tải lên Ảnh' })).toBeVisible(); // and its corner tile adds more
+  await expect(page.getByText('1/25')).toBeVisible();
+  await expect(page.getByText(/ảnh ×/)).toHaveCount(0); // one photo is one job, priced as before
+
+  await page.getByLabel('Ảnh cần xoá nền').setInputFiles([file('small.png'), file('model.png')]);
+  await expect(page.locator('.slot[data-one]')).toHaveCount(0);
+  await expect(page.getByText('3/25')).toBeVisible();
+  await expect(page.getByText('3 ảnh × $0.00 = $0.00')).toBeVisible();
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
+  const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; batch: string | null }[] };
+  expect(jobs.jobs.map((j) => j.feature)).toEqual(['background_remover', 'background_remover', 'background_remover']);
+  expect(new Set(jobs.jobs.map((j) => j.batch)).size).toBe(1);
+  expect(jobs.jobs[0]!.batch).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+});
+
 test('Background Remover (one slot): Run needs the image, a mock job reaches History and the Library under Ứng dụng with the app name', async ({ page }) => {
   await signIn(page, 'appsa');
   await openApp(page, 'Xoá nền', 'background-remover');

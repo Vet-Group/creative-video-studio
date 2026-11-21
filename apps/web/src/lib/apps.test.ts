@@ -88,6 +88,8 @@ describe('Jewelry Try-On pieces', () => {
   it('takes as many pieces as the model allows beside the person, and one image in every other slot', () => {
     expect([slotMax(jewelry, 0, 4), slotMax(jewelry, 1, 4), slotMax(jewelry, 0, 2)]).toEqual([3, 1, 1]);
     expect(slotMax(appBySlug('face-swap')!, 0, 4)).toBe(1);
+    // A bulk app's first slot takes a Run's worth of photos, one per job; its reference slot still one.
+    expect([slotMax(appBySlug('background-changer')!, 0, 2), slotMax(appBySlug('background-changer')!, 1, 2), slotMax(appBySlug('image-upscale')!, 0, 1)]).toEqual([25, 1, 25]);
     expect(reason('jewelry-try-on', [['a', 'b', 'c'], ['p']], '', 4)).toBeNull();
     expect(reason('jewelry-try-on', [['a', 'b', 'c'], ['p']], '', 3)).toBe('Mô hình này nhận tối đa 3 ảnh.');
     expect(appInputs(jewelry, { images: [[img('a'), img('b')], [img('p')]], prompt: '' })).toEqual({ assetIds: ['a', 'b', 'p'] });
@@ -181,6 +183,12 @@ describe('appReason', () => {
 
   it('refuses more images than the model takes', () => {
     expect(reason('character-swap', [['a'], ['b']], '', 1)).toBe('Mô hình này nhận tối đa 1 ảnh.');
+  });
+
+  it("counts one photo of a bulk app's first slot per job, so many photos fit a model that takes one or two", () => {
+    expect(reason('background-remover', [['a', 'b', 'c']], '', 1)).toBeNull();
+    expect(reason('background-changer', [['a', 'b', 'c'], ['r']], '', 2)).toBeNull();
+    expect(reason('background-changer', [['a', 'b'], ['r']], '', 1)).toBe('Mô hình này nhận tối đa 1 ảnh.');
   });
 });
 
@@ -433,8 +441,9 @@ describe('the batch apps', () => {
     expect(itemPrompt('reframe', {})).toBeUndefined();
   });
 
-  it('are the apps that pick items, and their Run id is a UUID', () => {
-    expect(APPS.filter((a) => a.views || a.breeds || a.styles || a.products || a.names || a.poses).map((a) => a.feature)).toEqual(BATCH_FEATURES);
+  it('are the apps that pick items or take many photos, and their Run id is a UUID', () => {
+    expect(APPS.filter((a) => a.views || a.breeds || a.styles || a.products || a.names || a.poses || a.bulk).map((a) => a.feature).sort()).toEqual([...BATCH_FEATURES].sort());
+    expect(APPS.filter((a) => a.bulk).map((a) => a.slug)).toEqual(['background-changer', 'image-upscale', 'background-remover']);
     expect(isBatchId('7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11')).toBe(true);
     for (const bad of ['', 'batch-1', '7D0E2F54-3C55-4A0E-9A59-2F3F0C8B1A11', '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11 ']) expect(isBatchId(bad)).toBe(false);
   });

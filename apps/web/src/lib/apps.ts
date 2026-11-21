@@ -57,6 +57,8 @@ export interface AppConfig {
   /** Shows the poses (POSES, by their pictures) and a box for the member's own words, up to MAX_POSES in all (the pose generator): Run sends one job per pose, each with its
    * `params.pose` or `params.poseText` and the prompt posePrompt makes. */
   poses?: boolean;
+  /** Its first slot takes up to MAX_BATCH photos: Run sends one job per photo, each with the same settings, the other slots and one `params.batch`. */
+  bulk?: boolean;
   /** An app that is not built yet: its page says so, and why. */
   soon?: string;
 }
@@ -101,10 +103,11 @@ export const APPS: AppConfig[] = [
     keywords: 'background changer, change background',
     category: 'photo',
     slots: [
-      { label: 'Ảnh', inputLabel: 'Ảnh cần đổi nền', empty: 'Thêm 1 ảnh' },
+      { label: 'Ảnh', inputLabel: 'Ảnh cần đổi nền', empty: 'Thêm 1 hoặc nhiều ảnh' },
       { label: 'Ảnh nền tham chiếu (tuỳ chọn)', inputLabel: 'Ảnh nền tham chiếu', empty: 'Thêm 1 ảnh nền nếu muốn', optional: true },
     ],
     prompt: 'background',
+    bulk: true,
   },
   {
     slug: 'reframe',
@@ -123,8 +126,9 @@ export const APPS: AppConfig[] = [
     description: 'Phóng mọi ảnh lên tới 4K mà không mất chi tiết.',
     keywords: 'image upscale, upscaler, 4K',
     category: 'photo',
-    slots: [{ label: 'Ảnh', inputLabel: 'Ảnh cần tăng độ phân giải', empty: 'Thêm 1 ảnh' }],
+    slots: [{ label: 'Ảnh', inputLabel: 'Ảnh cần tăng độ phân giải', empty: 'Thêm 1 hoặc nhiều ảnh' }],
     resolution: true,
+    bulk: true,
   },
   {
     slug: 'face-swap',
@@ -145,7 +149,8 @@ export const APPS: AppConfig[] = [
     description: 'Xoá mọi nền chỉ với một lần bấm. Ảnh PNG trong suốt.',
     keywords: 'background remover, remove background, cutout',
     category: 'photo',
-    slots: [{ label: 'Ảnh', inputLabel: 'Ảnh cần xoá nền', empty: 'Thêm 1 ảnh' }],
+    slots: [{ label: 'Ảnh', inputLabel: 'Ảnh cần xoá nền', empty: 'Thêm 1 hoặc nhiều ảnh' }],
+    bulk: true,
   },
   {
     slug: 'motion-control',
@@ -353,7 +358,8 @@ export function appReason(app: AppConfig, d: AppDraft): string | null {
     if (reference && written) return 'Chọn mô tả nền hoặc ảnh nền tham chiếu, không dùng cả hai.';
     if (!reference && !written) return 'Nhập mô tả nền mới hoặc tải lên ảnh nền tham chiếu.';
   }
-  const count = d.images.reduce((n, list) => n + list.length, 0);
+  // A bulk app's job takes one photo of its first slot.
+  const count = d.images.reduce((n, list, i) => n + (app.bulk && i === 0 ? Math.min(list.length, 1) : list.length), 0);
   if (count > model.maxImages) return `Mô hình này nhận tối đa ${model.maxImages} ảnh.`;
   return null;
 }
@@ -394,7 +400,7 @@ export function stockGroups(slot: AppSlot, have: ReadonlySet<string>): { label?:
 
 /** The asset ids of a Run, slot by slot, and the prompt the body carries (only Background Changer sends one). */
 /** How many images slot `i` takes with a model that accepts `maxImages`. */
-export const slotMax = (app: AppConfig, i: number, maxImages: number): number => (app.slots[i]?.many ? Math.max(1, maxImages - (app.slots.length - 1)) : 1);
+export const slotMax = (app: AppConfig, i: number, maxImages: number): number => (app.bulk && i === 0 ? MAX_BATCH : app.slots[i]?.many ? Math.max(1, maxImages - (app.slots.length - 1)) : 1);
 
 /** Puts a job's images back in the slots they were sent from: one per slot, except a `many` slot, which takes all those between its neighbours. */
 export function splitImages<T>(app: AppConfig, images: T[]): T[][] {
@@ -439,8 +445,9 @@ export const breedSwapPrompt = (breed: string): string =>
   'Keep everything else exactly unchanged: every text, name and number, the layout, the background, the product and its shape, the lighting and the art style. ' +
   'A photo stays a photo and an illustration stays an illustration in the same style. Do not add any text, logos or watermarks.';
 
-/** The batch apps: a Run sends one job per item picked, all with one `params.batch` id (a UUID), by which History's Reuse and "Chọn cả lô" find the whole Run. */
-export const BATCH_FEATURES = ['multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator'];
+/** The batch apps: a Run sends one job per item picked (or per photo, on a `bulk` app), all with one `params.batch` id (a UUID), by which History's Reuse and
+ * "Chọn cả lô" find the whole Run. */
+export const BATCH_FEATURES = ['multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'background_changer', 'image_upscale', 'background_remover'];
 export const isBatchId = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s);
 
 /** The most jobs one Run of a batch app sends (the name swap app's names, or its names times its breeds, can reach it); POST /api/jobs holds every Run to it. */

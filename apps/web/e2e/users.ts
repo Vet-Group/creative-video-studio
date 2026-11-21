@@ -173,6 +173,8 @@ export const USERS = {
   // result-tools.e2e: a breed swap's ZIP named by breed, History's Background Remover button on an image result, and Media Optimizer's listing preset.
   toolsa: { email: 'toolsa@e2e.test', name: 'E2E Tools A', role: 'member' },
   toolsb: { email: 'toolsb@e2e.test', name: 'E2E Tools B', role: 'member' },
+  // apps.e2e: a bulk Run of several photos on Background Remover.
+  bulka: { email: 'bulka@e2e.test', name: 'E2E Bulk A', role: 'member' },
   toolsc: { email: 'toolsc@e2e.test', name: 'E2E Tools C', role: 'member' }, // the listing preset's .zip of several images
   toolsd: { email: 'toolsd@e2e.test', name: 'E2E Tools D', role: 'member' }, // History selects a whole Run of more than the 20 jobs it loads (seeded)
   // library.e2e: a picture's Library detail opens it in Background Remover, for its creator and for another member.
