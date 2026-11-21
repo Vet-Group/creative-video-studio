@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Analysis, AnalysisShot } from '@cvs/core/analysis/breakdown';
 import { REMAKE_ENDPOINT, REMAKE_MAX_SECONDS, REMAKE_MAX_SHOTS, REMAKE_USD_PER_SECOND, remakeScene, remakeShotSeconds } from '@cvs/core/analysis/remake';
-import { bookLlm } from '@cvs/core/ledger';
+import { bookLlm, withTransaction } from '@cvs/core/ledger';
 import type { ModelConfig } from '@cvs/core/models';
 import type { ProviderStatus } from '@cvs/core/providers';
 import { createFalProvider } from '@cvs/core/providers/fal';
@@ -207,7 +207,12 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
   const paid = async <T extends { costUsd: number }>(entry: ShotResult, call: () => Promise<T>): Promise<T> => {
     const book = async (costUsd: number) => {
       const ref = `${entry.index}:video`;
-      await bookLlm(pool, { remake: remakeId, step: ref }, { costUsd, provider: 'fal', model: REMAKE_ENDPOINT }).catch((e) => {
+      // cost_usd rises with the ledger row, in its transaction: the caps hold the remake's estimate less cost_usd (limits.ts openRemakes).
+      await withTransaction(pool, async (tx) => {
+        if (await bookLlm(tx, { remake: remakeId, step: ref }, { costUsd, provider: 'fal', model: REMAKE_ENDPOINT })) {
+          await tx.query('update remakes set cost_usd = coalesce(cost_usd, 0) + $2 where id = $1', [remakeId, usd(costUsd)]);
+        }
+      }).catch((e) => {
         console.error(`worker: remake ${remakeId}: could not book ${costUsd} USD for ${ref}; the monthly fal invoice (invoice_diff) will carry it:`, e);
         throw e;
       });

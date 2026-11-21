@@ -347,36 +347,53 @@ describe('LLM calls', () => {
     await pool.query('update settings set features_monthly_cap_usd = 260, member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
   });
 
-  test('a new Smart Remake counts what the open remakes have yet to book: the caller’s in their day and month, everyone’s in the company month', async () => {
+  test('a new Smart Remake counts what the open remakes have yet to book, in the ICT day and month they were made: the caller’s in their day and month, everyone’s in the company month', async () => {
     await setCaps('20', 5);
     await pool.query('update settings set member_daily_usd_cap = 10, member_monthly_usd_cap = 100');
     const [u, other] = [await member(), await member()];
     for (const [id, user] of [['limits-an-u', u], ['limits-an-o', other]]) {
       await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, created_at, workspace_id) values ($1, $2, 'team-b', 's', 'succeeded', '2032-07-10T03:00:00Z', 'ws_vet')`, [id, user]);
     }
-    // u's open remake has booked $1 of its 2 shots, each held at the longest a shot is billed ($2.00): $3 more to come. other's holds $2.
+    // u's open remake was admitted at $2.50 and has booked $1: $1.50 more to come. other's is from before migration 0116 (no estimate): its one shot
+    // holds the longest a shot is billed, $2.00. u's open one from yesterday holds $1 in the month only, and a finished one from yesterday booked $5.
     await pool.query(
-      `insert into remakes (id, user_id, team_id, analysis_id, shots, status, cost_usd, created_at, workspace_id) values
-         ('limits-rm-u', $1, 'team-b', 'limits-an-u', '[1, 2]', 'running', 1, '2032-07-10T03:00:00Z', 'ws_vet'),
-         ('limits-rm-o', $2, 'team-b', 'limits-an-o', '[1]', 'queued', null, '2032-07-10T03:00:00Z', 'ws_vet')`,
+      `insert into remakes (id, user_id, team_id, analysis_id, shots, status, estimate_usd, cost_usd, created_at, workspace_id) values
+         ('limits-rm-u', $1, 'team-b', 'limits-an-u', '[1, 2]', 'running', 2.5, 1, '2032-07-10T03:00:00Z', 'ws_vet'),
+         ('limits-rm-o', $2, 'team-b', 'limits-an-o', '[1]', 'queued', null, null, '2032-07-10T03:00:00Z', 'ws_vet'),
+         ('limits-rm-u1', $1, 'team-b', 'limits-an-u', '[1]', 'queued', 1, null, '2032-07-09T03:00:00Z', 'ws_vet'),
+         ('limits-rm-u0', $1, 'team-b', 'limits-an-u', '[1]', 'succeeded', 5, 5, '2032-07-09T03:00:00Z', 'ws_vet')`,
       [u, other],
     );
     await bookLlm(pool, { remake: 'limits-rm-u', step: '1:video' }, { costUsd: 1, provider: 'fal', model: 'm' });
-    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, status, cost_usd, created_at, workspace_id) values ('limits-rm-u0', $1, 'team-b', 'limits-an-u', '[1]', 'succeeded', 5, '2032-07-09T03:00:00Z', 'ws_vet')`, [u]);
-    await bookLlm(pool, { remake: 'limits-rm-u0', step: '1:video' }, { costUsd: 5, provider: 'fal', model: 'm' }); // yesterday: the month only
+    await bookLlm(pool, { remake: 'limits-rm-u0', step: '1:video' }, { costUsd: 5, provider: 'fal', model: 'm' });
     const when = at('2032-07-10T04:00:00Z');
-    expect(await checkCaps(pool, u, '6.0000', when, 'remake')).toBeNull(); // u's day: 1 booked + 3 held + 6 = 10
-    expect(await checkCaps(pool, u, '6.0001', when, 'remake')).toBe('member_daily_usd');
+    expect(await checkCaps(pool, u, '7.5000', when, 'remake')).toBeNull(); // u's day: 1 booked + 1.5 held + 7.5 = 10
+    expect(await checkCaps(pool, u, '7.5001', when, 'remake')).toBe('member_daily_usd');
     await pool.query('update settings set member_daily_usd_cap = 100, member_monthly_usd_cap = 12');
-    expect(await checkCaps(pool, u, '3.0000', when, 'remake')).toBeNull(); // u's month: 5 + 1 + 3 + 3 = 12
-    expect(await checkCaps(pool, u, '3.0001', when, 'remake')).toBe('member_monthly_usd');
+    expect(await checkCaps(pool, u, '3.5000', when, 'remake')).toBeNull(); // u's month: 5 + 1 booked + 1.5 + 1 held + 3.5 = 12
+    expect(await checkCaps(pool, u, '3.5001', when, 'remake')).toBe('member_monthly_usd');
     await pool.query('update settings set member_monthly_usd_cap = 100');
-    expect(await checkCaps(pool, u, '9.0000', when, 'remake')).toBeNull(); // company month: 6 booked + 3 + 2 held + 9 = 20
-    expect(await checkCaps(pool, u, '9.0001', when, 'remake')).toBe('monthly_usd');
-    expect(await memberUsage(pool, u, when)).toMatchObject({ dayUsd: { used: '4.0000' }, monthUsd: { used: '9.0000' } });
+    expect(await checkCaps(pool, u, '9.5000', when, 'remake')).toBeNull(); // company month: 6 booked + 1.5 + 2 + 1 held + 9.5 = 20
+    expect(await checkCaps(pool, u, '9.5001', when, 'remake')).toBe('monthly_usd');
+    expect(await memberUsage(pool, u, when)).toMatchObject({ dayUsd: { used: '2.5000' }, monthUsd: { used: '8.5000' } });
     for (let i = 0; i < 5; i++) await newJob(u, '2032-07-10T03:30:00Z');
     expect(await checkCaps(pool, u, '0.0000', when, 'remake')).toBe('daily_clips'); // the daily clips still hold a remake back, as before
     await setCaps('200');
     await pool.query('update settings set member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
+  });
+
+  test('an open remake holds its own estimate in the member’s day: a short one under the cap leaves an image Run room, and its hold refuses one past it', async () => {
+    await pool.query('update settings set member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
+    const u = await member();
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, created_at, workspace_id) values ('limits-an-s', $1, 'team-b', 's', 'succeeded', '2032-08-10T03:00:00Z', 'ws_vet')`, [u]);
+    // Six 2 s shots: $2.40 admitted, where six shots at the longest would hold $12, past the whole $10 day.
+    await pool.query(
+      `insert into remakes (id, user_id, team_id, analysis_id, shots, status, estimate_usd, created_at, workspace_id) values ('limits-rm-s', $1, 'team-b', 'limits-an-s', '[1, 2, 3, 4, 5, 6]', 'running', 2.4, '2032-08-10T03:00:00Z', 'ws_vet')`,
+      [u],
+    );
+    const when = at('2032-08-10T04:00:00Z');
+    expect(await checkCaps(pool, u, '7.6000', when, 'image')).toBeNull(); // 2.4 held + 7.6 = 10
+    expect(await checkCaps(pool, u, '7.6001', when, 'image')).toBe('member_daily_usd');
+    expect((await memberUsage(pool, u, when)).dayUsd).toEqual({ used: '2.4000', cap: '10.0000' });
   });
 });

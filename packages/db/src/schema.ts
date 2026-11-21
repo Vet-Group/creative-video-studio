@@ -37,7 +37,7 @@ export const FEATURES = [
   'video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap',
   'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on', 'fashion_model', 'multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator',
 ] as const;
-/** The features under settings.features_monthly_cap_usd and the per-member USD caps. */
+/** The features under settings.features_monthly_cap_usd and the per-member USD caps (which count a Smart Remake too, packages/core/src/limits.ts). */
 export const FEATURE_BUDGET = FEATURES.filter((f) => f !== 'video' && f !== 'marketing');
 export const COST_KINDS = ['estimate', 'actual_adjustment', 'release', 'late_bill', 'bakeoff', 'manual_adjustment', 'invoice_diff', 'store_reassign', 'llm'] as const;
 export type CostKind = (typeof COST_KINDS)[number];
@@ -421,7 +421,7 @@ export const settings = pgTable(
     memberDailyClipCap: integer('member_daily_clip_cap').notNull().default(5),
     /** How many reference-video analyses (POST /api/analyses) a member may start on one ICT day; a failed one with no cost booked does not count. */
     memberDailyAnalysisCap: integer('member_daily_analysis_cap').notNull().default(20),
-    /** Hard caps on the image and apps features (FEATURE_BUDGET): the month for all members, and each member's ICT day and month. */
+    /** Hard caps on the image and apps features (FEATURE_BUDGET): the month for all members, and each member's ICT day and month (with their Smart Remakes). */
     featuresMonthlyCapUsd: numeric('features_monthly_cap_usd', { precision: 12, scale: 4 }).notNull().default('260'),
     memberDailyUsdCap: numeric('member_daily_usd_cap', { precision: 12, scale: 4 }).notNull().default('10'),
     memberMonthlyUsdCap: numeric('member_monthly_usd_cap', { precision: 12, scale: 4 }).notNull().default('50'),
@@ -714,6 +714,8 @@ export const remakes = pgTable(
     status: text('status', { enum: REMAKE_STATUSES }).notNull().default('queued'),
     result: jsonb('result'),
     outputAssetId: text('output_asset_id').references(() => assets.id, { onDelete: 'set null' }),
+    /** What the API estimated the chosen shots to cost when it admitted the remake; the caps hold it less cost_usd while the remake is open. Null on rows from before 0116. */
+    estimateUsd: numeric('estimate_usd', { precision: 12, scale: 4 }),
     costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
     error: text('error'),
     workspaceId: workspaceId(),

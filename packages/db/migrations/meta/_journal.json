@@ -806,6 +806,13 @@
 			"when": 1796700000000,
 			"tag": "0115_member_daily_analysis_cap",
 			"breakpoints": true
+		},
+		{
+			"idx": 115,
+			"version": "7",
+			"when": 1796800000000,
+			"tag": "0116_remake_estimate_usd",
+			"breakpoints": true
 		}
 	]
 }

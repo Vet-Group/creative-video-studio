@@ -165,8 +165,8 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
         </div>
       </fieldset>
       <fieldset>
-        <legend>Ảnh và ứng dụng</legend>
-        <p className="muted">Thử đồ, Tạo ảnh và các Ứng dụng ảnh; tách riêng khỏi ngân sách video, không tính video.</p>
+        <legend>Ảnh, ứng dụng và Smart Remake</legend>
+        <p className="muted">Thử đồ, Tạo ảnh và các Ứng dụng ảnh, tách riêng khỏi ngân sách video. Hạn mức mỗi thành viên tính cả Smart Remake.</p>
         <div className="fields">
           <Field label="Ngân sách tháng cho ảnh và ứng dụng" unit="USD" value={features} onChange={setFeatures} hint="Trần chung của cả công ty. Chạm mức thì các trang này không bấm Tạo được tới ngày 1 tháng sau." />
           <Field label="Hạn mức mỗi thành viên mỗi ngày" unit="USD" value={memberDay} onChange={setMemberDay} />

@@ -16,16 +16,18 @@ const budgetRow = (features: string) => `exists (select 1 from jobs bj where bj.
  */
 export const capRowOf = (alias: string) => `(${alias}.kind <> 'llm' or ${alias}.ref like 'llm:remake:%')`;
 const capRow = capRowOf('cost_entries');
-/** What the open remakes matching `where` (on alias r) have yet to book: their shots less what they booked so far.
- * shortcut: an open remake's shots count at the longest a shot is billed (REMAKE_MAX_SECONDS), which only holds back a little more for the few minutes
- * it runs; store each remake's estimate if that ever refuses a remake near a cap. */
-const openRemakes = (where: string) => `(select coalesce(sum(greatest(jsonb_array_length(r.shots) * ${remakeShotUsd({ start: 0, end: REMAKE_MAX_SECONDS }).toFixed(4)} - coalesce(r.cost_usd, 0), 0)), 0)::numeric(12, 4)
-             from remakes r where r.status in ('queued', 'running') and ${where})`;
+/** What the open remakes matching `where` (on alias r) and made in the ICT `period` of CTE m (where bookLlm books their rows) have yet to book: the
+ * estimate each was admitted with less what it has booked so far. A row from before migration 0116 has no estimate: its shots count at the longest a
+ * shot is billed (REMAKE_MAX_SECONDS). */
+const openRemakes = (where: string, period: 'day' | 'month') =>
+  `(select coalesce(sum(greatest(coalesce(r.estimate_usd, jsonb_array_length(r.shots) * ${remakeShotUsd({ start: 0, end: REMAKE_MAX_SECONDS }).toFixed(4)}) - coalesce(r.cost_usd, 0), 0)), 0)::numeric(12, 4)
+     from remakes r, m where r.status in ('queued', 'running') and ${where}
+       and ${period === 'day' ? `(r.created_at at time zone 'Asia/Ho_Chi_Minh')::date = m.day` : `to_char(r.created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') = m.month`})`;
 /** The member caps' spend of user $1 in the ICT `period` of CTE m (features in parameter `features` are the video ones): the image and apps rows
  * and the user's Smart Remakes (owner decision, 2026-11-21), booked or still to book. */
 const memberSpend = (period: 'day' | 'month', features: string) =>
   `((select coalesce(sum(usd), 0.0000) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.${period} = m.${period} and ${capRow}
-       and (${budgetRow(features)} or cost_entries.ref like 'llm:remake:%')) + ${openRemakes('r.user_id = $1')})`;
+       and (${budgetRow(features)} or cost_entries.ref like 'llm:remake:%')) + ${openRemakes('r.user_id = $1', period)})`;
 
 /** The video clips (features in parameter `features`) the user in parameter `user` made on the ICT day of `t.at`, as the daily clip cap counts them:
  * `failed` jobs with no provider cost booked (an Enhance llm row aside) do not count. The day is a range on the bare `created_at`, so the tray's poll reads it
@@ -94,7 +96,7 @@ export async function checkCaps(tx: Queryable, userId: string, estimateUsd: stri
          ${memberSpend('day', '$4')} + $2::numeric > s.member_daily_usd_cap as member_day_full,
          ${memberSpend('month', '$4')} + $2::numeric > s.member_monthly_usd_cap as member_month_full,
          (select coalesce(sum(usd), 0) from cost_entries, m where cost_entries.month = m.month and ${capRow} and not ${budgetRow('$4')})
-           + ${openRemakes('true')} + $2::numeric > s.monthly_cap_usd as month_full
+           + ${openRemakes('true', 'month')} + $2::numeric > s.monthly_cap_usd as month_full
        from t, settings s where s.id = 1`,
       values,
     );

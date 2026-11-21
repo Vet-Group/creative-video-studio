@@ -76,13 +76,13 @@ test('every route 404s while the feature is off', async () => {
   }
 });
 
-test("queues a remake of the caller's own analysis and image, with the analysis' store and the shots in shot order", async () => {
+test("queues a remake of the caller's own analysis and image, with the analysis' store, the shots in shot order and their estimate", async () => {
   const res = await post(ok);
   expect(res.status).toBe(201);
   const { id } = (await res.json()) as { id: string };
-  const row = (await pool.query('select user_id, team_id, store_id, analysis_id, product_asset_id, shots, status from remakes where id = $1', [id])).rows[0];
+  const row = (await pool.query('select user_id, team_id, store_id, analysis_id, product_asset_id, shots, status, estimate_usd::text from remakes where id = $1', [id])).rows[0];
   const team = (await pool.query('select team_id from users where id = $1', [userId])).rows[0].team_id;
-  expect(row).toEqual({ user_id: userId, team_id: team, store_id: 'store-ok', analysis_id: 'an-ok', product_asset_id: 'img', shots: [1, 3], status: 'queued' });
+  expect(row).toEqual({ user_id: userId, team_id: team, store_id: 'store-ok', analysis_id: 'an-ok', product_asset_id: 'img', shots: [1, 3], status: 'queued', estimate_usd: '0.8000' }); // 2 shots of 1 s at $0.40
 });
 
 test('drops the analysis’ store when the caller, now in a billing team, may no longer pick it (docs/BILLING.md)', async () => {
@@ -125,10 +125,13 @@ test('polls one of the caller’s remakes and hides another member’s', async (
 
 test('counts the open remakes against the company month and refuses one that would pass it, queuing nothing', async () => {
   const prev = (await pool.query('select monthly_cap_usd::text as cap from settings where id = 1')).rows[0].cap as string;
-  const open = (await pool.query(`select coalesce(sum(jsonb_array_length(shots)), 0)::int as n from remakes where status in ('queued', 'running')`)).rows[0].n as number;
+  const held = (await pool.query(`select coalesce(sum(estimate_usd), 0)::float as usd, count(*) filter (where estimate_usd is null)::int as old, coalesce(sum(jsonb_array_length(shots)) filter (where estimate_usd is null), 0)::int as "oldShots"
+       from remakes where status in ('queued', 'running')`)).rows[0] as { usd: number; old: number; oldShots: number };
   const count = async () => (await pool.query('select count(*)::int as n from remakes')).rows[0].n as number;
-  // An open remake's shots hold $2.00 each (10 s sent + 10 s made at $0.10); these 1 s shots cost $0.40 each (2 s sent + 2 s made), so there is room for 2 more.
-  await pool.query('update settings set monthly_cap_usd = $1 where id = 1', [(open * 2 + 2 * 0.4).toFixed(4)]);
+  expect(held.old).toBe(1); // rm-theirs, written without an estimate as before migration 0116
+  // An open remake holds the estimate it was admitted with; one with none holds $2.00 a shot (10 s sent + 10 s made at $0.10). These 1 s shots
+  // cost $0.40 each (2 s sent + 2 s made), so there is room for 2 more.
+  await pool.query('update settings set monthly_cap_usd = $1 where id = 1', [(held.usd + held.oldShots * 2 + 2 * 0.4).toFixed(4)]);
   try {
     const before = await count();
     const over = await post({ ...ok, shots: [1, 2, 3] });
@@ -141,10 +144,11 @@ test('counts the open remakes against the company month and refuses one that wou
 });
 
 test('counts the caller’s open remakes against their own daily cap and refuses one that would pass it, queuing nothing', async () => {
-  const mine = (await pool.query(`select coalesce(sum(jsonb_array_length(shots)), 0)::int as n from remakes where user_id = $1 and status in ('queued', 'running')`, [userId])).rows[0].n as number;
+  const mine = (await pool.query(`select coalesce(sum(estimate_usd), 0)::float as usd from remakes where user_id = $1 and status in ('queued', 'running')`, [userId])).rows[0].usd as number;
   const count = async () => (await pool.query('select count(*)::int as n from remakes')).rows[0].n as number;
-  // As above: $2.00 held per open shot, $0.40 per 1 s shot of this one, so the caller has room for 2 more shots today.
-  await pool.query('update settings set member_daily_usd_cap = $1 where id = 1', [(mine * 2 + 2 * 0.4).toFixed(4)]);
+  expect(mine).toBeGreaterThan(0); // the caller's open remakes, each holding its estimate
+  // $0.40 per 1 s shot of this one, so the caller has room for 2 more shots today.
+  await pool.query('update settings set member_daily_usd_cap = $1 where id = 1', [(mine + 2 * 0.4).toFixed(4)]);
   try {
     const before = await count();
     const over = await post({ ...ok, shots: [1, 2, 3] });

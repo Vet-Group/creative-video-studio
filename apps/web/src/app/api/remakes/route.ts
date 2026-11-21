@@ -66,14 +66,14 @@ export async function POST(request: Request) {
   const cap = await withTransaction(pool, async (tx) => {
     // One writer at a time, as for a Run, so two remakes cannot both take the last dollars of the month or of the member's caps.
     await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
-    // checkCaps adds what the open remakes have yet to book: they have booked only the calls made so far.
+    // checkCaps adds what the open remakes have yet to book (their estimate less the calls booked so far); this one's is stored for the next.
     const estimate = shots.reduce((sum, index) => sum + remakeShotUsd(remakeScene(result, index)!), 0);
     const refused = await checkCaps(tx, userId, estimate.toFixed(6), undefined, 'remake');
     if (refused) return refused;
     await tx.query(
-      `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots, workspace_id)
-         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6, $7)`,
-      [id, userId, analysis.own && analysis.store_ok ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots), g.workspaceId],
+      `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots, estimate_usd, workspace_id)
+         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6, $7, $8)`,
+      [id, userId, analysis.own && analysis.store_ok ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots), estimate.toFixed(4), g.workspaceId],
     );
     return null;
   });
