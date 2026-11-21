@@ -5,7 +5,7 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import type { ParamFormat } from '@/lib/marketing';
 import { runKey } from '@/lib/run-guard';
-import { type Starter, STARTERS } from '@/lib/prompt-starters';
+import { inSeason, type Starter, STARTERS } from '@/lib/prompt-starters';
 import s from './PromptComposer.module.css';
 import { type PromptPart, PromptTools } from './PromptTools';
 import type { Ask } from './Suggestions';
@@ -93,7 +93,7 @@ interface Props {
   required?: boolean;
 }
 
-export function PromptComposer({ id, label, optional, feature, format, value, onChange, maxLength, onRun, placeholder, disabled, ask, aiLabel, parts, enhance, starters = STARTERS[feature] ?? [], meta, required }: Props) {
+export function PromptComposer({ id, label, optional, feature, format, value, onChange, maxLength, onRun, placeholder, disabled, ask, aiLabel, parts, enhance, starters = inSeason(STARTERS[feature] ?? []), meta, required }: Props) {
   const near = maxLength !== undefined && value.length >= maxLength * NEAR;
   return (
     <div className={`field ${s.composer}`}>

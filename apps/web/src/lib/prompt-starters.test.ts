@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { endingLine, hookLine, MAX_ENDING, MAX_HOOK } from './marketing';
-import { PROMPT_TEMPLATES, STARTERS } from './prompt-starters';
+import { inSeason, PROMPT_TEMPLATES, STARTERS } from './prompt-starters';
 import { sampleType } from './samples';
+
+describe('inSeason', () => {
+  const list = [{ label: 'a', text: 'a' }, { label: 'x', text: 'x', holiday: true as const }, { label: 'b', text: 'b' }];
+  it('puts the holiday chips first from 15 November to 31 December in Vietnam, and leaves them out otherwise', () => {
+    expect(inSeason(list, new Date('2026-11-14T23:59:00+07:00')).map((s) => s.label)).toEqual(['a', 'b']);
+    expect(inSeason(list, new Date('2026-11-14T17:30:00Z')).map((s) => s.label)).toEqual(['x', 'a', 'b']); // already 15 November in Vietnam
+    expect(inSeason(list, new Date('2026-12-31T23:00:00+07:00')).map((s) => s.label)).toEqual(['x', 'a', 'b']);
+    expect(inSeason(list, new Date('2027-01-01T00:00:00+07:00')).map((s) => s.label)).toEqual(['a', 'b']);
+  });
+  it('gives the image, try-on and background changer rows holiday chips', () => {
+    for (const k of ['image', 'try_on', 'background_changer']) expect(STARTERS[k]!.some((s) => s.holiday)).toBe(true);
+  });
+});
 
 describe('STARTERS', () => {
   it.each(Object.entries(STARTERS))('%s: uniquely labelled chips with a Vietnamese label and English text', (_, list) => {

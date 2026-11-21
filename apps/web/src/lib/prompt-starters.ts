@@ -3,6 +3,14 @@
 export interface Starter {
   label: string;
   text: string;
+  /** A Christmas, winter or Black Friday chip: it leads the row from 15 November to 31 December (ICT) and is left out the rest of the year. */
+  holiday?: true;
+}
+
+/** The chips to show on `now`: the holiday ones first from 15 November to 31 December (ICT), and none of them the rest of the year. */
+export function inSeason(list: Starter[], now = new Date()): Starter[] {
+  const monthDay = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).slice(5);
+  return monthDay >= '11-15' ? [...list.filter((s) => s.holiday), ...list.filter((s) => !s.holiday)] : list.filter((s) => !s.holiday);
 }
 
 /** A template of a sectioned prompt: a Vietnamese name and one-line description, and the English hook, body and last shot it fills the three sections with. */
@@ -322,6 +330,10 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
 /** By feature, as PromptComposer's feature; a feature without starters shows none. */
 export const STARTERS: Record<string, Starter[]> = {
   image: [
+    { label: 'Phòng Giáng sinh', holiday: true, text: 'The product in a cosy living room decorated for Christmas, a lit tree with warm fairy lights and wrapped presents softly blurred behind, warm evening light, its colours, print and any text exactly as in the photo.' },
+    { label: 'Hộp quà', holiday: true, text: 'The product as a gift beside an open kraft gift box with tissue paper, a red satin ribbon and a blank tag on a white table, soft daylight, top-down, its colours, print and any text exactly as in the photo.' },
+    { label: 'Black Friday', holiday: true, text: 'A bold premium product photo for a Black Friday sale: the product centred on a matte black backdrop under a soft spotlight with a subtle red rim light, no added text, its colours, print and any text exactly as in the photo.' },
+    { label: 'Phố tuyết', holiday: true, text: 'A model wearing the outfit on a snowy street at dusk, warm shop lights and gently falling snow behind, full-body shot, the colours and print of the outfit exactly as in the photo.' },
     { label: 'Studio nền trắng', text: 'The product on a seamless white studio background, soft even light, centered, high detail.' },
     { label: 'Lifestyle', text: 'The product in a bright, cozy living room, natural window light, shallow depth of field.' },
     { label: 'Ngoài phố', text: 'A model wearing the outfit on a sunny city street, golden-hour light, full-body shot.' },
@@ -340,6 +352,8 @@ export const STARTERS: Record<string, Starter[]> = {
     { label: 'Tưởng nhớ thú cưng', text: 'The memorial ornament from the photo resting on a soft cream knit blanket beside a lit candle, a dog collar and a few dried flowers, warm gentle light and a calm mood, the pet photo, the name and any dates exactly as in the photo.' },
   ],
   try_on: [
+    { label: 'Giáng sinh', holiday: true, text: "Set the scene in a cosy living room decorated for Christmas, a lit tree and warm fairy lights softly blurred behind, the model's pose unchanged." },
+    { label: 'Phố tuyết', holiday: true, text: "Set the scene on a snowy city street at dusk with warm shop lights and gently falling snow, the model's pose unchanged." },
     { label: 'Studio', text: "A clean studio backdrop with soft even light, the model's pose unchanged." },
     { label: 'Đường phố', text: "Set the scene on a sunny city street in natural daylight with a softly blurred background, the model's pose unchanged." },
     { label: 'Quán cà phê', text: "Set the scene by the window of a cozy cafe in warm natural light with a softly blurred interior, the model's pose unchanged." },
@@ -352,6 +366,9 @@ export const STARTERS: Record<string, Starter[]> = {
     { label: 'Ánh sáng studio', text: 'Soft, even studio-style light with gentle shadows and a clean, neutral look.' },
   ],
   background_changer: [
+    { label: 'Cây thông Noel', holiday: true, text: 'a cosy living room with a lit Christmas tree and wrapped presents softly blurred behind' },
+    { label: 'Tuyết trắng', holiday: true, text: 'fresh white snow with a few pine branches in soft winter daylight' },
+    { label: 'Nền Black Friday', holiday: true, text: 'a matte black backdrop under a soft spotlight with a subtle red rim light' },
     { label: 'Bàn đá cẩm thạch', text: 'a white marble table in a bright minimalist kitchen' },
     { label: 'Quán cà phê', text: 'a sunny outdoor cafe table with a blurred street behind' },
     { label: 'Bãi biển', text: 'a sandy beach at golden hour with soft waves' },
