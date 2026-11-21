@@ -10,6 +10,6 @@ export default {
     'Trang Ứng dụng gắn nhãn "Mới" cho ứng dụng ra mắt trong 14 ngày gần nhất.',
   ],
   href: '/apps/pose-generator',
-  prs: [0],
+  prs: [619],
   audience: 'all',
 } satisfies ChangeEntry;
