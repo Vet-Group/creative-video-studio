@@ -12,7 +12,7 @@ const TZ = 'Asia/Ho_Chi_Minh';
 const fmtDay = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric', timeZone: TZ });
 const fmtTime = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 const PR_URL = 'https://github.com/Vet-Group/creative-video-studio/pull/';
-/** Days the page shows at first and adds per "Xem ... ngày trước đó": the whole list ran to about 100 phone screens. */
+/** Days the page shows at first and adds per press of the more button: the whole list ran to about 100 phone screens. */
 const DAYS_STEP = 10;
 
 export function Changelog({ entries, isAdmin }: { entries: ChangeEntry[]; isAdmin: boolean }) {
