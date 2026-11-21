@@ -20,7 +20,8 @@ changed on the host). The raw output is the run log `.omc/run/logs/vet-check-202
 
 `cvs-web` and `cvs-worker` keep `MemoryMax=768M` each. Both run in `user@0.service`, whose cap is 5 GiB; Ideas Hub and the other
 root user units use 1.79 GiB now, so the worst case is 1.79 + 1.5 = 3.29 GiB, leaving about 1.7 GiB for Ideas Hub to grow. The
-app's Postgres and MinIO run under `docker.service`, outside that cap, and the host has 10 GiB available.
+app's Postgres and MinIO run under `docker.service`, outside that cap, and the host has 10 GiB available. Later the worker got
+`MemoryMax=2G` and became a system unit running as `cvs-worker` ([deploy.md](deploy.md#the-workers-user)), so it is outside `user@0.service` too.
 
 ## Open item
 

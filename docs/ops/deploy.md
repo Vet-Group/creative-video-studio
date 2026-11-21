@@ -2,6 +2,8 @@
 
 `deploy/linux/install.sh` and `deploy/linux/uninstall.sh` install and remove Creative Video Studio as **root user units**
 (`systemctl --user` under root, `XDG_RUNTIME_DIR=/run/user/0`) in `/opt/creative-video-studio`, the same way Ideas Hub is run.
+The exception is the worker: `cvs-worker` is a system unit (`systemctl`, without `--user`) that runs as the unprivileged user
+`cvs-worker` (see [The worker's user](#the-workers-user)).
 Deploy only under the owner's pre-approval (plan section 3). Nothing here runs by itself.
 
 ## Standing operations permission (owner, 2026-11-02)
@@ -38,8 +40,8 @@ deploy/linux/uninstall.sh --dry-run
 ```
 
 `--dry-run` prints every command and every unit file it would write, changes nothing, and exits 0 when the preconditions
-pass (for install: root, the required tools, the deploy key, `.env` present with mode 600, `cloudflared` when a token is set,
-a free port set; for uninstall, a valid state file). Lines start with `[dry-run]`; a real run prints `==>` instead.
+pass (for install: root, the required tools, the deploy key, `.env` present with mode 600 or 640, `cloudflared` when a token is set,
+a free port set, and nothing the worker reads under `/root` or `/home`; for uninstall, a valid state file). Lines start with `[dry-run]`; a real run prints `==>` instead.
 A failed read-only precondition prints `[dry-run] would fail: <reason>` and exits 1. `uninstall.sh --dry-run` ends with
 "dry run: nothing was changed".
 
@@ -71,6 +73,12 @@ without it they stay on fal (`FAL_KEY`). After adding or removing the key, resta
    used; its content is never read or printed. A detached checkout (what the gate's `deploy <commit>` leaves) keeps its commit:
    only a checkout on a branch is fetched and fast-forwarded. The gate runs the installer of the commit it deploys, so a rollback
    to a commit older than this rule still fast-forwards to the tip of `main`.
+   Then it creates the system user `cvs-worker` when it is missing, makes the app directory `root:cvs-worker` mode 750 and `.env`
+   `root:cvs-worker` mode 640, and checks as that user that it can read `.env`, the worker's code, the Vertex keys
+   (`GOOGLE_APPLICATION_CREDENTIALS`, `..._NEXT`), run an already installed Node and, with `REA_ANALYZE_ENABLED=1`, run
+   `rea-video --help`; a key or `rea-video` under `/root` or `/home` is refused too. The script runs under `umask 022` (secret
+   files still under 077), so what it creates is readable by the worker whatever umask the gate's session has. Any of these
+   stops the run before the build (see [The worker's user](#the-workers-user)).
 3. Installs the pinned Node (**24.22.1**, inside the root `engines` range) into `/opt/creative-video-studio/node`. The tarball is
    downloaded from `https://nodejs.org/dist/v24.22.1/` and checked with `sha256sum -c` against that release's `SHASUMS256.txt`.
    Then pnpm at the `packageManager` version is installed next to it.
@@ -88,6 +96,7 @@ without it they stay on fal (`FAL_KEY`). After adding or removing the key, resta
    new CNAME `video.vetgroup.net`. **Without the token this step is skipped** and the app is deployed without the public hostname.
 8. Writes and enables the units `cvs-web`, `cvs-worker` (each `MemoryMax=768M`, `Restart=on-failure`), `cvs-backup.timer`,
    `cvs-drill.timer` (monthly), `cvs-backup-weekly.timer` (daily R2 copy despite its name; only if all three `CVS_R2_*` are set) and `cvs-tunnel` (only if step 7 ran).
+   `cvs-worker` goes to `/etc/systemd/system/cvs-worker.service` and is started with `systemctl restart cvs-worker.service`.
 
 `MemoryMax=768M` for web and worker was confirmed by plan step D.3 against the measured headroom next to Ideas Hub; see
 [`production.md`](production.md).
@@ -107,7 +116,7 @@ Vet-Group organization had deploy keys disabled and the new VET host (192.168.1.
 A state file means the next `install.sh` is an update, and it works without uninstalling (which would delete the tunnel and the
 DNS record): ports held by this install's own compose project (`docker compose -p creative-video-studio ps -q` is not empty) or
 by `cvs-web` are not counted as taken, the repo is fast-forwarded when it is on a branch (a detached checkout keeps its commit), and a recorded tunnel is kept, but only when its DNS record id
-and both `cloudflared/` files exist. After the build, an update restarts `cvs-web` and `cvs-worker` so they run the new code (`cvs-web` on the new build directory). The worker first lets the provider calls in flight finish, so its restart can take up to about 23 minutes (`TimeoutStopSec=1500`) when an image is being made. A tunnel recorded without them (a run that stopped in step 7) is refused with
+and both `cloudflared/` files exist. After the build, an update restarts `cvs-web` and `cvs-worker` so they run the new code (the web first, on the new build directory, then the worker). The worker first lets the provider calls in flight finish, so its restart can take up to about 23 minutes (`TimeoutStopSec=1500`) when an image is being made. A tunnel recorded without them (a run that stopped in step 7) is refused with
 "run uninstall.sh first". A run that stopped after `compose up` can be undone with `uninstall.sh`, because the compose line was
 recorded before `up`.
 
@@ -138,9 +147,60 @@ This swaps only the web build: the checkout, `node_modules`, the worker and the 
 commits have the same lockfile (in particular the same `next`) and no migration the old code cannot run with; otherwise roll back
 with `bash scripts/run/vet.sh deploy <older commit>`, which builds that commit the same way. The next deploy rewrites the unit anyway.
 
+## The worker's user
+
+The worker feeds uploaded videos and images to `ffmpeg`, `ffprobe` and `rea-video`, so a decoder bug must not get root and the whole
+host (Fable audit 2026-11-20, security #6). It runs as the system user `cvs-worker` (no login shell, home `/var/lib/cvs-worker`)
+under `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=yes` and `PrivateTmp=yes`: everything is read-only for it except
+its own `/tmp` (all its job files) and `/var/lib/cvs-worker` (`StateDirectory=`, systemd creates it owned by the user; `rea-video`
+keeps its downloaded models there), and `/root` and `/home` are hidden. It reads `.env` through its group (`root:cvs-worker`, mode
+640, not world-readable); `provision-vet-env.sh` keeps that group and mode when it rewrites the file. The app directory, which
+`provision-vet-env.sh` creates with mode 700, becomes `root:cvs-worker` mode 750, so the worker may enter it and other users still may not.
+
+Why a system unit: a unit in root's user manager cannot set `User=`. The other choice, a user manager of its own for `cvs-worker`
+with lingering, would need a home and its own `systemctl --user -M cvs-worker@` handling, and its sandbox options depend on
+unprivileged user namespaces, which Ubuntu restricts through AppArmor. A system unit gets `User=` and every sandbox option natively.
+It drains like before (`TimeoutStopSec=1500`) and keeps `MemoryMax=2G`, now outside `user@0.service`.
+
+The first deploy with this change moves the worker: after the web restart it runs `systemctl --user disable --now cvs-worker.service`
+(the root worker finishes its provider calls first, up to about 23 minutes), removes that user unit and its `unit=` state line, then
+starts the system unit. The new worker is only started after the old one stopped, so two never run.
+
+Before that deploy (owner, as root on the host):
+
+- `rea-video` was installed with `uv tool` as root (tool and Python under `/root/.local`, linked from `/usr/local/bin`), which the
+  worker cannot reach. Reinstall the same commit outside `/root`, for example
+  `UV_TOOL_DIR=/opt/rea-video/tools UV_TOOL_BIN_DIR=/opt/rea-video/bin UV_PYTHON_INSTALL_DIR=/opt/rea-video/python uv tool install --python 3.12 "/root/rea-video[asr]"`
+  (not `-e`: an editable install would still load its code from `/root/rea-video`), then `ln -sf /opt/rea-video/bin/rea-video /usr/local/bin/rea-video`.
+  Smoke it as a non-root user behind the same `ProtectHome` first:
+  `systemd-run --wait --pipe -p DynamicUser=yes -p ProtectHome=yes -p MemoryMax=2G /usr/local/bin/rea-video --help`.
+  Its models are downloaded again into `/var/lib/cvs-worker` on the first analysis, unless `/root/.cache/huggingface` is copied
+  there after the deploy (`chown -R cvs-worker:cvs-worker`).
+- A Vertex key under `/root` or `/home`: move it (for example to `/opt/creative-video-studio-keys/`, `root:cvs-worker`, mode 640) and
+  point `GOOGLE_APPLICATION_CREDENTIALS` at the new path. A bad account 1 key stops the worker at start-up.
+
+`install.sh` refuses (before anything is built or restarted) while either is still in the way, naming the file.
+
+Back to the root worker (rollback), as root on the host:
+
+```
+systemctl disable --now cvs-worker.service           # drains like any stop
+rm /etc/systemd/system/cvs-worker.service && systemctl daemon-reload
+git -C /opt/creative-video-studio show <commit before this change>:deploy/linux/cvs-worker.service \
+  | sed 's|@APP@|/opt/creative-video-studio|g' > /root/.config/systemd/user/cvs-worker.service
+XDG_RUNTIME_DIR=/run/user/0 systemctl --user daemon-reload
+XDG_RUNTIME_DIR=/run/user/0 systemctl --user enable --now cvs-worker.service
+sed -i '/^system_unit=/d; /^user=/d' /opt/creative-video-studio/install.state   # older uninstall.sh refuses these lines
+echo unit=cvs-worker.service >> /opt/creative-video-studio/install.state
+```
+
+Then deploy only commits before this change (their `install.sh` writes the root unit again), or the next deploy moves the worker back
+to `cvs-worker`. Optionally give `/opt/creative-video-studio` (750) and its `.env` (640) back to group `root` and `.env` mode 600;
+the user can stay (`userdel cvs-worker` removes it).
+
 ## Status
 
-`bash scripts/run/vet.sh status` runs `deploy/linux/status.sh` on VET (read-only): the commit, the web build directory `cvs-web` runs and the ones on disk, the `cvs-*` units, the compose
+`bash scripts/run/vet.sh status` runs `deploy/linux/status.sh` on VET (read-only): the commit, the web build directory `cvs-web` runs and the ones on disk, the `cvs-*` units (root's user units and the `cvs-worker` system unit), the compose
 containers, the answer of `https://video.vetgroup.net/privacy`, the last backup log line, and `perf` lines that tell a slow app from a
 slow line: `/login` and a static file served on the server itself and through the tunnel, the server's download and upload speed to
 Cloudflare, the tunnel's protocol and edge, and the CPU, load and memory. They add a few seconds and about 15 MB of traffic.
@@ -148,7 +208,8 @@ Cloudflare, the tunnel's protocol and edge, and the CPU, load and memory. They a
 ## The state file
 
 `/opt/creative-video-studio/install.state` lists what install.sh created, one `key=value` per line:
-`compose=creative-video-studio` (the only accepted value), `unit=<name>`, `tunnel_id`, `account_id`, `zone_id`, `dns_record_id`,
+`compose=creative-video-studio` (the only accepted value), `unit=<name>`, `system_unit=cvs-worker.service`, `user=cvs-worker` (only
+when install.sh created the user), `tunnel_id`, `account_id`, `zone_id`, `dns_record_id`,
 and `file=<path under cloudflared/>`. Each line is written as soon as the thing exists, so a failed install can still be undone.
 
 ## uninstall.sh
@@ -156,7 +217,8 @@ and `file=<path under cloudflared/>`. Each line is written as soon as the thing 
 Reads only the state file and validates every line; a unit that is not named `cvs-*`, a file outside `cloudflared/`, or a
 malformed id makes it refuse before running anything. Then it:
 
-1. disables and removes the recorded units;
+1. disables and removes the recorded units (the worker's system unit with `systemctl`, the others with `systemctl --user`), then
+   deletes the user `cvs-worker` when install.sh created it. `/var/lib/cvs-worker` (the worker's model cache) stays;
 2. runs `docker compose -p creative-video-studio down` from the app directory, even when the state file holds only the `compose` line.
    **Volumes are kept**: `-v` is never passed, so the database and the videos survive;
 3. removes the recorded files;
