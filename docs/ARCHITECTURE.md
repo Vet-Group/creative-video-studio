@@ -222,6 +222,17 @@ The fal adapter always sends `X-Fal-Store-IO: 0` and an object lifecycle of at l
 
 - Nightly: `pg_dump -Fc` plus the MinIO data go into a local encrypted restic repo on the VET server, kept for 14 daily snapshots. Deduplication keeps 14 dailies from multiplying the video size. At most 1 day of data may be lost.
 - Daily at 04:30 (weekly until 2026-11-01; the unit is still named `cvs-backup-weekly`): `restic copy` to an encrypted Cloudflare R2 repo, keeping 14 daily and 8 weekly snapshots, so at most 1 day of data is lost if the server disk fails. The owner creates the bucket and key. Without them the copy is skipped and the nightly backups still run.
+- The nightly snapshot also holds `/backup/secrets/auth.env`: the `BETTER_AUTH_SECRET=` line of `.env`, which decrypts the stored TOTP secrets and backup codes. The restic container writes it to a tmpfs of its own, so it never becomes a file on the host's disk and never reaches the log; the daily copy takes it to R2 with the rest of the snapshot.
+- Restoring onto a new host: put that line back into `.env` before the app first starts, or every user with 2FA is locked out. With the restic password in the shell (`read -rs RESTIC_PASSWORD; export RESTIC_PASSWORD`), from the local repo:
+
+  ```
+  cd /opt/creative-video-studio
+  line="$(docker run --rm -e RESTIC_PASSWORD -e RESTIC_REPOSITORY=/repo -v /opt/creative-video-studio/backups/restic:/repo restic/restic:0.19.1 dump latest /backup/secrets/auth.env)"
+  sed -i '/^BETTER_AUTH_SECRET=/d' .env && printf '%s\n' "$line" >> .env && unset line
+  ```
+
+  From R2 instead, drop the `-v` and pass `-e RESTIC_REPOSITORY=<CVS_R2_REPOSITORY> -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=auto` with the R2 key in the shell. The database and MinIO data come from the same snapshot (`/backup/staging/cvs.dump`, `/backup/minio`).
+- The restic password (`CVS_RESTIC_PASSWORD`) is kept on the same host, in `.env` and in `~/.config/creative-video-studio/backup.env`. A lost host loses it too, so the backups, this secret included, only help when the owner also keeps the restic password somewhere off the host.
 - Before each run the script checks free disk space and refuses below 15%.
 - Restore drill (`--drill`): restore the latest snapshot into a scratch database and a scratch MinIO, then compare the user, job and asset counts, plus the `cost_entries` row count and `sum(usd)`. A mismatch exits non-zero.
 - The drill runs before staff go live, then monthly from a timer.

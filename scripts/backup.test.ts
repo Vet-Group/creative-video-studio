@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -138,6 +138,68 @@ describe.skipIf(!hasBash)('cvs-backup reads backup.env (needs bash only)', { tim
   });
 });
 
+// docker is a stub here: it logs each call and answers just enough for a nightly backup to finish, so this runs on any machine.
+describe.skipIf(!hasBash)('cvs-backup puts the auth secret into the snapshot only (needs bash only)', { timeout: 30_000 }, () => {
+  const fake = 'BETTER_AUTH_SECRET=fake-auth-secret-9c4e71';
+  const dockerStub = `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$STUB_LOG"
+case " $* " in *" -e CVS_AUTH_LINE "*) printf '%s\\n' "$CVS_AUTH_LINE" > "$STUB_LOG.container-env" ;; esac
+case " $* " in
+  *" pg_restore "*) printf 'COPY public.users (id) FROM stdin;\\nu1\\n\\\\.\\n' ;;
+  *" ps -q minio "*) echo minio-id ;;
+  *" ls --recursive --json "*) echo '{"type":"file","size":3}' ;;
+esac
+exit 0
+`;
+  // Bash's own view of a path: Git Bash's PATH cannot hold C:/x.
+  const posix = (p: string) => spawnSync(bash, ['-c', 'cd "$1" && pwd', '_', p], { encoding: 'utf8' }).stdout.trim();
+  function nightly(dotEnv: string) {
+    const dir = fwd(mkdtempSync(join(tmpdir(), 'cvs-backup-secret-')));
+    for (const d of ['repo', 'stubs', 'backups', 'state']) mkdirSync(join(dir, d));
+    writeFileSync(join(dir, 'repo', '.env'), dotEnv, { mode: 0o600 });
+    writeFileSync(join(dir, 'stubs', 'docker'), dockerStub, { mode: 0o755 });
+    const r = spawnSync(bash, ['-c', 'PATH="$STUBS:$PATH"; exec "$BASH" "$@"', '_', script], {
+      cwd: root,
+      env: { ...process.env, ...baseEnv, CVS_REPO: `${dir}/repo`, CVS_BACKUP_DIR: `${dir}/backups`, CVS_STATE_DIR: `${dir}/state`, STUBS: posix(`${dir}/stubs`), STUB_LOG: `${dir}/docker.log` },
+      encoding: 'utf8',
+      timeout: 25_000,
+    });
+    const calls = readFileSync(join(dir, 'docker.log'), 'utf8').split('\n');
+    const containerEnv = existsSync(join(dir, 'docker.log.container-env')) ? readFileSync(join(dir, 'docker.log.container-env'), 'utf8') : null;
+    // Every file the run left in its backup and state directories (the staging copy, backup.log, the lock).
+    const left = ['backups', 'state'].flatMap((d) => readdirSync(join(dir, d), { recursive: true, withFileTypes: true }).filter((e) => e.isFile()).map((e) => readFileSync(join(e.parentPath, e.name), 'utf8')));
+    return { status: r.status, out: `${r.stdout}${r.stderr}`, calls, containerEnv, left, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  }
+
+  test("the .env's BETTER_AUTH_SECRET line reaches the restic container by name, onto its tmpfs, and nowhere else", () => {
+    const r = nightly(`S3_BUCKET=b\n${fake}\nDATABASE_URL=postgres://x\n`);
+    expect(r.status, r.out).toBe(0);
+    expect(r.out).toContain('backup done');
+    const backup = r.calls.find((c) => c.includes(' backup --host cvs /backup'));
+    expect(backup).toContain('--tmpfs /backup/secrets:mode=0700 -e CVS_AUTH_LINE --entrypoint sh ');
+    expect(backup).toContain(` -c umask 077 && printf "%s\\n" "$CVS_AUTH_LINE" > /backup/secrets/auth.env && exec restic "$@" sh backup --host cvs /backup`);
+    expect(r.containerEnv).toBe(`${fake}\n`); // only that line, not the rest of .env
+    expect(r.calls.filter((c) => c.includes('CVS_AUTH_LINE'))).toHaveLength(1); // not for forget or any other call
+    const secret = fake.split('=')[1]!;
+    expect(r.out).not.toContain(secret);
+    expect(r.calls.join('\n')).not.toContain(secret); // never on a command line
+    expect(r.left.length).toBeGreaterThan(0);
+    for (const content of r.left) expect(content).not.toContain(secret); // nor in a file on this disk, backup.log included
+    r.cleanup();
+  });
+
+  test('without the line the backup still runs, says so, and passes nothing extra to the container', () => {
+    const r = nightly('S3_BUCKET=b\nBETTER_AUTH_SECRET=\n');
+    expect(r.status, r.out).toBe(0);
+    expect(r.out).toContain('warning: .env has no BETTER_AUTH_SECRET, so this snapshot holds none');
+    const backup = r.calls.find((c) => c.includes(' backup --host cvs /backup'));
+    expect(backup).not.toContain('--tmpfs');
+    expect(backup).not.toContain('--entrypoint');
+    expect(r.containerEnv).toBeNull();
+    r.cleanup();
+  });
+});
+
 const skipReason = stackSkipReason();
 
 describe.skipIf(skipReason !== null)(`cvs-backup against compose ${skipReason ? `(skipped: ${skipReason})` : project}`, () => {
@@ -174,6 +236,17 @@ describe.skipIf(skipReason !== null)(`cvs-backup against compose ${skipReason ? 
     expect(r.status).toBe(0);
     expect(snapshotCount()).toBe(1);
     expect(r.out).not.toContain(baseEnv.CVS_RESTIC_PASSWORD);
+    // The restore step of the docs: the snapshot hands back the .env's BETTER_AUTH_SECRET line (compared here, never printed).
+    const line = /^BETTER_AUTH_SECRET=.+$/m.exec(envFile)?.[0];
+    if (line) {
+      const image = /^restic_image="([^"]+)"/m.exec(readFileSync(script, 'utf8'))![1]!;
+      const dump = spawnSync('docker', ['run', '--rm', '-e', 'RESTIC_PASSWORD', '-e', 'RESTIC_REPOSITORY=/repo', '-v', `${backupDir}/restic:/repo`, image, 'dump', 'latest', '/backup/secrets/auth.env'], {
+        env: { ...process.env, RESTIC_PASSWORD: baseEnv.CVS_RESTIC_PASSWORD },
+        encoding: 'utf8',
+      });
+      expect(dump.status).toBe(0);
+      expect(dump.stdout.trimEnd() === line.trimEnd(), 'the snapshot holds the same BETTER_AUTH_SECRET line').toBe(true);
+    }
   });
 
   test('2. the drill passes; jobs and cost_entries are absent on both sides; scratch resources are removed', { timeout: 300_000 }, () => {
