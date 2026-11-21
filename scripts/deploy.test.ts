@@ -46,16 +46,19 @@ case "$n" in
   docker) case " $* " in *" ps -q "*) printf '%s' "\${STUB_PS_Q:-}" ;; esac ;;
   systemctl) case " $* " in *" is-active "*) exit "\${STUB_WEB_ACTIVE:-3}" ;; esac ;;
   git) case " $* " in *" remote get-url "*) printf '%s\\n' "\${STUB_GIT_REMOTE:-}" ;; *" rev-parse "*) printf '%s\\n' "\${STUB_GIT_HEAD:-}" ;; esac ;;
+  getent) exit "\${STUB_GETENT:-2}" ;;
+  runuser) exit "\${STUB_RUNUSER_EXIT:-0}" ;;
 esac
 exit 0
 `;
-const stubNames = ['id', 'stat', 'curl', 'docker', 'systemctl', 'loginctl', 'git', 'tar', 'xz', 'sha256sum', 'base64', 'mktemp', 'flock', 'cloudflared'];
+// The worker's user (getent ... chmod) is stubbed too, so no test creates a user or changes a file's owner on this machine.
+const stubNames = ['id', 'stat', 'curl', 'docker', 'systemctl', 'loginctl', 'git', 'tar', 'xz', 'sha256sum', 'base64', 'mktemp', 'flock', 'cloudflared', 'getent', 'useradd', 'userdel', 'runuser', 'chgrp', 'chmod'];
 const defaultRepo = 'git@github.com:Vet-Group/creative-video-studio.git';
 
 function sandbox(listen = 'LISTEN 0 4096 127.0.0.1:631 0.0.0.0:*\n', dotEnv = '') {
   const dir = fwd(mkdtempSync(join(tmpdir(), 'cvs-deploy-test-')));
   dirs.push(dir);
-  for (const d of ['creative-video-studio', 'home', 'stubs']) mkdirSync(join(dir, d));
+  for (const d of ['creative-video-studio', 'home', 'stubs', 'system']) mkdirSync(join(dir, d));
   const appDir = join(dir, 'creative-video-studio');
   writeFileSync(join(dir, 'listen.txt'), listen);
   writeFileSync(join(dir, 'deploy-key'), `-----BEGIN FAKE KEY-----\n${secrets.key}\n-----END FAKE KEY-----\n`);
@@ -73,14 +76,20 @@ function sandbox(listen = 'LISTEN 0 4096 127.0.0.1:631 0.0.0.0:*\n', dotEnv = ''
     CVS_APP_DIR: app,
     CVS_LISTEN_FILE: posix(dir) + '/listen.txt',
     CVS_DEPLOY_KEY: posix(dir) + '/deploy-key',
+    CVS_SYSTEM_UNIT_DIR: posix(join(dir, 'system')),
     CLOUDFLARE_API_TOKEN: secrets.token,
     CVS_RESTIC_PASSWORD: '',
     CVS_R2_REPOSITORY: '',
     CVS_R2_ACCESS_KEY_ID: '',
     CVS_R2_SECRET_ACCESS_KEY: '',
     S3_BUCKET: '',
+    // What the worker reads from elsewhere: only a test's .env sets them.
+    GOOGLE_APPLICATION_CREDENTIALS: '',
+    GOOGLE_APPLICATION_CREDENTIALS_NEXT: '',
+    REA_ANALYZE_ENABLED: '',
+    REA_VIDEO_BIN: '',
   };
-  const left = () => [...readdirSync(appDir), ...readdirSync(join(dir, 'home'))].filter((f) => f !== '.env');
+  const left = () => [...readdirSync(appDir), ...readdirSync(join(dir, 'home')), ...readdirSync(join(dir, 'system'))].filter((f) => f !== '.env');
   const calls = () => (existsSync(`${dir}/calls.log`) ? readFileSync(`${dir}/calls.log`, 'utf8') : '');
   const stdin = () => (existsSync(`${dir}/calls.log.stdin`) ? readFileSync(`${dir}/calls.log.stdin`, 'utf8') : '');
   const stateFile = join(appDir, 'install.state');
@@ -114,6 +123,16 @@ test('worker unit launches tsx directly so pnpm cannot turn a clean shutdown int
   expect(unit).not.toContain('SuccessExitStatus=');
 });
 
+test('worker unit runs as cvs-worker in a sandbox that can write only its /tmp and its state directory', () => {
+  const unit = readFileSync(join(root, 'deploy/linux/cvs-worker.service'), 'utf8');
+  const directives = unit.split('\n').filter((l) => /^[A-Z]\w+=/.test(l));
+  for (const d of ['User=cvs-worker', 'Group=cvs-worker', 'NoNewPrivileges=yes', 'ProtectSystem=strict', 'ProtectHome=yes', 'PrivateTmp=yes', 'StateDirectory=cvs-worker']) {
+    expect(directives).toContain(d);
+  }
+  expect(directives.filter((d) => /^(ReadWritePaths|ReadWriteDirectories|ProtectSystem|ProtectHome)=/.test(d))).toEqual(['ProtectSystem=strict', 'ProtectHome=yes']);
+  expect(directives).toContain('WantedBy=multi-user.target'); // a system unit
+});
+
 // Each case starts the script through Git Bash, which takes seconds on Windows.
 describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, () => {
   test.each([installSh, uninstallSh])('bash -n finds no syntax error in %s', (script) => {
@@ -138,6 +157,12 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     const steps = [
       'ports 3400 5435 9400 9401 are free',
       'git -C ' + s.app + ' init',
+      'useradd --system --user-group --home-dir /var/lib/cvs-worker --no-create-home --shell /usr/sbin/nologin cvs-worker',
+      'record user=cvs-worker',
+      `chgrp cvs-worker ${s.app}/.env`,
+      `chmod 640 ${s.app}/.env`,
+      `runuser -u cvs-worker -- test -r ${s.app}/.env`,
+      `runuser -u cvs-worker -- test -r ${s.app}/apps/worker/src/index.ts`,
       'download https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-',
       'SHASUMS256.txt',
       'pnpm install --frozen-lockfile',
@@ -148,11 +173,15 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
       'cloudflare POST /accounts/<account id>/cfd_tunnel',
       'cloudflare POST /zones/<zone id>/dns_records',
       '/.config/systemd/user/cvs-web.service',
-      '/.config/systemd/user/cvs-worker.service',
       '/.config/systemd/user/cvs-backup.timer',
       '/.config/systemd/user/cvs-drill.timer',
       '/.config/systemd/user/cvs-tunnel.service',
-      'systemctl --user enable --now cvs-web.service cvs-worker.service cvs-backup.timer cvs-drill.timer cvs-tunnel.service',
+      `write ${s.env.CVS_SYSTEM_UNIT_DIR}/cvs-worker.service:`,
+      'record system_unit=cvs-worker.service',
+      'systemctl --user enable --now cvs-web.service cvs-backup.timer cvs-drill.timer cvs-tunnel.service\n',
+      'systemctl daemon-reload',
+      'systemctl enable cvs-worker.service',
+      'systemctl restart cvs-worker.service',
     ];
     let at = -1;
     for (const step of steps) {
@@ -208,7 +237,8 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
   const fixture = (app: string, extra = '') =>
     [
       'unit=cvs-web.service',
-      'unit=cvs-worker.service',
+      'system_unit=cvs-worker.service',
+      'user=cvs-worker',
       'unit=cvs-backup.service',
       'unit=cvs-backup.timer',
       'unit=cvs-drill.service',
@@ -233,6 +263,9 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(units.length).toBeGreaterThan(7);
     expect(units.filter((u) => !u.startsWith('cvs-'))).toEqual([]);
     expect(r.out).toContain('systemctl --user disable --now cvs-web.service');
+    expect(r.out).toContain('[dry-run] systemctl disable --now cvs-worker.service\n');
+    expect(r.out).toContain(`[dry-run] rm -f ${s.env.CVS_SYSTEM_UNIT_DIR}/cvs-worker.service\n`);
+    expect(r.out).toContain('[dry-run] userdel cvs-worker\n');
     expect(r.out).toContain('[dry-run] docker compose -p creative-video-studio down\n');
     expect(r.out).not.toMatch(/(^|\s)(-v|--volumes|volume)(\s|$)/);
     expect(r.out.match(/docker compose -p (\S+)/g)).toEqual(['docker compose -p creative-video-studio']);
@@ -243,7 +276,7 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
   });
 
   test('c2. a state file naming a non-cvs unit, a foreign file or a bad id is refused before any command', () => {
-    for (const bad of ['unit=ideashub-web.service', 'unit=cvs-web.service; rm', 'file=/etc/passwd', 'tunnel_id=../../x', 'zone_id=not-hex']) {
+    for (const bad of ['unit=ideashub-web.service', 'unit=cvs-web.service; rm', 'system_unit=ssh.service', 'user=root', 'file=/etc/passwd', 'tunnel_id=../../x', 'zone_id=not-hex']) {
       const s = sandbox();
       writeFileSync(s.stateFile, fixture(s.app, bad));
       const r = run(uninstallSh, ['--dry-run'], s.env);
@@ -297,7 +330,7 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(r.out).not.toContain('cfd_tunnel');
     expect(r.out).not.toContain('cvs-tunnel');
     expect(r.out).not.toContain('tunnel_id');
-    expect(r.out).toContain('systemctl --user enable --now cvs-web.service cvs-worker.service cvs-backup.timer cvs-drill.timer\n');
+    expect(r.out).toContain('systemctl --user enable --now cvs-web.service cvs-backup.timer cvs-drill.timer\n');
   });
 
   const wouldFailLine = (r: { status: number | null; out: string }, reason: string) => {
@@ -464,8 +497,9 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(ok.out).toContain('held by this install');
     expect(own.calls()).toContain('docker compose -p creative-video-studio ps -q');
     expect(own.calls()).toContain('systemctl --user is-active --quiet cvs-web.service');
-    // An update restarts web and worker after the build, so they run the new code; a first install (test a) only enables them.
-    expect(ok.out).toContain('systemctl --user restart cvs-web.service cvs-worker.service');
+    // An update restarts web and worker after the build, so they run the new code; a first install (test a) only enables the web.
+    expect(ok.out).toContain('systemctl --user restart cvs-web.service\n');
+    expect(ok.out).toContain('systemctl restart cvs-worker.service\n');
     expect(run(installSh, ['--dry-run'], sandbox().env).out).not.toContain('systemctl --user restart');
 
     const stranger = sandbox(all);
@@ -478,18 +512,9 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(run(installSh, ['--dry-run'], { ...fresh.env, STUB_PS_Q: 'abc123', STUB_WEB_ACTIVE: '0' }).status).toBe(1);
   });
 
-  // A real update run with node, pnpm and git stubbed. cvs-web serves .next-live; .next and .next-older are older builds.
-  // The pnpm stub's build makes the directory Next would (CVS_DIST_DIR under apps/web) and then exits with STUB_BUILD_EXIT.
-  function realUpdate(buildExit: number) {
-    const s = sandbox(undefined, `CVS_RESTIC_PASSWORD=${secrets.restic}\n`);
-    const web = join(s.appDir, 'apps', 'web');
-    for (const d of ['.next', '.next-older', '.next-live']) {
-      mkdirSync(join(web, d), { recursive: true });
-      writeFileSync(join(web, d, 'BUILD_ID'), d);
-    }
-    const unitFile = join(s.dir, 'home', '.config', 'systemd', 'user', 'cvs-web.service');
-    mkdirSync(join(unitFile, '..'), { recursive: true });
-    writeFileSync(unitFile, 'Environment=CVS_DIST_DIR=.next-live\n');
+  // A real install run with node, pnpm and git stubbed. The pnpm stub's build makes the directory Next would (CVS_DIST_DIR under
+  // apps/web) and then exits with buildExit; every other pnpm command succeeds.
+  function realRun(s: ReturnType<typeof sandbox>, env: Record<string, string> = {}, buildExit = 0) {
     mkdirSync(join(s.appDir, 'node', 'bin'), { recursive: true });
     writeFileSync(join(s.appDir, 'node', 'bin', 'node'), '#!/usr/bin/env bash\necho v24.22.1\n', { mode: 0o755 });
     writeFileSync(join(s.appDir, 'package.json'), '{ "packageManager": "pnpm@12.14.0" }\n');
@@ -501,8 +526,22 @@ case "$*" in
 esac
 `;
     writeFileSync(join(s.dir, 'stubs', 'pnpm'), pnpm, { mode: 0o755 });
+    return run(installSh, [], { ...s.env, CLOUDFLARE_API_TOKEN: '', STUB_PS_Q: 'abc123', STUB_WEB_ACTIVE: '0', ...env });
+  }
+
+  // An update where cvs-web serves .next-live; .next and .next-older are older builds.
+  function realUpdate(buildExit: number) {
+    const s = sandbox(undefined, `CVS_RESTIC_PASSWORD=${secrets.restic}\n`);
+    const web = join(s.appDir, 'apps', 'web');
+    for (const d of ['.next', '.next-older', '.next-live']) {
+      mkdirSync(join(web, d), { recursive: true });
+      writeFileSync(join(web, d, 'BUILD_ID'), d);
+    }
+    const unitFile = join(s.dir, 'home', '.config', 'systemd', 'user', 'cvs-web.service');
+    mkdirSync(join(unitFile, '..'), { recursive: true });
+    writeFileSync(unitFile, 'Environment=CVS_DIST_DIR=.next-live\n');
     writeFileSync(s.stateFile, 'compose=creative-video-studio\n');
-    const r = run(installSh, [], { ...s.env, CLOUDFLARE_API_TOKEN: '', STUB_PS_Q: 'abc123', STUB_WEB_ACTIVE: '0', STUB_GIT_HEAD: 'abcd1234' });
+    const r = realRun(s, { STUB_GIT_HEAD: 'abcd1234' }, buildExit);
     const builds = () => readdirSync(web).sort();
     return { ...s, r, web, unit: () => readFileSync(unitFile, 'utf8'), builds };
   }
@@ -527,10 +566,75 @@ esac
     expect(u.builds()).toEqual([dist!, '.next-live'].sort());
     expect(readFileSync(join(u.web, '.next-live', 'BUILD_ID'), 'utf8')).toBe('.next-live');
     // Old builds go only after the restart moved cvs-web off them.
-    const restart = u.r.out.indexOf('==> systemctl --user restart cvs-web.service cvs-worker.service');
+    const restart = u.r.out.indexOf('==> systemctl --user restart cvs-web.service\n');
     expect(restart).toBeGreaterThan(-1);
     expect(u.r.out.indexOf(`==> rm -rf ${u.app}/apps/web/.next\n`)).toBeGreaterThan(restart);
     expect(u.r.out.indexOf(`==> rm -rf ${u.app}/apps/web/.next-older\n`)).toBeGreaterThan(restart);
+    // The worker (a system unit) restarts after the web's switch is done.
+    expect(u.r.out.indexOf('==> systemctl restart cvs-worker.service\n')).toBeGreaterThan(u.r.out.indexOf(`==> rm -rf ${u.app}/apps/web/.next-older\n`));
+  });
+
+  test('m. an update moves the root worker to the cvs-worker system unit once, and a re-run changes nothing more', () => {
+    const s = sandbox(undefined, `CVS_RESTIC_PASSWORD=${secrets.restic}\n`);
+    const oldUnit = join(s.dir, 'home', '.config', 'systemd', 'user', 'cvs-worker.service');
+    mkdirSync(join(oldUnit, '..'), { recursive: true });
+    writeFileSync(oldUnit, '[Service]\nExecStart=/bin/true\n');
+    writeFileSync(s.stateFile, 'compose=creative-video-studio\nunit=cvs-web.service\nunit=cvs-worker.service\n');
+    const first = realRun(s);
+    expect(first.status, first.out).toBe(0);
+    const calls = s.calls();
+    const order = [
+      'useradd --system --user-group --home-dir /var/lib/cvs-worker --no-create-home --shell /usr/sbin/nologin cvs-worker',
+      `chgrp cvs-worker ${s.app}/.env`,
+      `chmod 640 ${s.app}/.env`,
+      `runuser -u cvs-worker -- test -r ${s.app}/.env`,
+      'pnpm --filter @cvs/web build',
+      'systemctl --user restart cvs-web.service\n',
+      'systemctl --user disable --now cvs-worker.service', // the root worker drains before the new one starts, so two never run
+      'systemctl daemon-reload',
+      'systemctl enable cvs-worker.service',
+      'systemctl restart cvs-worker.service',
+    ];
+    let at = -1;
+    for (const step of order) {
+      const next = calls.indexOf(step, at + 1);
+      expect(next, `missing or out of order: ${step}`).toBeGreaterThan(at);
+      at = next;
+    }
+    expect(existsSync(oldUnit)).toBe(false);
+    const unit = readFileSync(join(s.dir, 'system', 'cvs-worker.service'), 'utf8');
+    expect(unit).toContain('User=cvs-worker');
+    expect(unit).toContain(`ExecStart=${s.app}/node/bin/node ${s.app}/apps/worker/node_modules/tsx/dist/cli.mjs`);
+    expect(s.state()).toEqual(expect.arrayContaining(['user=cvs-worker', 'system_unit=cvs-worker.service']));
+    expect(s.state()).not.toContain('unit=cvs-worker.service');
+
+    // Again, with the user there: nothing is created or stopped, the worker is restarted on the new code.
+    rmSync(`${s.dir}/calls.log`);
+    const again = realRun(s, { STUB_GETENT: '0' });
+    expect(again.status, again.out).toBe(0);
+    expect(s.calls()).not.toContain('useradd');
+    expect(s.calls()).not.toContain('disable --now');
+    expect(s.calls()).toContain('systemctl restart cvs-worker.service\n');
+    expect(s.state()!.filter((l) => l === 'user=cvs-worker')).toHaveLength(1);
+  });
+
+  test('m2. what the worker reads must be outside /root and /home and readable by cvs-worker, or nothing is built', () => {
+    const rootKey = run(installSh, ['--dry-run'], sandbox(undefined, 'GOOGLE_APPLICATION_CREDENTIALS=/root/keys/vertex.json\n').env);
+    wouldFailLine(rootKey, 'the worker reads /root/keys/vertex.json, which is under /root or /home');
+    const rea = run(installSh, ['--dry-run'], sandbox(undefined, 'REA_ANALYZE_ENABLED=1\nREA_VIDEO_BIN=/root/.local/bin/rea-video\n').env);
+    wouldFailLine(rea, "REA_ANALYZE_ENABLED=1 but /root/.local/bin/rea-video is not on the worker's PATH");
+    // A key path relative to the app directory is where the worker (WorkingDirectory=<app>) looks for it.
+    const s = sandbox(undefined, 'GOOGLE_APPLICATION_CREDENTIALS=keys/vertex.json\n');
+    const ok = run(installSh, ['--dry-run'], s.env);
+    expect(ok.status, ok.out).toBe(0);
+    expect(ok.out).toContain(`[dry-run] runuser -u cvs-worker -- test -r ${s.app}/keys/vertex.json\n`);
+
+    const unreadable = sandbox(undefined, `CVS_RESTIC_PASSWORD=${secrets.restic}\n`);
+    const r = realRun(unreadable, { STUB_RUNUSER_EXIT: '1' });
+    expect(r.status).toBe(1);
+    expect(r.out).toContain(`error: cvs-worker cannot read ${unreadable.app}/.env; move it first`);
+    expect(unreadable.calls()).not.toContain('pnpm --filter @cvs/web build');
+    expect(unreadable.calls()).not.toContain('systemctl');
   });
 
   test('k. real uninstall: the token goes over stdin only, state lines go as their resources go, compose keeps the volumes', () => {
@@ -548,6 +652,8 @@ esac
     expect(s.calls()).toContain('curl --config - --silent --show-error --max-time 30 --output /dev/null --write-out %{http_code} --request DELETE https://api.cloudflare.com/client/v4/zones/');
     expect(s.calls()).toContain('docker compose -p creative-video-studio down\n');
     expect(s.calls()).not.toMatch(/docker[^\n]*(\s-v\b|--volumes)/);
+    expect(s.calls()).toContain('systemctl disable --now cvs-worker.service\n');
+    expect(s.calls()).toContain('userdel cvs-worker\n');
     expect(s.state()).toBeNull();
   });
 

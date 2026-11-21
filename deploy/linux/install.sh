@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # Usage: install.sh [--dry-run]
-# Installs Creative Video Studio on the VET host as root user units (docs/ops/deploy.md). Modelled on Ideas Hub's install-units.sh.
+# Installs Creative Video Studio on the VET host as root user units, and the worker as a system unit running as the user
+# cvs-worker (docs/ops/deploy.md). Modelled on Ideas Hub's install-units.sh.
 #   --dry-run  print every command and file it would write, change nothing, exit 0 when the preconditions pass.
 #              A failing precondition prints "[dry-run] would fail: <reason>" and exits 1.
-# Steps: check the preconditions (root, tools, deploy key, .env mode 600), refuse if a port is taken, clone/update the repo
-# with a read-only deploy key, install the pinned Node, build, start the compose project, migrate, install and enable the
-# cvs-* units, and (with CLOUDFLARE_API_TOKEN) create the tunnel and its DNS record. Everything it creates is recorded in
+# Steps: check the preconditions (root, tools, deploy key, .env mode 600 or 640), refuse if a port is taken, clone/update the repo
+# with a read-only deploy key, create the worker's user and check what it reads, install the pinned Node, build, start the
+# compose project, migrate, install and enable the cvs-* units, and (with CLOUDFLARE_API_TOKEN) create the tunnel and its DNS record. Everything it creates is recorded in
 # <app>/install.state so uninstall.sh can undo exactly that. With a state file present the run is an update: ports held by
 # this install's own compose project and cvs-web are not "taken", and a recorded tunnel is kept.
 # Env (defaults): CVS_APP_DIR (/opt/creative-video-studio; absolute, last part creative-video-studio), CVS_REPO_URL (the GitHub
 # SSH URL; no user or password in an https URL), CVS_REPO_REF (main), CVS_DEPLOY_KEY (~/.ssh/cvs_deploy_ed25519, the key install-gate-key.sh made), CVS_HOSTNAME
 # (video.vetgroup.net), CVS_ZONE (vetgroup.net), CLOUDFLARE_API_TOKEN, CVS_STATE_DIR (~/.local/state/creative-video-studio;
 # holds ops.lock, shared with cvs-backup), CVS_ROOT_HOME (/root; HOME is forced to it so `systemctl --user` and
-# ~/.config/systemd/user agree), CVS_LISTEN_FILE (a file in `ss -ltnH` format that replaces running ss; for tests).
+# ~/.config/systemd/user agree), CVS_LISTEN_FILE (a file in `ss -ltnH` format that replaces running ss; for tests),
+# CVS_SYSTEM_UNIT_DIR (/etc/systemd/system; for tests).
 # Values missing from the environment are read from <app>/.env (CLOUDFLARE_API_TOKEN, S3_BUCKET, CVS_RESTIC_PASSWORD,
 # CVS_R2_*). Secret values are never printed, and the Cloudflare/R2/restic ones are not passed to pnpm.
 set -euo pipefail
@@ -42,6 +44,7 @@ public_host="${CVS_HOSTNAME:-video.vetgroup.net}"
 zone="${CVS_ZONE:-vetgroup.net}"
 state_file="$app/install.state"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+system_unit_dir="${CVS_SYSTEM_UNIT_DIR:-/etc/systemd/system}"
 backup_env="$HOME/.config/creative-video-studio/backup.env"
 ops_state="${CVS_STATE_DIR:-$HOME/.local/state/creative-video-studio}"
 node_dir="$app/node"
@@ -73,11 +76,12 @@ record() { # $1 = key=value, kept once in the state file
 [[ $app == /* && $app != *..* && "$(basename "$app")" == "$project" ]] || fail "CVS_APP_DIR must be an absolute path ending in /$project"
 
 # 1. Preconditions. All of them only read, so a dry run checks them too.
-[ "$(id -u)" = 0 ] || precheck "not root: the units are root user units"
-for c in git docker curl tar xz sha256sum systemctl loginctl base64 mktemp flock; do command -v "$c" > /dev/null || precheck "$c is not installed"; done
+[ "$(id -u)" = 0 ] || precheck "not root: the units are root user units and a system unit"
+for c in git docker curl tar xz sha256sum systemctl loginctl base64 mktemp flock getent useradd runuser; do command -v "$c" > /dev/null || precheck "$c is not installed"; done
 [ -r "$deploy_key" ] || precheck "deploy key $deploy_key is not readable (set CVS_DEPLOY_KEY)"
 [ -f "$app/.env" ] || precheck "$app/.env is missing; copy .env.example to it and fill it first"
-[ "$(stat -c %a "$app/.env")" = 600 ] || precheck "$app/.env must be mode 600 (it holds secrets)"
+# 640 once step 4b gave the worker's group read access.
+[[ "$(stat -c %a "$app/.env")" =~ ^6[04]0$ ]] || precheck "$app/.env must be mode 600 or 640 (it holds secrets)"
 # A checkout of another repository in the app directory is never touched. The same repository over anonymous HTTPS is
 # accepted: the repo is public, so a host without a GitHub deploy key can still fetch it.
 if [ -d "$app/.git" ]; then
@@ -160,6 +164,38 @@ fi
 
 units_src="$app/deploy/linux"
 [ -f "$units_src/cvs-web.service" ] || units_src="$here"
+
+# 4b. The worker's own system user (Fable audit 2026-11-20, security #6): the worker feeds uploaded media to ffmpeg and rea-video,
+# so it runs as cvs-worker in a sandbox, not as root, and reads .env through its group. What it reads is checked as that user now,
+# before anything is built: its sandbox also hides /root and /home (ProtectHome), where root may have put rea-video or a Vertex key.
+worker_path="$node_dir/bin:/usr/local/bin:/usr/bin:/bin" # the unit's PATH
+outside=() # what it reads from elsewhere on the host
+for v in GOOGLE_APPLICATION_CREDENTIALS GOOGLE_APPLICATION_CREDENTIALS_NEXT; do
+  case "${!v:-}" in "") ;; /*) outside+=("${!v}") ;; *) outside+=("$app/${!v}") ;; esac # relative to the worker's directory
+done
+rea=""
+if [ "${REA_ANALYZE_ENABLED:-}" = 1 ]; then
+  rea="$(PATH="$worker_path" command -v "${REA_VIDEO_BIN:-rea-video}" || true)"
+  [ -n "$rea" ] || precheck "REA_ANALYZE_ENABLED=1 but ${REA_VIDEO_BIN:-rea-video} is not on the worker's PATH ($worker_path)"
+  outside+=("$rea")
+fi
+moved="move it first (docs/ops/deploy.md, \"The worker's user\"); nothing was built or restarted"
+for f in "${outside[@]}"; do
+  case "$(readlink -f "$f" || printf '%s' "$f")" in /root/* | /home/*) precheck "the worker reads $f, which is under /root or /home, hidden from it; $moved" ;; esac
+done
+if ! getent passwd cvs-worker > /dev/null; then
+  run useradd --system --user-group --home-dir /var/lib/cvs-worker --no-create-home --shell /usr/sbin/nologin cvs-worker
+  record "user=cvs-worker"
+fi
+run chgrp cvs-worker "$app/.env"
+run chmod 640 "$app/.env"
+for f in "$app/.env" "$app/apps/worker/src/index.ts" "${outside[@]}"; do
+  run runuser -u cvs-worker -- test -r "$f" || fail "cvs-worker cannot read $f; $moved"
+done
+if [ -n "$rea" ]; then
+  say "checking that cvs-worker can run $rea"
+  run runuser -u cvs-worker -- env PATH="$worker_path" "$rea" --help > /dev/null || fail "cvs-worker cannot run $rea; $moved"
+fi
 
 # 5. Pinned Node.
 case "$(uname -m)" in
@@ -244,8 +280,8 @@ for v in CVS_R2_REPOSITORY CVS_R2_ACCESS_KEY_ID CVS_R2_SECRET_ACCESS_KEY; do
   if [ -f "$backup_env" ]; then grep -q "^$v=." "$backup_env" || r2=0; elif [ -z "${!v:-}" ]; then r2=0; fi
 done
 
-units=(cvs-web.service cvs-worker.service cvs-backup.service cvs-backup.timer cvs-drill.service cvs-drill.timer)
-enable=(cvs-web.service cvs-worker.service cvs-backup.timer cvs-drill.timer)
+units=(cvs-web.service cvs-backup.service cvs-backup.timer cvs-drill.service cvs-drill.timer)
+enable=(cvs-web.service cvs-backup.timer cvs-drill.timer)
 if [ "$r2" = 1 ]; then
   units+=(cvs-backup-weekly.service cvs-backup-weekly.timer)
   enable+=(cvs-backup-weekly.timer)
@@ -322,17 +358,20 @@ else
   enable+=(cvs-tunnel.service)
 fi
 
-# 9. Units. The backup units name /opt/creative-video-studio; it is rewritten when CVS_APP_DIR differs.
+# 9. Units. The backup units name /opt/creative-video-studio; it is rewritten when CVS_APP_DIR differs. The worker is a system
+# unit (a unit in root's user manager cannot set User=), recorded as system_unit=.
 run mkdir -p "$unit_dir"
-for name in "${units[@]}"; do
+for name in "${units[@]}" cvs-worker.service; do
+  dir="$unit_dir" key=unit
+  if [ "$name" = cvs-worker.service ]; then dir="$system_unit_dir" key=system_unit; fi
   filled="$(sed -e "s|@APP@|$app|g" -e "s|/opt/creative-video-studio|$app|g" -e "s|@CLOUDFLARED@|${cloudflared_bin:-/usr/bin/cloudflared}|g" -e "s|@DIST@|$dist|g" "$units_src/$name")"
   if [ "$dry" = 1 ]; then
-    printf '[dry-run] write %s/%s:\n%s\n\n' "$unit_dir" "$name" "$filled"
+    printf '[dry-run] write %s/%s:\n%s\n\n' "$dir" "$name" "$filled"
   else
-    printf '%s\n' "$filled" > "$unit_dir/$name"
-    say "==> wrote $unit_dir/$name"
+    printf '%s\n' "$filled" > "$dir/$name"
+    say "==> wrote $dir/$name"
   fi
-  record "unit=$name"
+  record "$key=$name"
 done
 if [ "$(loginctl show-user "$(id -un)" -p Linger --value 2> /dev/null || true)" != yes ]; then
   run loginctl enable-linger "$(id -un)"
@@ -340,9 +379,20 @@ fi
 run systemctl --user daemon-reload
 run systemctl --user enable --now "${enable[@]}"
 # enable --now leaves a unit that is already running on its old code, so an update restarts the app units after the new build.
-if [ ${#own[@]} -gt 0 ]; then run systemctl --user restart cvs-web.service cvs-worker.service; fi
+if [ ${#own[@]} -gt 0 ]; then run systemctl --user restart cvs-web.service; fi
 # cvs-web now runs the new build: older ones go, except the previous one (a rollback, docs/ops/deploy.md).
 for d in "$app"/apps/web/.next "$app"/apps/web/.next-*; do
   case "$(basename "$d")" in "$dist" | "${prev_dist:-.next}") ;; *) if [ -d "$d" ]; then run rm -rf "$d"; fi ;; esac
 done
+# The worker of earlier installs, a root user unit: stopping it lets its provider calls finish first, like a restart (TimeoutStopSec).
+if [ -f "$unit_dir/cvs-worker.service" ]; then
+  run systemctl --user disable --now cvs-worker.service || fail "the root worker did not stop; the new one is not started, so two never run: run install.sh again"
+  run rm -f "$unit_dir/cvs-worker.service"
+  run systemctl --user daemon-reload
+  if [ "$dry" = 0 ]; then sed -i '/^unit=cvs-worker\.service$/d' "$state_file"; fi
+fi
+run systemctl daemon-reload
+run systemctl enable cvs-worker.service
+# restart also starts a stopped worker, so a first install, an update and the move off root all end with the new code running.
+run systemctl restart cvs-worker.service
 say "done. State: $state_file; undo with $here/uninstall.sh"

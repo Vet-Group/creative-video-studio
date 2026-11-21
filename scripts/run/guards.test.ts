@@ -137,6 +137,12 @@ describe('provision-vet-env.sh (D.5 owner step)', () => {
   test('the remote step runs the same awk file', () => {
     expect(readFileSync(join(ROOT, 'scripts/run/provision-vet-env.sh'), 'utf8')).toContain('keep-vet-values.awk');
   });
+
+  test('the remote step keeps the worker group read access to .env once that group exists, and never makes it world-readable', () => {
+    const src = readFileSync(join(ROOT, 'scripts/run/provision-vet-env.sh'), 'utf8');
+    expect(src).toContain('if getent group cvs-worker > /dev/null; then chgrp cvs-worker $APP/.env.new && chmod 640 $APP/.env.new; else chmod 600 $APP/.env.new; fi');
+    expect(src).not.toMatch(/chmod [0-7]{2}[1-7]\b/);
+  });
 });
 
 const pwsh = spawnSync('pwsh', ['-NoProfile', '-Command', 'exit 0']).status === 0;

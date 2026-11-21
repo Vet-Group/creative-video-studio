@@ -1,10 +1,14 @@
-# Creative Video Studio worker, a root user unit. install.sh fills @APP@.
+# Creative Video Studio worker. It feeds uploaded media to ffmpeg, ffprobe and rea-video, so it runs as the unprivileged system
+# user cvs-worker in a sandbox, not as root (Fable audit 2026-11-20, security #6). A system unit, because a unit in root's user
+# manager cannot set User=. install.sh fills @APP@, creates the user and writes this to /etc/systemd/system.
 # Run tsx directly: pnpm can report a failed task after a clean worker shutdown.
-# The worker reads <app>/.env itself (DATABASE_URL and the S3 settings).
+# The worker reads <app>/.env itself (DATABASE_URL and the S3 settings): install.sh makes it root:cvs-worker, mode 640.
 [Unit]
 Description=Creative Video Studio worker
 
 [Service]
+User=cvs-worker
+Group=cvs-worker
 WorkingDirectory=@APP@
 Environment=PATH=@APP@/node/bin:/usr/local/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
@@ -17,6 +21,13 @@ TimeoutStopSec=1500
 # on top of the Node worker, so this is 2G, not the 768M the rest of the worker needs. The box has 31 GB and
 # runs only CVS (docs/ops/production.md).
 MemoryMax=2G
+# Sandbox: everything is read-only except its own /tmp (all its job files) and /var/lib/cvs-worker, its HOME (rea-video's model
+# cache). /root and /home are hidden, so what it reads (rea-video, the Vertex keys) must live elsewhere (docs/ops/deploy.md).
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+StateDirectory=cvs-worker
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target

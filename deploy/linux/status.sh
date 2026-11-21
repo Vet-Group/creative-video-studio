@@ -10,6 +10,7 @@ echo "commit $(git -C "$app" rev-parse --short HEAD 2> /dev/null || echo '?')"
 dist="$(sed -n 's/^Environment=CVS_DIST_DIR=//p' "$HOME/.config/systemd/user/cvs-web.service" 2> /dev/null)"
 echo "web build ${dist:-.next}; on disk: $(find "$app/apps/web" -maxdepth 1 -type d -name '.next*' -printf '%f ' 2> /dev/null)"
 systemctl --user list-units 'cvs-*' --all --no-pager --plain --no-legend
+systemctl list-units 'cvs-*' --all --no-pager --plain --no-legend # cvs-worker, a system unit running as cvs-worker
 (cd "$app" && docker compose -p creative-video-studio ps --format '{{.Name}}\t{{.Status}}')
 curl -s -o /dev/null -m 15 -w 'https://video.vetgroup.net/privacy %{http_code}\n' https://video.vetgroup.net/privacy
 tail -n 1 "$HOME/.local/state/creative-video-studio/backup.log" 2> /dev/null || echo 'no backup log yet'
