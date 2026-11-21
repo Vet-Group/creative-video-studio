@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-21T12:02:00+07:00',
+  at: '2026-11-21T13:45:00+07:00',
   kind: 'new',
   title: 'Tạo ảnh: chọn 2 hoặc 4 ảnh một lượt',
   details: [
