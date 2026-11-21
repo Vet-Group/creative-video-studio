@@ -159,7 +159,8 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
       'git -C ' + s.app + ' init',
       'useradd --system --user-group --home-dir /var/lib/cvs-worker --no-create-home --shell /usr/sbin/nologin cvs-worker',
       'record user=cvs-worker',
-      `chgrp cvs-worker ${s.app}/.env`,
+      `chgrp cvs-worker ${s.app} ${s.app}/.env`,
+      `chmod 750 ${s.app}\n`,
       `chmod 640 ${s.app}/.env`,
       `runuser -u cvs-worker -- test -r ${s.app}/.env`,
       `runuser -u cvs-worker -- test -r ${s.app}/apps/worker/src/index.ts`,
@@ -585,9 +586,11 @@ esac
     const calls = s.calls();
     const order = [
       'useradd --system --user-group --home-dir /var/lib/cvs-worker --no-create-home --shell /usr/sbin/nologin cvs-worker',
-      `chgrp cvs-worker ${s.app}/.env`,
+      `chgrp cvs-worker ${s.app} ${s.app}/.env`,
+      `chmod 750 ${s.app}\n`,
       `chmod 640 ${s.app}/.env`,
       `runuser -u cvs-worker -- test -r ${s.app}/.env`,
+      `runuser -u cvs-worker -- test -x ${s.app}/node/bin/node`, // an earlier run's Node
       'pnpm --filter @cvs/web build',
       'systemctl --user restart cvs-web.service\n',
       'systemctl --user disable --now cvs-worker.service', // the root worker drains before the new one starts, so two never run
@@ -632,7 +635,7 @@ esac
     const unreadable = sandbox(undefined, `CVS_RESTIC_PASSWORD=${secrets.restic}\n`);
     const r = realRun(unreadable, { STUB_RUNUSER_EXIT: '1' });
     expect(r.status).toBe(1);
-    expect(r.out).toContain(`error: cvs-worker cannot read ${unreadable.app}/.env; move it first`);
+    expect(r.out).toContain(`error: cvs-worker cannot read ${unreadable.app}/.env; check its mode`);
     expect(unreadable.calls()).not.toContain('pnpm --filter @cvs/web build');
     expect(unreadable.calls()).not.toContain('systemctl');
   });

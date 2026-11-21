@@ -18,6 +18,9 @@
 # Values missing from the environment are read from <app>/.env (CLOUDFLARE_API_TOKEN, S3_BUCKET, CVS_RESTIC_PASSWORD,
 # CVS_R2_*). Secret values are never printed, and the Cloudflare/R2/restic ones are not passed to pnpm.
 set -euo pipefail
+# The checkout, Node and the build must be readable by the worker's user whatever umask the caller (the gate's ssh session) has;
+# the secret files below are still written under umask 077.
+umask 022
 
 # Node pinned to an exact version inside the root package.json "engines" range. The tarball's sha256 is checked against
 # SHASUMS256.txt from the same nodejs.org release directory.
@@ -187,14 +190,19 @@ if ! getent passwd cvs-worker > /dev/null; then
   run useradd --system --user-group --home-dir /var/lib/cvs-worker --no-create-home --shell /usr/sbin/nologin cvs-worker
   record "user=cvs-worker"
 fi
-run chgrp cvs-worker "$app/.env"
+# provision-vet-env.sh makes the app directory under umask 077 (mode 700): the worker's group may enter it, others still may not.
+run chgrp cvs-worker "$app" "$app/.env"
+run chmod 750 "$app"
 run chmod 640 "$app/.env"
+modes="check its mode and its directories' (docs/ops/deploy.md, \"The worker's user\"); nothing was built or restarted"
 for f in "$app/.env" "$app/apps/worker/src/index.ts" "${outside[@]}"; do
-  run runuser -u cvs-worker -- test -r "$f" || fail "cvs-worker cannot read $f; $moved"
+  run runuser -u cvs-worker -- test -r "$f" || fail "cvs-worker cannot read $f; $modes"
 done
+# A Node installed by an earlier run is kept, so it is checked too; a new one is unpacked under the umask above.
+if [ -e "$node_dir/bin/node" ]; then run runuser -u cvs-worker -- test -x "$node_dir/bin/node" || fail "cvs-worker cannot run $node_dir/bin/node; $modes"; fi
 if [ -n "$rea" ]; then
   say "checking that cvs-worker can run $rea"
-  run runuser -u cvs-worker -- env PATH="$worker_path" "$rea" --help > /dev/null || fail "cvs-worker cannot run $rea; $moved"
+  run runuser -u cvs-worker -- env PATH="$worker_path" "$rea" --help > /dev/null || fail "cvs-worker cannot run $rea; $modes"
 fi
 
 # 5. Pinned Node.

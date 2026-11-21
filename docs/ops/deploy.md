@@ -73,9 +73,11 @@ without it they stay on fal (`FAL_KEY`). After adding or removing the key, resta
    used; its content is never read or printed. A detached checkout (what the gate's `deploy <commit>` leaves) keeps its commit:
    only a checkout on a branch is fetched and fast-forwarded. The gate runs the installer of the commit it deploys, so a rollback
    to a commit older than this rule still fast-forwards to the tip of `main`.
-   Then it creates the system user `cvs-worker` when it is missing, makes `.env` `root:cvs-worker` mode 640, and checks as that
-   user that it can read `.env`, the worker's code, the Vertex keys (`GOOGLE_APPLICATION_CREDENTIALS`, `..._NEXT`) and, with
-   `REA_ANALYZE_ENABLED=1`, run `rea-video --help`; a key or `rea-video` under `/root` or `/home` is refused too. Any of these
+   Then it creates the system user `cvs-worker` when it is missing, makes the app directory `root:cvs-worker` mode 750 and `.env`
+   `root:cvs-worker` mode 640, and checks as that user that it can read `.env`, the worker's code, the Vertex keys
+   (`GOOGLE_APPLICATION_CREDENTIALS`, `..._NEXT`), run an already installed Node and, with `REA_ANALYZE_ENABLED=1`, run
+   `rea-video --help`; a key or `rea-video` under `/root` or `/home` is refused too. The script runs under `umask 022` (secret
+   files still under 077), so what it creates is readable by the worker whatever umask the gate's session has. Any of these
    stops the run before the build (see [The worker's user](#the-workers-user)).
 3. Installs the pinned Node (**24.22.1**, inside the root `engines` range) into `/opt/creative-video-studio/node`. The tarball is
    downloaded from `https://nodejs.org/dist/v24.22.1/` and checked with `sha256sum -c` against that release's `SHASUMS256.txt`.
@@ -152,7 +154,8 @@ host (Fable audit 2026-11-20, security #6). It runs as the system user `cvs-work
 under `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=yes` and `PrivateTmp=yes`: everything is read-only for it except
 its own `/tmp` (all its job files) and `/var/lib/cvs-worker` (`StateDirectory=`, systemd creates it owned by the user; `rea-video`
 keeps its downloaded models there), and `/root` and `/home` are hidden. It reads `.env` through its group (`root:cvs-worker`, mode
-640, not world-readable); `provision-vet-env.sh` keeps that group and mode when it rewrites the file.
+640, not world-readable); `provision-vet-env.sh` keeps that group and mode when it rewrites the file. The app directory, which
+`provision-vet-env.sh` creates with mode 700, becomes `root:cvs-worker` mode 750, so the worker may enter it and other users still may not.
 
 Why a system unit: a unit in root's user manager cannot set `User=`. The other choice, a user manager of its own for `cvs-worker`
 with lingering, would need a home and its own `systemctl --user -M cvs-worker@` handling, and its sandbox options depend on
@@ -192,8 +195,8 @@ echo unit=cvs-worker.service >> /opt/creative-video-studio/install.state
 ```
 
 Then deploy only commits before this change (their `install.sh` writes the root unit again), or the next deploy moves the worker back
-to `cvs-worker`. Optionally `chmod 600 /opt/creative-video-studio/.env` and `chgrp root` it; the user can stay (`userdel cvs-worker`
-removes it).
+to `cvs-worker`. Optionally give `/opt/creative-video-studio` (750) and its `.env` (640) back to group `root` and `.env` mode 600;
+the user can stay (`userdel cvs-worker` removes it).
 
 ## Status
 
