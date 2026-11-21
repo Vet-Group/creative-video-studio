@@ -24,6 +24,7 @@ test('Ctrl+K opens the command palette on Windows and Linux, Cmd+K on a Mac, wit
   expect(isPaletteShortcut(key('k'), false)).toBe(false);
   expect(isPaletteShortcut(key('k', { ctrlKey: true, shiftKey: true }), false)).toBe(false);
   expect(isPaletteShortcut(key('k', { ctrlKey: true, altKey: true }), false)).toBe(false);
+  expect(isPaletteShortcut({ ...key('k', { ctrlKey: true }), key: undefined as unknown as string }, false)).toBe(false); // autofill's keydown has no key
 });
 
 test('the groups keep the order users know, and only an Admin gets the admin group, last', () => {

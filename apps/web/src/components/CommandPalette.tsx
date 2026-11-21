@@ -32,7 +32,8 @@ function remember(href: string) {
   } catch {}
 }
 
-const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
+const TIME = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' });
+const fmtTime = (iso: string) => TIME.format(new Date(iso));
 
 /** What a key pressed in the box does: ↑/↓ move the active option (round the ends), Enter opens it, Ctrl/⌘+Enter in a new tab; null leaves the key to the box. */
 export function paletteKey(e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey'>, active: number, count: number): { active: number } | { open: 'here' | 'tab' } | null {
@@ -77,7 +78,8 @@ export function CommandPalette({ open, onClose, pages, mac }: { open: boolean; o
   // A page or app opened goes on the recent list; a job is already on its own.
   const opened = (item: PaletteItem) => !jobItems.includes(item) && remember(item.href);
   function onKey(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.nativeEvent.isComposing) return; // Enter that ends a word typed with an input method (Vietnamese on a Mac) opens nothing
+    // Enter that ends a word typed with an input method (Vietnamese on a Mac) opens nothing; Safari ends the word first, so only its keyCode 229 tells.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     const r = paletteKey(e, at, flat.length);
     if (!r) return;
     e.preventDefault();
@@ -99,7 +101,7 @@ export function CommandPalette({ open, onClose, pages, mac }: { open: boolean; o
           type="text"
           role="combobox"
           aria-label="Tìm trang, ứng dụng hoặc lượt tạo"
-          aria-expanded="true"
+          aria-expanded={flat.length > 0}
           aria-controls={`${id}-list`}
           aria-autocomplete="list"
           aria-activedescendant={flat.length > 0 ? optionId(at) : undefined}
@@ -122,7 +124,7 @@ export function CommandPalette({ open, onClose, pages, mac }: { open: boolean; o
               const i = n++;
               return (
                 // A click with Ctrl, ⌘ or Shift is the browser's: a new tab or window, the palette stays open.
-                <Link key={i} id={optionId(i)} href={item.href} role="option" aria-selected={i === at} tabIndex={-1} onMouseMove={() => i !== at && setActive(i)} onClick={(e) => (opened(item), !(e.ctrlKey || e.metaKey || e.shiftKey) && onClose())}>
+                <Link key={i} id={optionId(i)} href={item.href} prefetch={false} role="option" aria-selected={i === at} tabIndex={-1} onMouseMove={() => i !== at && setActive(i)} onClick={(e) => (opened(item), !(e.ctrlKey || e.metaKey || e.shiftKey) && onClose())}>
                   <Icon name={item.icon} size={16} />
                   <span className="palette-text">
                     <span>{item.name}</span>
@@ -134,11 +136,10 @@ export function CommandPalette({ open, onClose, pages, mac }: { open: boolean; o
           </div>
         ))}
       </div>
-      {flat.length === 0 && (
-        <p className="palette-empty" role="status">
-          Không tìm thấy “{query.trim()}”. Thử tên một trang hoặc ứng dụng, như “thư viện” hay “đổi nền”.
-        </p>
-      )}
+      {/* Always there, so a screen reader announces the text when nothing matches. */}
+      <p className="palette-empty" role="status">
+        {flat.length === 0 && `Không tìm thấy “${query.trim()}”. Thử tên một trang hoặc ứng dụng, như “thư viện” hay “đổi nền”.`}
+      </p>
       <p className="palette-keys" aria-hidden="true">
         <kbd>↑</kbd> <kbd>↓</kbd> chọn · <kbd>Enter</kbd> mở · <kbd>{mac ? '⌘' : 'Ctrl'}</kbd>+<kbd>Enter</kbd> mở ở tab mới · <kbd>Esc</kbd> đóng
       </p>

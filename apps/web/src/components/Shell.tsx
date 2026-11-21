@@ -830,7 +830,9 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
     const onKey = (e: KeyboardEvent) => {
       if (isPaletteShortcut(e, isMac())) {
         e.preventDefault(); // not the browser's own search box
-        if (!document.querySelector('dialog[open]:not(.palette)')) setPalette((p) => !p); // over another dialog it would leave that one open behind the page it opens
+        if (e.repeat || document.querySelector('dialog[open]:not(.palette)')) return; // held down it would flicker; over another dialog it would leave that one open behind the page it opens
+        setOpen(false); // the phone drawer, as the sidebar row does
+        setPalette((p) => !p);
         return;
       }
       if (!isSettingsShortcut(e, isMac()) || document.querySelector('dialog[open]')) return;

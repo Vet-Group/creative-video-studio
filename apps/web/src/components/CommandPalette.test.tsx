@@ -33,6 +33,8 @@ test('the box is a combobox over a listbox of options whose first is active, gro
   const activeId = html.match(/aria-activedescendant="([^"]+)"/)![1];
   expect(html).toContain(`<a id="${activeId}" role="option" aria-selected="true" tabindex="-1" href="/explore">`); // out of the tab order: the box keeps the focus
   expect(html.match(/aria-selected="true"/g)).toHaveLength(1);
+  expect(html).toMatch(/role="combobox"[^>]*aria-expanded="true"/);
+  expect(html).toContain('<p class="palette-empty" role="status"></p>'); // the live region is there, empty while there are results
   expect([...html.matchAll(/class="palette-group"[^>]*>([^<]+)</g)].map((m) => m[1])).toEqual(['Trang', 'Ứng dụng', 'Lượt tạo gần đây']);
   // A finished job opens in the Library, a failed one on its page, as the tray's links do; the member's words are shown.
   expect(html).toContain('href="/library?item=j1"');

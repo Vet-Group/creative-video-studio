@@ -2696,6 +2696,7 @@ dialog.modal.palette { width: min(40rem, calc(100vw - 2rem)); max-height: min(34
 .palette-text { display: grid; min-width: 0; font-weight: 500; }
 .palette-desc { overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .palette-empty { margin: 0; padding: 16px 20px 20px; color: var(--text-muted); font-size: 14px; line-height: 20px; }
+.palette-empty:empty { padding: 0; } /* the live region stays, with no room, while there are results */
 .palette-keys { margin: 0; padding: 8px 16px; border-top: 1px solid var(--divider); color: var(--text-muted); font-size: 12px; line-height: 16px; }
 .palette-keys kbd { font-family: inherit; color: var(--ink); }
 @media (pointer: coarse) {
