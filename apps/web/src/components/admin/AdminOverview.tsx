@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { LoadError } from '@/components/LoadError';
-import { auditLabel, auditTarget, groupRecent, useFetch } from '@/lib/admin-ui';
+import { auditLabel, auditTarget, groupRecent, sellerUse, useFetch } from '@/lib/admin-ui';
 import { NO_CAP } from '@/lib/caps';
 import type { AdminOverview as Data } from '@/lib/overview';
 import { AdminRatings } from './AdminRatings';
@@ -39,6 +39,44 @@ export function Budget({ title, used, cap }: { title: string; used: string; cap:
         {Number(cap) === 0 ? 'Đang khoá (ngân sách 0)' : `Đã dùng ${Math.round(share * 100)}% · còn ${usd(String(Math.max(Number(cap) - Number(used), 0)))}`}
       </p>
     </div>
+  );
+}
+
+/** Each sales-team member and when they last used CVS, so the Admin sees who has not started or has stopped. */
+function Sellers({ sellers }: { sellers: Data['sellers'] }) {
+  if (sellers.length === 0) return null;
+  const rows = sellers.map((s) => ({ ...s, use: sellerUse(s.lastUsedAt, s.lastSeenAt) }));
+  const never = rows.filter((r) => !r.lastUsedAt && !r.lastSeenAt).length;
+  return (
+    <section className="panel" aria-labelledby="sellers-title">
+      <div className="panel-head">
+        <h2 id="sellers-title">Người bán dùng CVS</h2>
+        <Link href="/admin/report">Xem báo cáo tuần</Link>
+      </div>
+      <p className="muted">
+        {rows.filter((r) => !r.use.idle).length}/{rows.length} người bán đã dùng trong 14 ngày qua{never > 0 && ` · ${never} người chưa thấy đăng nhập lần nào`}.
+      </p>
+      <div className="table-wrap" role="region" aria-label="Bảng người bán và lần dùng gần nhất" tabIndex={0}>
+        <table className="jobs">
+          <thead>
+            <tr>
+              <th scope="col">Team</th>
+              <th scope="col">Người bán</th>
+              <th scope="col">Lần dùng gần nhất</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} data-idle={r.use.idle}>
+                <td>{r.team}</td>
+                <td>{r.name}</td>
+                <td title={r.lastUsedAt ? fmtTime(r.lastUsedAt) : undefined}>{r.use.text}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -113,6 +151,7 @@ export function AdminOverview() {
               </ol>
             )}
           </section>
+          <Sellers sellers={data.sellers} />
           <AdminRatings />
           <p className="muted">
             Tổng chi phí tháng: {usd(data.totalUsd)}

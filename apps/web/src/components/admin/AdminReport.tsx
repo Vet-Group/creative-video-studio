@@ -63,7 +63,7 @@ export function AdminReport() {
           {data.users.length === 0 ? (
             <Empty title="Không có job nào trong tuần này">Chọn một ngày của tuần khác để xem.</Empty>
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap" role="region" aria-label="KPI từng người trong tuần" tabIndex={0}>
               <table className="sticky-first">
                 <thead>
                   <tr>

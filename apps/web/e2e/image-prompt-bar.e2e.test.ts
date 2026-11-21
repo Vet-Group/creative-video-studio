@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { STARTERS } from '../src/lib/prompt-starters';
+import { inSeason, STARTERS } from '../src/lib/prompt-starters';
 import { modelButton, openMore, openTab, pickModel, png, select, selectText, signIn } from './support.test';
 
 // Image Generation's prompt bar, as Fash's: on a wide screen it floats at the foot of the screen over the full-width tabs and gallery, and holds every
@@ -332,7 +332,7 @@ test('a suggested model with thinking levels keeps its name readable in the chip
 
 test('the starter chips fold to one row, a +N chip unfolds the rest and folds them back, and a folded chip takes no Tab stop', async ({ page }) => {
   await signIn(page, 'pbarl');
-  const starters = STARTERS.image!;
+  const starters = inSeason(STARTERS.image!);
   const total = starters.length;
   for (const [width, height] of [[1440, 900], [1024, 768], [390, 844]] as const) {
     await page.setViewportSize({ width, height });
