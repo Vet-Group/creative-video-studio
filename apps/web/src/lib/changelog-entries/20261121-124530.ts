@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-21T12:00:30+07:00',
+  at: '2026-11-21T12:45:30+07:00',
   kind: 'new',
   title: 'Tổng quan: ai trong các team bán hàng đang dùng CVS',
   details: [

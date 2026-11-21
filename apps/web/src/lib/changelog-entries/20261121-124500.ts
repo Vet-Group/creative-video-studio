@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-21T12:00:00+07:00',
+  at: '2026-11-21T12:45:00+07:00',
   kind: 'improved',
   title: 'Gợi ý nhanh mùa lễ; trang Có gì mới gọn hơn',
   details: [
