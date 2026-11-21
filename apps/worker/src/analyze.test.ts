@@ -1,6 +1,8 @@
 // Runs against a disposable database on the compose Postgres (`pnpm services:up`). No binary, network or
 // S3: the decompose, object store and VLM env are all injected.
-import { mkdir, writeFile } from 'node:fs/promises';
+import { generateKeyPairSync } from 'node:crypto';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
@@ -225,6 +227,32 @@ test('defaultVlmEnv uses BytePlus from the key and never probes when the Vertex 
     if (prev.fb === undefined) delete process.env.REA_VLM_VERTEX_FALLBACK;
     else process.env.REA_VLM_VERTEX_FALLBACK = prev.fb;
     vi.unstubAllGlobals();
+  }
+});
+
+test('the Vertex fallback calls the global endpoint even when GOOGLE_CLOUD_LOCATION names a region', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cvs-vlm-'));
+  const file = join(dir, 'key.json');
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  await writeFile(file, JSON.stringify({ client_email: 'sa@test', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }), project_id: 'vx' }));
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ access_token: 'vx-token', expires_in: 3600 })));
+  const keys = ['BYTEPLUS_ARK_API_KEY', 'REA_VLM_VERTEX_FALLBACK', 'GOOGLE_APPLICATION_CREDENTIALS', 'GOOGLE_APPLICATION_CREDENTIALS_NEXT', 'GOOGLE_CLOUD_PROJECT', 'GOOGLE_CLOUD_LOCATION'] as const;
+  const prev = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  for (const k of keys) delete process.env[k];
+  Object.assign(process.env, { REA_VLM_VERTEX_FALLBACK: '1', GOOGLE_APPLICATION_CREDENTIALS: file, GOOGLE_CLOUD_LOCATION: 'us-central1' });
+  try {
+    const r = await defaultVlmEnv();
+    expect(r.provider).toBe('vertex');
+    expect(r.env.REA_VLM_BASE_URL).toBe('https://aiplatform.googleapis.com/v1beta1/projects/vx/locations/global/endpoints/openapi');
+    expect(r.env.REA_VLM_API_KEY).toBe('vx-token');
+    expect(r.model).toBe('google/gemini-3.5-flash');
+  } finally {
+    for (const k of keys) {
+      if (prev[k] === undefined) delete process.env[k];
+      else process.env[k] = prev[k];
+    }
+    vi.unstubAllGlobals();
+    await rm(dir, { recursive: true, force: true });
   }
 });
 
