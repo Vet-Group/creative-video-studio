@@ -60,6 +60,8 @@ const KINDS = [
 const APP_KINDS = JOB_APPS.map((a) => ({ id: a.feature, label: a.name }));
 /** The size slider: card widths from small to large, remembered per browser. */
 const SIZES = ['12rem', '16rem', '22rem'];
+/** The grid's columns on a 1440 px desktop at the default size: that first row's pictures load at once, as one of them is the page's LCP (measured 2026-11-21). */
+const FIRST_ROW = 4;
 const SIZE_KEY = 'cvs.library.size';
 /** The Library's phone layout (globals.css), where the filters open in a sheet. */
 const PHONE = '(max-width: 639.98px)';
@@ -214,7 +216,7 @@ const verdictClass = (v: NonNullable<Clip['verdict']>) => (v.verdict === 'fail' 
  * A grid card puts the result first: its type and length on the media, the mark in its corner, the actions over it on hover (always on touch), two short lines under it and the marks for whoever may edit; Reuse and the store live in the detail view. A `list` row keeps the clip actions and the marks.
  * On both, the picture opens the detail (`onOpen`); while `selecting`, the page makes that click pick the item instead (owner, 2026-11-18), and the checkbox in the picture's corner stays the control a keyboard or screen reader uses.
  */
-export function ClipCard({ clip, view, select, selecting = false, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; select?: ReactNode; selecting?: boolean; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
+export function ClipCard({ clip, view, index, select, selecting = false, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; index?: number; select?: ReactNode; selecting?: boolean; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [problem, setProblem] = useState('');
   const [saving, setSaving] = useState(false);
@@ -363,7 +365,14 @@ export function ClipCard({ clip, view, select, selecting = false, onChange, onDe
       {select}
       <div className="lib-media" onPointerEnter={(e) => e.pointerType === 'mouse' && play(true)} onPointerLeave={() => play(false)} onFocus={() => play(true)} onBlur={() => play(false)}>
         {image ? (
-          <img className="output" src={thumbUrl(clip.posterAssetId ?? clip.videoAssetId)} alt={clip.downloadName} loading="lazy" decoding="async" />
+          <img
+            className="output"
+            src={thumbUrl(clip.posterAssetId ?? clip.videoAssetId)}
+            alt={clip.downloadName}
+            loading={index !== undefined && index < FIRST_ROW ? undefined : 'lazy'}
+            fetchPriority={index === 0 ? 'high' : undefined}
+            decoding="async"
+          />
         ) : (
           <video ref={video} muted loop playsInline preload={clip.posterAssetId ? 'none' : 'metadata'} poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={`/api/assets/${clip.videoAssetId}/content`} />
         )}
@@ -1548,6 +1557,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
                     key={c.id}
                     clip={c}
                     view={view}
+                    index={g.start + j}
                     select={zip.check(c.id, clipLabel(c))}
                     selecting={zip.active}
                     onChange={update}

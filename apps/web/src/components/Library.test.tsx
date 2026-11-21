@@ -76,6 +76,15 @@ const sample: Clip = {
 };
 const card = (c: Clip, view: 'grid' | 'list' = 'grid') => renderToStaticMarkup(<ClipCard clip={c} view={view} onChange={() => undefined} onDeleted={() => undefined} onOpen={() => undefined} />);
 
+test("the first row's pictures load at once, the first one first, and the rest lazily (the page's LCP)", () => {
+  const image: Clip = { ...sample, mediaType: 'image', feature: 'image', posterAssetId: null };
+  const img = (index?: number) => renderToStaticMarkup(<ClipCard clip={image} view="grid" index={index} onChange={() => undefined} onDeleted={() => undefined} onOpen={() => undefined} />).match(/<img class="output"[^>]*>/)![0];
+  expect(img(0)).toMatch(/ fetchpriority="high"/i); // React writes it fetchPriority; HTML attribute names ignore case
+  for (const i of [0, 1, 3]) expect(img(i)).not.toContain('loading="lazy"');
+  for (const i of [1, 3, 4, 20]) expect(img(i)).not.toMatch(/fetchpriority/i);
+  for (const i of [4, 20, undefined]) expect(img(i)).toContain('loading="lazy"');
+});
+
 test('a card is named by what was made, the model and the Vietnam time, not by its file name', () => {
   expect(clipLabel(sample)).toBe('Tạo video · Seedance 1.5 Pro · 08:04 14/11');
   for (const view of ['grid', 'list'] as const) expect(card(sample, view)).toContain('aria-label="Tạo video · Seedance 1.5 Pro · 08:04 14/11"');
