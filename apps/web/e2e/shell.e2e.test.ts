@@ -7,13 +7,13 @@ const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướ
 test('the sidebar lists Explore, Try On, Image Generation, Create, Marketing Studio, Apps and Library in the live order, and Admin only for an Admin', async ({ page }) => {
   await signIn(page, 'member1');
   await expect(nav(page).getByRole('link')).toHaveCount(10);
-  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', 'Có gì mới', 'Hướng dẫn']);
+  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Tìm nhanh', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', 'Có gì mới', 'Hướng dẫn']);
   await expect(nav(page).getByRole('link', { name: 'Marketing Studio', exact: true })).toBeVisible(); // the badge is not part of the name
   await (await openSettings(page)).getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await signIn(page, 'admin');
   await expect(nav(page).getByRole('link')).toHaveCount(11);
-  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', 'Có gì mới', 'Hướng dẫn', 'Quản trị']);
+  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Tìm nhanh', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', 'Có gì mới', 'Hướng dẫn', 'Quản trị']);
 });
 
 test('a link anywhere in the app, not only the sidebar, shows the top progress bar until the next page is up', async ({ page }) => {

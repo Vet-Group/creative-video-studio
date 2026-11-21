@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { filterApps } from './apps';
-import { appShortcuts, isSettingsShortcut, navGroups } from './sidebar';
+import { appShortcuts, isPaletteShortcut, isSettingsShortcut, navGroups } from './sidebar';
 
 const key = (k: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey', boolean>> = {}) => ({ key: k, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
 
@@ -13,6 +13,18 @@ test('Ctrl+, opens Settings on Windows and Linux, Cmd+, on a Mac, and nothing el
   expect(isSettingsShortcut(key('.', { ctrlKey: true }), false)).toBe(false);
   expect(isSettingsShortcut(key(',', { ctrlKey: true, shiftKey: true }), false)).toBe(false);
   expect(isSettingsShortcut(key(',', { ctrlKey: true, altKey: true }), false)).toBe(false);
+});
+
+test('Ctrl+K opens the command palette on Windows and Linux, Cmd+K on a Mac, with Caps Lock on too, and nothing else does', () => {
+  expect(isPaletteShortcut(key('k', { ctrlKey: true }), false)).toBe(true);
+  expect(isPaletteShortcut(key('K', { ctrlKey: true }), false)).toBe(true);
+  expect(isPaletteShortcut(key('k', { metaKey: true }), true)).toBe(true);
+  expect(isPaletteShortcut(key('k', { metaKey: true }), false)).toBe(false);
+  expect(isPaletteShortcut(key('k', { ctrlKey: true }), true)).toBe(false);
+  expect(isPaletteShortcut(key('k'), false)).toBe(false);
+  expect(isPaletteShortcut(key('k', { ctrlKey: true, shiftKey: true }), false)).toBe(false);
+  expect(isPaletteShortcut(key('k', { ctrlKey: true, altKey: true }), false)).toBe(false);
+  expect(isPaletteShortcut({ ...key('k', { ctrlKey: true }), key: undefined as unknown as string }, false)).toBe(false); // autofill's keydown has no key
 });
 
 test('the groups keep the order users know, and only an Admin gets the admin group, last', () => {

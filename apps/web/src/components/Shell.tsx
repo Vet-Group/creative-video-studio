@@ -14,11 +14,12 @@ import { featureLabel } from '@/lib/features';
 import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
 import { userAvatarColor } from '@/lib/profile';
-import { APPS_OPEN_KEY, appShortcuts, COLLAPSED_COOKIE, isMac, isSettingsShortcut, navGroups } from '@/lib/sidebar';
+import { APPS_OPEN_KEY, appShortcuts, COLLAPSED_COOKIE, isMac, isPaletteShortcut, isSettingsShortcut, navGroups } from '@/lib/sidebar';
 import { confirmRerun, confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { ChangelogPopup } from './ChangelogPopup';
+import { CommandPalette } from './CommandPalette';
 import { CompareSlider } from './CompareSlider';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { FalLowNotice } from './FalLowNotice';
@@ -782,6 +783,8 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
   const [settingsUsed, setSettingsUsed] = useState(false); // once opened it stays mounted, so closing returns focus as before
   if (settings !== null && !settingsUsed) setSettingsUsed(true);
   const [guide, setGuide] = useState(false); // the "Chọn công cụ nào?" dialog
+  const [palette, setPalette] = useState(false); // the quick search (command palette)
+  const [mac, setMac] = useState(false); // after the first paint, so the server's Ctrl hint does not mismatch a Mac's ⌘
   const [jobsOpen, setJobsOpen] = useState(false); // the "Lượt tạo của tôi" drawer of a page without its own History
   const trayPage = !hasOwnHistory(pathname);
   const openGuide = useCallback(() => (setOpen(false), setGuide(true)), []);
@@ -823,7 +826,15 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
   }
 
   useEffect(() => {
+    setMac(isMac());
     const onKey = (e: KeyboardEvent) => {
+      if (isPaletteShortcut(e, isMac())) {
+        e.preventDefault(); // not the browser's own search box
+        if (e.repeat || document.querySelector('dialog[open]:not(.palette)')) return; // held down it would flicker; over another dialog it would leave that one open behind the page it opens
+        setOpen(false); // the phone drawer, as the sidebar row does
+        setPalette((p) => !p);
+        return;
+      }
       if (!isSettingsShortcut(e, isMac()) || document.querySelector('dialog[open]')) return;
       e.preventDefault();
       setSettings('profile');
@@ -853,6 +864,7 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
   const accountMenu = (variant: 'chip' | 'avatar') => (
     <AccountMenu name={userName} email={account.email} color={userAvatarColor(userName, account.avatarColor)} variant={variant} onSettings={setSettings} />
   );
+  const groups = navGroups(isAdmin, feedbackNew, analyzeEnabled, workspace.owner && !workspace.company);
   // An app page is named by its app (Smart Remake), the other pages by PAGE_TITLES; the tab title carries the same name.
   const page = (pathname.startsWith('/apps/') ? appBySlug(pathname.split('/')[2]!)?.name : undefined) ?? PAGE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1];
   const title = page ?? 'Creative Video Studio';
@@ -892,7 +904,7 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
               </div>
               {workspaces.length > 1 && <WorkspaceSwitcher current={workspace.id} workspaces={workspaces} />}
               <nav aria-label="Điều hướng chính" data-hint-off={hintOff || undefined} onKeyDown={(e) => e.key === 'Escape' && setHintOff(true)} onFocus={(e) => (setHintOff(false), placeHint(e.target))} onPointerOver={(e) => (hintOff && setHintOff(false), placeHint(e.target))}>
-                {navGroups(isAdmin, feedbackNew, analyzeEnabled, workspace.owner && !workspace.company).map((g, i) => (
+                {groups.map((g, i) => (
                   <div key={g.label ?? 'home'} className="nav-group" role={g.label ? 'group' : undefined} aria-labelledby={g.label ? `nav-group-${i}` : undefined}>
                     {g.label && (
                       <div className="nav-group-head">
@@ -906,6 +918,17 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
                       const row = link(n.href, n.text, n.icon, current(n.href), n.badge, n.hint, n.href === '/changelog' && changelogDot);
                       return n.href === '/apps' ? <AppsNav key={n.href} row={row} pathname={pathname} /> : row;
                     })}
+                    {!g.label && (
+                      <button type="button" className="nav-search" aria-haspopup="dialog" aria-keyshortcuts={mac ? 'Meta+K' : 'Control+K'} title={collapsed ? `Tìm nhanh (${mac ? '⌘K' : 'Ctrl+K'})` : undefined} onClick={() => (setOpen(false), setPalette(true))}>
+                        <span className="nav-icon">
+                          <Icon name="search" size={16} />
+                        </span>
+                        <span className="nav-label">Tìm nhanh</span>
+                        <kbd className="nav-kbd" aria-hidden="true">
+                          {mac ? '⌘K' : 'Ctrl K'}
+                        </kbd>
+                      </button>
+                    )}
                   </div>
                 ))}
               </nav>
@@ -939,6 +962,7 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
             <Toasts />
           </div>
           <ToolGuide open={guide} onClose={() => setGuide(false)} analyzeEnabled={analyzeEnabled} />
+          <CommandPalette open={palette} onClose={() => setPalette(false)} pages={groups.flatMap((g) => g.items)} mac={mac} />
           <ConfirmHost />
           <TemplateBlanksHost />
           <WorkspaceChanged />

@@ -83,4 +83,8 @@ export const appShortcuts = (smartRemake: boolean): AppConfig[] => {
 export const isSettingsShortcut = (e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>, mac: boolean): boolean =>
   e.key === ',' && (mac ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey;
 
+/** Ctrl+K (Cmd+K on a Mac) opens the command palette from anywhere, even while typing; the Shell keeps the browser's own search off it. */
+export const isPaletteShortcut = (e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>, mac: boolean): boolean =>
+  e.key?.toLowerCase() === 'k' && (mac ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey; // a browser's autofill sends a keydown without a key
+
 export const isMac = (): boolean => /Mac|iPhone|iPad/.test(navigator.userAgent);
