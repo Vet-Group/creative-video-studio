@@ -253,7 +253,9 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
           ? 'Email này đã có người khác dùng.'
           : err instanceof ApiError && err.message === 'company_email'
             ? 'Không dùng được email này cho tài khoản ở không gian làm việc này. Hãy dùng email khác.'
-            : 'Không lưu được hồ sơ. Hãy thử lại.',
+            : err instanceof ApiError && err.code === 'company_email'
+              ? err.message
+              : 'Không lưu được hồ sơ. Hãy thử lại.',
       );
     } finally {
       setBusy(false);

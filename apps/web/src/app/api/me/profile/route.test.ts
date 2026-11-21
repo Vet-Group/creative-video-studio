@@ -108,9 +108,25 @@ describe('PATCH /api/me/profile', () => {
     const dotted = await patch({ email: 'boss@vetgroup.net.' }, asPartner);
     expect([dotted.status, ((await dotted.json()) as { error: string }).error]).toEqual([400, 'email must be an email address']);
     expect((await pool.query('select email from users where id = $1', [id])).rows[0].email).toBe('me@example.test');
-    // Another address still saves there, and in the company workspace a company address does too.
+    // Another address still saves there.
     expect((await patch({ email: 'me.partner@example.test' }, asPartner)).status).toBe(200);
-    expect((await patch({ email: 'me@vetgroup.net' })).status).toBe(200);
+    await pool.query("update users set email = 'me@example.test', email_verified = true where id = $1", [id]);
+  });
+
+  test('in the company workspace a company-domain address no account has is refused in plain Vietnamese, so it cannot block that staff member’s first Lark sign-in', async () => {
+    const before = (await audits()).length;
+    for (const email of ['Someone.New@VETGROUP.net', 'x@sales.vetgroup.net', 'lead@vetglobalbrand.com']) {
+      const res = await patch({ email });
+      expect([res.status, await res.json()], email).toEqual([403, { error: 'Bạn không tự đổi sang email công ty được. Hãy nhờ Admin đổi giúp.', code: 'company_email' }]);
+    }
+    expect((await pool.query('select email from users where id = $1', [id])).rows[0].email).toBe('me@example.test');
+    expect(await audits()).toHaveLength(before);
+    // One an account already has is still the 409 for a taken address, and the caller's own company address is no change.
+    await auth.api.createUser({ body: { email: 'boss@vetgroup.net', name: 'Boss', password, role: 'member' } });
+    expect((await patch({ email: 'boss@vetgroup.net' })).status).toBe(409);
+    await pool.query("update users set email = 'me@vetgroup.net' where id = $1", [id]);
+    const own = await patch({ email: 'Me@VetGroup.net', name: 'Nguyễn Văn Ánh' });
+    expect([own.status, ((await own.json()) as { email: string }).email]).toEqual([200, 'me@vetgroup.net']);
     await pool.query("update users set email = 'me@example.test', email_verified = true where id = $1", [id]);
   });
 
