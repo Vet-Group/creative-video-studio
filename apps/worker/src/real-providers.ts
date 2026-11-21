@@ -14,7 +14,7 @@ import sharp from 'sharp';
 import type { SendLark } from '@cvs/core/lark';
 import { falNext } from './fal-next';
 import { failoverOnBilling } from './vertex-accounts';
-import { DEFAULT_OPTIONS, type WorkerDeps } from './worker';
+import type { WorkerDeps } from './worker';
 import { deleteObject, getObject, putObject } from './storage';
 
 // Inputs are inlined as base64 in the JSON body. In the bake-off a provider reset a 3.8 MB body while 3.7 MB passed, so with up to 4 images
@@ -68,6 +68,8 @@ export function realProviders(
   pool: WorkerDeps['pool'], env: NodeJS.ProcessEnv = process.env, read?: (key: string) => Promise<Uint8Array>, send?: SendLark,
   /** Runs the Vertex credits guard; called when Google refuses an account's calls because its billing is disabled (vertex-accounts.ts). */
   rerunVertexGuard: () => Promise<unknown> = async () => undefined,
+  /** Sent to fal with every video and image request: fal drops one that no runner started within this many seconds. */
+  startTimeoutSec?: number,
 ): Pick<WorkerDeps, 'providers' | 'imageProviders' | 'enhance' | 'suggest'> & { vertexAccounts: VertexAccount[] } {
   const readImage = assetReader(pool, read);
   const providers: WorkerDeps['providers'] = {};
@@ -75,8 +77,6 @@ export function realProviders(
   let enhance: WorkerDeps['enhance'];
   let suggest: WorkerDeps['suggest'];
   if (env.FAL_KEY) {
-    // fal drops a request no runner started by the time the worker times the job out, so a long fal queue is never run and billed after that.
-    const startTimeoutSec = DEFAULT_OPTIONS.runTimeoutMs / 1000;
     providers.fal = createFalProvider({ apiKey: env.FAL_KEY, readImage, startTimeoutSec });
     imageProviders.fal = createFalImageProvider({ apiKey: env.FAL_KEY, readImage, startTimeoutSec });
     // A second fal account (FAL_KEY_NEXT, the team) takes the new jobs once FAL_KEY's account runs out (fal-next.ts).

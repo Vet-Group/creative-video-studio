@@ -42,9 +42,11 @@ export async function runSuggestion(
       await bookLlm(tx, { suggestion: runId }, call);
     });
   } catch (e) {
-    // The calls that answered before the run failed were billed all the same.
-    if (e instanceof PaidSuggestError) await bookLlm(pool, { suggestion: runId }, e.call);
     await pool.query(`update suggestion_runs set status = 'failed' where id = $1 and status = 'queued'`, [runId]);
+    // The calls that answered before the run failed were billed all the same; a booking that fails is logged, and the run's own error is thrown.
+    if (e instanceof PaidSuggestError) {
+      await bookLlm(pool, { suggestion: runId }, e.call).catch((err) => console.error(`worker: suggestion ${runId}: could not book ${e.call.costUsd} USD; the monthly invoice (invoice_diff) will carry it:`, err));
+    }
     throw e;
   }
 }

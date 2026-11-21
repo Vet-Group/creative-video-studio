@@ -19,7 +19,7 @@ import { createDb } from '@cvs/db/client';
 import { falActive } from './fal-next';
 import { concatClips, cutShot, probeSize, probeVideoSeconds, sideBySide, spliceClips, trimClip } from './media';
 import { fitForInline } from './real-providers';
-import { getObject, putObject } from './storage';
+import { downloadObject, getObject, putObject } from './storage';
 import type { WorkerDeps } from './worker';
 
 type Pool = WorkerDeps['pool'];
@@ -241,7 +241,9 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
     if (new Set(chosen).size !== chosen.length) throw new Error('each shot may be chosen once');
     if (!r.product_key) throw new Error('the product image is no longer available');
     const video = join(dir, 'source.mp4');
-    await writeFile(video, await read(r.source_key));
+    // Streamed to disk: the source can be 500 MB, which in memory would share the worker's 2G with ffmpeg.
+    if (seams.read) await writeFile(video, await seams.read(r.source_key));
+    else await downloadObject(r.source_key, video);
     const product = { bytes: await read(r.product_key), contentType: r.product_mime as string };
     const analysis = r.result as Analysis | null;
     // Each made shot's clip, and the cut it was made from, for the before/after.

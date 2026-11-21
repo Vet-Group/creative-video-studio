@@ -1,8 +1,9 @@
 import { expect, test } from 'vitest';
 import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_URL } from './enhance';
+import { ProviderHttpError } from './providers/http';
 import {
   CHECK_SYSTEM, createFalSuggester, FORMAT_NOTES, createOpenAiSuggester, cutTo, DIRECTIONS, lengthenPrompt, modelNote, parseOption, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM,
-  frameTimes, PaidSuggestError, parseCheck, parseScenes, parseVideoAnswer, PERSON_KEEP, SCENES_SYSTEM, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_FRAMES, VIDEO_SYSTEM, videoPrompt,
+  frameTimes, PaidSuggestError, parseCheck, parseScenes, parseVideoAnswer, PERSON_KEEP, SCENES_SYSTEM, PRODUCT_KEEP, type SuggestInput, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_FRAMES, VIDEO_SYSTEM, videoPrompt,
 } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -137,11 +138,24 @@ test('a failed direction fails the run only once the others settle, with the cos
   const refused = await failed(() => answer({ detail: 'down' }, 500));
   expect(refused).toBeInstanceOf(PaidSuggestError);
   expect(refused!.message).toContain('HTTP 500');
+  expect(refused!.cause).toBeInstanceOf(ProviderHttpError);
   expect(refused!.call).toEqual({ costUsd: expect.closeTo(0.0004), provider: 'fal', model: ENHANCE_MODEL });
   // An answer that cannot be read was billed all the same.
   const unreadable = await failed(() => answer({ output: 'Here are some ideas', usage: { cost: 0.0001 } }));
   expect(unreadable!.message).toBe('suggest: the answer is not JSON');
   expect(unreadable!.call.costUsd).toBeCloseTo(0.0005);
+});
+
+test("a single call whose answer cannot be read fails the run with that call's cost, keeping the parse error as the cause", async () => {
+  const suggest = createFalSuggester({ apiKey: 'k', fetch: () => answer({ output: 'Here are some ideas', usage: { cost: 0.0003 } }) });
+  const runs: [SuggestInput, string[]?][] = [[{ field: 'translate', text: 'x', context: '', max: 100 }], [{ field: 'check', text: 'x', context: '', max: 100 }], [video, stills], [scenes, stills.slice(0, 4)]];
+  for (const [i, frames] of runs) {
+    const e = await suggest(i, frames).then(() => null, (x: unknown) => x as PaidSuggestError);
+    expect(e).toBeInstanceOf(PaidSuggestError);
+    expect(e!.message).toBe('suggest: the answer is not JSON');
+    expect(e!.call).toEqual({ costUsd: 0.0003, provider: 'fal', model: ENHANCE_MODEL });
+    expect(e!.cause).toBeInstanceOf(Error);
+  }
 });
 
 test("a tool's prompt asks for English under its own system prompt, naming the server's task and keeping the member's notes", async () => {

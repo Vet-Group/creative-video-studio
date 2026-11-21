@@ -354,10 +354,10 @@ const sum = (costs: (number | null)[]): number | null => (costs.every((c) => c =
 /** A run that failed after some of its calls answered: `call` is what they cost, which the provider billed all the same. */
 export class PaidSuggestError extends Error {
   constructor(
-    message: string,
+    cause: unknown,
     readonly call: { costUsd: number | null; provider: string; model: string },
   ) {
-    super(message);
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
   }
 }
 
@@ -368,25 +368,33 @@ export class PaidSuggestError extends Error {
  */
 async function suggestWith(chat: Chat, by: { provider: string; model: string }, input: SuggestInput, frames: string[] = []): ReturnType<Suggester> {
   const system = SYSTEMS[input.field];
+  // A call that answered was billed, so an answer that cannot be read fails the run with that call's cost.
+  const billed = <T>(costUsd: number | null, parse: () => T): T => {
+    try {
+      return parse();
+    } catch (e) {
+      throw new PaidSuggestError(e, { costUsd, ...by });
+    }
+  };
   if (input.field === 'video') {
     if (!frames.length) throw new Error('suggest: no stills of the clip');
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.4, 800, frames);
-    return { options: [parseVideoAnswer(text, input.max)], costUsd, ...by };
+    return { options: [billed(costUsd, () => parseVideoAnswer(text, input.max))], costUsd, ...by };
   }
   if (input.field === 'scenes') {
     const count = input.times?.length ?? 0;
     if (!count || frames.length !== count + 1) throw new Error('suggest: the product and one still per scene are needed');
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0, 800, frames);
-    return { options: parseScenes(text, count).map(String), costUsd, ...by };
+    return { options: billed(costUsd, () => parseScenes(text, count)).map(String), costUsd, ...by };
   }
   if (input.field === 'check') {
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.2, 1200);
-    const issues = parseCheck(text);
+    const issues = billed(costUsd, () => parseCheck(text));
     return { options: issues.map((x) => x.issue), meanings: issues.map((x) => x.fix), costUsd, ...by };
   }
   if (input.field === 'translate') {
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.2, maxTokens(input));
-    return { options: [parseOption(text, input.max).text], costUsd, ...by };
+    return { options: [billed(costUsd, () => parseOption(text, input.max)).text], costUsd, ...by };
   }
   const { low, max } = targetRange(input);
   // Each direction's answered calls, in order, kept apart from its result: a call billed before its direction failed still counts.
@@ -409,7 +417,7 @@ async function suggestWith(chat: Chat, by: { provider: string; model: string }, 
   );
   const costUsd = sum(costs.flat());
   const failed = settled.find((s) => s.status === 'rejected');
-  if (failed) throw new PaidSuggestError(failed.reason instanceof Error ? failed.reason.message : String(failed.reason), { costUsd, ...by });
+  if (failed) throw new PaidSuggestError(failed.reason, { costUsd, ...by });
   const answers = settled.flatMap((s) => (s.status === 'fulfilled' ? [s.value] : []));
   return { options: answers.map((a) => a.text), meanings: answers.map((a) => a.vi), costUsd, ...by };
 }

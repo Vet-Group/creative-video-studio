@@ -7,7 +7,6 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { assetReader, cropToRatio, fitForInline, MAX_INLINE_BYTES, realProviders } from './real-providers';
-import { DEFAULT_OPTIONS } from './worker';
 
 const asset = { s3_key: 'inputs/a1', mime: 'image/png' };
 const pool = (rows: unknown[]) => ({ query: vi.fn(async () => ({ rows })) }) as never;
@@ -137,7 +136,7 @@ describe('realProviders', () => {
     expect(read).toHaveBeenCalledWith('inputs/a1');
   });
 
-  test('every fal video and image provider asks fal to drop a request no runner started before the worker gives up on the job', async () => {
+  test('every fal video and image provider sends the start timeout it is given, so fal drops a request no runner started by then', async () => {
     const sent: { auth?: string; start?: string }[] = [];
     vi.stubGlobal('fetch', async (_url: string, init: { headers: Record<string, string> }) => {
       sent.push({ auth: init.headers.Authorization, start: init.headers['X-Fal-Request-Start-Timeout'] });
@@ -146,11 +145,11 @@ describe('realProviders', () => {
     const image = { id: 'nb', provider: 'fal', endpoint: 'fal-ai/nano-banana-pro/edit', label: 'NB', ratios: ['1:1'], maxImages: 4, imagePrices: { '1K': '0.15' }, features: ['image'] } as ImageModelConfig;
     // FAL_KEY's account, then the team's (FAL_KEY_NEXT once settings.fal_next_at is set: the stub pool answers every query with the row).
     for (const [env, row] of [[{ FAL_KEY: 'k' }, asset], [{ FAL_KEY: 'k', FAL_KEY_NEXT: 'n' }, { ...asset, s: true }]] as const) {
-      const { providers, imageProviders } = realProviders(pool([row]), env, read);
+      const { providers, imageProviders } = realProviders(pool([row]), env, read, undefined, undefined, 7200);
       await providers.fal!.submit({ model: BAKEOFF_MODELS[0]!, prompt: 'p', imageUrls: ['asset://a1'], ratio: '9:16', durationSec: 5 });
       await imageProviders!.fal!.submit({ model: image, prompt: 'p', imageUrls: ['asset://a1'], ratio: '1:1', resolution: '1K' });
     }
-    const start = String(DEFAULT_OPTIONS.runTimeoutMs / 1000);
+    const start = '7200';
     expect(sent).toEqual([{ auth: 'Key k', start }, { auth: 'Key k', start }, { auth: 'Key n', start }, { auth: 'Key n', start }]);
   });
 });
