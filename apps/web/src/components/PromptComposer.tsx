@@ -2,7 +2,7 @@
 // The one prompt field of every form (Create, Marketing Studio and its lines, Try On, the apps): the label with an Optional chip, a box that
 // grows with the text, starter chips while it is empty, a toolbar (Enhance when the page has it, AI suggestions, recent words, the tall editor)
 // and a meta row with the Ctrl+Enter hint while typing and the count, red near the model's limit.
-import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ParamFormat } from '@/lib/marketing';
 import { runKey } from '@/lib/run-guard';
 import { inSeason, type Starter, STARTERS } from '@/lib/prompt-starters';
@@ -93,8 +93,10 @@ interface Props {
   required?: boolean;
 }
 
-export function PromptComposer({ id, label, optional, feature, format, value, onChange, maxLength, onRun, placeholder, disabled, ask, aiLabel, parts, enhance, starters = inSeason(STARTERS[feature] ?? []), meta, required }: Props) {
+export function PromptComposer({ id, label, optional, feature, format, value, onChange, maxLength, onRun, placeholder, disabled, ask, aiLabel, parts, enhance, starters, meta, required }: Props) {
   const near = maxLength !== undefined && value.length >= maxLength * NEAR;
+  // One list per feature, so the chip row's layout effect does not run again on every render.
+  const chips = useMemo(() => starters ?? inSeason(STARTERS[feature] ?? []), [starters, feature]);
   return (
     <div className={`field ${s.composer}`}>
       <div className={s.head}>
@@ -111,7 +113,7 @@ export function PromptComposer({ id, label, optional, feature, format, value, on
       </div>
       <div className={`prompt-box ${s.box}`} data-disabled={disabled || undefined}>
         <textarea id={id} className={s.input} value={disabled ? '' : value} maxLength={maxLength} disabled={disabled} aria-required={required || undefined} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} onKeyDown={runKey(() => void onRun())} />
-        {!disabled && !value && starters.length > 0 && <Starters starters={starters} onPick={onChange} />}
+        {!disabled && !value && chips.length > 0 && <Starters starters={chips} onPick={onChange} />}
         {!disabled && (
           <div className={s.toolbar}>
             {enhance}

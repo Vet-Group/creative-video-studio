@@ -37,8 +37,10 @@ test('a first visit shows the dot for the newest day but no popup; the page list
   // Grouped by day, newest first, ten days at a time.
   const days = page.locator('.changelog-day');
   await expect(days).toHaveCount(10);
+  await page.getByRole('button', { name: /ngày trước đó/ }).click();
+  await expect(days.nth(10)).toBeFocused(); // the first day it revealed, so the keyboard carries on from there
   await showAll(page);
-  await expect(page.getByRole('heading', { level: 3, name: 'Trang Có gì mới' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 3, name: 'Trang Có gì mới', exact: true })).toBeVisible();
   expect(await days.count()).toBeGreaterThan(10);
   await expect(days.first()).toContainText(String(Number(NEWEST_DAY.slice(8))));
   // A member sees no admin entry, no operations chip and no PR numbers.

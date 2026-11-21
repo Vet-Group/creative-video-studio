@@ -1,6 +1,7 @@
 // Browser-side helpers shared by the Admin pages.
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from './api';
+import { vnDay } from './lark-prompt';
 import { useTabReturn } from './use-tab-return';
 
 /**
@@ -76,11 +77,11 @@ export function groupRecent<T extends { actorName: string; action: string; creat
   return out;
 }
 
-const ictDay = (d: Date) => Date.parse(d.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }));
+const ictDay = (d: Date) => Date.parse(vnDay(d));
 
 /** When a seller last used CVS, in words by ICT calendar day; `idle` once they have not used it for 14 days or never have. */
 export function sellerUse(lastUsedAt: string | null, lastSeenAt: string | null, now = new Date()): { text: string; idle: boolean } {
-  if (!lastUsedAt) return { text: lastSeenAt ? 'Đã đăng nhập, chưa tạo gì' : 'Chưa đăng nhập', idle: true };
+  if (!lastUsedAt) return { text: lastSeenAt ? 'Đã đăng nhập, chưa tạo gì' : 'Chưa thấy đăng nhập', idle: true };
   const days = Math.round((ictDay(now) - ictDay(new Date(lastUsedAt))) / 86_400_000);
   return { text: days <= 0 ? 'Hôm nay' : days === 1 ? 'Hôm qua' : `${days} ngày trước`, idle: days >= 14 };
 }

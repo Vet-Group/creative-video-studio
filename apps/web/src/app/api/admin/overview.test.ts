@@ -118,9 +118,10 @@ describe('GET /api/admin/overview', () => {
     const seller = await newUser('seller@example.test', 'member'); // signed in, then used CVS
     const idle = await newUser('idle@example.test', 'member'); // signed in only
     const fresh = (await auth.api.createUser({ body: { email: 'fresh@example.test', name: 'fresh@example.test', role: 'member' } })).user.id; // never signed in
+    const lark = (await auth.api.createUser({ body: { email: 'lark@example.test', name: 'lark@example.test', role: 'member' } })).user.id; // signed in with Lark, then out
     const locked = await newUser('locked@example.test', 'member');
     const hidden = await newUser('hidden@example.test', 'member');
-    await pool.query(`update users set team_id = 'ts' where id = any($1)`, [[seller.id, idle.id, fresh, locked.id]]);
+    await pool.query(`update users set team_id = 'ts' where id = any($1)`, [[seller.id, idle.id, fresh, lark, locked.id]]);
     await pool.query(`update users set banned = true where id = $1`, [locked.id]);
     await pool.query(`update users set team_id = 'th' where id = $1`, [hidden.id]);
     await pool.query(
@@ -129,10 +130,13 @@ describe('GET /api/admin/overview', () => {
       [seller.id],
     );
     await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, created_at, workspace_id) values ('oa1', $1, 'ts', 'k', 'succeeded', '2026-11-21T08:00:00+07:00', 'ws_vet')`, [seller.id]);
+    // Signing out deletes the session; the Lark account the first sign-in made stays.
+    await pool.query(`insert into accounts (id, user_id, account_id, provider_id, created_at, updated_at) values ('oacc', $1, 'lark-x', 'lark', now(), now())`, [lark]);
     // An Admin impersonating the fresh account is not its own sign-in.
     await pool.query(`insert into sessions (id, user_id, token, expires_at, impersonated_by) values ('oi1', $1, 'oi1', now() + interval '1 hour', $2)`, [fresh, admin.id]);
     const sellers = (await overview()).sellers.filter((s) => s.team !== 'Overview Team');
-    expect(sellers.map((s) => s.name)).toEqual(['fresh@example.test', 'idle@example.test', 'seller@example.test']);
+    expect(sellers.map((s) => s.name)).toEqual(['fresh@example.test', 'idle@example.test', 'lark@example.test', 'seller@example.test']);
+    expect(sellers.find((s) => s.id === lark)).toMatchObject({ lastUsedAt: null, lastSeenAt: expect.any(String) });
     expect(sellers.find((s) => s.id === seller.id)).toMatchObject({ team: 'Team Sales', lastUsedAt: new Date('2026-11-21T08:00:00+07:00').toISOString() });
     expect(sellers.find((s) => s.id === idle.id)).toMatchObject({ lastUsedAt: null, lastSeenAt: expect.any(String) });
     expect(sellers.find((s) => s.id === fresh)).toMatchObject({ lastUsedAt: null, lastSeenAt: null });

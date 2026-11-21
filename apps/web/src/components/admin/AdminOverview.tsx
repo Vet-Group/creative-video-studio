@@ -54,9 +54,9 @@ function Sellers({ sellers }: { sellers: Data['sellers'] }) {
         <Link href="/admin/report">Xem báo cáo tuần</Link>
       </div>
       <p className="muted">
-        {rows.filter((r) => !r.use.idle).length}/{rows.length} người bán đã dùng trong 14 ngày qua{never > 0 && ` · ${never} người chưa đăng nhập lần nào`}.
+        {rows.filter((r) => !r.use.idle).length}/{rows.length} người bán đã dùng trong 14 ngày qua{never > 0 && ` · ${never} người chưa thấy đăng nhập lần nào`}.
       </p>
-      <div className="table-wrap" role="region" aria-labelledby="sellers-title" tabIndex={0}>
+      <div className="table-wrap" role="region" aria-label="Bảng người bán và lần dùng gần nhất" tabIndex={0}>
         <table className="jobs">
           <thead>
             <tr>

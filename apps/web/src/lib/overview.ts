@@ -21,11 +21,13 @@ export async function adminOverview() {
       `select a.id::int as id, coalesce(u.name, 'Hệ thống') as "actorName", a.action, a.target, a.created_at as "createdAt"
          from audit_entries a left join users u on u.id = a.actor_id order by a.id desc limit 40`,
     ),
-    // Who in each sales team uses CVS: their last job or video analysis, and their last own sign-in (an Admin's impersonation is not one).
+    // Who in each sales team uses CVS: their last job or video analysis, and the last trace of their own sign-in. Sign-out deletes a session row, so a
+    // linked sign-in account (Lark, made on the first sign-in) counts too; an Admin-made password account and an Admin's impersonation do not.
     pool.query(
       `select u.id, u.name, t.name as team,
               greatest((select max(created_at) from jobs j where j.user_id = u.id and not j.is_mock), (select max(created_at) from analyses a where a.user_id = u.id)) as "lastUsedAt",
-              (select max(updated_at) from sessions s where s.user_id = u.id and s.impersonated_by is null) as "lastSeenAt"
+              greatest((select max(updated_at) from sessions s where s.user_id = u.id and s.impersonated_by is null),
+                       (select max(created_at) from accounts a where a.user_id = u.id and a.provider_id <> 'credential')) as "lastSeenAt"
          from users u join teams t on t.id = u.team_id
         where t.billable and not t.hidden and not u.banned
         order by t.name, u.name`,

@@ -3,7 +3,7 @@ import { auditChanges, auditLabel, auditNewValue, auditTarget, groupRecent, sell
 
 test('sellerUse counts ICT calendar days since the last use and marks 14 days or never as idle', () => {
   const now = new Date('2026-11-21T10:00:00+07:00');
-  expect(sellerUse(null, null, now)).toEqual({ text: 'Chưa đăng nhập', idle: true });
+  expect(sellerUse(null, null, now)).toEqual({ text: 'Chưa thấy đăng nhập', idle: true });
   expect(sellerUse(null, '2026-11-20T09:00:00+07:00', now)).toEqual({ text: 'Đã đăng nhập, chưa tạo gì', idle: true });
   expect(sellerUse('2026-11-21T00:30:00+07:00', null, now)).toEqual({ text: 'Hôm nay', idle: false });
   // 23:30 ICT the day before is 16:30 UTC the same UTC day as now: still yesterday in Vietnam.

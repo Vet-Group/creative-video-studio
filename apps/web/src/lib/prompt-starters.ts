@@ -1,5 +1,7 @@
 // Starter chips under an empty prompt box: a short Vietnamese label, and the text a click puts in the box to edit from. Video, image and try-on
 // tools read English best, so their text is English. Create and Marketing Studio start from a prompt template instead (PROMPT_TEMPLATES).
+import { vnDay } from './lark-prompt';
+
 export interface Starter {
   label: string;
   text: string;
@@ -9,7 +11,7 @@ export interface Starter {
 
 /** The chips to show on `now`: the holiday ones first from 15 November to 31 December (ICT), and none of them the rest of the year. */
 export function inSeason(list: Starter[], now = new Date()): Starter[] {
-  const monthDay = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).slice(5);
+  const monthDay = vnDay(now).slice(5);
   return monthDay >= '11-15' ? [...list.filter((s) => s.holiday), ...list.filter((s) => !s.holiday)] : list.filter((s) => !s.holiday);
 }
 

@@ -1,7 +1,7 @@
 'use client';
 // The changelog page: entries by Vietnam day, newest first, ten days at a time, with filter chips by kind. Opening it marks every entry seen.
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type ChangeEntry, type ChangeKind, KIND_LABEL } from '@/lib/changelog';
 import { loadSeen, markSeen, unseenEntries } from '@/lib/changelog-seen';
 import { vnDay } from '@/lib/lark-prompt';
@@ -25,6 +25,12 @@ export function Changelog({ entries, isAdmin }: { entries: ChangeEntry[]; isAdmi
   }, []); // once, on opening: a second run would find nothing unseen
   const kinds: (ChangeKind | 'all')[] = ['all', 'new', 'improved', 'fixed', ...(isAdmin ? (['ops'] as const) : [])];
   const [shown, setShown] = useState(DAYS_STEP);
+  /** The first day the more button reveals: focus moves to its heading, as the button itself goes once the last days show. */
+  const revealed = useRef<string | null>(null);
+  useEffect(() => {
+    if (revealed.current) document.getElementById(`changelog-day-${revealed.current}`)?.focus();
+    revealed.current = null;
+  }, [shown]);
   const days = new Map<string, ChangeEntry[]>();
   for (const e of entries) {
     const day = vnDay(new Date(e.at));
@@ -52,7 +58,7 @@ export function Changelog({ entries, isAdmin }: { entries: ChangeEntry[]; isAdmi
       ) : (
         all.slice(0, limit).map(([day, items]) => (
           <section key={day} aria-labelledby={`changelog-day-${day}`}>
-            <h2 id={`changelog-day-${day}`} className="changelog-day">
+            <h2 id={`changelog-day-${day}`} className="changelog-day" tabIndex={-1}>
               {fmtDay.format(new Date(items[0]!.at))}
             </h2>
             <ol className="changelog-list" aria-labelledby={`changelog-day-${day}`}>
@@ -90,7 +96,7 @@ export function Changelog({ entries, isAdmin }: { entries: ChangeEntry[]; isAdmi
         ))
       )}
       {left > 0 && (
-        <button type="button" className="changelog-more" onClick={() => setShown(limit + DAYS_STEP)}>
+        <button type="button" className="changelog-more" onClick={() => ((revealed.current = all[limit]![0]), setShown(limit + DAYS_STEP))}>
           Xem {Math.min(left, DAYS_STEP)} ngày trước đó (còn {left} ngày)
         </button>
       )}
