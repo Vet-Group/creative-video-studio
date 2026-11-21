@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import { SharedVideos } from './SharedVideos';
 
-const tee = { id: 'an-1', title: 'Áo thun trơn', sharedAt: '2026-11-15T10:00:00Z', sourceAssetId: 'vid-1', durationS: 11.4, sceneCount: 3 };
+const tee = { id: 'an-1', title: 'Áo thun trơn', sourceAssetId: 'vid-1', durationS: 11.4, sceneCount: 3 };
 const pick = async () => undefined;
 
 test('the shelf shows each shared video as a card with its preview, title, length and scene count, the one on view marked', () => {

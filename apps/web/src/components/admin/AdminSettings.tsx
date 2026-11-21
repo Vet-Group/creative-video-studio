@@ -161,7 +161,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
             hint="Trần chung của cả công ty. Chạm mức (tính cả tiền đang tạm giữ) thì không ai bấm Tạo video được tới ngày 1 tháng sau. 200 USD ≈ 350 clip Kling 5 giây."
           />
           <Field label="Số clip tối đa mỗi thành viên mỗi ngày" unit="clip" numeric value={daily} onChange={setDaily} hint="Clip lỗi không mất tiền thì không tính." />
-          <Field label="Số lượt phân tích video tối đa mỗi thành viên mỗi ngày" unit="lượt" numeric value={analyses} onChange={setAnalyses} hint="Lượt phân tích lỗi không mất tiền thì không tính." />
+          <Field label="Số lượt phân tích video tối đa mỗi thành viên mỗi ngày" unit="lượt" numeric value={analyses} onChange={setAnalyses} hint="Tính mọi lượt đã bắt đầu phân tích, kể cả lượt lỗi. 0 là tắt phân tích." />
         </div>
       </fieldset>
       <fieldset>

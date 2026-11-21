@@ -10,6 +10,7 @@ import { ANALYSIS_RUN, analysisError, analysisFormat, mergeShots, roleLabel, scr
 import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
 import { api, ApiError, errorText, sendJson } from '@/lib/api';
 import { runProgress } from '@/lib/explore';
+import type { SharedVideo } from '@/lib/remake';
 import { confirmRun } from '@/lib/run-guard';
 import { MAX_VIDEO_BYTES } from '@/lib/upload-limits';
 import { useFrames } from '@/lib/use-frames';
@@ -22,7 +23,7 @@ import { AnalysisHistory, EveryoneChoice } from './AnalysisHistory';
 import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
 import { RemakePanel } from './RemakePanel';
-import { type SharedVideo, SharedVideos, ShareControl } from './SharedVideos';
+import { SharedVideos, ShareControl } from './SharedVideos';
 
 type Tab = 'result' | 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { result: 'Kết quả', create: 'Phân tích', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };

@@ -61,20 +61,27 @@ export async function POST(request: Request) {
   // Refusals members read (errorText).
   const refused = await withTransaction(pool, async (tx): Promise<Response | null> => {
     await tx.query(`select pg_advisory_xact_lock(hashtext('analyses:' || $1))`, [userId]); // two quick sends cannot both pass the checks
-    // A queued row older than the queue's expiry lost its job (a worker stopped between taking it and starting it, and the queue never retries one), and
-    // a member cannot delete a queued row, so only a younger one holds the next analysis back. A stale running row is closed by the worker.
-    const unfinished = await tx.query(
-      `select 1 from analyses where user_id = $1 and (status = 'running' or (status = 'queued' and created_at > now() - $2 * interval '1 second')) limit 1`,
-      [userId, ANALYZE_QUEUE_OPTIONS.expireInSeconds],
-    );
-    if (unfinished.rowCount) return bad('Bạn đang có một phân tích chưa xong. Hãy đợi nó xong rồi phân tích video tiếp theo.', 429);
-    // The member's analyses of this ICT day, as the daily clip cap counts clips (dayClips, packages/core/src/limits.ts): a range on the bare created_at,
-    // and a failed one with no cost booked (the worker books an analysis only once it succeeds, ref llm:analysis:<id>) does not count.
+    // A running row holds the next analysis back (a stale one is closed by the worker), and so does a queued row while its queue job waits, however long
+    // (a backed-up queue, a stopped worker). A queued row with no waiting job lost it: a worker stopped between taking the job and starting the row, and the
+    // queue never retries one, nor can the member delete a queued row. Within the queue's expiry a queued row holds anyway (its job may not be sent yet).
+    const unfinished = (
+      await tx.query(`select id, status, created_at > now() - $2 * interval '1 second' as young from analyses where user_id = $1 and status in ('queued', 'running')`, [
+        userId,
+        ANALYZE_QUEUE_OPTIONS.expireInSeconds,
+      ])
+    ).rows as { id: string; status: string; young: boolean }[];
+    for (const a of unfinished) {
+      if (a.status === 'running' || a.young || (await (await boss()).findJobs(ANALYZE_QUEUE, { data: { analysisId: a.id }, queued: true })).length) {
+        return bad('Bạn đang có một phân tích chưa xong. Hãy đợi nó xong rồi phân tích video tiếp theo.', 429);
+      }
+    }
+    // The member's analyses of this ICT day, as a range on the bare created_at like the daily clip cap (dayClips, packages/core/src/limits.ts). Every one
+    // the worker started counts, failed or not, as its model calls may have been paid; only one that failed before it started (the queue refused it) is free.
     const day = (
       await tx.query(
         `select (select count(*) from analyses a
                   where a.user_id = $1
-                    and not (a.status = 'failed' and not exists (select 1 from cost_entries c where c.ref = 'llm:analysis:' || a.id))
+                    and not (a.status = 'failed' and a.started_at is null)
                     and a.created_at >= (date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh') at time zone 'Asia/Ho_Chi_Minh')
                     and a.created_at < ((date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh') + interval '1 day') at time zone 'Asia/Ho_Chi_Minh'))::int as today,
                 s.member_daily_analysis_cap as cap
@@ -82,6 +89,7 @@ export async function POST(request: Request) {
         [userId],
       )
     ).rows[0] as { today: number; cap: number };
+    if (day.cap === 0) return bad('Phân tích video đang tạm tắt.', 429);
     if (day.today >= day.cap) return bad(`Hôm nay bạn đã dùng hết ${day.cap} lượt phân tích. Mai bạn dùng tiếp được.`, 429);
     await tx.query(
       `insert into analyses (id, user_id, team_id, store_id, source_key, workspace_id)

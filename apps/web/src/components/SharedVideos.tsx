@@ -4,20 +4,11 @@
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { MAX_SHARED_TITLE } from '@/lib/analyze';
 import { api, ApiError, errorText, sendJson } from '@/lib/api';
+import type { SharedVideo } from '@/lib/remake';
 import { CardVideo } from './AnalysisHistory';
 import type { AnalysisRow } from './AnalyzeView';
 import { confirmDialog } from './Confirm';
 import { Modal } from './Modal';
-
-/** One card of the shelf, as the shared list gives it (only analyses whose source video is still there). */
-export interface SharedVideo {
-  id: string;
-  title: string;
-  sharedAt: string;
-  sourceAssetId: string;
-  durationS: number | null;
-  sceneCount: number;
-}
 
 /**
  * The shelf: nothing while none is shared or the list does not load. `onPick` opens the analysis (the page fetches it, so a video the member chose

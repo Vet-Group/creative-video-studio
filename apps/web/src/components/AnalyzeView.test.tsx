@@ -150,7 +150,7 @@ test("an Admin viewing another member's analysis sees who made it, and no share 
 });
 
 test('on a wide screen the shared videos the page loaded render above the Examples from the first paint, so the Examples do not jump down when the list arrives', () => {
-  const tee = { id: 'an-1', title: 'Áo thun trơn', sharedAt: '2026-11-15T10:00:00Z', sourceAssetId: 'vid-1', durationS: 11.4, sceneCount: 3 };
+  const tee = { id: 'an-1', title: 'Áo thun trơn', sourceAssetId: 'vid-1', durationS: 11.4, sceneCount: 3 };
   const html = renderToStaticMarkup(
     <JobsProvider userId="u1">
       <AnalyzeView remakeEnabled initialShared={[tee]} />

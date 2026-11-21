@@ -18,6 +18,7 @@ const { POST: start } = await import('./[id]/impersonate/route');
 const { POST: stop } = await import('../../me/stop-impersonating/route');
 const { POST: switchWorkspace } = await import('../../me/workspace/route');
 const { DELETE: deleteJob } = await import('../../jobs/[id]/route');
+const { POST: zip } = await import('../../library/zip/route');
 const profile = await import('../../me/profile/route');
 const sessionsRoute = await import('../../me/sessions/route');
 const { GET: limits } = await import('../../me/limits/route');
@@ -326,11 +327,13 @@ describe('an impersonated Admin only looks', () => {
     expect(read.status).toBe(200);
   });
 
-  test('a change through a member route with an Admin branch is refused too; switching workspace and stopping still work', async () => {
+  test('a change through a member route with an Admin branch is refused too; the Library zip (a read sent as POST), switching workspace and stopping still work', async () => {
     const cookie = merge(devCookie, await startAs(devCookie, other));
     const del = await deleteJob(new Request(`${ORIGIN}/api/jobs/x`, { method: 'DELETE', headers: { cookie } }), { params: Promise.resolve({ id: 'x' }) });
     expect(del.status).toBe(403);
     expect(((await del.json()) as { error: string }).error).toBe('not_allowed_while_impersonating');
+    const download = await zip(new Request(`${ORIGIN}/api/library/zip`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ids: [] }) }));
+    expect([download.status, ((await download.json()) as { error: string }).error]).toEqual([400, 'ids must list 1 to 50 items']); // past the guard
     const ws = await switchWorkspace(
       new Request(`${ORIGIN}/api/me/workspace`, { method: 'POST', headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' }, body: JSON.stringify({ workspaceId: COMPANY_WORKSPACE_ID }) }),
     );

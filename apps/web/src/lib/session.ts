@@ -26,8 +26,8 @@ export const isImpersonated = (session: Session): boolean => Boolean(session.ses
 export const impersonationRefusal = () => Response.json({ error: 'not_allowed_while_impersonating' }, { status: 403 });
 
 const IMPERSONATION_MAX_MS = 60 * 60 * 1000;
-/** The only writes an Admin signed in as another Admin may send (guard). */
-const IMPERSONATED_ADMIN_WRITES = new Set(['/api/me/stop-impersonating', '/api/me/workspace']);
+/** The only non-GET requests an Admin signed in as another Admin may send (guard): ending it, switching workspace, and the Library zip (a read sent as POST). */
+const IMPERSONATED_ADMIN_WRITES = new Set(['/api/me/stop-impersonating', '/api/me/workspace', '/api/library/zip']);
 
 const cookieValue = (headers: Headers, name: string): string | null => {
   for (const part of (headers.get('cookie') ?? '').split(';')) {
@@ -116,7 +116,7 @@ export async function guard(request: Request, role: 'member' | 'editor' | 'admin
   // A page on a sibling subdomain gets the cookie (SameSite=Lax is per site) and a text/plain body needs no preflight, so the browser's own word decides.
   if (write && crossOrigin(request)) return { error: Response.json({ error: 'forbidden origin' }, { status: 403 }) };
   // An Admin signed in as an Admin only looks, on every route (member routes have Admin branches too): a change made here would be logged under that
-  // Admin's name. Ending the impersonation and switching between the workspaces both share stay open.
+  // Admin's name. Ending the impersonation, switching between the workspaces both share and the Library zip stay open.
   if (write && isImpersonated(session) && session.user.role === 'admin' && !IMPERSONATED_ADMIN_WRITES.has(new URL(request.url).pathname)) return { error: impersonationRefusal() };
   const rendered = request.headers.get(WORKSPACE_HEADER);
   if (write && rendered && rendered !== workspace.workspaceId) return { error: Response.json({ error: 'workspace_changed' }, { status: 409 }) };

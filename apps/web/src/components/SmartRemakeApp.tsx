@@ -29,6 +29,9 @@ export const pickNote = (picked: number | null, again = false): string =>
   (again ? 'Ảnh sản phẩm đã đổi nên các cảnh được chọn lại từ đầu. ' : '') +
   (picked === null ? 'Chưa tự chọn được cảnh nào. Bạn hãy tự chọn các cảnh cần thay sản phẩm.' : picked === 0 ? 'AI chưa thấy cảnh nào có sản phẩm giống của bạn. Bạn hãy tự chọn các cảnh cần thay.' : `AI đã chọn sẵn ${picked} cảnh có sản phẩm của bạn; bỏ chọn cảnh nào không cần.`);
 
+/** "Thử phân tích lại" is offered for a failed analysis, and for one the server refused to start (a 429: one unfinished, or the day's cap), which leaves none on view. */
+export const offersRetry = (analysis: Pick<AnalysisRow, 'status'> | null, startFailed: boolean): boolean => analysis?.status === 'failed' || startFailed;
+
 /** The app's address for an analysis and the product on view, or the bare app without an analysis. */
 export const remakeHref = (slug: string, id: string | null, product?: string): string =>
   id ? `/apps/${slug}?analysis=${id}${product ? `&product=${product}` : ''}` : `/apps/${slug}`;
@@ -55,6 +58,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
   const [video, setVideo] = useState<RefVideo | null>(null);
   const [product, setProduct] = useState<Img[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisRow | null>(null);
+  const [startFailed, setStartFailed] = useState(false); // the last analyse() was refused before an analysis existed
   const [busy, setBusy] = useState(false); // an upload or the start of the analysis
   const [error, setError] = useState('');
   const [asked, setAsked] = useState(''); // `analysis:product` the pick was last asked for
@@ -126,6 +130,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
 
   // An analysis to work from with its reference video shown as chosen: the one the address names, or a shared one picked from the shelf.
   function showAnalysis(row: AnalysisRow) {
+    setStartFailed(false);
     setAnalysis(row);
     setVideo(row.sourceAssetId ? { id: row.sourceAssetId, filename: row.sharedTitle ?? 'Video mẫu', durationMs: Math.round((row.result?.durationS ?? 0) * 1000) } : null);
   }
@@ -156,12 +161,14 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
   async function analyse(v: RefVideo) {
     wanted.current = v.id;
     setAnalysis(null);
+    setStartFailed(false);
+    setError('');
     try {
       const { id } = await api<{ id: string }>('/api/analyses', sendJson('POST', { sourceAssetId: v.id }));
       // The member may have removed or replaced the video meanwhile.
       if (wanted.current === v.id) setAnalysis({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: v.id });
     } catch (e) {
-      if (wanted.current === v.id) setError(errorText(e, 'Không bắt đầu phân tích được.'));
+      if (wanted.current === v.id) (setError(errorText(e, 'Không bắt đầu phân tích được.')), setStartFailed(true));
     }
   }
 
@@ -247,7 +254,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
                 {status}
               </p>
             )}
-            {analysis?.status === 'failed' && video && (
+            {offersRetry(analysis, startFailed) && video && (
               <button type="button" className="link-button" disabled={locked} onClick={() => void analyse(video)}>
                 Thử phân tích lại
               </button>

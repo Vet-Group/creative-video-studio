@@ -10,21 +10,27 @@ import { LoadError } from './LoadError';
 
 const WHEN: Intl.DateTimeFormatOptions = { dateStyle: 'short', timeStyle: 'short' };
 
+/** Calls `onSeen` once `el` first scrolls into view, at once where the browser has no IntersectionObserver; returns the cleanup. */
+export function whenSeen(el: Element, onSeen: () => void): () => void {
+  if (typeof IntersectionObserver === 'undefined') {
+    onSeen();
+    return () => undefined;
+  }
+  const watch = new IntersectionObserver(([e]) => {
+    if (!e?.isIntersecting) return;
+    watch.disconnect();
+    onSeen();
+  });
+  watch.observe(el);
+  return () => watch.disconnect();
+}
+
 /** A card's first frame. An uploaded video has no poster, so its src is attached only once the card scrolls into view: a list of 50 no longer opens 50
  * streams through the app at once. */
 export function CardVideo({ assetId }: { assetId: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [seen, setSeen] = useState(false);
-  useEffect(() => {
-    if (!ref.current) return;
-    const watch = new IntersectionObserver(([e]) => {
-      if (!e?.isIntersecting) return;
-      setSeen(true);
-      watch.disconnect();
-    });
-    watch.observe(ref.current);
-    return () => watch.disconnect();
-  }, []);
+  useEffect(() => (ref.current ? whenSeen(ref.current, () => setSeen(true)) : undefined), []);
   return <video ref={ref} src={seen ? `/api/assets/${assetId}/content#t=0.1` : undefined} muted playsInline preload="metadata" tabIndex={-1} />;
 }
 
