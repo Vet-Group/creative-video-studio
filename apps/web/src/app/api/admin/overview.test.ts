@@ -31,6 +31,7 @@ interface Overview {
   users: { active: number; locked: number };
   models: { enabled: number; total: number };
   audit: { actorName: string; action: string; target: string }[];
+  sellers: { id: string; name: string; team: string; lastUsedAt: string | null; lastSeenAt: string | null }[];
 }
 let admin: Awaited<ReturnType<typeof newUser>>;
 let member: Awaited<ReturnType<typeof newUser>>;
@@ -109,6 +110,32 @@ describe('GET /api/admin/overview', () => {
     const { rows } = await pool.query('select count(*) filter (where twin_of is null)::int as visible, count(*)::int as all from model_configs');
     expect(rows[0].all).toBeGreaterThan(rows[0].visible);
     expect((await overview()).models.total).toBe(rows[0].visible);
+  });
+
+  test("lists each visible sales team's unlocked members with their last job or analysis and their last own sign-in", async () => {
+    await pool.query(`insert into teams (id, name, billable) values ('ts', 'Team Sales', true), ('th', 'Team Hidden', true)`);
+    await pool.query(`update teams set hidden = true where id = 'th'`);
+    const seller = await newUser('seller@example.test', 'member'); // signed in, then used CVS
+    const idle = await newUser('idle@example.test', 'member'); // signed in only
+    const fresh = (await auth.api.createUser({ body: { email: 'fresh@example.test', name: 'fresh@example.test', role: 'member' } })).user.id; // never signed in
+    const locked = await newUser('locked@example.test', 'member');
+    const hidden = await newUser('hidden@example.test', 'member');
+    await pool.query(`update users set team_id = 'ts' where id = any($1)`, [[seller.id, idle.id, fresh, locked.id]]);
+    await pool.query(`update users set banned = true where id = $1`, [locked.id]);
+    await pool.query(`update users set team_id = 'th' where id = $1`, [hidden.id]);
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, created_at, workspace_id)
+       values ('os1', $1, 'ts', 'fal-test', 'fal', 'p', '9:16', 5, '{}', 'image', '2026-11-20T10:00:00+07:00', 'ws_vet')`,
+      [seller.id],
+    );
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, created_at, workspace_id) values ('oa1', $1, 'ts', 'k', 'succeeded', '2026-11-21T08:00:00+07:00', 'ws_vet')`, [seller.id]);
+    // An Admin impersonating the fresh account is not its own sign-in.
+    await pool.query(`insert into sessions (id, user_id, token, expires_at, impersonated_by) values ('oi1', $1, 'oi1', now() + interval '1 hour', $2)`, [fresh, admin.id]);
+    const sellers = (await overview()).sellers.filter((s) => s.team !== 'Overview Team');
+    expect(sellers.map((s) => s.name)).toEqual(['fresh@example.test', 'idle@example.test', 'seller@example.test']);
+    expect(sellers.find((s) => s.id === seller.id)).toMatchObject({ team: 'Team Sales', lastUsedAt: new Date('2026-11-21T08:00:00+07:00').toISOString() });
+    expect(sellers.find((s) => s.id === idle.id)).toMatchObject({ lastUsedAt: null, lastSeenAt: expect.any(String) });
+    expect(sellers.find((s) => s.id === fresh)).toMatchObject({ lastUsedAt: null, lastSeenAt: null });
   });
 
   test('lists the newest audit entries, newest first, with the actor name', async () => {

@@ -76,6 +76,15 @@ export function groupRecent<T extends { actorName: string; action: string; creat
   return out;
 }
 
+const ictDay = (d: Date) => Date.parse(d.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }));
+
+/** When a seller last used CVS, in words by ICT calendar day; `idle` once they have not used it for 14 days or never have. */
+export function sellerUse(lastUsedAt: string | null, lastSeenAt: string | null, now = new Date()): { text: string; idle: boolean } {
+  if (!lastUsedAt) return { text: lastSeenAt ? 'Đã đăng nhập, chưa tạo gì' : 'Chưa đăng nhập', idle: true };
+  const days = Math.round((ictDay(now) - ictDay(new Date(lastUsedAt))) / 86_400_000);
+  return { text: days <= 0 ? 'Hôm nay' : days === 1 ? 'Hôm qua' : `${days} ngày trước`, idle: days >= 14 };
+}
+
 /** The workspace routes' refusals (lib/workspaces.ts), which a workspace owner reads too, in words. */
 const REASONS: Record<string, string> = {
   no_user: 'Chưa có tài khoản nào với email này. Đánh dấu “Tạo tài khoản mới” để tạo.',

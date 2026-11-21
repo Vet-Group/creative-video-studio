@@ -836,6 +836,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin .recent li:first-child { border-top: 0; }
 .admin .recent time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .admin :is(.recent-who, .recent-target, td.clip) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin tr[data-idle='true'] td:last-child { font-weight: 600; }
 .admin .recent-who { font-weight: 500; }
 .admin :is(.recent-target, td.clip) { color: var(--text-sub); font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 @container (max-width: 640px) { .admin .recent li { grid-template-columns: auto minmax(0, 1fr); } }
