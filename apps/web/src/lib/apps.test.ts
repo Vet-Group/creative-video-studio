@@ -3,7 +3,7 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
 import { POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, jobImages, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, posePrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isNewApp, itemLabel, itemPrompt, jobImages, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, posePrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -492,5 +492,17 @@ describe('motionReason', () => {
     expect(motionReason({ ...base, videoMs: 10_000, orientation: 'image' })).toBeNull();
     expect(motionReason({ ...base, videoMs: 12_000, orientation: 'video' })).toBeNull();
     expect(motionReason({ ...base, videoMs: 12_000 })).toBeNull();
+  });
+});
+
+describe('isNewApp', () => {
+  it('shows the New badge for 14 days from the midnight (ICT) an app went live, and never for an app with no day', () => {
+    const app = { added: '2026-11-20' };
+    expect(isNewApp(app, Date.parse('2026-11-20T00:00:00+07:00'))).toBe(true);
+    expect(isNewApp(app, Date.parse('2026-12-03T23:59:59+07:00'))).toBe(true);
+    expect(isNewApp(app, Date.parse('2026-12-04T00:00:00+07:00'))).toBe(false);
+    expect(isNewApp({}, Date.parse('2026-11-20T00:00:00+07:00'))).toBe(false);
+    // Every day set is a real date, so no card is new forever or never.
+    for (const a of APPS.filter((x) => x.added)) expect(Number.isNaN(Date.parse(`${a.added}T00:00:00+07:00`))).toBe(false);
   });
 });
