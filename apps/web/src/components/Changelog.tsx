@@ -1,5 +1,5 @@
 'use client';
-// The changelog page: entries by Vietnam day, newest first, with filter chips by kind. Opening it marks every entry seen.
+// The changelog page: entries by Vietnam day, newest first, ten days at a time, with filter chips by kind. Opening it marks every entry seen.
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { type ChangeEntry, type ChangeKind, KIND_LABEL } from '@/lib/changelog';
@@ -12,6 +12,8 @@ const TZ = 'Asia/Ho_Chi_Minh';
 const fmtDay = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric', timeZone: TZ });
 const fmtTime = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 const PR_URL = 'https://github.com/Vet-Group/creative-video-studio/pull/';
+/** Days the page shows at first and adds per "Xem ... ngày trước đó": the whole list ran to about 100 phone screens. */
+const DAYS_STEP = 10;
 
 export function Changelog({ entries, isAdmin }: { entries: ChangeEntry[]; isAdmin: boolean }) {
   const [kind, setKind] = useState<ChangeKind | 'all'>('all');
@@ -22,11 +24,16 @@ export function Changelog({ entries, isAdmin }: { entries: ChangeEntry[]; isAdmi
     markSeen(entries);
   }, []); // once, on opening: a second run would find nothing unseen
   const kinds: (ChangeKind | 'all')[] = ['all', 'new', 'improved', 'fixed', ...(isAdmin ? (['ops'] as const) : [])];
+  const [shown, setShown] = useState(DAYS_STEP);
   const days = new Map<string, ChangeEntry[]>();
   for (const e of entries) {
     const day = vnDay(new Date(e.at));
     if (kind === 'all' || e.kind === kind) days.set(day, [...(days.get(day) ?? []), e]);
   }
+  const all = [...days];
+  // Every day holding an entry still unseen stays in view, however far back it is.
+  const limit = Math.max(shown, all.findLastIndex(([, items]) => items.some((e) => fresh.has(e.at))) + 1);
+  const left = all.length - limit;
   return (
     <section aria-labelledby="changelog-title" className="changelog">
       <h1 id="changelog-title">Có gì mới</h1>
@@ -43,7 +50,7 @@ export function Changelog({ entries, isAdmin }: { entries: ChangeEntry[]; isAdmi
           {entries.length === 0 ? 'Chưa có thay đổi nào.' : 'Chưa có thay đổi nào thuộc loại này.'}
         </p>
       ) : (
-        [...days].map(([day, items]) => (
+        all.slice(0, limit).map(([day, items]) => (
           <section key={day} aria-labelledby={`changelog-day-${day}`}>
             <h2 id={`changelog-day-${day}`} className="changelog-day">
               {fmtDay.format(new Date(items[0]!.at))}
@@ -81,6 +88,11 @@ export function Changelog({ entries, isAdmin }: { entries: ChangeEntry[]; isAdmi
             </ol>
           </section>
         ))
+      )}
+      {left > 0 && (
+        <button type="button" className="changelog-more" onClick={() => setShown(limit + DAYS_STEP)}>
+          Xem {Math.min(left, DAYS_STEP)} ngày trước đó (còn {left} ngày)
+        </button>
       )}
     </section>
   );

@@ -11,6 +11,12 @@ const NEWEST_DAY = CHANGELOG.find((e) => e.audience === 'all')!.at.slice(0, 10);
 const dot = (page: Page) => page.locator('.sidebar nav a[href="/changelog"] .nav-dot');
 const popup = (page: Page) => page.getByRole('dialog', { name: 'Có gì mới' });
 
+/** Opens every earlier day: the page shows ten days at a time. */
+async function showAll(page: Page) {
+  const more = page.getByRole('button', { name: /ngày trước đó/ });
+  while (await more.isVisible()) await more.click();
+}
+
 /** Pretends the member last looked at the changelog long ago, so newer entries are unseen. */
 async function unseen(page: Page) {
   await page.evaluate(([seen, popupKey, value]) => (localStorage.setItem(seen!, value!), localStorage.removeItem(popupKey!)), [SEEN, POPUP, longAgo]);
@@ -28,10 +34,12 @@ test('a first visit shows the dot for the newest day but no popup; the page list
   await expect(page).toHaveURL(/\/changelog$/);
   await expect(dot(page)).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 1, name: 'Có gì mới' })).toBeVisible();
-  await expect(page.getByRole('heading', { level: 3, name: 'Trang Có gì mới' })).toBeVisible();
-  // Grouped by day, newest first.
+  // Grouped by day, newest first, ten days at a time.
   const days = page.locator('.changelog-day');
-  expect(await days.count()).toBeGreaterThan(5);
+  await expect(days).toHaveCount(10);
+  await showAll(page);
+  await expect(page.getByRole('heading', { level: 3, name: 'Trang Có gì mới' })).toBeVisible();
+  expect(await days.count()).toBeGreaterThan(10);
   await expect(days.first()).toContainText(String(Number(NEWEST_DAY.slice(8))));
   // A member sees no admin entry, no operations chip and no PR numbers.
   await expect(page.getByText('Chỉ quản trị viên')).toHaveCount(0);
@@ -101,6 +109,7 @@ test('"Xem tất cả" in the popup opens the page and marks everything seen; an
     const admin = await context.newPage();
     await signIn(admin, 'admin');
     await admin.goto('/changelog');
+    await showAll(admin);
     await expect(admin.getByRole('heading', { level: 3, name: 'Xoá người dùng' })).toBeVisible();
     await expect(admin.getByText('Chỉ quản trị viên').first()).toBeVisible();
     await expect(admin.getByRole('button', { name: 'Vận hành' })).toBeVisible();
