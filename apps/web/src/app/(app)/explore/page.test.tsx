@@ -156,6 +156,20 @@ test('Continue shows running jobs first, then the latest finished, at most four;
   expect(list).toContain('Không thành công');
 });
 
+test("Continue's pictures, all in the first row, load at once, the first one first (the page's LCP); the decorative strip's stay lazy", async () => {
+  // The first job has no picture yet, so the high priority goes to the second, the first picture shown.
+  const html = await withJobs([job('bad', 'failed'), ...['a', 'b', 'c'].map((id) => job(id, 'succeeded', { poster_asset_id: `p-${id}` }))], { strip: [{ id: 's1' }] });
+  const list = html.match(/<ul class="explore-jobs"[^>]*>([\s\S]*?)<\/ul>/)![1]!;
+  expect(list.indexOf('banner-empty')).toBeLessThan(list.indexOf('<img'));
+  const pictures = [...list.matchAll(/<img [^>]*>/g)].map((m) => m[0]);
+  expect(pictures).toHaveLength(3);
+  for (const img of pictures) expect(img).not.toContain('loading="lazy"');
+  expect(pictures.map((img) => / fetchpriority="high"/i.test(img))).toEqual([true, false, false]); // React writes it fetchPriority
+  const strip = [...html.match(/<div class="explore-strip"[\s\S]*?<\/div>/)![0].matchAll(/<img [^>]*>/g)].map((m) => m[0]);
+  expect(strip.length).toBeGreaterThan(0);
+  for (const img of strip) expect(img).toContain('loading="lazy"');
+});
+
 test("Continue shows a finished image job's preview when it has one, else the image itself", async () => {
   const html = await withJobs([
     job('img-new', 'succeeded', { feature: 'image', resolution: '2K', output_asset_id: 'big', poster_asset_id: 'small' }),
