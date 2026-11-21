@@ -40,6 +40,9 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await expect(reason(page)).toHaveText('Tải lên ảnh: Người mẫu.');
     await page.getByLabel('Ảnh người mẫu', { exact: true }).setInputFiles({ name: 'model.png', mimeType: 'image/png', buffer: png() });
     await expect(slot(page).getByRole('img', { name: 'model.png' })).toBeVisible();
+    // The one photo fills its slot whole, as Marketing Studio's do, not a 56 px thumbnail under a name chip cut to "N…" (the label above names it).
+    expect((await slot(page).getByRole('img', { name: 'model.png' }).boundingBox())!.height).toBeGreaterThan(180);
+    await expect(slot(page).locator('.slot-chip')).toBeHidden();
     await expect(reason(page)).toHaveText('Chọn ít nhất một tư thế, hoặc tự tả một tư thế.');
     await expect(runButton(page)).toBeDisabled();
     await expect(cost(page)).toHaveCount(0); // no price while nothing is picked
