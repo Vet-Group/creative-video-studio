@@ -46,6 +46,14 @@ describe('sendRun', () => {
     expect(await sendRun({ modelId: 'm', prompt: 'a blue shirt' })).toBe(true);
     expect(confirm).not.toHaveBeenCalled();
   });
+  it("asks about a batch Run sent again, whose batch id is new each time", async () => {
+    const confirm = vi.mocked(confirmDialog).mockReset().mockResolvedValue(false);
+    vi.mocked(api).mockReset().mockResolvedValue({});
+    const body = { feature: 'background_remover', modelId: 'm', assetIds: ['a'] };
+    expect(await sendRun({ ...body, params: { resolution: '1K', batch: '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11' } })).toBe(true);
+    expect(await sendRun({ ...body, params: { resolution: '1K', batch: '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a12' } })).toBe(false);
+    expect(confirm).toHaveBeenCalledOnce();
+  });
   it('remembers only a Run the server took', async () => {
     const confirm = vi.mocked(confirmDialog).mockReset().mockResolvedValue(true);
     vi.mocked(api).mockReset().mockRejectedValueOnce(new ApiError(500, 'down')).mockResolvedValue({});

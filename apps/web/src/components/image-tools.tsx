@@ -447,7 +447,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
     </span>
   );
   // "3/13" on screen; a screen reader hears "3 trên 13 ảnh trang phục", as a bare fraction reads badly.
-  const counter = count && (images.length > 0 || count === 'always') && (
+  const counter = count && !whole && (images.length > 0 || count === 'always') && (
     <span className="slot-count" data-over={images.length > max || undefined}>
       <span aria-hidden="true">
         {images.length}/{max}
@@ -479,7 +479,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       ) : (
         name
       )}
-      <div ref={box} className="slot" role="group" aria-labelledby={labelId} aria-describedby={counter ? countId : undefined} data-room={room || undefined} data-over={over} data-one={whole || undefined} {...(!zone && { onDragOver, onDragLeave: () => setOver(false), onDrop })}>
+      <div ref={box} className="slot" role="group" aria-labelledby={labelId} aria-describedby={counter ? countId : undefined} data-room={(room && !(one && images.length > 0)) || undefined} data-over={over} data-one={whole || undefined} {...(!zone && { onDragOver, onDragLeave: () => setOver(false), onDrop })}>
         <input
           ref={input}
           type="file"

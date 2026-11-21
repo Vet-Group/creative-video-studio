@@ -5,7 +5,7 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { waitLabel } from '@/lib/explore';
 import { parseFashionTraits } from '@/lib/fashion-model';
 import { usable } from '@/lib/fashion-models';
@@ -177,7 +177,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const poseTextId = useId();
   const genderName = useId();
   const { models, failed } = useImageModels(app.feature);
-  const count = images.reduce((n, list) => n + list.length, 0);
+  const count = jobImages(app, images);
   const pick = useImageChoice(models, Math.max(1, count));
   const { chosen } = pick;
   // The saved AI models a slot offers (the pose generator's model photo), as Try On's model picker does.
@@ -307,7 +307,14 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     setError('');
     try {
       const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
-      setImages((cur) => cur.map((list, i) => (i === into ? (slotMax(app, i, chosen?.maxImages ?? 1) === 1 || app.bulk ? [img] : [...list, img]) : list)));
+      // A one-photo slot, or a bulk slot holding one photo at most, takes the result in place; a bulk slot with a batch waiting adds it, up to its max.
+      setImages((cur) =>
+        cur.map((list, i) => {
+          if (i !== into) return list;
+          const max = slotMax(app, i, chosen?.maxImages ?? 1);
+          return max === 1 || (app.bulk && list.length <= 1) ? [img] : app.bulk && list.length >= max ? list : [...list, img];
+        }),
+      );
       notify(`Đã dùng kết quả cho ô ${app.slots[into]!.label}`);
       if (narrow) setTab('create');
     } catch (e) {
@@ -361,8 +368,9 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     } catch (e) {
       let sent = '';
       if (done > 0 && app.bulk) {
-        // The photos sent leave the slot, so Run again sends only the rest.
-        setImages((cur) => cur.map((list, i) => (i === 0 ? list.slice(done) : list)));
+        // The photos sent leave the slot, by id (one may have been removed meanwhile), so Run again sends only the rest.
+        const gone = new Set(images[0]!.slice(0, done).map((x) => x.id));
+        setImages((cur) => cur.map((list, i) => (i === 0 ? list.filter((x) => !gone.has(x.id)) : list)));
         sent = ` Đã gửi ${done}/${runs.length} ảnh và bỏ các ảnh đã gửi khỏi ô Ảnh.`;
       } else if (done > 0) {
         // What was sent is unticked, so Run again sends only the rest instead of every item a second time.

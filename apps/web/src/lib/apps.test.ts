@@ -3,7 +3,7 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
 import { POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, posePrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, jobImages, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, posePrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -188,7 +188,10 @@ describe('appReason', () => {
   it("counts one photo of a bulk app's first slot per job, so many photos fit a model that takes one or two", () => {
     expect(reason('background-remover', [['a', 'b', 'c']], '', 1)).toBeNull();
     expect(reason('background-changer', [['a', 'b', 'c'], ['r']], '', 2)).toBeNull();
-    expect(reason('background-changer', [['a', 'b'], ['r']], '', 1)).toBe('Mô hình này nhận tối đa 1 ảnh.');
+    expect(reason('background-changer', [['a', 'b'], ['r']], '', 1)).toBe('Mô hình này nhận tối đa 1 ảnh.');    // The model choice counts the same way, so two photos do not lock a one-image model.
+    expect(jobImages(appBySlug('background-remover')!, [[img('a'), img('b')]])).toBe(1);
+    expect(jobImages(appBySlug('background-changer')!, [[img('a'), img('b')], [img('r')]])).toBe(2);
+    expect(jobImages(appBySlug('face-swap')!, [[img('a')], [img('b')]])).toBe(2);
   });
 });
 

@@ -30,7 +30,9 @@ const lastRuns = new Map<string, string>();
  */
 export async function sendRun(body: Record<string, unknown>): Promise<boolean> {
   const feature = typeof body.feature === 'string' ? body.feature : 'video';
-  const json = JSON.stringify(body);
+  // A batch id is new on every Run, so it is left out: the same items again still ask. shortcut: a bulk Run is keyed by its first job, so another batch
+  // starting with the same photo asks too; key on every photo if that annoys.
+  const json = JSON.stringify(body, (k, v) => (k === 'batch' ? undefined : v));
   const again = lastRuns.get(feature) === json;
   if (again && !(await confirmDialog({ title: 'Chạy lại đúng các cài đặt vừa gửi?', body: 'Bạn vừa gửi một lượt tạo y hệt. Lượt mới tạo thêm một kết quả và tính phí như lượt trước.', confirmLabel: 'Chạy lại' }))) return false;
   await api('/api/jobs', sendJson('POST', body));

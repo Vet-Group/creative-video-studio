@@ -148,7 +148,7 @@ test('Background Remover takes several photos: one shows whole with a corner til
   await expect(slot.getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(page.locator('.slot[data-one]')).toHaveCount(1); // one photo shows whole, as on a one-photo app
   await expect(slot.getByRole('button', { name: 'Tải lên Ảnh' })).toBeVisible(); // and its corner tile adds more
-  await expect(page.getByText('1/25')).toBeVisible();
+  await expect(page.getByText('1/25')).toHaveCount(0); // the photo shows whole, under no count
   await expect(page.getByText(/ảnh ×/)).toHaveCount(0); // one photo is one job, priced as before
 
   await page.getByLabel('Ảnh cần xoá nền').setInputFiles([file('small.png'), file('model.png')]);

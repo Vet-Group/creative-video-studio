@@ -358,8 +358,7 @@ export function appReason(app: AppConfig, d: AppDraft): string | null {
     if (reference && written) return 'Chọn mô tả nền hoặc ảnh nền tham chiếu, không dùng cả hai.';
     if (!reference && !written) return 'Nhập mô tả nền mới hoặc tải lên ảnh nền tham chiếu.';
   }
-  // A bulk app's job takes one photo of its first slot.
-  const count = d.images.reduce((n, list, i) => n + (app.bulk && i === 0 ? Math.min(list.length, 1) : list.length), 0);
+  const count = jobImages(app, d.images);
   if (count > model.maxImages) return `Mô hình này nhận tối đa ${model.maxImages} ảnh.`;
   return null;
 }
@@ -400,6 +399,9 @@ export function stockGroups(slot: AppSlot, have: ReadonlySet<string>): { label?:
 
 /** The asset ids of a Run, slot by slot, and the prompt the body carries (only Background Changer sends one). */
 /** How many images slot `i` takes with a model that accepts `maxImages`. */
+/** How many photos one job of the app sends: a bulk app's job takes one photo of its first slot. */
+export const jobImages = (app: AppConfig, images: unknown[][]): number => images.reduce<number>((n, list, i) => n + (app.bulk && i === 0 ? Math.min(list.length, 1) : list.length), 0);
+
 export const slotMax = (app: AppConfig, i: number, maxImages: number): number => (app.bulk && i === 0 ? MAX_BATCH : app.slots[i]?.many ? Math.max(1, maxImages - (app.slots.length - 1)) : 1);
 
 /** Puts a job's images back in the slots they were sent from: one per slot, except a `many` slot, which takes all those between its neighbours. */
