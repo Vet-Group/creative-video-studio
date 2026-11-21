@@ -61,6 +61,8 @@ export interface AppConfig {
   bulk?: boolean;
   /** An app that is not built yet: its page says so, and why. */
   soon?: string;
+  /** The day it went live (ICT, as its changelog entry says): its Apps card shows the New badge for NEW_DAYS days from then. */
+  added?: string;
 }
 
 /** The template photos of Jewelry Try-On's wearer slot (samples `jewelry-template-<group>-NN.jpg`), in the reference site's order. */
@@ -203,6 +205,7 @@ export const APPS: AppConfig[] = [
   {
     // Ours too, and the only app with its own page (components/FashionModelApp.tsx): the traits are its form, so it has no upload slot.
     slug: 'ai-fashion-model',
+    added: '2026-11-12',
     feature: 'fashion_model',
     name: 'Tạo người mẫu AI',
     description: 'Chọn đặc điểm để tạo người mẫu hư cấu, lưu lại và dùng trong Thử đồ, Tạo ảnh và Tạo video.',
@@ -213,6 +216,7 @@ export const APPS: AppConfig[] = [
   {
     // Ours too: the sides of a product from its front photo, as reference images that help a video model keep an all-over print.
     slug: 'multi-angle',
+    added: '2026-11-18',
     feature: 'multi_angle',
     name: 'Ảnh nhiều góc',
     description: 'Từ một ảnh sản phẩm, tạo ảnh mặt sau, hai bên hoặc góc 3/4, mỗi góc một ảnh riêng.',
@@ -224,6 +228,7 @@ export const APPS: AppConfig[] = [
   {
     // Ours too (the pet pack, 2026-11-19): one design or photo with a dog, the same picture with another breed per job, so a seller lists one design for many breeds.
     slug: 'breed-swap',
+    added: '2026-11-19',
     feature: 'breed_swap',
     name: 'Đổi giống chó hàng loạt',
     description: 'Từ một ảnh có chó (mockup, thiết kế hay ảnh chụp), tạo một ảnh cho mỗi giống chó đã chọn, giữ nguyên chữ và bố cục.',
@@ -235,6 +240,7 @@ export const APPS: AppConfig[] = [
   {
     // Ours too (the pet apps, 2026-11-19): one pet photo, one print-ready design per style, for a seller's custom pet portrait products.
     slug: 'pet-portrait',
+    added: '2026-11-19',
     feature: 'pet_portrait',
     name: 'Chân dung thú cưng',
     description: 'Từ một ảnh thú cưng, tạo một thiết kế in sẵn nền trắng cho mỗi phong cách đã chọn: màu nước, hoạt hình, nét mực, chân dung hoàng gia và hơn nữa.',
@@ -246,6 +252,7 @@ export const APPS: AppConfig[] = [
   {
     // Ours too: one design, one product mockup per product, or the design on the seller's own blank product photo.
     slug: 'mockup-pack',
+    added: '2026-11-19',
     feature: 'mockup_pack',
     name: 'Mockup hàng loạt',
     description: 'Từ một thiết kế, tạo một ảnh mockup cho mỗi sản phẩm đã chọn: thảm tròn, ornament, áo thun, cốc, chăn và tranh canvas.',
@@ -260,6 +267,7 @@ export const APPS: AppConfig[] = [
   {
     // Ours too: one personalized design, one picture per customer name (and breed), so a seller lists one design for many names.
     slug: 'name-swap',
+    added: '2026-11-19',
     feature: 'name_swap',
     name: 'Đổi tên hàng loạt',
     description: 'Từ một thiết kế có tên, tạo một ảnh cho mỗi tên mới, giữ nguyên phông chữ, màu và vị trí; có thể đổi cả giống chó.',
@@ -271,6 +279,7 @@ export const APPS: AppConfig[] = [
   {
     // Ours too (owner-approved 2026-11-20): one model photo, the same person in other poses, one job per pose; a fashion app beside the AI model generator, whose models it poses.
     slug: 'pose-generator',
+    added: '2026-11-20',
     feature: 'pose_generator',
     name: 'Tạo tư thế người mẫu',
     description: 'Từ một ảnh người mẫu, tạo cùng người mẫu ấy trong tối đa 4 tư thế, mỗi tư thế một ảnh riêng, giữ nguyên người và trang phục.',
@@ -283,6 +292,7 @@ export const APPS: AppConfig[] = [
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
     // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
     slug: 'smart-remake',
+    added: '2026-11-13',
     feature: 'video',
     name: 'Smart Remake',
     description: 'Giữ mạch truyện của một video mẫu và đặt sản phẩm của bạn vào các cảnh. Chỉ cần một video và một ảnh sản phẩm.',
@@ -298,6 +308,10 @@ export const visibleApps = (smartRemake: boolean): AppConfig[] => APPS.filter((a
 export const JOB_APPS: AppConfig[] = APPS.filter((a) => a.feature !== 'video');
 
 export const appBySlug = (slug: string): AppConfig | undefined => APPS.find((a) => a.slug === slug);
+
+export const NEW_DAYS = 14;
+/** Whether an app went live less than NEW_DAYS days before `now` (its `added` day starts at midnight ICT). */
+export const isNewApp = (app: Pick<AppConfig, 'added'>, now = Date.now()): boolean => !!app.added && now - Date.parse(`${app.added}T00:00:00+07:00`) < NEW_DAYS * 86_400_000;
 
 /** Lower case without accents or stroked d, so a search typed without diacritics still matches. */
 export const fold = (s: string): string => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd');

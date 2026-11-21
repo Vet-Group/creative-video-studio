@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
-import { api, ApiError, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob, WORKSPACE_CHANGED_EVENT } from '@/lib/api';
+import { api, ApiError, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob, withWorkspace, WORKSPACE_CHANGED_EVENT } from '@/lib/api';
 import { appBySlug, itemLabel } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
@@ -14,6 +14,7 @@ import { featureLabel } from '@/lib/features';
 import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
 import { userAvatarColor } from '@/lib/profile';
+import { loginFor } from '@/lib/return-to';
 import { APPS_OPEN_KEY, appShortcuts, COLLAPSED_COOKIE, isMac, isPaletteShortcut, isSettingsShortcut, navGroups } from '@/lib/sidebar';
 import { confirmRerun, confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -499,6 +500,42 @@ function HistoryEmpty({ feature }: { feature: string }) {
   );
 }
 
+/** History's "Ghép lookbook": 2 to 4 picked pictures as one JPEG, two per row (/api/library/lookbook), saved as a download. */
+function LookbookButton({ ids, notify }: { ids: string[]; notify: (text: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function make() {
+    if (ids.length < 2 || ids.length > 4) return notify('Chọn 2 đến 4 ảnh để ghép lookbook.');
+    setBusy(true);
+    try {
+      const res = await fetch('/api/library/lookbook', withWorkspace(sendJson('POST', { ids })));
+      // What api() does for any call: a lost session signs in again, a workspace switched in another tab says so.
+      if (res.status === 401) return window.location.assign(loginFor(window.location.pathname + window.location.search));
+      if (res.status === 409) return window.dispatchEvent(new Event(WORKSPACE_CHANGED_EVENT));
+      if (!res.ok) {
+        const why: Record<number, string> = { 400: 'Chỉ ghép được ảnh, không ghép video.', 403: 'Có ảnh đã bị xoá hoặc không dùng được. Hãy bỏ chọn ảnh đó.', 422: 'Có ảnh không đọc được để ghép.' };
+        return notify(why[res.status] ?? 'Không ghép được lookbook, hãy thử lại.');
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'lookbook.jpg';
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      notify('Không ghép được lookbook, hãy thử lại.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button type="button" className="link-button" disabled={busy} onClick={() => void make()}>
+      {busy ? 'Đang ghép…' : 'Ghép lookbook'}
+    </button>
+  );
+}
+
 /** The "My jobs" list. It opens in the drawer of a page without its own History, or sits in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation).
  * Beside a form (FormContext), the cards' chips set their value on it and Dùng lại refills it in place. With `format` (Marketing Studio's), only that format's jobs; UGC's carry none. */
 export function Tray({ feature, format }: { feature?: string; format?: string }) {
@@ -506,7 +543,9 @@ export function Tray({ feature, format }: { feature?: string; format?: string })
   const all = useJobs();
   const { workerOffline, loaded, failed, refresh, queue } = all;
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature && (format === undefined || (j.format ?? 'ugc') === format)) : all.jobs;
-  const zip = useZipDownload();
+  // A page of pictures (an image job has no duration) can also lay 2 to 4 picked ones out as one lookbook.
+  const pictures = jobs.some((j) => j.durationSec === 0 && j.outputAssetId);
+  const zip = useZipDownload({ actions: pictures ? (ids) => <LookbookButton ids={ids} notify={all.notify} /> : undefined });
   // A batch app's card offers its Run when the list shows another result of it. The Run's results are read from the job, as a Run can hold more than the 20 latest jobs.
   const inBatch = (j: TrayJob) => !!j.batch && jobs.some((b) => b.id !== j.id && b.batch === j.batch && b.status === 'succeeded' && b.outputAssetId);
   async function selectBatch(j: TrayJob) {
