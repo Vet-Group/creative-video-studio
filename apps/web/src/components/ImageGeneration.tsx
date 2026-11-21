@@ -142,7 +142,7 @@ ${style.prompt}` : prompt.trim();
   const sent = kit ? withBrand(styled, kit, 'image') : styled;
   // When the member's words fit and what the page adds does not, the reason names it: the brand kit sits under the more-options pill.
   const added = chosen && prompt.trim().length <= chosen.maxPromptChars ? [kit && 'bộ nhận diện', style?.prompt && 'phong cách'].filter(Boolean).join(' và ') : '';
-  const on = [storeId && 'cửa hàng', kit && 'bộ nhận diện'].filter(Boolean); // the folded options in use, counted on the more-options pill
+  const on = [storeId && 'cửa hàng', kit && 'bộ nhận diện', count > 1 && `${count} ảnh`].filter(Boolean); // the folded options in use, counted on the more-options pill
   const previewNote = [
     style && !style.prompt && `Mô tả của phong cách "${style.label}" do quản trị giữ, máy chủ thêm vào sau phần của bạn khi tạo.`,
     enhance && ENHANCE_NOTE,
@@ -194,7 +194,7 @@ ${style.prompt}` : prompt.trim();
 
   const total = runTotal(pick.estimate, count);
   async function run() {
-    if (!(await confirmRun(total, `Tạo lượt này với giá ${usd(total ?? 0)}?`))) return; // the price as the button shows it
+    if (!(await confirmRun(total))) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -212,8 +212,11 @@ ${style.prompt}` : prompt.trim();
       if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
-      setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${done > 0 ? ` Đã gửi ${done}/${count} ảnh.` : ''}`);
-      if (done > 0) await refresh();
+      setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${done > 0 ? ` Đã gửi ${done}/${count} ảnh, còn ${count - done} ảnh chưa gửi.` : ''}`);
+      if (done > 0) {
+        setCount(count - done); // Run again sends only the rest
+        await refresh();
+      }
     } finally {
       setBusy(false);
     }
@@ -302,7 +305,6 @@ ${style.prompt}` : prompt.trim();
             <>
               <Select chip label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={(v) => (recall.touch(), pick.setRatio(v))} />
               <Select chip label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={(v) => (recall.touch(), pick.setResolution(v))} />
-              <Select chip label="Số ảnh" icon="copy" heading="Số ảnh mỗi lượt" value={String(count)} options={[1, 2, 4].map((n) => ({ value: String(n), label: `${n} ảnh` }))} onChange={(v) => setCount(Number(v))} />
               {pick.thinking && <Select chip label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t }))} onChange={pick.setThinking} />}
             </>
           )}
@@ -322,6 +324,7 @@ ${style.prompt}` : prompt.trim();
         </div>
 
         <div className="imagebar-foot" id="imagegen-more" hidden={!narrow && !more}>
+          {chosen && <Select chip label="Số ảnh" icon="copy" heading="Số ảnh mỗi lượt" value={String(count)} options={[...new Set([1, 2, 4, count])].sort((a, b) => a - b).map((n) => ({ value: String(n), label: `${n} ảnh` }))} onChange={(v) => setCount(Number(v))} />}
           <BrandPicker storeId={storeId} onStore={(v) => (recall.touch(), setStoreId(v))} on={useBrand} onToggle={(v) => (recall.touch(), setUseBrand(v))} onKit={setKit} onFailed={() => setMore(true)} />
           <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
           {prompt.trim() && <PromptPreview feature="image" prompts={[sent]} limit={chosen?.maxPromptChars} note={previewNote || undefined} folded />}

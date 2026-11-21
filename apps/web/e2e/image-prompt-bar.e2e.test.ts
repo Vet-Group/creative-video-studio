@@ -74,7 +74,6 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
     bar.getByRole('button', { name: /^Mô hình / }),
     bar.getByRole('combobox', { name: 'Tỉ lệ', exact: true }),
     bar.getByRole('combobox', { name: 'Độ phân giải', exact: true }),
-    bar.getByRole('combobox', { name: 'Số ảnh', exact: true }),
     more,
     run,
   ]) {
@@ -126,7 +125,7 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
     order.push(await focusedName(page));
   }
   const chips = order.slice(order.indexOf('Phong cách'));
-  expect(chips.map((n) => n.replace(/ .*/, ''))).toEqual(['Phong', 'Mô', 'Tỉ', 'Độ', 'Số', 'Tuỳ', 'Tạo']);
+  expect(chips.map((n) => n.replace(/ .*/, ''))).toEqual(['Phong', 'Mô', 'Tỉ', 'Độ', 'Tuỳ', 'Tạo']);
   expect(chips[1]).toMatch(/^Mô hình Mock image E2E/);
   expect(order.slice(0, order.indexOf('Phong cách'))).toEqual(expect.arrayContaining(['Cải thiện mô tả bằng AI', 'Gợi ý AI', 'Mở rộng']));
   await expect(run).toBeFocused();
@@ -310,9 +309,12 @@ test('a Run of 4 pictures is priced four times on Run and sends four image jobs 
   const cost = bar.getByRole('button', { name: /^Tạo ảnh/ }).locator('.run-cost');
   await expect(cost).toHaveText(/^· \$\d+\.\d{4}$/);
   const one = Number((await cost.textContent())!.replace('· $', ''));
+  await expect(select(page, 'Số ảnh')).toBeHidden(); // under the more-options pill, as the chip row has no room for it
+  await openMore(page);
   await expect(select(page, 'Số ảnh')).toHaveAttribute('data-value', '1');
   await expect(bar.getByText(/^\d ảnh × /)).toHaveCount(0); // one picture is priced as before
   await selectText(page, 'Số ảnh', '4 ảnh');
+  await expect(bar.locator('.imagebar-more-on')).toContainText('1'); // the pill counts it as an option in use
   await expect(cost).toHaveText(`· $${(one * 4).toFixed(4)}`);
   await expect(bar.getByText(/^4 ảnh × \$[\d.]+ = \$[\d.]+$/)).toBeVisible();
 
