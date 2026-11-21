@@ -18,7 +18,7 @@ const { GET: listJobs, POST } = await import('./route');
 const { GET } = await import('../stores/route');
 const { settle } = await import('@cvs/core/ledger');
 const { FEATURE_PROMPTS } = await import('@cvs/core/models');
-const { breedSwapPrompt, mockupPrompt, nameSwapPrompt, petPortraitPrompt, posePrompt } = await import('@/lib/apps');
+const { breedSwapPrompt, MAX_BATCH, mockupPrompt, nameSwapPrompt, petPortraitPrompt, posePrompt } = await import('@/lib/apps');
 const { forgetFalBalance } = await import('@/lib/provider-credit');
 
 const PASSWORD = 'correct-horse-battery';
@@ -503,6 +503,19 @@ describe('POST /api/jobs for an image feature', () => {
     expect(await sentCount(m.id)).toBe(1);
   });
 
+  test('a Run of several pictures shares one batch id, a UUID, and stops at MAX_BATCH jobs', async () => {
+    const m = await newMember();
+    const RUN = '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a21';
+    const res = await runImage(m, { params: { resolution: '2K', batch: RUN } });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select params from jobs where id = $1', [id])).rows).toEqual([{ params: { resolution: '2K', batch: RUN } }]);
+    expect(await error(await runImage(m, { params: { resolution: '2K', batch: 'run-1' } }))).toBe('params.batch must be a UUID');
+    await pool.query(`insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, params, status, is_mock, workspace_id)
+      select 'run-' || i || '-' || $1, $1, 'team-unassigned', 'image', 'img-pro', 'fal', 'x', '3:4', 0, '{}', jsonb_build_object('resolution', '2K', 'batch', $2::text), 'succeeded', false, 'ws_vet' from generate_series(2, ${MAX_BATCH}) i`, [m.id, RUN]);
+    expect(await error(await runImage(m, { params: { resolution: '2K', batch: RUN } }))).toBe(`a Run (params.batch) takes at most ${MAX_BATCH} jobs`);
+  });
+
   test('adds an Image Generation style after the member prompt, keeps their words as the brief, and refuses a Create preset, a switched-off style and a style elsewhere', async () => {
     const m = await newMember();
     const style = (await pool.query(`select prompt from presets where id = 'style-street'`)).rows[0].prompt as string;
@@ -608,7 +621,7 @@ describe('POST /api/jobs for an image feature', () => {
     ['a resolution the model lacks', { params: { resolution: '4K' } }, /ratio, resolution or number of images/],
     ['a prototype key as the resolution', { params: { resolution: 'constructor' } }, /ratio, resolution or number of images/],
     ['no resolution', { params: {} }, /params\.resolution is required/],
-    ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution, quality, thinking and brief/],
+    ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution, quality, thinking, brief and batch/],
     ['a quality that does not exist', { params: { resolution: '1K', quality: 'ultra' } }, /params\.quality must be one of/],
     ['a thinking level on a model with none', { params: { resolution: '2K', thinking: 'high' } }, /the model has no thinking level/],
     ['a thinking level the model lacks', { modelId: 'img-think', ratio: 'auto', params: { resolution: '1K', thinking: 'low' } }, /params\.thinking must be one of minimal, medium, high on this model/],
@@ -665,7 +678,7 @@ describe('POST /api/jobs for an image feature', () => {
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', pose: 'cartwheel' } }))).toMatch(/params.pose must be one of the Try On poses/);
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: '2' } }))).toMatch(/params.garments must count the garment images \(1 to 1\)/); // 2 inputs: the person and 1 garment
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: 'x' } }))).toMatch(/params.garments must count the garment images/);
-    expect(await error(await runImage(m, { params: { resolution: '1K', garments: '1' } }))).toMatch(/params may hold only resolution, quality, thinking and brief/);
+    expect(await error(await runImage(m, { params: { resolution: '1K', garments: '1' } }))).toMatch(/params may hold only resolution, quality, thinking, brief and batch/);
     expect(await error(await runImage(m, { params: { resolution: '1K', brief: 'x'.repeat(5001) } }))).toMatch(/params.brief may be at most 5000/);
     expect(await jobCount()).toBe(before);
   });

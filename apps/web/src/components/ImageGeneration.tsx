@@ -2,10 +2,11 @@
 // Image Generation: the History, Examples and About tabs take the full width, and a prompt bar (reference images, prompt, style, model, ratio,
 // resolution, Enhance, the brand kit, Run) floats at the foot of the screen over them, as on Fash. Below 1024 px the bar is the Create tab. Run posts an image job.
 import { type FocusEvent, useEffect, useId, useRef, useState } from 'react';
-import { errorText } from '@/lib/api';
+import { api, errorText, sendJson } from '@/lib/api';
+import { runTotal } from '@/lib/apps';
 import { type BrandKit, withBrand } from '@/lib/brand';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun, sendRun } from '@/lib/run-guard';
+import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
@@ -36,6 +37,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const [prompt, setPrompt, clearDraft] = useDraftState('image', reuse !== undefined);
   const [styleId, setStyleId] = useState(''); // '' for no style
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash
+  const [count, setCount] = useState(1); // how many pictures one Run makes, one job each
   const [storeId, setStoreId] = useState('');
   const [useBrand, setUseBrand] = useState(false); // the chosen store's brand kit, added to the prompt on the server
   const [style, setStyle] = useState<PresetRow | null>(null);
@@ -190,20 +192,28 @@ ${style.prompt}` : prompt.trim();
     }
   }
 
+  const total = runTotal(pick.estimate, count);
   async function run() {
-    if (!(await confirmRun(pick.estimate))) return;
+    if (!(await confirmRun(total, `Tạo lượt này với giá ${usd(total ?? 0)}?`))) return; // the price as the button shows it
     setBusy(true);
     setError('');
     setNotice('');
+    let done = 0;
+    const batch = count > 1 ? crypto.randomUUID() : undefined; // one id on the Run's jobs, by which History's "Chọn cả lô" finds them all
     try {
-      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, storeId: storeId || null, useBrand, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
-      if (!(await sendRun(body))) return;
+      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, storeId: storeId || null, useBrand, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }), ...(batch && { batch }) } };
+      for (; done < count; done++) {
+        // The first job stands for the Run: a Run the same as the last one asks before anything is sent.
+        if (done > 0) await api('/api/jobs', sendJson('POST', body));
+        else if (!(await sendRun(body))) return;
+      }
       clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
+      setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${done > 0 ? ` Đã gửi ${done}/${count} ảnh.` : ''}`);
+      if (done > 0) await refresh();
     } finally {
       setBusy(false);
     }
@@ -215,7 +225,7 @@ ${style.prompt}` : prompt.trim();
   const runButton = (
     <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? 'imagegen-reason' : undefined} onClick={() => void run()}>
       Tạo ảnh
-      {busy ? <span className="run-cost">· Đang gửi…</span> : starting ? <span className="run-cost">· Đang tải…</span> : pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
+      {busy ? <span className="run-cost">· Đang gửi…</span> : starting ? <span className="run-cost">· Đang tải…</span> : total !== undefined && <span className="run-cost">· ${total}</span>}
     </button>
   );
 
@@ -275,6 +285,11 @@ ${style.prompt}` : prompt.trim();
             </p>
           )}
           {pick.note && <p className="help" role="status">{pick.note}</p>}
+          {count > 1 && pick.estimate !== undefined && (
+            <p className="help" role="status">
+              {count} ảnh × {usd(pick.estimate)} = {usd(total!)}
+            </p>
+          )}
           {style && <p className="help">Phong cách: {style.label} · thêm vào cuối mô tả của bạn</p>}
           <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
         </div>
@@ -287,6 +302,7 @@ ${style.prompt}` : prompt.trim();
             <>
               <Select chip label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={(v) => (recall.touch(), pick.setRatio(v))} />
               <Select chip label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={(v) => (recall.touch(), pick.setResolution(v))} />
+              <Select chip label="Số ảnh" icon="copy" heading="Số ảnh mỗi lượt" value={String(count)} options={[1, 2, 4].map((n) => ({ value: String(n), label: `${n} ảnh` }))} onChange={(v) => setCount(Number(v))} />
               {pick.thinking && <Select chip label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t }))} onChange={pick.setThinking} />}
             </>
           )}
