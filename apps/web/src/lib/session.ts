@@ -26,8 +26,8 @@ export const isImpersonated = (session: Session): boolean => Boolean(session.ses
 export const impersonationRefusal = () => Response.json({ error: 'not_allowed_while_impersonating' }, { status: 403 });
 
 const IMPERSONATION_MAX_MS = 60 * 60 * 1000;
-/** The only non-GET requests an Admin signed in as another Admin may send (guard): ending it, switching workspace, and the Library zip (a read sent as POST). */
-const IMPERSONATED_ADMIN_WRITES = new Set(['/api/me/stop-impersonating', '/api/me/workspace', '/api/library/zip']);
+/** The only non-GET requests an Admin signed in as another Admin may send (guard): ending it, switching workspace, and the Library zip and lookbook (reads sent as POST). */
+const IMPERSONATED_ADMIN_WRITES = new Set(['/api/me/stop-impersonating', '/api/me/workspace', '/api/library/zip', '/api/library/lookbook']);
 
 const cookieValue = (headers: Headers, name: string): string | null => {
   for (const part of (headers.get('cookie') ?? '').split(';')) {

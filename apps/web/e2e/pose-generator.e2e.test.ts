@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
 import { OWN_POSE, posePrompt } from '../src/lib/apps';
 import { poseOf, POSES } from '../src/lib/try-on-stock';
@@ -32,6 +33,7 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await page.goto('/apps');
     await page.getByRole('list', { name: 'Danh sách ứng dụng' }).getByRole('link').filter({ hasText: 'Tạo tư thế người mẫu' }).click();
     await expect(page).toHaveURL(/\/apps\/pose-generator$/);
+    await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']); // the company's poses as examples
 
     // The slot says what photo it wants; every pose is a tile, none picked until the member picks one, as each costs a job.
     await expect(page.getByRole('button', { name: 'Tải lên Người mẫu' })).toHaveAttribute('title', 'Ảnh người mẫu (rõ mặt, thấy người)');
@@ -82,6 +84,14 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await page.getByRole('button', { name: 'Bỏ chọn hết' }).click();
     await expect(count(page)).toHaveText('1/4 đã chọn');
     for (const tile of await poses(page).getByRole('button').all()) await expect(tile).toHaveAttribute('aria-pressed', 'false');
+    // Keys 1 to 9 toggle the first nine poses while one has focus.
+    const second = poses(page).getByRole('button').nth(1);
+    await poses(page).getByRole('button').first().focus();
+    await page.keyboard.press('2');
+    await expect(second).toHaveAttribute('aria-pressed', 'true');
+    await expect(count(page)).toHaveText('2/4 đã chọn · Bỏ chọn hết');
+    await page.keyboard.press('2');
+    await expect(second).toHaveAttribute('aria-pressed', 'false');
     for (const name of ['Mặt trước', 'Quỳ một gối']) await poses(page).getByRole('button', { name, exact: true }).click();
 
     // The run on the mock model: one job per pose, in the list's order and the own words last, cleaned, each with its own prompt and one batch id.
@@ -100,6 +110,20 @@ test('picks a model photo, two library poses and own words, sees the price of th
       [null, own, 'succeeded'], ['front', null, 'succeeded'], ['kneel', null, 'succeeded'],
     ]);
     for (const title of ['Mặt trước', 'Quỳ một gối', OWN_POSE]) await expect(page.getByRole('heading', { name: `Tạo tư thế · ${title}`, level: 3 })).toBeVisible();
+
+    // History lays the Run's pictures out as one lookbook, two per row, saved as a JPEG; a single picture is not a lookbook.
+    const card = page.locator('.job-card').filter({ has: page.getByRole('heading', { name: 'Tạo tư thế · Mặt trước' }) });
+    await card.getByRole('button', { name: 'Chọn cả lô' }).click();
+    await expect(page.getByRole('group', { name: 'Tải nhiều mục' })).toContainText('Đã chọn 3');
+    const saved = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Ghép lookbook' }).click();
+    const lookbook = await saved;
+    expect(lookbook.suggestedFilename()).toBe('lookbook.jpg');
+    const bytes = await readFile((await lookbook.path())!);
+    expect([...bytes.subarray(0, 3)]).toEqual([0xff, 0xd8, 0xff]);
+    for (const title of [OWN_POSE, 'Quỳ một gối']) await page.getByRole('checkbox', { name: new RegExp(`^Chọn Tạo tư thế · ${title} `) }).uncheck();
+    await page.getByRole('button', { name: 'Ghép lookbook' }).click();
+    await expect(toast(page, 'Chọn 2 đến 4 ảnh để ghép lookbook.')).toBeVisible();
 
     // Reuse one card: the photo back in its slot, and the two poses and the own words of its Run picked again.
     const jobs = await mine(page);

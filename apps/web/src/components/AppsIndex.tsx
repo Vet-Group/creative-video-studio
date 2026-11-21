@@ -2,7 +2,8 @@
 // The Apps index: a search box, the category chips and a card for each app.
 import Link from 'next/link';
 import { useId, useState } from 'react';
-import { type AppCategory, CATEGORIES, filterApps } from '@/lib/apps';
+import { type AppCategory, CATEGORIES, filterApps, isNewApp } from '@/lib/apps';
+import { useHydrated } from '@/lib/use-hydrated';
 import { AppArt } from './AppPage';
 import { Icon } from './Icon';
 import { useSmartRemakeEnabled } from './SmartRemakeGate';
@@ -13,6 +14,7 @@ export function AppsIndex() {
   const [search, setSearch] = useState('');
   const searchId = useId();
   const apps = filterApps(category, search, useSmartRemakeEnabled());
+  const hydrated = useHydrated(); // the New badge reads the viewer's clock, so the server leaves it out
   return (
     <section aria-labelledby="apps-title" className="apps">
       <h1 id="apps-title">Ứng dụng</h1>
@@ -46,7 +48,7 @@ export function AppsIndex() {
                 <AppArt app={a} />
                 <span className="app-card-head">
                   <strong>{a.name}</strong>
-                  {a.soon && <span className="badge-soon">Sắp có</span>}
+                  {a.soon ? <span className="badge-soon">Sắp có</span> : hydrated && isNewApp(a) && <span className="badge-soon badge-new">Mới</span>}
                 </span>
                 <span className="muted">{a.description}</span>
               </Link>
