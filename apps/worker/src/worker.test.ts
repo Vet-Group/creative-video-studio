@@ -40,7 +40,7 @@ const pool = createPool(testDb.url, 10);
 const boss = new PgBoss({ connectionString: testDb.url, max: 3 });
 const mockDir = join(tmpdir(), `cvs-mock-${randomBytes(6).toString('hex')}`);
 
-const FAST: Partial<WorkerOptions> = { admissionSleepMs: 100, waitPollMs: 100, reconcileEveryMs: 200, heartbeatEveryMs: 200, resendAfterMs: 0, pollingIntervalSeconds: 0.5, drainMs: 500 };
+const FAST: Partial<WorkerOptions> = { admissionSleepMs: 100, waitPollMs: 100, reconcileEveryMs: 200, heartbeatEveryMs: 200, resendAfterMs: 0, pollingIntervalSeconds: 0.5, drainMs: 500, saveIdRetryMs: [100, 100, 100, 100, 100, 100] };
 const workers: RunningWorker[] = [];
 const run = promisify(execFile);
 
@@ -127,6 +127,12 @@ describe('run timeout', () => {
   test('systemd waits longer for the worker to stop than the worker waits for its submits in flight', async () => {
     const unit = await readFile(new URL('../../../deploy/linux/cvs-worker.service', import.meta.url), 'utf8');
     expect(Number(/^TimeoutStopSec=(\d+)$/m.exec(unit)?.[1]) * 1000).toBeGreaterThan(DEFAULT_OPTIONS.drainMs);
+  });
+
+  test("saving a submitted job's provider id is tried for about a minute, which a stop's drain outlasts", () => {
+    const retryMs = DEFAULT_OPTIONS.saveIdRetryMs.reduce((a, b) => a + b, 0);
+    expect(retryMs).toBe(60_000);
+    expect(DEFAULT_OPTIONS.drainMs).toBeGreaterThan(retryMs);
   });
 });
 
@@ -811,16 +817,21 @@ describe('a submit that pg-boss expiry or an error would orphan', () => {
     expect((await dailyClips(pool, 'u4')).today).toBe(2);
   });
 
-  test('a database error while saving the provider job id is tried again, so the job runs with its id instead of ending failed_unknown', async () => {
+  test('a database error while saving the provider job id is tried again through the retry window, so the job runs with its id; past it the job ends failed_unknown with every attempt logged', async () => {
     counting.submits = 0;
-    const id = await newJob('u1');
-    let saves = 0;
-    // The first save of the id fails, as when Postgres restarts right then.
+    const [kept, lost] = [await newJob('u1'), await newJob('u1')];
+    // The save of the id fails as while Postgres restarts: for `kept` on every attempt but the last, for `lost` on every one.
+    const failing = new Map([[kept, FAST.saveIdRetryMs!.length], [lost, Infinity]]);
+    const saves = new Map<string, number>();
     const flaky = new Proxy(pool, {
       get(t, p) {
         if (p === 'query') {
           return async (sql: unknown, ...a: unknown[]) => {
-            if (typeof sql === 'string' && sql.includes('set provider_job_id') && saves++ === 0) throw new Error('Connection terminated unexpectedly');
+            const jobId = (a[0] as string[] | undefined)?.[0] ?? '';
+            if (typeof sql === 'string' && sql.includes('set provider_job_id')) {
+              saves.set(jobId, (saves.get(jobId) ?? 0) + 1);
+              if (saves.get(jobId)! <= (failing.get(jobId) ?? 0)) throw new Error('Connection terminated unexpectedly');
+            }
             return (t.query as (...x: unknown[]) => unknown)(sql, ...a);
           };
         }
@@ -828,16 +839,24 @@ describe('a submit that pg-boss expiry or an error would orphan', () => {
         return typeof v === 'function' ? v.bind(t) : v;
       },
     });
+    const errors = vi.spyOn(console, 'error');
     let held = true;
     const holding = counting(300, (inner) => ({ ...inner, status: async (j) => (held ? { state: 'running' } : inner.status(j)) }));
     workers.push(await startWorker({ pool: flaky, connectionString: testDb.url, providers: { mock: holding }, options: FAST }));
-    await send(id, 'u1');
-    await waitFor('the id or the loss', async () => (await job(id)).provider_job_id || (await status(id)) === 'failed_unknown');
-    const j = await job(id);
-    expect([j.status, j.provider_job_id, saves]).toEqual(['running', expect.stringMatching(/^mock:/), 2]);
+    await send(kept, 'u1');
+    await send(lost, 'u1');
+    await waitFor('both saves to end', async () => ((await job(kept)).provider_job_id || (await status(kept)) === 'failed_unknown') && (await status(lost)) === 'failed_unknown');
+    const [k, l] = [await job(kept), await job(lost)];
+    const attempts = FAST.saveIdRetryMs!.length + 1;
+    expect([k.status, k.provider_job_id, saves.get(kept)]).toEqual(['running', expect.stringMatching(/^mock:/), attempts]);
+    expect([l.status, l.provider_job_id, saves.get(lost)]).toEqual(['failed_unknown', null, attempts]);
+    const logged = errors.mock.calls.map((c) => String(c[0])).filter((m) => m.includes(`of job ${lost}, attempt`));
+    expect(logged).toHaveLength(attempts);
+    expect(logged.at(-1)).toMatch(new RegExp(`saving provider job id mock:\\S+ of job ${lost}, attempt ${attempts}; giving up`));
+    errors.mockRestore();
     held = false;
-    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
-    expect(counting.submits).toBe(1);
+    await waitFor('the kept job to succeed', async () => (await status(kept)) === 'succeeded');
+    expect(counting.submits).toBe(2);
   });
 });
 

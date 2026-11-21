@@ -49,6 +49,8 @@ export interface WorkerOptions {
   pollingIntervalSeconds: number;
   /** How long stop() waits for the submits in flight before it cuts them: a submit cut short is a provider job that is billed and lost. */
   drainMs: number;
+  /** The waits between the attempts to save a submitted job's provider id, which the provider has billed: long enough to outlast a Postgres restart or a full pool. */
+  saveIdRetryMs: number[];
 }
 
 export const DEFAULT_OPTIONS: WorkerOptions = {
@@ -66,6 +68,8 @@ export const DEFAULT_OPTIONS: WorkerOptions = {
   pollingIntervalSeconds: 2,
   // Vertex's longest submit: 4 calls of 300 s with up to three 60 s waits after a 429 (vertex.ts), 1,380 s. cvs-worker.service's TimeoutStopSec (1,500 s) is above it.
   drainMs: 1_400_000,
+  // About 60 s in all; drainMs covers it on a stop.
+  saveIdRetryMs: [1_000, 2_000, 4_000, 8_000, 15_000, 30_000],
 };
 
 export interface WorkerDeps {
@@ -228,7 +232,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     return claimed;
   }
 
-  /** Calls the provider once. A failure before the call is a clean release; once the call is made, any failure may have started a billed job. */
+  /** Calls the provider once. A failure before the call, or a 4xx refusal other than 408 or 429, is a clean release; any other failure once the call is made may have started a billed job. */
   async function submit(jobId: string, signal: AbortSignal): Promise<void> {
     submitting.add(jobId);
     try {
@@ -302,7 +306,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         return;
       }
       // The id is saved whatever the row says now (even failed_unknown), so the provider's late result can still be billed. The provider has billed
-      // the job by now, so a database error is tried again 3 times, 2 s apart, before the row is left to end failed_unknown.
+      // the job by now, so a database error is tried again after each of saveIdRetryMs before the row is left to end failed_unknown. Meanwhile the job
+      // stays in `submitting`, so failLostSubmits leaves it alone, and the update has no status condition, so a retry is harmless.
       for (let n = 0; ; n++) {
         try {
           await pool.query(
@@ -312,11 +317,10 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
           );
           break;
         } catch (e) {
-          if (n === 3) {
-            log(`saving provider job id ${providerJobId} of job ${jobId} (set it by hand to recover the job)`, e);
-            throw e;
-          }
-          await new Promise((r) => setTimeout(r, 2_000));
+          const last = n === o.saveIdRetryMs.length;
+          log(`saving provider job id ${providerJobId} of job ${jobId}, attempt ${n + 1}${last ? '; giving up: set it by hand to recover the job' : ''}`, e);
+          if (last) throw e;
+          await new Promise((r) => setTimeout(r, o.saveIdRetryMs[n]));
         }
       }
     } finally {
