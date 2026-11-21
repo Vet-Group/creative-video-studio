@@ -1,0 +1,2 @@
+-- The owner's daily cap on reference-video analyses per member (POST /api/analyses), next to member_daily_clip_cap; 20 a day (owner decision, 2026-11-21).
+ALTER TABLE "settings" ADD COLUMN "member_daily_analysis_cap" integer DEFAULT 20 NOT NULL;

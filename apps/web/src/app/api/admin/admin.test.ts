@@ -326,7 +326,7 @@ describe('store reassignment', () => {
 });
 
 describe('settings', () => {
-  const get = async () => (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json() as Promise<{ monthlyCapUsd: string; memberDailyClipCap: number; models: { id: string; enabled: boolean; priced: boolean }[] }>;
+  const get = async () => (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json() as Promise<{ monthlyCapUsd: string; memberDailyClipCap: number; memberDailyAnalysisCap: number; models: { id: string; enabled: boolean; priced: boolean }[] }>;
   const put = (body: unknown) => settingsRoute.PUT(call(admin.cookie, '/api/admin/settings', 'PUT', body));
 
   test('reads the two caps and the models', async () => {
@@ -367,10 +367,26 @@ describe('settings', () => {
     expect((await put({ monthlyCapUsd: '350.5', memberDailyClipCap: 8 })).status).toBe(200);
     expect(await get()).toMatchObject({ monthlyCapUsd: '350.5000', memberDailyClipCap: 8 });
     expect(await audits('settings:1')).toEqual([
-      { actor_id: admin.id, action: 'settings.update', old_value: { monthlyCapUsd: '200.0000', memberDailyClipCap: 5 }, new_value: { monthlyCapUsd: '350.5000', memberDailyClipCap: 8 } },
+      {
+        actor_id: admin.id, action: 'settings.update',
+        old_value: { monthlyCapUsd: '200.0000', memberDailyClipCap: 5, memberDailyAnalysisCap: 20 }, new_value: { monthlyCapUsd: '350.5000', memberDailyClipCap: 8, memberDailyAnalysisCap: 20 },
+      },
     ]);
     expect((await put({ monthlyCapUsd: 350.5 })).status).toBe(200);
     expect(await audits('settings:1')).toHaveLength(1);
+  });
+
+  test('reads and changes the daily analysis cap (20 by default), audited with the clip cap, and writes nothing when it is unchanged', async () => {
+    expect((await get()).memberDailyAnalysisCap).toBe(20);
+    expect((await put({ memberDailyAnalysisCap: 12 })).status).toBe(200);
+    expect((await get()).memberDailyAnalysisCap).toBe(12);
+    expect((await audits('settings:1')).at(-1)).toEqual({
+      actor_id: admin.id, action: 'settings.update',
+      old_value: { monthlyCapUsd: '350.5000', memberDailyClipCap: 8, memberDailyAnalysisCap: 20 }, new_value: { monthlyCapUsd: '350.5000', memberDailyClipCap: 8, memberDailyAnalysisCap: 12 },
+    });
+    const count = (await audits('settings:1')).length;
+    expect((await put({ memberDailyAnalysisCap: 12 })).status).toBe(200);
+    expect(await audits('settings:1')).toHaveLength(count);
   });
 
   test('reads and changes the image and apps caps and the soft per-feature caps, each audited once', async () => {
@@ -395,7 +411,7 @@ describe('settings', () => {
     expect((await put({ featureCaps: [{ feature: 'no-such-feature', monthlyUsd: '1' }] })).status).toBe(404);
   });
 
-  test.each([{}, { monthlyCapUsd: -1 }, { monthlyCapUsd: 'lots' }, { monthlyCapUsd: '' }, { monthlyCapUsd: '0x10' }, { monthlyCapUsd: '1e2' }, { monthlyCapUsd: '1.23456' }, { memberDailyClipCap: 1.5 }, { memberDailyClipCap: -1 }, { models: [{ id: 'fal-test' }] }, { models: 'all' }, { memberDailyUsdCap: -1 }, { featuresMonthlyCapUsd: 'lots' }, { featureCaps: [{ feature: 'image' }] }, { featureCaps: 'all' }])('refuses %j', async (body) => {
+  test.each([{}, { monthlyCapUsd: -1 }, { monthlyCapUsd: 'lots' }, { monthlyCapUsd: '' }, { monthlyCapUsd: '0x10' }, { monthlyCapUsd: '1e2' }, { monthlyCapUsd: '1.23456' }, { memberDailyClipCap: 1.5 }, { memberDailyClipCap: -1 }, { memberDailyAnalysisCap: 1.5 }, { memberDailyAnalysisCap: -1 }, { memberDailyAnalysisCap: '20' }, { models: [{ id: 'fal-test' }] }, { models: 'all' }, { memberDailyUsdCap: -1 }, { featuresMonthlyCapUsd: 'lots' }, { featureCaps: [{ feature: 'image' }] }, { featureCaps: 'all' }])('refuses %j', async (body) => {
     expect((await put(body)).status).toBe(400);
   });
 

@@ -1,6 +1,7 @@
 // The reference-video analysis API: the feature flag gate, who may analyse which video, and the queued row it writes,
 // against a disposable database on the compose Postgres. No S3 or rea-video binary: the worker consumes the queue.
 import { randomBytes } from 'node:crypto';
+import { bookLlm } from '@cvs/core/ledger';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -117,6 +118,33 @@ test('refuses a new analysis while the member already has one queued or running,
   expect((await POST(call('/api/analyses', 'POST', { sourceAssetId: 'v-other' }, otherCookie))).status).toBe(201);
   await pool.query(`delete from analyses where user_id = $1`, [otherId]);
   await settle();
+});
+
+test('refuses the 21st analysis of the ICT day (the daily cap, 20 by default), not counting a failed one with no cost booked or one from yesterday', async () => {
+  const { user } = await auth.api.createUser({ body: { email: 'daily@example.test', name: 'Daily', password: PASSWORD, role: 'member' } });
+  const dailyCookie = (await auth.api.signInEmail({ body: { email: 'daily@example.test', password: PASSWORD }, asResponse: true })).headers
+    .getSetCookie()
+    .map((c) => c.split(';')[0])
+    .join('; ');
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ('v-daily', $1, 'input', 's3/daily', 'd.mp4', 'video/mp4', 1000, 5000, 'ws_vet')`, [user.id]);
+  const add = (name: string, n: number, status: string, created = 'now()') =>
+    pool.query(
+      `insert into analyses (id, user_id, team_id, source_key, status, workspace_id, created_at) select $2 || '-' || g, u.id, u.team_id, 's3/daily', $3, 'ws_vet', ${created}
+         from users u, generate_series(1, $4::int) g where u.id = $1`,
+      [user.id, name, status, n],
+    );
+  const send = () => POST(call('/api/analyses', 'POST', { sourceAssetId: 'v-daily' }, dailyCookie));
+  await add('daily-done', 18, 'succeeded');
+  await add('daily-paid', 1, 'failed'); // failed after its call was paid: it counts
+  await bookLlm(pool, { analysis: 'daily-paid-1' }, { costUsd: 0.1, provider: 'gemini', model: 'flash' });
+  await add('daily-free', 3, 'failed'); // failed with nothing booked: free, not counted
+  await add('daily-yesterday', 5, 'succeeded', `now() - interval '1 day'`); // the ICT day before
+  expect((await send()).status).toBe(201); // the 20th of today
+  await pool.query(`update analyses set status = 'succeeded' where user_id = $1 and status = 'queued'`, [user.id]);
+  const refused = await send();
+  expect(refused.status).toBe(429);
+  expect(await errorOf(refused)).toBe('Hôm nay bạn đã dùng hết 20 lượt phân tích. Mai bạn dùng tiếp được.');
+  expect((await pool.query(`select count(*)::int as n from analyses where user_id = $1`, [user.id])).rows[0].n).toBe(28);
 });
 
 test('refuses a video that is not the caller’s, a non-video asset, a missing asset and a hidden store', async () => {

@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 }
 
 /** Queues an analysis of one of the caller's own videos (an upload, a History clip or an Example, each already copied to
- * their own input): rea-video decomposes it on the worker. Answers with the new analysis id to poll, or 429 while the caller has one unfinished. */
+ * their own input): rea-video decomposes it on the worker. Answers with the new analysis id to poll, or 429 while the caller has one unfinished or has used the day's cap (settings.member_daily_analysis_cap). */
 export async function POST(request: Request) {
   if (!reaAnalyzeEnabled()) return notHere();
   const g = await guard(request, 'member');
@@ -58,23 +58,39 @@ export async function POST(request: Request) {
   }
 
   const id = randomUUID();
-  const busy = await withTransaction(pool, async (tx) => {
-    await tx.query(`select pg_advisory_xact_lock(hashtext('analyses:' || $1))`, [userId]); // two quick sends cannot both pass the check
+  // Refusals members read (errorText).
+  const refused = await withTransaction(pool, async (tx): Promise<Response | null> => {
+    await tx.query(`select pg_advisory_xact_lock(hashtext('analyses:' || $1))`, [userId]); // two quick sends cannot both pass the checks
     // A queued row older than the queue's expiry lost its job (a worker stopped between taking it and starting it, and the queue never retries one), and
     // a member cannot delete a queued row, so only a younger one holds the next analysis back. A stale running row is closed by the worker.
     const unfinished = await tx.query(
       `select 1 from analyses where user_id = $1 and (status = 'running' or (status = 'queued' and created_at > now() - $2 * interval '1 second')) limit 1`,
       [userId, ANALYZE_QUEUE_OPTIONS.expireInSeconds],
     );
-    if (unfinished.rowCount) return true;
+    if (unfinished.rowCount) return bad('Bạn đang có một phân tích chưa xong. Hãy đợi nó xong rồi phân tích video tiếp theo.', 429);
+    // The member's analyses of this ICT day, as the daily clip cap counts clips (dayClips, packages/core/src/limits.ts): a range on the bare created_at,
+    // and a failed one with no cost booked (the worker books an analysis only once it succeeds, ref llm:analysis:<id>) does not count.
+    const day = (
+      await tx.query(
+        `select (select count(*) from analyses a
+                  where a.user_id = $1
+                    and not (a.status = 'failed' and not exists (select 1 from cost_entries c where c.ref = 'llm:analysis:' || a.id))
+                    and a.created_at >= (date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh') at time zone 'Asia/Ho_Chi_Minh')
+                    and a.created_at < ((date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh') + interval '1 day') at time zone 'Asia/Ho_Chi_Minh'))::int as today,
+                s.member_daily_analysis_cap as cap
+           from settings s where s.id = 1`,
+        [userId],
+      )
+    ).rows[0] as { today: number; cap: number };
+    if (day.today >= day.cap) return bad(`Hôm nay bạn đã dùng hết ${day.cap} lượt phân tích. Mai bạn dùng tiếp được.`, 429);
     await tx.query(
       `insert into analyses (id, user_id, team_id, store_id, source_key, workspace_id)
          values ($1, $2, (select team_id from users where id = $2), $3, $4, $5)`,
       [id, userId, storeId, found.asset.s3Key, g.workspaceId],
     );
-    return false;
+    return null;
   });
-  if (busy) return bad('Bạn đang có một phân tích chưa xong. Hãy đợi nó xong rồi phân tích video tiếp theo.', 429); // a refusal members read (errorText)
+  if (refused) return refused;
   try {
     await (await boss()).send(ANALYZE_QUEUE, { analysisId: id });
   } catch (e) {
