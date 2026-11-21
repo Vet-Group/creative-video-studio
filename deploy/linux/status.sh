@@ -6,6 +6,9 @@ uid="$(id -u)"
 export HOME="${CVS_ROOT_HOME:-/root}" XDG_RUNTIME_DIR="/run/user/$uid"
 app="${CVS_APP_DIR:-/opt/creative-video-studio}"
 echo "commit $(git -C "$app" rev-parse --short HEAD 2> /dev/null || echo '?')"
+# The build directory cvs-web runs (install.sh makes a new one per deploy) and the ones kept for a rollback.
+dist="$(sed -n 's/^Environment=CVS_DIST_DIR=//p' "$HOME/.config/systemd/user/cvs-web.service" 2> /dev/null)"
+echo "web build ${dist:-.next}; on disk: $(find "$app/apps/web" -maxdepth 1 -type d -name '.next*' -printf '%f ' 2> /dev/null)"
 systemctl --user list-units 'cvs-*' --all --no-pager --plain --no-legend
 (cd "$app" && docker compose -p creative-video-studio ps --format '{{.Name}}\t{{.Status}}')
 curl -s -o /dev/null -m 15 -w 'https://video.vetgroup.net/privacy %{http_code}\n' https://video.vetgroup.net/privacy
@@ -16,7 +19,7 @@ t() { curl -s -o /dev/null -m 20 -w "$1 %{http_code} ttfb %{time_starttransfer}s
 echo "perf cpu $(nproc) load $(cut -d' ' -f1-3 /proc/loadavg) mem $(free -m | awk '/Mem:/ {print $3 "/" $2 " MB used"}')"
 t 'perf local /login' http://127.0.0.1:3400/login
 t 'perf tunnel /login' https://video.vetgroup.net/login
-chunk="$(find "$app/apps/web/.next/static/chunks" -maxdepth 1 -name '*.js' -printf '%s %f\n' 2> /dev/null | sort -rn | head -n 1 | cut -d' ' -f2)"
+chunk="$(find "$app/apps/web/${dist:-.next}/static/chunks" -maxdepth 1 -name '*.js' -printf '%s %f\n' 2> /dev/null | sort -rn | head -n 1 | cut -d' ' -f2)"
 if [ -n "$chunk" ]; then
   t 'perf local static' "http://127.0.0.1:3400/_next/static/chunks/$chunk"
   t 'perf tunnel static' "https://video.vetgroup.net/_next/static/chunks/$chunk?perf=$(date +%s%N)"

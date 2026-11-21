@@ -8,6 +8,8 @@ const config: NextConfig = {
   transpilePackages: ['@cvs/core', '@cvs/db'],
   serverExternalPackages: ['pg-boss'],
   poweredByHeader: false,
+  // install.sh builds each deploy into a new directory and restarts cvs-web on it only after the build succeeded (docs/ops/deploy.md).
+  distDir: process.env.CVS_DIST_DIR || '.next',
   // CI typechecks in its own step first, so its builds skip the second pass (~12 s each); a deploy build still typechecks.
   typescript: { ignoreBuildErrors: process.env.CVS_SKIP_BUILD_TYPECHECK === '1' },
   devIndicators: { position: 'bottom-right' }, // the account chip has the bottom-left corner
