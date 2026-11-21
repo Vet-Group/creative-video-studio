@@ -86,7 +86,8 @@ export const defaultVlmEnv = async (): Promise<{ env: Record<string, string>; pr
   const token = account && (!byteplus || !reachable) ? await serviceAccountToken(account.key)() : undefined;
   const vlm = pickReaVlm({
     byteplus,
-    vertex: account && token ? () => vertexReaVlm({ project: account.project, location: process.env.GOOGLE_CLOUD_LOCATION || 'global', token }) : undefined,
+    // Always global: the Vertex VLM model is served there only, whatever region GOOGLE_CLOUD_LOCATION sets for the other Vertex calls.
+    vertex: account && token ? () => vertexReaVlm({ project: account.project, location: 'global', token }) : undefined,
     byteplusReachable: reachable,
   });
   return { env: reaVlmEnv(vlm), provider: byteplus && vlm.baseUrl === byteplus.baseUrl ? 'byteplus' : 'vertex', model: vlm.model };

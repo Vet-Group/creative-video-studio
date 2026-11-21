@@ -17,7 +17,8 @@ export interface ReaVlm {
 
 const ARK_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
 const ARK_MODEL = 'seed-2-0-lite-260428';
-const VERTEX_MODEL = 'google/gemini-2.5-flash';
+// cvs-vertex gets 404 for gemini-2.5-flash in us-central1 and global (checked 2026-11-22); 3.5 Flash answers on global and 404s in us-central1.
+const VERTEX_MODEL = 'google/gemini-3.5-flash';
 
 export const byteplusReaVlm = (apiKey: string, model: string = ARK_MODEL): ReaVlm => ({ baseUrl: ARK_BASE, apiKey, model });
 
