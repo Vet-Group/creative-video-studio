@@ -19,7 +19,7 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
 /**
  * The video model picker (image models are left out) for a ratio and duration (`?ratio=9:16&durationSec=8`): the enabled models with pass rate, recommendation
  * score and estimated cost, and the model to pre-select: the best score among those that support the choice (the cheaper on a tie), flagged `recommended`
- * unless every supported model scores the same; for Create Video (`?feature=video` or none) while the active Vertex account runs on credits alone (vertexOnCredits), the best
+ * unless every supported model scores the same; for Create Video (`?feature=video` or none) and Marketing Studio (`?feature=marketing`) while the active Vertex account runs on credits alone (vertexOnCredits), the best
  * supported Vertex model is pre-selected and flagged `recommended` instead, whatever the others score. Pass rate = (seed passes + marked passes) / (seed total + marked total) over every marked clip, deleted or
  * purged ones included; null while nothing is counted. The score also weighs how often real jobs of the model end well (lib/model-scores.ts).
  * `?feature=video`, `marketing` or `motion_control` keeps the models whose `features` lists it (Marketing Studio also accepts ratio 16:9, Motion Control takes only `auto`); without it every enabled video model is listed.
@@ -136,9 +136,10 @@ export async function GET(request: Request) {
     };
   });
   const supported = list.filter((m) => m.supported && !overCredit(m.provider, m.estimateUsd, m.creditUsd)).map((m) => ({ id: m.id, score: m.score, usd: Number(m.estimateUsd), vertex: m.provider === 'vertex' }));
-  // Create Video only: while the active Vertex account runs on credits alone, its models are ranked among themselves, and the best one is the pre-selection.
+  // Create Video and Marketing Studio (not Motion Control): while the active Vertex account runs on credits alone, its models are ranked among themselves,
+  // and the best one is the pre-selection.
   const onVertex = supported.filter((m) => m.vertex);
-  const onCredits = onVertex.length > 0 && (feature === null || feature === 'video') && (await vertexOnCredits(pool));
+  const onCredits = onVertex.length > 0 && (feature === null || feature === 'video' || feature === 'marketing') && (await vertexOnCredits(pool));
   const ranked = rank(onCredits ? onVertex : supported);
   const best = ranked.best;
   const recommended = onCredits ? best : ranked.recommended;
