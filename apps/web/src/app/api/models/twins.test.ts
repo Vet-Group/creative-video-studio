@@ -95,7 +95,7 @@ describe('the video picker', () => {
     }
   });
 
-  test('pre-selects the best Vertex model in Create Video while the active Vertex account runs on credits alone, whatever a fal model scores, and ranks as before otherwise', async () => {
+  test('pre-selects the best Vertex model in Create Video and Marketing Studio while the active Vertex account runs on credits alone, whatever a fal model scores, and ranks as before otherwise', async () => {
     const before = (await pool.query(`select id, features, pass_seed_passes, pass_seed_total from model_configs where id in ('kling-o3-pro', 'veo-3.1-vertex')`)).rows;
     await pool.query(`update model_configs set pass_seed_passes = 9, pass_seed_total = 10 where id = 'kling-o3-pro'`);
     await pool.query(`update model_configs set features = array_append(features, 'marketing') where id = 'veo-3.1-vertex' and 'marketing' <> all(features)`);
@@ -110,7 +110,9 @@ describe('the video picker', () => {
       expect(await pick(null)).toEqual(['kling-o3-pro', 'kling-o3-pro']);
       expect(await pick('t-paid')).toEqual(['kling-o3-pro', 'kling-o3-pro']); // an account that may bill money
       expect(await pick('cvs-vertex')).toEqual(['veo-3.1-vertex', 'veo-3.1-vertex']); // credits only, though it scores less
-      expect(await pick('cvs-vertex', 'marketing')).toEqual(['kling-o3-pro', 'kling-o3-pro']); // Create Video only
+      expect(await pick('cvs-vertex', 'marketing')).toEqual(['veo-3.1-vertex', 'veo-3.1-vertex']); // Marketing Studio too
+      expect(await pick('t-paid', 'marketing')).toEqual(['kling-o3-pro', 'kling-o3-pro']);
+      expect(await pick(null, 'marketing')).toEqual(['kling-o3-pro', 'kling-o3-pro']); // credits ended: back to the best score
     } finally {
       await vertex(null);
       await pool.query(`delete from vertex_accounts where project_id = 't-paid'`);
