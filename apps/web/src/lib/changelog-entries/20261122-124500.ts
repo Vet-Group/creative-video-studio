@@ -10,6 +10,6 @@ export default {
     'Khi credit Vertex hết, Marketing Studio tự quay về chọn model theo điểm như trước.',
   ],
   href: '/marketing-studio',
-  prs: [0],
+  prs: [624],
   audience: 'all',
 } satisfies ChangeEntry;
