@@ -169,13 +169,15 @@ starts the system unit. The new worker is only started after the old one stopped
 Before that deploy (owner, as root on the host):
 
 - `rea-video` was installed with `uv tool` as root (tool and Python under `/root/.local`, linked from `/usr/local/bin`), which the
-  worker cannot reach. Reinstall the same commit outside `/root`, for example
-  `UV_TOOL_DIR=/opt/rea-video/tools UV_TOOL_BIN_DIR=/opt/rea-video/bin UV_PYTHON_INSTALL_DIR=/opt/rea-video/python uv tool install --python 3.12 "/root/rea-video[asr]"`
-  (not `-e`: an editable install would still load its code from `/root/rea-video`), then `ln -sf /opt/rea-video/bin/rea-video /usr/local/bin/rea-video`.
+  worker cannot reach. Reinstall the same commit outside `/root`: take the `git` URL and `rev` from
+  `/root/.local/share/uv/tools/rea-video/uv-receipt.toml` (a checkout such as `/root/rea-video` may sit on another commit), for example
+  `UV_TOOL_DIR=/opt/rea-video/tools UV_TOOL_BIN_DIR=/opt/rea-video/bin UV_PYTHON_INSTALL_DIR=/opt/rea-video/python uv tool install --python 3.12 --constraints /tmp/rea-constraints.txt "rea-video[asr] @ git+https://github.com/JuneYaooo/rea-video@<rev>"`,
+  where the constraints pin the root install's dependencies (`uv pip freeze --python /root/.local/share/uv/tools/rea-video/bin/python`
+  without its `rea-video` line; a fresh resolve picks newer patch releases), then `ln -sf /opt/rea-video/bin/rea-video /usr/local/bin/rea-video`.
   Smoke it as a non-root user behind the same `ProtectHome` first:
   `systemd-run --wait --pipe -p DynamicUser=yes -p ProtectHome=yes -p MemoryMax=2G /usr/local/bin/rea-video --help`.
-  Its models are downloaded again into `/var/lib/cvs-worker` on the first analysis, unless `/root/.cache/huggingface` is copied
-  there after the deploy (`chown -R cvs-worker:cvs-worker`).
+  Its models (`~/.cache/rea-video/models`) are downloaded again into `/var/lib/cvs-worker` on the first analysis, unless
+  `/root/.cache/rea-video` is copied to `/var/lib/cvs-worker/.cache/rea-video` after the deploy (`chown -R cvs-worker:cvs-worker`).
 - A Vertex key under `/root` or `/home`: move it (for example to `/opt/creative-video-studio-keys/`, `root:cvs-worker`, mode 640) and
   point `GOOGLE_APPLICATION_CREDENTIALS` at the new path. A bad account 1 key stops the worker at start-up.
 
