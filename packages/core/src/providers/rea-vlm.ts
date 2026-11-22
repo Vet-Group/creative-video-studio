@@ -13,6 +13,8 @@ export interface ReaVlm {
   baseUrl: string;
   apiKey: string;
   model: string;
+  /** Passed to rea-video as REA_VLM_REASONING_EFFORT; unset sends no reasoning_effort at all. */
+  reasoningEffort?: 'low' | 'medium' | 'high';
 }
 
 const ARK_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
@@ -24,10 +26,16 @@ export const byteplusReaVlm = (apiKey: string, model: string = ARK_MODEL): ReaVl
 
 export function vertexReaVlm(opts: { project: string; location: string; token: string; model?: string }): ReaVlm {
   const host = opts.location === 'global' ? 'https://aiplatform.googleapis.com' : `https://${opts.location}-aiplatform.googleapis.com`;
-  return { baseUrl: `${host}/v1beta1/projects/${opts.project}/locations/${opts.location}/endpoints/openapi`, apiKey: opts.token, model: opts.model ?? VERTEX_MODEL };
+  // low: at the default effort, Gemini's thinking ate rea-video's 2048-token survey answer and cut its JSON short (real decompose, 2026-11-22).
+  return { baseUrl: `${host}/v1beta1/projects/${opts.project}/locations/${opts.location}/endpoints/openapi`, apiKey: opts.token, model: opts.model ?? VERTEX_MODEL, reasoningEffort: 'low' };
 }
 
-export const reaVlmEnv = (v: ReaVlm): Record<string, string> => ({ REA_VLM_BASE_URL: v.baseUrl, REA_VLM_API_KEY: v.apiKey, REA_VLM_MODEL: v.model });
+export const reaVlmEnv = (v: ReaVlm): Record<string, string> => ({
+  REA_VLM_BASE_URL: v.baseUrl,
+  REA_VLM_API_KEY: v.apiKey,
+  REA_VLM_MODEL: v.model,
+  ...(v.reasoningEffort ? { REA_VLM_REASONING_EFFORT: v.reasoningEffort } : {}),
+});
 
 // BytePlus when its key is configured and reachable, else the Vertex fallback; if only one is
 // configured, use it. The reachability of BytePlus is probed by the caller. `vertex` is a thunk so

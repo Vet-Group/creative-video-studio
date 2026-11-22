@@ -220,6 +220,7 @@ test('defaultVlmEnv uses BytePlus from the key and never probes when the Vertex 
     expect(r.provider).toBe('byteplus');
     expect(r.env.REA_VLM_API_KEY).toBe('ark-test');
     expect(r.model).toBe('seed-2-0-lite-260428');
+    expect(r.env).not.toHaveProperty('REA_VLM_REASONING_EFFORT');
     expect(fetchSpy).not.toHaveBeenCalled(); // BytePlus is the default; no reachability probe when the fallback is off
   } finally {
     if (prev.key === undefined) delete process.env.BYTEPLUS_ARK_API_KEY;
@@ -246,6 +247,7 @@ test('the Vertex fallback calls the global endpoint even when GOOGLE_CLOUD_LOCAT
     expect(r.env.REA_VLM_BASE_URL).toBe('https://aiplatform.googleapis.com/v1beta1/projects/vx/locations/global/endpoints/openapi');
     expect(r.env.REA_VLM_API_KEY).toBe('vx-token');
     expect(r.model).toBe('google/gemini-3.5-flash');
+    expect(r.env.REA_VLM_REASONING_EFFORT).toBe('low');
   } finally {
     for (const k of keys) {
       if (prev[k] === undefined) delete process.env[k];
