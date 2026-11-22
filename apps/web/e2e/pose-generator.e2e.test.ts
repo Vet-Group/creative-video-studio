@@ -18,15 +18,16 @@ type Job = { id: string; feature: string; status: string; batch: string | null; 
 const mine = async (page: Page) => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: Job[] }).jobs.filter((j) => j.feature === 'pose_generator');
 
 test('picks a model photo, two library poses and own words, sees the price of three images, refuses a fifth pose, runs one job per pose and titles each card by its pose', async ({ page }) => {
-  // One pose picture of a man's, so the pictures show and the gender switch has something to switch.
+  // One pose picture of a man's, so the pictures show and the gender switch has something to switch, and the company model's result in that pose.
   const sample = 'try-on-pose-man-kneel.jpg';
-  const asAdmin = async (send: () => Promise<{ ok(): boolean }>) => {
+  const result = 'pose-result-man-kneel.jpg';
+  const asAdmin = async (send: (name: string) => Promise<{ ok(): boolean }>) => {
     await page.context().clearCookies();
     await signIn(page, 'admin');
-    await settled(send, sample);
+    for (const name of [sample, result]) await settled(() => send(name), name);
     await page.context().clearCookies();
   };
-  await asAdmin(() => page.request.put(`/api/admin/samples/${sample}`, { data: jpg(), headers: { 'content-type': 'image/jpeg' } }));
+  await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: jpg(), headers: { 'content-type': 'image/jpeg' } }));
   try {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await signIn(page, 'posea');
@@ -54,6 +55,13 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await expect(page.getByRole('radio', { name: 'Nam', exact: true })).toBeChecked();
     await expect(kneel.locator('img')).toHaveAttribute('src', `/api/samples/${sample}?thumb=1`);
     await expect(kneel.locator('.photo-caption')).toHaveText('Quỳ một gối');
+    // Picked, it previews the company model's result in that pose; unpicked, the pose picture again.
+    await kneel.click();
+    await expect(kneel.locator('img')).toHaveAttribute('src', `/api/samples/${result}?thumb=1`);
+    await expect(kneel.locator('.photo-caption')).toHaveText('Quỳ một gối');
+    await kneel.click();
+    await expect(kneel).toHaveAttribute('aria-pressed', 'false');
+    await expect(kneel.locator('img')).toHaveAttribute('src', `/api/samples/${sample}?thumb=1`);
     // Three tiles a row in the form column, also once a pose has its picture.
     const rows = await Promise.all([0, 1, 2].map(async (i) => (await poses(page).getByRole('button').nth(i).boundingBox())!.y));
     expect(rows).toEqual([rows[0], rows[0], rows[0]]);
@@ -133,7 +141,7 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await expect(page.getByLabel(OWN_POSE)).toHaveValue(own);
     await expect(cost(page)).toContainText('3 ảnh ×');
   } finally {
-    await asAdmin(() => page.request.delete(`/api/admin/samples/${sample}`));
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
 });
 

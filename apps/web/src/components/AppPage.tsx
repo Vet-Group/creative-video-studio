@@ -532,7 +532,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                       ))}
                     </div>
                   )}
-                  {/* Try On's pose pictures as toggles: each pose's picture on that gender, or its name until one is uploaded; a picked one carries the check mark. */}
+                  {/* Try On's pose pictures as toggles: each pose's picture on that gender, or its name until one is uploaded; a picked one carries the check mark
+                      and, once the company's sample model has been run in that pose (pose-result-<gender>-<pose>.jpg), shows that result as a preview. */}
                   {/* Keys 1 to 9 toggle the first nine poses while a pose has focus. */}
                   <div
                     className="choice-grid model-grid pose-grid"
@@ -547,9 +548,11 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     }}
                   >
                     {POSES.map((p, i) => {
-                      const file = `try-on-pose-${gender}-${p.value}.jpg`;
+                      const picked = poses.includes(p.value);
+                      const result = `pose-result-${gender}-${p.value}.jpg`;
+                      const file = picked && have.has(result) ? result : `try-on-pose-${gender}-${p.value}.jpg`;
                       return (
-                        <button key={p.value} type="button" className={have.has(file) ? undefined : 'photo-name'} aria-label={p.label} aria-pressed={poses.includes(p.value)} aria-keyshortcuts={i < 9 ? String(i + 1) : undefined} disabled={busy} onClick={() => togglePose(p.value)}>
+                        <button key={p.value} type="button" className={have.has(file) ? undefined : 'photo-name'} aria-label={p.label} aria-pressed={picked} aria-keyshortcuts={i < 9 ? String(i + 1) : undefined} disabled={busy} onClick={() => togglePose(p.value)}>
                           {have.has(file) ? <img src={sampleThumb(file)} alt="" /> : <strong>{p.label}</strong>}
                           {have.has(file) && <span className="photo-caption">{p.label}</span>}
                         </button>
@@ -562,7 +565,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     {OWN_POSE} (tuỳ chọn)
                   </label>
                   <textarea id={poseTextId} className="names-box" rows={2} maxLength={MAX_POSE_TEXT} value={poseText} placeholder="Ví dụ: ngồi trên bậc thềm, tay chống cằm, nhìn ra xa" onChange={(e) => setPoseText(e.target.value)} />
-                  <p className="help">Mỗi tư thế tạo một ảnh riêng và tính tiền riêng, tối đa {MAX_POSES} tư thế mỗi lần chạy. Ô này tính là một tư thế và chạy thành ảnh riêng, không trộn với tư thế đã chọn. AI giữ khuôn mặt, tóc, dáng người và trang phục; hãy xem lại từng ảnh. Đang ở một ô tư thế, bấm phím 1 đến 9 để chọn nhanh chín tư thế đầu.</p>
+                  <p className="help">Mỗi tư thế tạo một ảnh riêng và tính tiền riêng, tối đa {MAX_POSES} tư thế mỗi lần chạy. Ô này tính là một tư thế và chạy thành ảnh riêng, không trộn với tư thế đã chọn. AI giữ khuôn mặt, tóc, dáng người và trang phục; hãy xem lại từng ảnh. Ô đã chọn hiện ảnh kết quả mẫu để bạn hình dung trước. Đang ở một ô tư thế, bấm phím 1 đến 9 để chọn nhanh chín tư thế đầu.</p>
                   {runCost}
                 </div>
               </>
