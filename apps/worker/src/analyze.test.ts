@@ -215,8 +215,10 @@ test('defaultVlmEnv uses BytePlus from the key and never probes when the Vertex 
   const prev = { key: process.env.BYTEPLUS_ARK_API_KEY, fb: process.env.REA_VLM_VERTEX_FALLBACK };
   process.env.BYTEPLUS_ARK_API_KEY = 'ark-test';
   delete process.env.REA_VLM_VERTEX_FALLBACK;
+  const active = vi.fn(async () => 'vx');
   try {
-    const r = await defaultVlmEnv();
+    const r = await defaultVlmEnv(active);
+    expect(active).not.toHaveBeenCalled(); // the guard's active account is read only when the fallback may be used
     expect(r.provider).toBe('byteplus');
     expect(r.env.REA_VLM_API_KEY).toBe('ark-test');
     expect(r.model).toBe('seed-2-0-lite-260428');
@@ -236,18 +238,24 @@ test('the Vertex fallback calls the global endpoint even when GOOGLE_CLOUD_LOCAT
   const file = join(dir, 'key.json');
   const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   await writeFile(file, JSON.stringify({ client_email: 'sa@test', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }), project_id: 'vx' }));
-  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ access_token: 'vx-token', expires_in: 3600 })));
+  const fetchSpy = vi.fn(async () => Response.json({ access_token: 'vx-token', expires_in: 3600 }));
+  vi.stubGlobal('fetch', fetchSpy);
   const keys = ['BYTEPLUS_ARK_API_KEY', 'REA_VLM_VERTEX_FALLBACK', 'GOOGLE_APPLICATION_CREDENTIALS', 'GOOGLE_APPLICATION_CREDENTIALS_NEXT', 'GOOGLE_CLOUD_PROJECT', 'GOOGLE_CLOUD_LOCATION'] as const;
   const prev = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   for (const k of keys) delete process.env[k];
   Object.assign(process.env, { REA_VLM_VERTEX_FALLBACK: '1', GOOGLE_APPLICATION_CREDENTIALS: file, GOOGLE_CLOUD_LOCATION: 'us-central1' });
   try {
-    const r = await defaultVlmEnv();
+    const r = await defaultVlmEnv(async () => 'vx');
     expect(r.provider).toBe('vertex');
     expect(r.env.REA_VLM_BASE_URL).toBe('https://aiplatform.googleapis.com/v1beta1/projects/vx/locations/global/endpoints/openapi');
     expect(r.env.REA_VLM_API_KEY).toBe('vx-token');
     expect(r.model).toBe('google/gemini-3.5-flash');
     expect(r.env.REA_VLM_REASONING_EFFORT).toBe('low');
+    // The credits guard ended the account (no active project, or another one): no Vertex token is minted and there is no VLM.
+    const minted = fetchSpy.mock.calls.length;
+    await expect(defaultVlmEnv(async () => null)).rejects.toThrow(/no VLM provider/);
+    await expect(defaultVlmEnv(async () => 'other-project')).rejects.toThrow(/no VLM provider/);
+    expect(fetchSpy.mock.calls.length).toBe(minted);
   } finally {
     for (const k of keys) {
       if (prev[k] === undefined) delete process.env[k];

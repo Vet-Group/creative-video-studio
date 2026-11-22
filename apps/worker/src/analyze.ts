@@ -75,15 +75,19 @@ const byteplusReachable = async (baseUrl: string): Promise<boolean> => {
 };
 
 // BytePlus Ark is the VLM by default. The Vertex fallback is wired but off unless REA_VLM_VERTEX_FALLBACK=1 and a Vertex
-// service account is configured; even then it is used only when BytePlus is unreachable. So the common path makes no probe.
-export const defaultVlmEnv = async (): Promise<{ env: Record<string, string>; provider: string; model: string }> => {
+// service account is configured; even then it is used only when BytePlus is unreachable, and only on the account the credits
+// guard keeps active (settings.vertex_active_project), so it stops with the other Vertex calls when the credits end. So the
+// common path makes no probe.
+export const defaultVlmEnv = async (activeProject: () => Promise<string | null>): Promise<{ env: Record<string, string>; provider: string; model: string }> => {
   const key = process.env.BYTEPLUS_ARK_API_KEY;
   const byteplus = key ? byteplusReaVlm(key) : undefined;
-  const account = process.env.REA_VLM_VERTEX_FALLBACK === '1' ? vertexAccounts(process.env)[0] : undefined;
+  const accounts = process.env.REA_VLM_VERTEX_FALLBACK === '1' ? vertexAccounts(process.env) : [];
 
-  const reachable = byteplus && account ? await byteplusReachable(byteplus.baseUrl) : true;
-  // Mint a Vertex token only when the fallback may actually be used (BytePlus absent or unreachable).
-  const token = account && (!byteplus || !reachable) ? await serviceAccountToken(account.key)() : undefined;
+  const reachable = byteplus && accounts.length ? await byteplusReachable(byteplus.baseUrl) : true;
+  // Read the active account and mint a Vertex token only when the fallback may actually be used (BytePlus absent or unreachable).
+  const active = accounts.length && (!byteplus || !reachable) ? await activeProject() : null;
+  const account = accounts.find((a) => a.project === active);
+  const token = account ? await serviceAccountToken(account.key)() : undefined;
   const vlm = pickReaVlm({
     byteplus,
     // Always global: the Vertex VLM model is served there only, whatever region GOOGLE_CLOUD_LOCATION sets for the other Vertex calls.
@@ -139,7 +143,8 @@ export async function analysisFromBreakdown(
 export async function runReaAnalyze(pool: Pool, analysisId: string, seams: AnalyzeSeams = {}, signal?: AbortSignal): Promise<void> {
   const decompose = seams.decompose ?? realDecompose;
   const write = seams.write ?? putObject;
-  const vlmEnv = seams.vlmEnv ?? defaultVlmEnv;
+  const vlmEnv =
+    seams.vlmEnv ?? (() => defaultVlmEnv(async () => ((await pool.query('select vertex_active_project from settings where id = 1')).rows[0]?.vertex_active_project as string | null) ?? null));
   const translate = seams.translate ?? defaultTranslate();
   const writePrompts = seams.writePrompts ?? defaultWritePrompts();
 
