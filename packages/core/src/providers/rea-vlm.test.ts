@@ -12,6 +12,7 @@ test('Vertex config builds the openapi endpoint and carries the OAuth token as t
   expect(global.baseUrl).toBe('https://aiplatform.googleapis.com/v1beta1/projects/cvs-vertex/locations/global/endpoints/openapi');
   expect(global.apiKey).toBe('tok');
   expect(global.model).toBe('google/gemini-3.5-flash');
+  expect(reaVlmEnv(global).REA_VLM_REASONING_EFFORT).toBe('low'); // only Vertex: BytePlus's env above has no effort
   const region = vertexReaVlm({ project: 'cvs-vertex', location: 'us-central1', token: 'tok' });
   expect(region.baseUrl).toBe('https://us-central1-aiplatform.googleapis.com/v1beta1/projects/cvs-vertex/locations/us-central1/endpoints/openapi');
 });
