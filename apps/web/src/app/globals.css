@@ -2807,14 +2807,13 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   .remake-item { gap: 20px; } /* each link's hit area ends where the next row's begins */
   .library .segmented button:first-child::after { right: -1px; left: -12px; }
   .library .segmented button:last-child::after { right: -12px; left: -1px; }
-  /* Fields, the pills and the Library's toolbar draw at 44 px instead: they sit in rows and scrolling strips, where a wider hit area would reach under the next control or be clipped. */
+  /* Fields, the pills, the Library's toolbar and History's select bar draw at 44 px instead: they sit in rows and scrolling strips, where a wider hit area would reach under the next control or be clipped. */
   .select-trigger, .apps-search input, .kinds button, .apps-tools .kinds button, .library-search, .library-field, .library-toggle, .library-tools .zip-toggle, .zip-tools .zip-toggle, .library-more, .changelog-more { height: 44px; }
   .library-search input, .library-field :is(select, input) { height: 42px; }
   .library-tools .zip-toggle, .zip-tools .zip-toggle { line-height: 42px; }
   .library-tools .library-share { width: 44px; height: 44px; }
-  :is(.library-active .link-button, .library-empty-actions :is(.button, button), .acct-rows + .actions button) { display: inline-flex; align-items: center; min-height: 44px; }
+  :is(.library-active .link-button, .library-empty-actions :is(.button, button), .acct-rows + .actions button, .zip-tools .link-button) { display: inline-flex; align-items: center; min-height: 44px; }
   :is(.end-scene, .highlights) input[type='text'] { min-height: 44px; }
-  .zip-tools .link-button { display: inline-flex; align-items: center; min-height: 44px; } /* History's select bar wraps into rows, where an ::after would reach into the next one */
   .zip-bar .lookbook-title { min-height: 44px; font-size: 16px; } /* 16 px: iOS Safari zooms into a smaller field */
   .fb-new, .fb-uploads > button, .fb-filters .fb-mine, .fb-comment-actions button, .fb-copy { min-height: 44px; }
 }
