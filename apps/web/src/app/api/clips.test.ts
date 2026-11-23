@@ -19,6 +19,7 @@ const { checkCaps } = await import('@cvs/core/limits');
 const { bucketName, ensureBucket, putObject, s3 } = await import('@/lib/storage');
 const { GET: GET_MINE } = await import('./jobs/route');
 const { GET: GET_JOB, DELETE: DELETE_JOB } = await import('./jobs/[id]/route');
+const { POST: RESTORE_JOB } = await import('./jobs/[id]/restore/route');
 const { PUT: PUT_VERDICT } = await import('./jobs/[id]/verdict/route');
 const { PUT: PUT_FAVORITE } = await import('./jobs/[id]/favorite/route');
 const { GET: GET_EXAMPLE, PUT: PUT_EXAMPLE, DELETE: DELETE_EXAMPLE } = await import('./jobs/[id]/example/route');
@@ -813,6 +814,62 @@ describe('DELETE /api/jobs/:id', () => {
   test('refuses a job that is not a Library clip', async () => {
     expect((await remove(alice.cookie, await clip(alice.id, { status: 'running' }))).status).toBe(404);
     expect((await remove(alice.cookie, 'nope')).status).toBe(404);
+  });
+});
+
+describe('POST /api/jobs/:id/restore', () => {
+  const remove = (cookie: string, id: string) => DELETE_JOB(req(`/api/jobs/${id}`, cookie, { method: 'DELETE' }), ctx(id));
+  const restore = (cookie: string | undefined, id: string) => RESTORE_JOB(req(`/api/jobs/${id}/restore`, cookie, { method: 'POST' }), ctx(id));
+
+  test('brings the owner clip back with its video and poster, once, and the Examples flag and favourite it had are still there', async () => {
+    const id = await clip(alice.id);
+    await pool.query(`insert into examples (job_id, added_by) values ($1, $2)`, [id, admin.id]);
+    await pool.query(`insert into favorites (user_id, job_id) values ($1, $2)`, [bob.id, id]);
+    expect((await restore(undefined, id)).status).toBe(401);
+    expect((await restore(alice.cookie, id)).status).toBe(409); // not deleted yet
+    expect((await remove(alice.cookie, id)).status).toBe(200);
+    expect(await libraryIds(bob.cookie)).not.toContain(id);
+    const res = await restore(alice.cookie, id);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id, deleted: false });
+    expect((await pool.query(`select count(*)::int as n from jobs j join assets a on a.id in (j.output_asset_id, j.poster_asset_id) where j.id = $1 and (j.deleted_at is not null or a.deleted_at is not null)`, [id])).rows[0].n).toBe(0);
+    expect(await libraryIds(bob.cookie)).toContain(id);
+    expect((await pool.query('select (select count(*)::int from examples where job_id = $1) as examples, (select count(*)::int from favorites where job_id = $1) as favorites', [id])).rows[0]).toEqual({ examples: 1, favorites: 1 });
+    expect(await audits(`job:${id}`)).toEqual([]);
+    expect((await restore(alice.cookie, id)).status).toBe(409); // a second undo
+  });
+
+  test('gives another Member 403 and leaves the deleted clip deleted; an Admin may restore it, audited', async () => {
+    const id = await clip(alice.id);
+    expect((await remove(alice.cookie, id)).status).toBe(200);
+    expect((await restore(bob.cookie, id)).status).toBe(403);
+    expect((await pool.query('select deleted_at is not null as gone from jobs where id = $1', [id])).rows[0].gone).toBe(true);
+    expect((await restore(admin.cookie, id)).status).toBe(200);
+    expect(await audits(`job:${id}`)).toEqual([
+      { actor_id: admin.id, action: 'clip.restore', old_value: { ownerId: alice.id, deleted: true }, new_value: { ownerId: alice.id, deleted: false } },
+    ]);
+  });
+
+  test('is 404 for a clip of another workspace, a purged clip, a job that is not a clip and an unknown id', async () => {
+    const other = await clip(alice.id);
+    expect((await remove(alice.cookie, other)).status).toBe(200);
+    await pool.query(`insert into workspaces (id, name) values ('ws_restore', 'Partner') on conflict do nothing`);
+    await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_restore', $1, 'member')`, [alice.id]);
+    await pool.query(`update jobs set workspace_id = 'ws_restore' where id = $1`, [other]);
+    try {
+      expect((await restore(alice.cookie, other)).status).toBe(404); // alice acts in the company workspace
+      expect((await restore(`${alice.cookie}; cvs_ws=ws_restore`, other)).status).toBe(200);
+    } finally {
+      await pool.query(`update jobs set workspace_id = 'ws_vet' where id = $1`, [other]);
+      await pool.query(`delete from workspace_members where workspace_id = 'ws_restore' and user_id = $1`, [alice.id]);
+    }
+    const purged = await clip(alice.id);
+    await pool.query(`update jobs set deleted_at = now(), purged_at = now(), output_asset_id = null, poster_asset_id = null where id = $1`, [purged]);
+    expect((await restore(alice.cookie, purged)).status).toBe(404);
+    const running = await clip(alice.id, { status: 'running' });
+    await pool.query('update jobs set deleted_at = now() where id = $1', [running]);
+    expect((await restore(alice.cookie, running)).status).toBe(404);
+    expect((await restore(alice.cookie, 'nope')).status).toBe(404);
   });
 });
 

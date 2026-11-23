@@ -104,6 +104,5 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
 
   // Delete.
   await card.getByRole('button', { name: 'Xoá', exact: true }).click();
-  await card.getByRole('button', { name: 'Xác nhận xoá' }).click();
   await expect(card).toHaveCount(0);
 });

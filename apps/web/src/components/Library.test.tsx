@@ -3,7 +3,8 @@ import { expect, test, vi } from 'vitest';
 import type { Clip } from '@/lib/api';
 import LibraryPage from '@/app/(app)/library/page';
 import { filtersFromSearch } from '@/lib/library-view';
-import { ClipCard, ClipDetail, clipLabel, deleteConsequence, emptyNoun, gridStep, Library, RecipeText } from './Library';
+import { ClipCard, ClipDetail, clipLabel, emptyNoun, gridStep, Library, RecipeText } from './Library';
+import { UndoNotice } from './UndoNotice';
 
 test('the empty Library names photos under a photo filter, clips under a video one, and results under a mixed one', () => {
   expect(['images', 'try_on', 'image'].map(emptyNoun)).toEqual(['ảnh', 'ảnh', 'ảnh']);
@@ -178,7 +179,13 @@ test('the grid follows the rendered width: one column moves by one, and a day he
   expect(gridStep([0, 0.4, 0.6], 1, 'ArrowDown')).toBeNull(); // sub-pixel differences are one row
 });
 
-test('the delete confirm says the item leaves the Library now and is gone for good after 30 days, and names the Examples tab only for an example', () => {
-  expect(deleteConsequence(false)).toBe('Nó biến khỏi Thư viện ngay, rồi bị xoá hẳn sau 30 ngày.');
-  expect(deleteConsequence(true)).toBe('Nó biến khỏi Thư viện ngay và khỏi mục Ví dụ, rồi bị xoá hẳn sau 30 ngày.');
+test('a delete shows a Hoàn tác notice inside a live region that is there before the text, and the card has no confirm dialog', () => {
+  expect(renderToStaticMarkup(<UndoNotice note={null} onClose={() => undefined} />)).toBe('<div class="undo-notice" role="status"></div>');
+  const note = renderToStaticMarkup(<UndoNotice note={{ key: 'c1', text: 'Đã xoá clip.', undo: async () => undefined }} onClose={() => undefined} />);
+  expect(note).toContain('role="status"');
+  expect(note).toContain('Đã xoá clip.');
+  expect(note).toMatch(/<button type="button">Hoàn tác<\/button>/);
+  const card = renderToStaticMarkup(<ClipCard clip={{ ...clip('video'), canEdit: true }} view="grid" onChange={() => undefined} onDeleted={() => undefined} onOpen={() => undefined} />);
+  expect(card).toContain('aria-label="Xoá"');
+  expect(card).not.toContain('alertdialog');
 });

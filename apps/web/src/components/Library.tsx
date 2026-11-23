@@ -24,6 +24,7 @@ import { ImageToolButtons } from './ImageToolButtons';
 import { useFreshResults, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
+import { UndoNotice, type UndoNote } from './UndoNotice';
 import { VerdictGuide } from './VerdictGuide';
 import { useZipDownload } from './ZipDownload';
 
@@ -82,9 +83,6 @@ interface StoreOption {
 /** Keys that type into a field are not shortcuts. */
 // A focused player keeps its own keys too: ←/→ seek there.
 const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA', 'VIDEO', 'AUDIO'].includes(t.tagName));
-
-/** What a delete really does: the item leaves the Library now (and the Examples tab, if an Admin put it there) and the worker's purge removes its files 30 days later (PURGE_AFTER in apps/worker/src/purge.ts). */
-export const deleteConsequence = (example: boolean) => `Nó biến khỏi Thư viện ngay${example ? ' và khỏi mục Ví dụ' : ''}, rồi bị xoá hẳn sau 30 ngày.`;
 
 /**
  * The card an arrow key moves to from card `from`, given every card's offsetTop in order: Left/Right step one, Home/End jump to the ends, Up/Down keep the column in the row above or below
@@ -217,7 +215,6 @@ const verdictClass = (v: NonNullable<Clip['verdict']>) => (v.verdict === 'fail' 
  * On both, the picture opens the detail (`onOpen`); while `selecting`, the page makes that click pick the item instead (owner, 2026-11-18), and the checkbox in the picture's corner stays the control a keyboard or screen reader uses.
  */
 export function ClipCard({ clip, view, index, lead = false, select, selecting = false, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; index?: number; lead?: boolean; select?: ReactNode; selecting?: boolean; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [problem, setProblem] = useState('');
   const [saving, setSaving] = useState(false);
   const image = clip.mediaType === 'image';
@@ -276,19 +273,6 @@ export function ClipCard({ clip, view, index, lead = false, select, selecting = 
       {name}
     </span>
   );
-  const confirm = confirmDelete && (
-    <div className="actions" role="alertdialog" aria-label="Xác nhận xoá">
-      <span>
-        Xoá {noun} này? {deleteConsequence(clip.example)}
-      </span>
-      <button type="button" disabled={saving} onClick={() => void remove()}>
-        Xác nhận xoá
-      </button>
-      <button type="button" onClick={() => setConfirmDelete(false)}>
-        Huỷ
-      </button>
-    </div>
-  );
 
   if (view === 'list') {
     const thumb = clip.posterAssetId ?? (image ? clip.videoAssetId : null); // an image's preview, else the image itself
@@ -327,13 +311,12 @@ export function ClipCard({ clip, view, index, lead = false, select, selecting = 
             <Icon name="download" />
           </button>
           {clip.canEdit && (
-            <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xoá" title="Xoá" {...about}>
+            <button type="button" className="danger icon-button" disabled={saving} onClick={() => void remove()} aria-label="Xoá" title="Xoá" {...about}>
               <Icon name="x" />
             </button>
           )}
         </div>
         {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} describedBy={labelId} />}
-        {confirm}
         {problem && <p className="error">{problem}</p>}
       </article>
     );
@@ -348,7 +331,7 @@ export function ClipCard({ clip, view, index, lead = false, select, selecting = 
         <Icon name="download" />
       </button>
       {clip.canEdit && (
-        <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xoá" title="Xoá" {...about}>
+        <button type="button" className="danger icon-button" disabled={saving} onClick={() => void remove()} aria-label="Xoá" title="Xoá" {...about}>
           <Icon name="x" />
         </button>
       )}
@@ -414,7 +397,6 @@ export function ClipCard({ clip, view, index, lead = false, select, selecting = 
         </p>
       </div>
       {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} describedBy={labelId} />}
-      {confirm}
       {problem && <p className="error">{problem}</p>}
     </article>
   );
@@ -1039,6 +1021,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   const [view, setView] = useState<LibraryView>('grid');
   const [size, setSize] = useState(1);
   const [clips, setClips] = useState<Clip[]>([]);
+  const [undo, setUndo] = useState<UndoNote | null>(null); // the delete just made, offered back for a few seconds; a newer delete takes its place
   // The day groups of what is loaded; the Examples' own order (as GET /api/library sorts it) is not by date, so it stays one flat grid.
   // The first row's first picture (a video shows its poster instead) is fetched before the rest: the likely LCP.
   const lead = clips.slice(0, FIRST_ROW).findIndex((c) => c.mediaType === 'image');
@@ -1106,6 +1089,15 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
     if (!c || c.verdict || !c.canEdit || counted.current.has(c.id)) return;
     counted.current.add(c.id);
     setUnmarked((n) => Math.max(0, n - 1));
+  };
+  // Puts a deleted item back where it was (the server restores it first), and its place in the unmarked count.
+  const restore = async (clip: Clip, at: number) => {
+    await api(`/api/jobs/${clip.id}/restore`, { method: 'POST' });
+    if (!clip.verdict && clip.canEdit) {
+      counted.current.delete(clip.id);
+      setUnmarked((n) => n + 1);
+    }
+    setClips((cur) => (cur.some((x) => x.id === clip.id) ? cur : [...cur.slice(0, at), clip, ...cur.slice(at)]));
   };
   const update = (next: Clip) => {
     if (next.verdict) uncount(clips.find((x) => x.id === next.id)); // a first mark
@@ -1565,8 +1557,10 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
                     selecting={zip.active}
                     onChange={update}
                     onDeleted={(id) => {
-                      uncount(clips.find((x) => x.id === id));
+                      const gone = clips.find((x) => x.id === id);
+                      uncount(gone);
                       setClips((cur) => cur.filter((x) => x.id !== id));
+                      if (gone) setUndo({ key: id, text: `Đã xoá ${gone.mediaType === 'image' ? 'ảnh' : 'clip'}.`, undo: () => restore(gone, clips.indexOf(gone)) });
                     }}
                     onOpen={zip.active ? () => zip.flip(c.id) : () => setDetail(g.start + j)}
                   />
@@ -1583,6 +1577,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
         </button>
       )}
       {zip.bar}
+      <UndoNotice note={undo} onClose={() => setUndo(null)} />
     </section>
   );
 }
