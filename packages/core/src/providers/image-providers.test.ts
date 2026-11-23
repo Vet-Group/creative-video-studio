@@ -46,6 +46,11 @@ describe('fal image submit', () => {
     });
   });
 
+  test.each(['fal-ai/nano-banana-pro/edit', 'openai/gpt-image-2/edit', 'bytedance/seedream/v5/pro/edit'])('%s gets the [ImageN] chips as the plain words "image N"', async (endpoint) => {
+    const { body } = await bodyFor(req(model(endpoint, { '1K': '0.04', '2K': '0.04' }), { prompt: 'the model in [Image1] wears the shirt in [Image2]' }));
+    expect((body as { prompt: string }).prompt).toBe('the model in image 1 wears the shirt in image 2');
+  });
+
   test.each(['google/nano-banana-2.1/edit', 'fal-ai/nano-banana-2/edit'])('%s uses the same fields as Nano Banana Pro', async (endpoint) => {
     const { body } = await bodyFor(req(model(endpoint, { '1K': '0.04' }), { ratio: 'auto' }));
     expect(body).toMatchObject({ aspect_ratio: 'auto', resolution: '1K', num_images: 1 });

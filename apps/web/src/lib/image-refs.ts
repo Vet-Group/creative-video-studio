@@ -1,7 +1,7 @@
 /**
  * The prompt's image tokens. A job sends its input images in the order of `assetIds` (the order the page lists them): the API keeps it as
- * `input_asset_ids`, the worker turns that into `imageUrls` in the same order, and each video adapter rewrites [ImageN] to its schema's name for the
- * Nth of them (packages/core/src/providers/http.ts imageTokens). So the Nth attached image is [ImageN], counting from 1.
+ * `input_asset_ids`, the worker turns that into `imageUrls` in the same order, each video adapter rewrites [ImageN] to its schema's name for the
+ * Nth of them (packages/core/src/providers/http.ts imageTokens), and the image adapters (fal, Vertex Gemini) send it as "image N". So the Nth attached image is [ImageN], counting from 1.
  */
 export const imageToken = (n: number) => `[Image${n}]`;
 

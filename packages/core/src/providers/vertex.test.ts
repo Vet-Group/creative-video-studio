@@ -56,6 +56,12 @@ describe('vertex Gemini image models', () => {
     expect(await p.status(job)).toEqual({ state: 'failed', error: 'the vertex result was lost when the worker restarted', costUsd: 0.24, costSource: 'estimate' });
   });
 
+  test('the [ImageN] chips reach Gemini as the plain words "image N"', async () => {
+    const { fn, calls } = fakeFetch([200, geminiAnswer]);
+    await provider(fn).submit(req(PRO, { prompt: 'put the label of [Image2] on the bottle in [Image1]' }));
+    expect(JSON.parse(calls[0]!.body).contents[0].parts[2]).toEqual({ text: 'put the label of image 2 on the bottle in image 1' });
+  });
+
   test("'auto' sends no ratio, and Nano Banana (Gemini 2.5 Flash Image) gets no size", async () => {
     const { fn, calls } = fakeFetch([200, geminiAnswer], [200, geminiAnswer]);
     await provider(fn).submit(req(PRO, { ratio: 'auto' }));

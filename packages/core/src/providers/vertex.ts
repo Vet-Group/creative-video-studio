@@ -11,7 +11,7 @@
 //   service-account token (JWT bearer grant): https://developers.google.com/identity/protocols/oauth2/service-account#httprest
 //   billing: "You're charged only for requests that return a 200 response code" (https://cloud.google.com/vertex-ai/generative-ai/pricing)
 import { createSign, randomUUID } from 'node:crypto';
-import { ImageReadError, imageEstimate, ProviderHttpError, resolveImages, sendJson, timeout, type Fetch, type ReadImage } from './http';
+import { ImageReadError, imageEstimate, imageTokens, plainImage, ProviderHttpError, resolveImages, sendJson, timeout, type Fetch, type ReadImage } from './http';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus } from './types';
 
 /** The fields of a service account JSON key that the token grant needs. */
@@ -99,7 +99,7 @@ function callFor(req: ImageSubmitRequest, images: Inline[], project: string, reg
     return {
       path: `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google/models/${model}:generateContent`,
       body: {
-        contents: [{ role: 'user', parts: [...images.map((inlineData) => ({ inlineData })), { text: req.prompt }] }],
+        contents: [{ role: 'user', parts: [...images.map((inlineData) => ({ inlineData })), { text: imageTokens(req.prompt, plainImage) }] }], // [Image1].. as plain words, as fal's image path does
         // thinkingLevel is an upper-case enum (GenerationConfig in the REST reference); sent only on a job that names a level.
         generationConfig: { responseModalities: ['IMAGE'], candidateCount: 1, imageConfig, ...(req.thinking && { thinkingConfig: { thinkingLevel: req.thinking.toUpperCase() } }) },
       },
