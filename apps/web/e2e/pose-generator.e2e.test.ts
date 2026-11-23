@@ -363,4 +363,13 @@ test('pose photos: each is one more pose beside the tiles and the own words, up 
   await expect(photos.getByRole('img')).toHaveCount(1);
   await expect(page.getByText('1 ảnh đầu vào (đã bị xoá)')).toBeVisible();
   await expect(count(page)).toContainText('3/4 đã chọn');
+
+  // Four pose photos fill the Run: the chips have no pose left to pick and are disabled; own words on top never read as a negative room.
+  await page.getByRole('button', { name: 'Bỏ chọn hết' }).click();
+  await photoInput.setInputFiles([file('ref-d.png'), file('ref-e.png'), file('ref-f.png')]);
+  await expect(photos.getByRole('img')).toHaveCount(4);
+  await expect(count(page)).toHaveText('4/4 đã chọn');
+  for (const name of ['Amazon', 'Etsy', 'Shopify']) await expect(chip(page, name)).toBeDisabled();
+  await page.getByLabel(OWN_POSE).fill('ngồi trên bậc thềm');
+  await expect(page.getByText('còn chỗ cho 0 ảnh')).toBeVisible();
 });

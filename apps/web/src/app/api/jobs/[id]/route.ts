@@ -56,7 +56,8 @@ export async function GET(request: Request, { params }: RouteContext) {
       ).rows.map(({ params: p, ...r }) => ({ view: p.view ?? null, breed: p.breed ?? null, style: p.style ?? null, product: p.product ?? null, name: p.name ?? null, pose: p.pose ?? null, poseText: p.poseText ?? null, poseRef: p.poseRef ?? null, background: p.background ?? null, id: r.id, status: r.status, outputAssetId: r.output_asset_id }))
     : null;
   // The pose photos of the whole Run (the creator's own), which the pose generator's Reuse puts back in its pose photo box; only the job's own one is among `images`.
-  const { rows: poseRefs } = await owned([...new Set((items ?? [{ poseRef: job.params.poseRef }]).flatMap((i) => (i.poseRef ? [i.poseRef as string] : [])))]);
+  const refIds = [...new Set((items ?? [{ poseRef: job.params.poseRef }]).flatMap((i) => (i.poseRef ? [i.poseRef as string] : [])))]; // none unless it is a pose generator job with pose photos
+  const poseRefs = refIds.length > 0 ? (await owned(refIds)).rows : [];
   return Response.json({
     id: job.id, userId: job.user_id, status: job.status, error: job.error, isMock: job.is_mock, feature: job.feature, resolution: job.params.resolution ?? null, presetId: job.preset_id, prompt: job.prompt, enhance: job.enhance, enhancedPrompt: job.enhanced_prompt, audio: job.params.audio ?? null, orientation: job.params.orientation ?? null, view: job.params.view ?? null, breed: job.params.breed ?? null, style: job.params.style ?? null, product: job.params.product ?? null, name: job.params.name ?? null, ratio: job.aspect,
     // The form inputs kept for reuse (Marketing Studio's, the image pages' own text, Try On's garment count). The brief and the script show to everyone who may see the job (owner, 2026-11-03):

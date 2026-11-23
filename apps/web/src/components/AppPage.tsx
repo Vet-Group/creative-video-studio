@@ -258,7 +258,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   // Background Changer: a reference photo stands in for the description, whose box is off meanwhile; its words stay in the box's state but are not used.
   const reference = app.prompt === 'background' && images[1]!.length > 0;
   const used = reference ? '' : prompt;
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt: used, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked, poseRefs: poseRefs.length }) ?? (poseRefs.some((r) => r.id === person?.id) ? `Ảnh ${POSE_PHOTOS.toLowerCase()} không được trùng ảnh người mẫu: bỏ một trong hai.` : null) ?? promptTooLong(chosen, used.trim() ? used.trim().length + fixed : 0);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt: used, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked, poseRefs: poseRefs.length }) ?? (poseRefs.some((r) => r.id === person?.id) ? `${POSE_PHOTOS} không được trùng ảnh người mẫu: bỏ một trong hai.` : null) ?? promptTooLong(chosen, used.trim() ? used.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
   /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
   const sent = basePrompt(app.feature, appInputs(app, { images, prompt: used }).prompt);
@@ -551,7 +551,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                         key={pr.id}
                         type="button"
                         aria-pressed={presetOn(pr)}
-                        disabled={busy}
+                        disabled={busy || presetPoses(pr).length === 0} // no room left for a pose of the preset: the pose photos and own words fill the Run
                         onClick={() => {
                           // A pressed chip toggles off: no picks and the photo's own background.
                           setPoses(presetOn(pr) ? [] : [...presetPoses(pr)]);
@@ -624,7 +624,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                 {/* Pictures of someone in the wanted pose: each is one more pose, up to what is left of the Run's four. */}
                 <Slot
                   label={POSE_PHOTOS}
-                  empty="Thêm ảnh người đang đứng đúng tư thế muốn tạo"
+                  empty="Thêm ảnh một người ở đúng tư thế muốn tạo"
                   inputLabel={POSE_PHOTOS}
                   images={poseRefs}
                   max={poseRoom}
@@ -636,7 +636,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                   onPick={(img) => setPoseRefs((cur) => (poseRoom === 1 ? [img] : [...cur, img]))}
                 />
                 <p className="help">
-                  Mỗi ảnh là một tư thế, tạo một ảnh riêng và tính tiền riêng; còn chỗ cho {poseRoom - poseRefs.length} ảnh. AI chỉ lấy tư thế, góc người và khung hình từ ảnh này; khuôn mặt, tóc, dáng người và trang phục vẫn theo ảnh người mẫu, còn nền theo mục Nền.
+                  Mỗi ảnh là một tư thế, tạo một ảnh riêng và tính tiền riêng; còn chỗ cho {Math.max(0, poseRoom - poseRefs.length)} ảnh. AI chỉ lấy tư thế, góc người và khung hình từ ảnh này; khuôn mặt, tóc, dáng người và trang phục vẫn theo ảnh người mẫu, còn nền theo mục Nền.
                 </p>
                 {runCost}
               </>
