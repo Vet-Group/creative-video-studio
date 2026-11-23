@@ -102,7 +102,7 @@ Migrations are forward-only and drizzle skips a migration older than the last ap
 Paths are under `apps/web/src`; line numbers drift, search by name.
 
 Cross-user reads:
-- Assets: `lib/assets.ts` `readableAsset` (owner short-circuit, Admin bypass, inputs of live clips, company/store choice photos, shared AI models, shared analysis videos), used by `/api/assets/[id]`, `/content`, `/download`, `/thumb`, `/compress`, and by analyses, remakes and suggestions.
+- Assets: `lib/assets.ts` `readableAsset` (owner short-circuit, Admin bypass, inputs of live clips, company/store choice photos, shared AI models, shared analysis videos), used by `/api/assets/[id]`, `/content`, `/download`, `/thumb`, `/compress`, `/reframe`, and by analyses, remakes and suggestions.
 - Job inputs: `/api/jobs` POST accepts any input of a succeeded job or a shared AI model.
 - Library: `/api/library` (list, creators, stores, ratios, unmarked count, `example=1`, clip cost), `/api/library/zip`.
 - Jobs: `/api/jobs/[id]` GET (any succeeded job, Admin any job), DELETE, `/favorite`, `/verdict`, `/example`; `lib/clips.ts` (Explore best clips, download names); `lib/model-scores.ts` (numbers only, stays global).

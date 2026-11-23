@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import type { ReframeFill, ReframeRatio } from '@cvs/core/queue';
 import { frameTimes } from '@cvs/core/suggest';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobe from 'ffprobe-static';
@@ -75,6 +76,41 @@ export const COMPRESS_TIMEOUT_MS = 480_000;
 export async function compressClip(video: string, out: string, { signal, timeoutMs = COMPRESS_TIMEOUT_MS }: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
   const fit = "scale=w='if(gt(iw,ih),min(1920,iw),-2)':h='if(gt(iw,ih),-2,min(1920,ih))':force_divisible_by=2";
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-map', '0:v:0', '-map', '0:a:0?', '-vf', fit, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out], { timeout: timeoutMs, signal });
+}
+
+/** `n` rounded down to an even number (H.264 in 4:2:0 needs even sides), at least 2. */
+const even = (n: number) => Math.max(2, Math.floor(n / 2) * 2);
+
+/**
+ * The ffmpeg arguments that put a `width` x `height` clip into a `ratio` frame. Every shape offered is portrait or square, so the frame's height is the
+ * clip's long side (at most 1920 px) and its width follows the ratio. The clip is fitted inside, which never crops it and, with that height, never enlarges
+ * it, and centred over a blurred, darkened copy of itself scaled to cover the frame ('blur') or over black. Its sound, when it has any, is brought to -14 LUFS
+ * (the level social apps play at; loudnorm in one pass) and fades out over the last 0.3 s. H.264 yuv420p and AAC with the index up front.
+ */
+export function reframeArgs(video: string, out: string, clip: { width: number; height: number; seconds: number; audio: boolean }, ratio: ReframeRatio, fill: ReframeFill): string[] {
+  const [rw, rh] = ratio.split(':').map(Number) as [number, number];
+  const h = even(Math.min(1920, Math.max(clip.width, clip.height)));
+  const w = even((h * rw) / rh);
+  // ffmpeg fits the frames as it decodes them, so a clip stored on its side with a rotation tag is fitted upright.
+  const fit = `scale=${w}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1`;
+  const graph =
+    fill === 'black'
+      ? `[0:v:0]${fit},pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:black[v]`
+      : `[0:v:0]split[a][b];[a]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},gblur=sigma=${Math.round(w / 20)},eq=brightness=-0.15,setsar=1[bg];[b]${fit}[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[v]`;
+  const fade = clip.seconds > 0.3 ? `,afade=t=out:st=${(clip.seconds - 0.3).toFixed(3)}:d=0.3` : '';
+  // loudnorm works at 192 kHz, so the sound is set back to 48 kHz.
+  const sound = clip.audio ? ['-map', '0:a:0', '-af', `loudnorm=I=-14:TP=-1.5:LRA=11${fade}`, '-c:a', 'aac', '-b:a', '128k', '-ar', '48000'] : [];
+  return ['-y', '-v', 'error', '-i', video, '-filter_complex', graph, '-map', '[v]', ...sound, ...H264, out];
+}
+
+/** Reframes `video` into `out` (reframeArgs), bounded like a compression: a hung ffmpeg must not hold a slot for good. */
+export async function reframeClip(video: string, out: string, ratio: ReframeRatio, fill: ReframeFill, { signal, timeoutMs = COMPRESS_TIMEOUT_MS }: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
+  const { stdout } = await run(ffprobe.path, ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', video], { timeout: timeoutMs, signal });
+  const { streams = [], format } = JSON.parse(stdout) as { streams?: { codec_type: string; width?: number; height?: number }[]; format?: { duration?: string } };
+  const v = streams.find((s) => s.codec_type === 'video');
+  if (!v?.width || !v.height) throw new Error('the clip has no video stream');
+  const clip = { width: v.width, height: v.height, seconds: Number(format?.duration) || 0, audio: streams.some((s) => s.codec_type === 'audio') };
+  await run(requireFfmpeg(), reframeArgs(video, out, clip, ratio, fill), { timeout: timeoutMs, signal });
 }
 
 /** Bounds each ffprobe and ffmpeg call of ensureH264. Delivery runs in the reconcile loop (no queue expiry covers it), so a hung process would stall every job polled after it. */

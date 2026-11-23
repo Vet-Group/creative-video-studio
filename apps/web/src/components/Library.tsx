@@ -2,9 +2,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { REFRAME_FILLS, REFRAME_RATIOS, type ReframeFill, type ReframeRatio } from '@cvs/core/queue';
 import { JOB_APPS } from '@/lib/apps';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
-import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
+import { downloadCompressed, downloadCompressedVideo, downloadReframedVideo } from '@/lib/compress-download';
 import { confirmRerun } from '@/lib/run-guard';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
@@ -573,6 +574,19 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
     }, 'Không nén và tải xuống được.');
     setCompressing(false);
   };
+  // Đổi khung: the video in a 9:16, 4:5 or 1:1 frame over a blurred copy of itself or black, made by the worker for free, then downloaded as Compress does.
+  const [frame, setFrame] = useState<{ ratio: ReframeRatio; fill: ReframeFill }>({ ratio: '9:16', fill: 'blur' });
+  const [reframing, setReframing] = useState(false);
+  const frameLabel = useId();
+  const reframe = async () => {
+    setReframing(true);
+    await act(async () => {
+      setNote('Đang đổi khung video, vui lòng chờ…');
+      await downloadReframedVideo(clip.videoAssetId, frame.ratio, frame.fill, clip.downloadName);
+      setNote('');
+    }, 'Không đổi khung và tải xuống được.');
+    setReframing(false);
+  };
   // A new paid job with the same inputs, after the same confirm as a Run; the server applies the caps and the ledger as for any other.
   const rerun = async () => {
     setRerunning(true); // from the click on, so a double click cannot send two paid jobs
@@ -790,6 +804,29 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
             </button>
           )}
         </div>
+        {!image && (
+          <div className="reframe" role="group" aria-labelledby={frameLabel}>
+            <span id={frameLabel}>Đổi khung</span>
+            <div className="segmented" role="group" aria-label="Tỉ lệ khung">
+              {REFRAME_RATIOS.map((ratio) => (
+                <button key={ratio} type="button" aria-pressed={frame.ratio === ratio} onClick={() => setFrame({ ...frame, ratio })}>
+                  {ratio}
+                </button>
+              ))}
+            </div>
+            <div className="segmented" role="group" aria-label="Nền">
+              {REFRAME_FILLS.map((fill) => (
+                <button key={fill} type="button" aria-pressed={frame.fill === fill} onClick={() => setFrame({ ...frame, fill })}>
+                  {fill === 'blur' ? 'Nền mờ' : 'Nền đen'}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="icon-button labelled" disabled={reframing} aria-busy={reframing} onClick={() => void reframe()} title="Đổi khung và tải về">
+              <Icon name="download" />
+              Tải về
+            </button>
+          </div>
+        )}
         {admin && <ExampleControl key={`example-${clip.id}`} clip={clip} onChange={onChange} />}
         {clip.canEdit && <p className="recipe-keys">Phím tắt: 1 Đạt · 2 Nổi bật · 3 Không đạt · ←/→ mục trước, sau</p>}
         {/* As on a History card, on any member's picture: the copy is the viewer's own new input (POST /api/assets/copy takes a Library clip of the workspace). */}

@@ -531,7 +531,7 @@ dialog.modal.jobs-drawer[open] { animation: jobs-drawer-in .28s cubic-bezier(.2,
 .job-when strong { font-weight: 500; }
 .job-card .error, .job-card .muted { margin: 0; font-size: 12px; }
 .job-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
-.job-actions .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); }
+.job-actions .icon-button, .reframe .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); }
 .job-reuse { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; border-radius: 8px; background: var(--fill); color: var(--ink-strong); font-size: 12px; font-weight: 500; text-decoration: none; }
 .job-reuse:hover { background: var(--fill-strong); }
 .job-main { display: grid; gap: 6px; margin-top: auto; }
@@ -1372,7 +1372,10 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
 .lightbox-foot-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .lightbox-foot-actions > * { flex: 1 1 0; min-width: max-content; padding: 0 12px; white-space: nowrap; }
 .lightbox-reuse.lightbox-rerun { border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink-strong); } /* a new paid job: never the same weight as Reuse */
-.job-actions .icon-button.labelled { gap: 6px; width: auto; padding: 0 10px; font: inherit; font-size: 12px; font-weight: 500; }
+.job-actions .icon-button.labelled, .reframe .icon-button.labelled { gap: 6px; width: auto; padding: 0 10px; font: inherit; font-size: 12px; font-weight: 500; }
+/* Reframe & download in a video's detail: its name, the shapes and the fills as segmented choices in words, and its download, on one row that wraps. */
+.reframe { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: var(--text-muted); font-size: 12px; font-weight: 500; }
+.reframe .segmented button { width: auto; padding: 0 10px; color: var(--text-2); font: inherit; }
 .lightbox-step { position: fixed; top: 50%; display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; background: rgb(var(--shade) / 70%); color: var(--on-dark); transform: translateY(-50%); }
 .lightbox-prev { left: 24px; }
 .lightbox-next { right: 24px; }
@@ -2827,6 +2830,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   :is(.end-scene, .highlights) input[type='text'] { min-height: 44px; }
   .zip-bar .lookbook-title { min-height: 44px; font-size: 16px; } /* 16 px: iOS Safari zooms into a smaller field */
   .fb-new, .fb-uploads > button, .fb-filters .fb-mine, .fb-comment-actions button, .fb-copy { min-height: 44px; }
+  .reframe :is(.segmented button, .icon-button) { min-width: 44px; height: 44px; } /* in a detail that scrolls: the row grows rather than reach under its neighbours */
 }
 
 /* The Marketing Studio guided wizard: the step list, the step toggle and the step circles. */

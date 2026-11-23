@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import ffprobe from 'ffprobe-static';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { burnEndText, concatClips, cutShot, endTextLayout, ensureH264, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, sideBySide, spliceClips, stillSlot, trimClip, wrapText } from './media';
+import { burnEndText, concatClips, cutShot, endTextLayout, ensureH264, probeSeconds, probeSize, probeVideoSeconds, reframeArgs, reframeClip, requireFfmpeg, sideBySide, spliceClips, stillSlot, trimClip, wrapText } from './media';
 
 const run = promisify(execFile);
 let dir = '';
@@ -228,4 +228,56 @@ describe('H.264 for every stored clip', () => {
     expect(failures).toEqual([]);
     await expect(readFile(out)).rejects.toThrow();
   });
+});
+
+describe('Đổi khung (reframe)', () => {
+  /** The frame size and the fill a reframe of a `width` x `height` clip asks ffmpeg for. */
+  const frameOf = (width: number, height: number, ratio: Parameters<typeof reframeArgs>[3], fill: Parameters<typeof reframeArgs>[4] = 'black') => {
+    const args = reframeArgs('in.mp4', 'out.mp4', { width, height, seconds: 5, audio: false }, ratio, fill);
+    const graph = args[args.indexOf('-filter_complex') + 1]!;
+    return graph.match(fill === 'black' ? /pad=(\d+):(\d+):/ : /crop=(\d+):(\d+),/)!.slice(1).join('x');
+  };
+
+  test('takes the long side as the frame height (at most 1920 px), the ratio for the width, and rounds both down to even', () => {
+    expect(frameOf(1920, 1080, '9:16')).toBe('1080x1920'); // 16:9 into 9:16
+    expect(frameOf(1080, 1920, '1:1')).toBe('1920x1920'); // 9:16 into 1:1
+    expect(frameOf(1024, 1024, '4:5')).toBe('818x1024'); // 1:1 into 4:5: 819.2 rounded down to even
+    expect(frameOf(1023, 575, '9:16')).toBe('574x1022'); // odd sides
+    expect(frameOf(3840, 2160, '4:5', 'blur')).toBe('1536x1920'); // over the cap
+    expect(frameOf(1080, 1920, '9:16')).toBe('1080x1920'); // already the shape: only the sound changes
+  });
+
+  test('fits the clip inside without cropping it, over a blurred cover of itself or black, and treats the sound only when there is some', () => {
+    const blur = reframeArgs('in.mp4', 'out.mp4', { width: 1920, height: 1080, seconds: 5, audio: true }, '9:16', 'blur');
+    const graph = blur[blur.indexOf('-filter_complex') + 1]!;
+    expect(graph).toContain('[b]scale=1080:1920:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1[fg]');
+    expect(graph).toContain('scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=54,eq=brightness=-0.15');
+    expect(graph).toContain('[bg][fg]overlay=(W-w)/2:(H-h)/2[v]');
+    expect(blur.join(' ')).toContain('-map 0:a:0 -af loudnorm=I=-14:TP=-1.5:LRA=11,afade=t=out:st=4.700:d=0.3 -c:a aac');
+    expect(blur.join(' ')).toContain('-pix_fmt yuv420p -movflags +faststart out.mp4');
+    const silent = reframeArgs('in.mp4', 'out.mp4', { width: 1920, height: 1080, seconds: 5, audio: false }, '1:1', 'black');
+    expect(silent.join(' ')).not.toMatch(/0:a|loudnorm|-c:a/);
+  });
+
+  test('with the pinned ffmpeg: a vertical clip with sound into 1:1 and 4:5 at -14 LUFS fading out, and a silent wide one into 9:16 staying silent', async () => {
+    const square = join(dir, 'square.mp4');
+    await reframeClip(source, square, '1:1', 'blur');
+    expect(await probeSize(square)).toEqual({ width: 640, height: 640 });
+    expect((await probe(square)).streams.map((s) => s.codec_type)).toEqual(['video', 'audio']);
+    const volume = async (args: string[]) => Number((await run(requireFfmpeg(), ['-hide_banner', ...args, '-i', square, '-map', '0:a', '-af', 'volumedetect', '-f', 'null', '-'])).stderr.match(/max_volume: (-?[\d.]+) dB/)![1]);
+    expect(await volume(['-sseof', '-0.03'])).toBeLessThan((await volume(['-ss', '1', '-t', '1'])) - 12); // the last 30 ms, faded, against the middle
+    const { stderr } = await run(requireFfmpeg(), ['-hide_banner', '-i', square, '-map', '0:a', '-af', 'ebur128', '-f', 'null', '-']);
+    expect(Number([...stderr.matchAll(/I:\s+(-?[\d.]+) LUFS/g)].at(-1)![1])).toBeCloseTo(-14, 0); // the summary, after the running readings
+
+    const portrait = join(dir, 'portrait.mp4');
+    await reframeClip(source, portrait, '4:5', 'black');
+    expect(await probeSize(portrait)).toEqual({ width: 512, height: 640 });
+
+    const wide = join(dir, 'wide-silent.mp4');
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=24', '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', wide]);
+    const tall = join(dir, 'tall.mp4');
+    await reframeClip(wide, tall, '9:16', 'blur');
+    expect(await probeSize(tall)).toEqual({ width: 180, height: 320 });
+    expect((await probe(tall)).streams.map((s) => s.codec_type)).toEqual(['video']);
+  }, 60_000);
 });

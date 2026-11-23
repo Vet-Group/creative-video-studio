@@ -1,3 +1,4 @@
+import type { ReframeFill, ReframeRatio } from '@cvs/core/queue';
 import { api } from './api';
 import { decodeOptimizerImage, optimizeImage } from './media-optimizer';
 
@@ -47,20 +48,35 @@ function open(url: string, name?: string) {
   a.remove();
 }
 
-/**
- * Saves a video result compressed by the worker (POST /api/assets/[id]/compress, then polls): made once and kept, so the next click is quick. When the copy
- * is not enough smaller the original is saved instead. `name` is the original's download name; returns whether the compressed copy was the one saved.
- */
-export async function downloadCompressedVideo(assetId: string, name?: string): Promise<boolean> {
-  const path = `/api/assets/${assetId}/compress`;
+/** Asks the worker for a copy (POST `path`) and polls it until it is no longer working or the wait gives up. */
+async function workerCopy(path: string) {
   type Reply = { status: 'ready' | 'working' | 'original' | 'failed' | 'none'; downloadUrl?: string };
   let r = await api<Reply>(path, { method: 'POST' });
   for (const until = Date.now() + GIVE_UP_MS; r.status === 'working' && Date.now() < until; ) {
     await new Promise((go) => setTimeout(go, POLL_MS));
     r = await api<Reply>(path);
   }
+  return r;
+}
+
+/**
+ * Saves a video result compressed by the worker (POST /api/assets/[id]/compress, then polls): made once and kept, so the next click is quick. When the copy
+ * is not enough smaller the original is saved instead. `name` is the original's download name; returns whether the compressed copy was the one saved.
+ */
+export async function downloadCompressedVideo(assetId: string, name?: string): Promise<boolean> {
+  const r = await workerCopy(`/api/assets/${assetId}/compress`);
   if (r.status === 'ready') open(r.downloadUrl!, name && `${name.replace(/\.[^.]+$/, '')}-nen.mp4`);
   else if (r.status === 'original') open((await api<{ downloadUrl: string }>(`/api/assets/${assetId}`)).downloadUrl, name);
   else throw new Error(`compression ${r.status}`);
   return r.status === 'ready';
+}
+
+/**
+ * Saves a video result reframed by the worker into a 9:16, 4:5 or 1:1 frame over a blurred or black fill (POST /api/assets/[id]/reframe, then polls): made
+ * once per shape and fill and kept, as a compressed copy is. `name` is the original's download name; the copy's carries the shape (`-9x16`).
+ */
+export async function downloadReframedVideo(assetId: string, ratio: ReframeRatio, fill: ReframeFill, name?: string): Promise<void> {
+  const r = await workerCopy(`/api/assets/${assetId}/reframe?ratio=${ratio}&fill=${fill}`);
+  if (r.status !== 'ready') throw new Error(`reframe ${r.status}`);
+  open(r.downloadUrl!, name && `${name.replace(/\.[^.]+$/, '')}-${ratio.replace(':', 'x')}.mp4`);
 }

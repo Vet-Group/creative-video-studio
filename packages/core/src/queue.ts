@@ -47,6 +47,33 @@ export interface CompressJobData {
 /** Where the compressed copy of a video asset is kept (the web streams it, the worker writes it and the purge removes it with the asset). */
 export const compressedKey = (assetId: string) => `compressed/${assetId}.mp4`;
 
+/**
+ * Reframe & download on a video: the clip fitted into a 9:16, 4:5 or 1:1 frame over a blurred copy of itself or black, its sound brought to a social loudness.
+ * One ffmpeg re-encode on the worker like Compress, under the same policy and size cap (COMPRESS_MAX_BYTES), one job per asset, shape and fill. No provider is called.
+ */
+export const REFRAME_QUEUE = 'reframe';
+export const REFRAME_QUEUE_OPTIONS = COMPRESS_QUEUE_OPTIONS;
+export const REFRAME_RATIOS = ['9:16', '4:5', '1:1'] as const;
+export const REFRAME_FILLS = ['blur', 'black'] as const;
+export type ReframeRatio = (typeof REFRAME_RATIOS)[number];
+export type ReframeFill = (typeof REFRAME_FILLS)[number];
+
+export interface ReframeJobData {
+  assetId: string;
+  ratio: ReframeRatio;
+  fill: ReframeFill;
+}
+
+/** The shape and fill a request names, or undefined unless both are allowed values (they become part of a storage key). */
+export function reframeOf(ratio: string | null, fill: string | null): { ratio: ReframeRatio; fill: ReframeFill } | undefined {
+  if (!REFRAME_RATIOS.includes(ratio as ReframeRatio) || !REFRAME_FILLS.includes(fill as ReframeFill)) return undefined;
+  return { ratio: ratio as ReframeRatio, fill: fill as ReframeFill };
+}
+
+/** Where one reframed copy of a video asset is kept (also the job's singletonKey); every one of them goes with the asset (reframedKeys). */
+export const reframedKey = (assetId: string, ratio: ReframeRatio, fill: ReframeFill) => `reframed/${assetId}-${ratio.replace(':', 'x')}-${fill}.mp4`;
+export const reframedKeys = (assetId: string) => REFRAME_RATIOS.flatMap((r) => REFRAME_FILLS.map((f) => reframedKey(assetId, r, f)));
+
 export interface RemakeJobData {
   remakeId: string;
 }
