@@ -63,8 +63,8 @@ export async function POST(request: Request) {
   const lone = cells.length % 2 === 1 ? cells.length - 1 : -1;
   const placed = cells.map((input, i) => ({ input, left: GAP + (i === lone ? (CELL + GAP) / 2 : (i % 2) * (CELL + GAP)), top: top + GAP + Math.floor(i / 2) * (cellHeight + GAP) }));
   if (pdf) {
-    // The title shrinks to stay inside the page's width; DejaVu Sans, on the server, covers Vietnamese.
-    const size = Math.min(84, Math.floor((WIDTH - 2 * GAP) / ([...title].length * 0.9)));
+    // The title shrinks to stay inside the page's width, sized for its widest letter (W is about 1.04 em in DejaVu Sans Bold); DejaVu Sans, on the server, covers Vietnamese.
+    const size = Math.min(84, Math.floor((WIDTH - 2 * GAP) / ([...title].length * 1.05)));
     const date = new Date().toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
     const text = Buffer.from(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEADER}" font-family="DejaVu Sans, Liberation Sans, sans-serif"><text x="${GAP}" y="120" font-size="${size}" font-weight="bold" fill="#111">${xml(title)}</text><text x="${GAP}" y="195" font-size="44" fill="#666">${xml(date)}</text></svg>`,
