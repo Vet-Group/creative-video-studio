@@ -58,7 +58,8 @@ KEEPAWK
   awk -f $APP/.keep.awk $APP/.env $APP/.env.new > $APP/.env.tmp && mv $APP/.env.tmp $APP/.env.new
   rm -f $APP/.keep.awk
 fi
-chmod 600 $APP/.env.new
+# The worker runs as cvs-worker and reads .env through its group (deploy/linux/install.sh step 4b).
+if getent group cvs-worker > /dev/null; then chgrp cvs-worker $APP/.env.new && chmod 640 $APP/.env.new; else chmod 600 $APP/.env.new; fi
 mv $APP/.env.new $APP/.env
 n="\$(grep -c '^FAL_ADMIN_KEY=' $APP/.env || true)"
 [ "\$n" = 0 ] || { echo "FAL_ADMIN_KEY reached VET; removing the file" >&2; rm -f $APP/.env; exit 1; }

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Usage: uninstall.sh [--dry-run]
 # Undoes install.sh using only what <app>/install.state recorded (docs/ops/deploy.md):
-#   - disables and removes the recorded cvs-* units (a state line that names any other unit makes it refuse);
+#   - disables and removes the recorded cvs-* units (a state line that names any other unit makes it refuse), the worker's
+#     system unit too, and deletes the user cvs-worker when install.sh created it;
 #   - runs `docker compose -p creative-video-studio down` in the app directory, which KEEPS the volumes (never -v);
 #   - removes the recorded files, then deletes the DNS record and the tunnel by their recorded ids (needs CLOUDFLARE_API_TOKEN).
 # Each state line is removed as soon as its resource is gone, and an HTTP 404 on a Cloudflare DELETE counts as already gone,
@@ -9,7 +10,8 @@
 # POD Studio paths. The app directory, the data volumes and the backups stay. --dry-run prints every command, changes nothing
 # and exits 0 when the state file is valid.
 # Env (defaults): CVS_APP_DIR (/opt/creative-video-studio; absolute, last part creative-video-studio), CLOUDFLARE_API_TOKEN
-# (else read from <app>/.env), CVS_ROOT_HOME (/root; HOME is forced to it), CVS_RETRY_SLEEP (5; seconds between tunnel DELETE tries).
+# (else read from <app>/.env), CVS_ROOT_HOME (/root; HOME is forced to it), CVS_RETRY_SLEEP (5; seconds between tunnel DELETE tries),
+# CVS_SYSTEM_UNIT_DIR (/etc/systemd/system; for tests).
 set -euo pipefail
 
 project=creative-video-studio
@@ -26,6 +28,7 @@ export HOME="${CVS_ROOT_HOME:-/root}"
 app="${CVS_APP_DIR:-/opt/creative-video-studio}"
 state_file="$app/install.state"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+system_unit_dir="${CVS_SYSTEM_UNIT_DIR:-/etc/systemd/system}"
 uid="$(id -u)"
 # Not inherited: under `su` without `-` it would point systemctl --user at another user's manager.
 export XDG_RUNTIME_DIR="/run/user/$uid"
@@ -50,6 +53,8 @@ drop() { # forget one state line once its resource is gone
 # Read the state file; every value is validated because it ends up in a path or an API URL.
 unit_re='^cvs-[a-z0-9-]+\.(service|timer)$'
 units=()
+system_units=()
+worker_user=""
 files=()
 tunnel_id="" account_id="" zone_id="" dns_id=""
 while IFS= read -r line; do
@@ -58,6 +63,12 @@ while IFS= read -r line; do
     unit=*)
       [[ $val =~ $unit_re ]] || fail "$state_file lists '$val', which is not a cvs-* unit; refusing"
       units+=("$val") ;;
+    system_unit=*)
+      [[ $val =~ $unit_re ]] || fail "$state_file lists '$val', which is not a cvs-* unit; refusing"
+      system_units+=("$val") ;;
+    user=*)
+      [ "$val" = cvs-worker ] || fail "$state_file lists user '$val', not cvs-worker; refusing"
+      worker_user="$val" ;;
     file=*)
       case "$val" in
         "$app"/cloudflared/*) ;;
@@ -85,6 +96,17 @@ for u in "${units[@]}"; do
   drop "unit=$u"
 done
 if [ ${#units[@]} -gt 0 ]; then run systemctl --user daemon-reload; fi
+for u in "${system_units[@]}"; do
+  soft systemctl disable --now "$u"
+  run rm -f "$system_unit_dir/$u"
+  drop "system_unit=$u"
+done
+if [ ${#system_units[@]} -gt 0 ]; then run systemctl daemon-reload; fi
+# Its state directory (/var/lib/cvs-worker, rea-video's model cache) is systemd's and stays.
+if [ -n "$worker_user" ]; then
+  soft userdel "$worker_user"
+  drop "user=$worker_user"
+fi
 
 # 2. This compose project only, from the app directory so no other directory's compose file is used; no -v, so the data volumes stay.
 cd "$app"
