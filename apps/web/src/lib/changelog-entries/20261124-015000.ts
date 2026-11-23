@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-24T01:00:00+07:00',
+  at: '2026-11-24T01:50:00+07:00',
   kind: 'new',
   title: 'Tải video theo tỉ lệ 9:16, 4:5 hoặc 1:1 miễn phí',
   details: [
