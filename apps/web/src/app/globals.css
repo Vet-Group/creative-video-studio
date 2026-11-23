@@ -3116,6 +3116,18 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 .input-viewer .input-viewer-use { justify-self: center; gap: 6px; width: auto; margin: 12px; padding: 0 20px; }
 .compare-modal .modal-body { height: min(860px, calc(100dvh - 64px)); padding: 0; overflow: hidden; border-radius: 16px; background: var(--lightbox-bg); }
 .compare-modal .modal-close, .input-viewer .modal-close { z-index: 1; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 8px; background: rgb(var(--shade) / 50%); color: var(--on-dark); font-size: 20px; }
+/* Two Library items side by side (CompareButton): two columns on a wide screen, stacked on a phone. The dialog sits inside the selection bar, so its close button needs more than `.zip-float button`. */
+dialog.modal.compare-two { width: min(1100px, calc(100vw - 32px)); max-width: none; }
+.compare-two-title { margin: 0 44px 12px 0; font-size: 16px; line-height: 24px; }
+.compare-two-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.compare-two-grid li { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.compare-two-grid :is(img, video) { display: block; width: 100%; max-height: 40dvh; border-radius: 10px; background: var(--media-bg); object-fit: contain; }
+.compare-two-label { color: var(--text-muted); font-size: 13px; line-height: 19px; overflow-wrap: anywhere; }
+.zip-float .compare-two .modal-close { top: 10px; right: 10px; width: 44px; height: 44px; margin: 0; padding: 0; border-radius: 10px; font-size: 24px; line-height: 1; }
+@media (min-width: 768px) {
+  .compare-two-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .compare-two-grid :is(img, video) { max-height: 70dvh; }
+}
 /* The History-tab button after a sent job's status line on a phone: a link-like button in the line. */
 .notice-link { padding: 0; border: 0; background: none; color: var(--link); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .analysis-en { margin: 6px 0; font-size: 13px; }
