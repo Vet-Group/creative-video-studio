@@ -3,6 +3,7 @@ import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState 
 import { resolutionVariants } from '@/lib/resolution-variants';
 import { api, type Clip as LibraryClip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, DEMO_TITLE, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
+import { endFrameModel } from '@/lib/end-frame-model';
 import { adjustNote } from '@/lib/video-adjust';
 import { anglePrompt, CAMERA_ANGLES, MAX_ANGLES } from '@/lib/camera-angles';
 import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
@@ -335,8 +336,15 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
   useEffect(() => {
     if (!image) return;
     let stale = false;
-    Promise.all([photoImg({ asset: image }), end ? photoImg({ asset: end }) : null])
-      .then(([img, endImg]) => !stale && (setImages([img]), setEndFrame(endImg))) // an end frame that was one of the images it replaces would be refused without them
+    // The end frame loads on its own: a lost one leaves the start image.
+    const endLoaded = end ? photoImg({ asset: end }).catch(() => undefined) : Promise.resolve(null);
+    Promise.all([photoImg({ asset: image }), endLoaded])
+      .then(([img, endImg]) => {
+        if (stale) return;
+        setImages([img]);
+        setEndFrame(endImg ?? null); // an end frame that was one of the images it replaces would be refused without them
+        if (endImg === undefined) setError('Không tìm thấy ảnh khung hình cuối, video sẽ chỉ bắt đầu từ ảnh đầu.');
+      })
       .catch(() => setError('Không tìm thấy ảnh để tạo video.'));
     return () => {
       stale = true;
@@ -432,11 +440,12 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
         }
         const cur = modelRef.current;
         const kept = r.models.find((m) => (m.id === cur || m.pairIds.includes(cur)) && m.supported);
-        // From History's two pictures, the end frame needs a model that takes it: the chosen one if it does, else the best-scored one the member can run (not locked by its provider's credit).
+        // From History's two pictures, the end frame needs a model that takes it: the chosen (else the default) one if it does, else the best one the picker would let the member pick.
         const needEnd = endWanted.current && withEnd;
         if (withEnd) endWanted.current = false;
-        const endModel = needEnd && !kept?.endFrame ? r.models.filter((m) => m.endFrame && m.supported && !(m.creditUsd != null && Number(m.estimateUsd) > Number(m.creditUsd))).sort((a, b) => b.score - a.score)[0] : undefined;
-        const next = endModel?.id ?? kept?.id ?? r.defaultModelId ?? '';
+        const base = kept?.id ?? r.defaultModelId ?? '';
+        const endModel = needEnd ? endFrameModel(r.models, base, audio) : undefined;
+        const next = endModel?.id ?? base;
         const out = left.current;
         left.current = null;
         // A model the list lacks altogether is switched off or hidden (one that does not take the ratio or duration is in the list, as unsupported).
@@ -448,8 +457,8 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
         const nextLabel = r.models.find((m) => m.id === next)?.label;
         const note = [
           out && skippedNote(images.length, { lost: out.lost, store: out.store, ...(gone && { model: { label: out.modelLabel, instead: nextLabel ?? null } }) }),
-          endModel && `Đã chuyển sang ${endModel.label} vì mô hình trước không nhận khung hình cuối.`,
-          needEnd && !kept?.endFrame && !endModel && 'Hiện chưa có mô hình nào nhận khung hình cuối cho bạn, nên ảnh thứ hai chưa được dùng.',
+          endModel && base !== '' && endModel.id !== base && `Đã chuyển sang ${endModel.label} vì mô hình trước không nhận khung hình cuối.`,
+          needEnd && !endModel && 'Hiện chưa có mô hình nào nhận khung hình cuối cho bạn, nên ảnh thứ hai chưa được dùng.',
           adjustNote({ ...(toDuration !== durationSec && { durationSec: { from: durationSec, to: toDuration } }), ...(cur !== '' && !kept && !gone && nextLabel && { model: { label: nextLabel, ratio, durationSec } }) }),
         ]
           .filter(Boolean)

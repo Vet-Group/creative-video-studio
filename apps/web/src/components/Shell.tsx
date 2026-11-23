@@ -502,11 +502,11 @@ function HistoryEmpty({ feature }: { feature: string }) {
 
 /** History's "Ghép lookbook": 2 to 4 picked pictures as one JPEG, two per row (/api/library/lookbook), saved as a download; "Tải PDF" makes it one A4 page under the typed title. */
 function LookbookButton({ ids, notify }: { ids: string[]; notify: (text: string) => void }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'jpg' | 'pdf' | null>(null); // the format being made
   const [title, setTitle] = useState('');
   async function make(format: 'jpg' | 'pdf') {
     if (ids.length < 2 || ids.length > 4) return notify('Chọn 2 đến 4 ảnh để ghép lookbook.');
-    setBusy(true);
+    setBusy(format);
     try {
       const res = await fetch('/api/library/lookbook', withWorkspace(sendJson('POST', format === 'pdf' ? { ids, format, title } : { ids })));
       // What api() does for any call: a lost session signs in again, a workspace switched in another tab says so.
@@ -527,17 +527,17 @@ function LookbookButton({ ids, notify }: { ids: string[]; notify: (text: string)
     } catch {
       notify('Không ghép được lookbook, hãy thử lại.');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
   return (
     <>
-      <button type="button" className="link-button" disabled={busy} onClick={() => void make('jpg')}>
-        {busy ? 'Đang ghép…' : 'Ghép lookbook'}
+      <button type="button" className="link-button" disabled={busy !== null} onClick={() => void make('jpg')}>
+        {busy === 'jpg' ? 'Đang ghép…' : 'Ghép lookbook'}
       </button>
       <input type="text" className="lookbook-title" aria-label="Tiêu đề lookbook" placeholder="Lookbook" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} />
-      <button type="button" className="link-button" disabled={busy} onClick={() => void make('pdf')}>
-        Tải PDF
+      <button type="button" className="link-button" disabled={busy !== null} onClick={() => void make('pdf')}>
+        {busy === 'pdf' ? 'Đang ghép…' : 'Tải PDF'}
       </button>
     </>
   );

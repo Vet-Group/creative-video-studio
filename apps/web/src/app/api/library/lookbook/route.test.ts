@@ -129,8 +129,28 @@ describe('/api/library/lookbook', () => {
     const start = pdf.indexOf(Buffer.from([0xff, 0xd8, 0xff]));
     expect(await sharp(pdf.subarray(start)).metadata()).toMatchObject({ format: 'jpeg', width: 24 + 2 * (1024 + 24), height: 260 + 24 + 1365 + 24 });
     // Any title, an empty or an over-long one included, still makes a page; `format: 'jpg'` is the JPEG as before.
-    for (const title of ['', '   ', 'x'.repeat(500), '\u0000\u0001']) expect((await POST(req(alice.cookie, { ids, format: 'pdf', title }))).status).toBe(200);
+    for (const title of ['', '   ', 'x'.repeat(500), '\u0000\u0001', 'a￾b\uD800c￿']) expect((await POST(req(alice.cookie, { ids, format: 'pdf', title }))).status).toBe(200);
     expect((await POST(req(alice.cookie, { ids, format: 'jpg' }))).headers.get('content-type')).toBe('image/jpeg');
+  });
+
+  test('format pdf draws the title in the band: dark glyphs on white, a 60-capital title kept inside the page', async () => {
+    const ids = [await job(alice.id, 'band-a', await png(300, 400, 250)), await job(alice.id, 'band-b', await png(300, 400, 250))];
+    const band = async (title: string) => {
+      const pdf = Buffer.from(await (await POST(req(alice.cookie, { ids, format: 'pdf', title }))).arrayBuffer());
+      const width = 24 + 2 * (1024 + 24);
+      const { data, info } = await sharp(pdf.subarray(pdf.indexOf(Buffer.from([0xff, 0xd8, 0xff])))).extract({ left: 0, top: 0, width, height: 260 }).raw().toBuffer({ resolveWithObject: true });
+      const darkest = (from: number, to: number) => {
+        let min = 255;
+        for (let y = 0; y < info.height; y++) for (let x = from; x < to; x++) for (let c = 0; c < info.channels; c++) min = Math.min(min, data[(y * info.width + x) * info.channels + c]!);
+        return min;
+      };
+      return { darkest, width };
+    };
+    const normal = await band('Bộ sưu tập Thu Đông');
+    expect(normal.darkest(0, normal.width)).toBeLessThan(100); // a server with no usable font draws nothing
+    const wide = await band('W'.repeat(60));
+    expect(wide.darkest(0, wide.width)).toBeLessThan(100);
+    expect(wide.darkest(wide.width - 24, wide.width)).toBeGreaterThan(200); // nothing in the right margin
   });
 
   test('format pdf refuses what the JPG refuses, a format it does not know and a title that is not text', async () => {

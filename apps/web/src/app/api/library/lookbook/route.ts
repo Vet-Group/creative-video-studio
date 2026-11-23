@@ -17,7 +17,7 @@ const bad = (error: string) => Response.json({ error }, { status: 400 });
 /**
  * `{ ids }`: 2 to 4 distinct job ids of picture results the caller can list (the zip's rule: deleted, failed, unknown ids and another workspace's refuse with 403).
  * Answers with one JPEG on white, two pictures per row in the order given (an odd last one centred), each fitted whole into a cell of the first picture's shape: a lookbook of a pose Run.
- * With `format: 'pdf'` it is one A4 page instead: the optional `title` (control characters stripped, 60 characters at most; "Lookbook" when empty) and today's date above the same grid.
+ * With `format: 'pdf'` it is one A4 page instead: the optional `title` (control characters, lone surrogates and noncharacters stripped, 60 characters at most; "Lookbook" when empty) and today's date above the same grid.
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   if (input?.format !== undefined && input.format !== 'jpg' && input.format !== 'pdf') return bad('format must be jpg or pdf');
   if (input?.title !== undefined && typeof input.title !== 'string') return bad('title must be text');
   const pdf = input?.format === 'pdf';
-  const title = [...(typeof input?.title === 'string' ? input.title : '').replace(/\p{Cc}/gu, '').trim()].slice(0, TITLE_MAX).join('').trim() || 'Lookbook';
+  const title = [...(typeof input?.title === 'string' ? input.title : '').replace(/[\p{Cc}\p{Cs}\p{Noncharacter_Code_Point}]/gu, '').trim()].slice(0, TITLE_MAX).join('').trim() || 'Lookbook';
   const me = g.session.user;
   const { rows } = await pool.query<{ id: string; s3_key: string; mime: string }>(
     `select j.id, o.s3_key, o.mime from jobs j join assets o on o.id = j.output_asset_id
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   const placed = cells.map((input, i) => ({ input, left: GAP + (i === lone ? (CELL + GAP) / 2 : (i % 2) * (CELL + GAP)), top: top + GAP + Math.floor(i / 2) * (cellHeight + GAP) }));
   if (pdf) {
     // The title shrinks to stay inside the page's width; DejaVu Sans, on the server, covers Vietnamese.
-    const size = Math.min(84, Math.floor((WIDTH - 2 * GAP) / ([...title].length * 0.72)));
+    const size = Math.min(84, Math.floor((WIDTH - 2 * GAP) / ([...title].length * 0.9)));
     const date = new Date().toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
     const text = Buffer.from(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEADER}" font-family="DejaVu Sans, Liberation Sans, sans-serif"><text x="${GAP}" y="120" font-size="${size}" font-weight="bold" fill="#111">${xml(title)}</text><text x="${GAP}" y="195" font-size="44" fill="#666">${xml(date)}</text></svg>`,
