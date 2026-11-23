@@ -829,7 +829,7 @@ describe('GET /api/jobs/:id', () => {
     const res = await detail(bob.cookie, id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, breed: null, style: null, product: null, name: null, ratio: '1:1', garments: null, pose: null, poseText: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, traits: null, durationSec: 8, modelId: 'fal-test',
+      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, breed: null, style: null, product: null, name: null, ratio: '1:1', garments: null, pose: null, poseText: null, background: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, traits: null, durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', storeLost: false, modelLabel: 'Fal test', inputCount: 3, inputIds: ['d-in-2', 'd-in-gone', 'd-in-1'], outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }],
       endFrame: null, videoRef: null, clips: [], batchItems: null,
@@ -885,9 +885,9 @@ describe('GET /api/jobs/:id', () => {
     const own = (await (await detail(alice.cookie, max)).json()) as { name: string; breed: string; batchItems: unknown };
     expect([own.name, own.breed]).toEqual(['Max', 'Pug']);
     expect(own.batchItems).toEqual([
-      { view: null, breed: 'Pug', style: null, product: null, name: 'Max', pose: null, poseText: null, id: max, status: 'succeeded', outputAssetId: `${max}-video` },
-      { view: null, breed: 'Pug', style: null, product: null, name: 'Bella', pose: null, poseText: null, id: bella, status: 'failed', outputAssetId: null },
-      { view: null, breed: 'Pug', style: null, product: null, name: 'Rio', pose: null, poseText: null, id: rio, status: 'succeeded', outputAssetId: null },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Max', pose: null, poseText: null, background: null, id: max, status: 'succeeded', outputAssetId: `${max}-video` },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Bella', pose: null, poseText: null, background: null, id: bella, status: 'failed', outputAssetId: null },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Rio', pose: null, poseText: null, background: null, id: rio, status: 'succeeded', outputAssetId: null },
     ]);
     // A Run of more than the 20 jobs History loads: every one, for the select-the-Run button.
     const big = '0c8a7a0e-9d6e-4a54-8a39-6d1c4c7f2b12';
@@ -897,6 +897,16 @@ describe('GET /api/jobs/:id', () => {
     expect(run.batchItems.map((b) => [b.id, b.outputAssetId])).toEqual(all.map((id) => [id, `${id}-video`]));
     expect(await (await detail(bob.cookie, max)).json()).toMatchObject({ name: 'Max', breed: 'Pug', batchItems: null });
     expect(await (await detail(admin.cookie, max)).json()).toMatchObject({ batchItems: null });
+  });
+
+  test("gives Reuse a pose generator job's background, and null for a job from before it", async () => {
+    const pose = async (params: Record<string, string>) => {
+      const id = await clip(alice.id, {});
+      await pool.query(`update jobs set feature = 'pose_generator', params = $2 where id = $1`, [id, { resolution: '1K', pose: 'front', ...params }]);
+      return id;
+    };
+    expect(await (await detail(alice.cookie, await pose({ background: 'white' }))).json()).toMatchObject({ pose: 'front', background: 'white' });
+    expect(await (await detail(alice.cookie, await pose({}))).json()).toMatchObject({ pose: 'front', background: null });
   });
 
   test('leaves out a store that is hidden now, hides a job that is not a clip from other Members but not from its owner or an Admin, and 404s a deleted one', async () => {

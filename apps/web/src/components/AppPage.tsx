@@ -5,14 +5,14 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseNames, PET_STYLES, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseNames, PET_STYLES, POSE_BACKGROUNDS, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { waitLabel } from '@/lib/explore';
 import { parseFashionTraits } from '@/lib/fashion-model';
 import { usable } from '@/lib/fashion-models';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { alignInputs, placesOf, type Skipped, skippedNote } from '@/lib/reuse';
 import { confirmRun, sendRun, usd } from '@/lib/run-guard';
-import { portraitGender, POSES } from '@/lib/try-on-stock';
+import { portraitGender, POSE_PRESETS, POSES } from '@/lib/try-on-stock';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
@@ -165,6 +165,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const [names, setNames] = useState(''); // the name swap app's box: one job per name (or per name and breed)
   const [poses, setPoses] = useState<string[]>([]); // the pose generator: one job per pose, none until picked
   const [poseText, setPoseText] = useState(''); // its own words for one more pose, a job of their own
+  const [background, setBackground] = useState('keep'); // the pose generator's background: the photo's own, a white studio or one lifestyle scene (POSE_BACKGROUNDS)
   const [poseGender, setPoseGender] = useState<'woman' | 'man' | null>(null); // the pose pictures' gender the member chose, else the photo's
   const promptId = useId();
   const reasonId = useId();
@@ -176,6 +177,9 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const posesId = useId();
   const poseTextId = useId();
   const genderName = useId();
+  const backgroundName = useId();
+  const backgroundId = useId();
+  const presetHelpId = useId();
   const { models, failed } = useImageModels(app.feature);
   const count = jobImages(app, images);
   const pick = useImageChoice(models, Math.max(1, count));
@@ -190,6 +194,9 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const ownPose = cleanName(poseText.replace(/\p{Cc}/gu, ' ')); // the box's words as a job takes them: control characters (pasted) as spaces, trimmed, one space between words
   const posesPicked = poses.length + (ownPose ? 1 : 0);
   const togglePose = (v: string) => (poses.includes(v) ? setPoses(poses.filter((x) => x !== v)) : posesPicked >= MAX_POSES ? notify(`Tối đa ${MAX_POSES} tư thế mỗi lần chạy`) : setPoses([...poses, v]));
+  // A marketplace preset's poses; the own words take one of the Run's slots, so with them filled only the first (MAX_POSES - 1) of the preset are used.
+  const presetPoses = (pr: (typeof POSE_PRESETS)[number]) => pr.poses.slice(0, MAX_POSES - (ownPose ? 1 : 0));
+  const presetOn = (pr: (typeof POSE_PRESETS)[number]) => background === pr.background && poses.length === presetPoses(pr).length && presetPoses(pr).every((v) => poses.includes(v));
   // The member's last model and settings, unless a refill opens the page.
   const recall = useRecall(
     app.feature,
@@ -230,6 +237,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
       if (j.pose || j.poseText) {
         setPoses(all('pose'));
         setPoseText(all('poseText')[0] ?? '');
+        setBackground(j.background ?? 'keep');
       }
       pick.refill({ ...j, ...(extra > 0 && { extra: { count: extra, max: slots!.flat().length } }) });
     },
@@ -264,7 +272,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
           : app.names
             ? parseNames(names).names.flatMap((name) => (pickedBreeds.length > 0 ? pickedBreeds.map((breed) => ({ name, breed })) : [{ name }]))
             : app.poses
-              ? [...POSES.filter((p) => poses.includes(p.value)).map((p) => ({ pose: p.value })), ...(ownPose ? [{ poseText: ownPose }] : [])]
+              ? [...POSES.filter((p) => poses.includes(p.value)).map((p) => ({ pose: p.value, background })), ...(ownPose ? [{ poseText: ownPose, background }] : [])]
               : app.bulk
                 ? images[0]!.map(() => ({})) // one job per photo of the first slot
                 : [{}];
@@ -521,6 +529,37 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                         )}
                       </span>
                     )}
+                  </div>
+                  <div className="segmented theme-choice preset-chips" role="group" aria-label="Chọn nhanh theo sàn" aria-describedby={presetHelpId}>
+                    {POSE_PRESETS.map((pr) => (
+                      <button
+                        key={pr.id}
+                        type="button"
+                        aria-pressed={presetOn(pr)}
+                        disabled={busy}
+                        onClick={() => {
+                          // A pressed chip toggles off: no picks and the photo's own background.
+                          setPoses(presetOn(pr) ? [] : [...presetPoses(pr)]);
+                          setBackground(presetOn(pr) ? 'keep' : pr.background);
+                        }}
+                      >
+                        {pr.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p id={presetHelpId} className="help">
+                    {`Chọn nhanh tư thế và nền hợp quy định ảnh của từng sàn (${MAX_POSES} tư thế, hoặc ${MAX_POSES - 1} khi đã có ô ${OWN_POSE}).`}
+                  </p>
+                  <span id={backgroundId} className="field-label">
+                    Nền
+                  </span>
+                  <div className="segmented theme-choice" role="radiogroup" aria-labelledby={backgroundId}>
+                    {POSE_BACKGROUNDS.map((b) => (
+                      <label key={b.value}>
+                        <input type="radio" name={backgroundName} checked={background === b.value} disabled={busy} onChange={() => setBackground(b.value)} />
+                        {b.label}
+                      </label>
+                    ))}
                   </div>
                   {(pictured('woman') || pictured('man')) && (
                     <div className="segmented theme-choice" role="radiogroup" aria-label="Ảnh tư thế mẫu">

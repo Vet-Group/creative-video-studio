@@ -926,8 +926,18 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await post({ params: kneel.params }, 1)).error).toBe('the prompt must be the one the pose makes');
       expect((await post(kneel, 0)).error).toMatch(/^assetIds must list 1 to /);
       expect((await post(kneel, 2)).error).toBe('the pose generator takes exactly one image: the person');
-      expect((await post({ ...kneel, params: { ...kneel.params, garments: '1' } }, 1)).error).toMatch(/^params may hold only resolution, quality, thinking, brief, pose, poseText and batch/);
+      expect((await post({ ...kneel, params: { ...kneel.params, garments: '1' } }, 1)).error).toMatch(/^params may hold only resolution, quality, thinking, brief, pose, poseText, background and batch/);
+      // The background is one of the three, and the prompt must be the one that background makes; it is for the pose generator only.
+      const on = (background: string, prompt = posePrompt('kneeling on one knee and facing the camera, full body', background)) => ({ prompt, params: { ...kneel.params, background } });
+      for (const bad of ['studio', 'White', '']) expect([bad, (await post(on(bad), 1)).error]).toEqual([bad, 'params.background must be one of keep, white, lifestyle']);
+      expect((await post(on('white', kneel.prompt), 1)).error).toBe('the prompt must be the one the pose makes');
+      expect((await post({ ...kneel, params: { ...kneel.params, background: 'lifestyle' } }, 1)).error).toBe('the prompt must be the one the pose makes');
+      expect((await app('face_swap', 2, { params: { resolution: '1K', background: 'white' } })).error).toMatch(/^params may hold only resolution, quality, thinking and brief, as text/);
       expect(await jobCount()).toBe(before);
+      for (const background of ['keep', 'white', 'lifestyle']) {
+        const one = on(background); // a Run of its own each, so the Run below keeps its count
+        expect(await post({ ...one, params: { ...one.params, batch: crypto.randomUUID() } }, 1)).toMatchObject({ status: 201, job: { prompt: one.prompt, params: { pose: 'kneel', background } } });
+      }
       const ok = await post(kneel, 1);
       expect([ok.status, ok.job]).toEqual([201, { feature: 'pose_generator', model: 'app-poses', prompt: kneel.prompt, aspect: 'auto', params: { resolution: '1K', pose: 'kneel', batch: BATCH }, workspace_id: 'ws_vet' }]);
       const words = 'x'.repeat(199) + 'ồ'; // 200 characters, a Vietnamese letter last

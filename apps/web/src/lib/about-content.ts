@@ -2652,7 +2652,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         title: 'Tạo tư thế người mẫu là gì?',
         blocks: [
           'Từ một ảnh người mẫu, ứng dụng tạo lại đúng người đó trong các tư thế bạn chọn: đứng thẳng, chống hông, quay lưng, ngồi, cận mặt và nhiều tư thế khác, hoặc một tư thế bạn tự tả. Mỗi tư thế là một ảnh riêng.',
-          `AI giữ nguyên khuôn mặt, tóc, dáng người, trang phục, ánh sáng và nền của ảnh gốc, chỉ đổi tư thế và khung hình. ${APP_COST}`,
+          `AI giữ nguyên khuôn mặt, tóc, dáng người, trang phục, ánh sáng và nền của ảnh gốc (nếu bạn không đổi nền), chỉ đổi tư thế và khung hình. ${APP_COST}`,
         ],
       },
       {
@@ -2662,7 +2662,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             steps: [
               { title: 'Chọn ảnh người mẫu', text: 'Tải lên một ảnh rõ mặt, thấy người, hoặc chọn trong Ảnh đã tải hay một người mẫu AI đã lưu. Trên kết quả của Tạo người mẫu AI và Thử đồ, nút Đổi tư thế mở sẵn ảnh đó ở đây.' },
-              { title: 'Chọn tư thế', text: 'Chọn tối đa 4 tư thế trong thư viện, hoặc tả tư thế trong ô Tư thế tự tả; ô này tính là một tư thế. Mỗi tư thế tạo một ảnh riêng và tính tiền riêng; tổng tiền hiện trước khi chạy.' },
+              { title: 'Chọn tư thế', text: 'Chọn tối đa 4 tư thế trong thư viện, hoặc tả tư thế trong ô Tư thế tự tả; ô này tính là một tư thế. Mỗi tư thế tạo một ảnh riêng và tính tiền riêng; tổng tiền hiện trước khi chạy. Mục Nền cho giữ nền gốc, đổi sang nền studio trắng hoặc một cảnh lifestyle chung cho mọi ảnh của lần chạy. Các nút Amazon, Etsy và Shopify chọn nhanh 4 tư thế và nền hợp quy định ảnh của từng sàn.' },
               { title: 'Chạy', text: 'Bấm Chạy. Mỗi tư thế là một lượt trong tab Lịch sử; "Chọn cả lô" trên một thẻ chọn mọi ảnh của lần chạy đó để tải về một tệp .zip.' },
             ],
           },

@@ -12,6 +12,8 @@ const cost = (page: Page) => page.getByRole('status').filter({ hasText: 'ảnh �
 const preview = (page: Page) => page.getByRole('group', { name: 'Bản cuối gửi cho mô hình' });
 const poses = (page: Page) => page.getByRole('group', { name: 'Tư thế cần tạo' });
 const count = (page: Page) => page.locator('.pick-count');
+const background = (page: Page, name: string) => page.getByRole('radiogroup', { name: 'Nền', exact: true }).getByRole('radio', { name, exact: true });
+const chip = (page: Page, name: string) => page.getByRole('group', { name: 'Chọn nhanh theo sàn' }).getByRole('button', { name, exact: true });
 const slot = (page: Page) => page.getByRole('group', { name: 'Người mẫu', exact: true });
 const toast = (page: Page, text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
 type Job = { id: string; feature: string; status: string; batch: string | null; pose: string | null; poseText: string | null };
@@ -49,6 +51,8 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await expect(reason(page)).toHaveText('Chọn ít nhất một tư thế, hoặc tự tả một tư thế.');
     await expect(runButton(page)).toBeDisabled();
     await expect(cost(page)).toHaveCount(0); // no price while nothing is picked
+    await expect(background(page, 'Giữ nền gốc')).toBeChecked(); // the photo's own background until the member picks another
+    for (const name of ['Amazon', 'Etsy', 'Shopify']) await expect(chip(page, name)).toHaveAttribute('aria-pressed', 'false');
 
     // An own photo says no gender, so the pictures are of the one that has them (his kneel); Nữ shows that pose by its name, as Try On does without a picture.
     const kneel = poses(page).getByRole('button', { name: 'Quỳ một gối', exact: true });
@@ -92,6 +96,42 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await page.getByRole('button', { name: 'Bỏ chọn hết' }).click();
     await expect(count(page)).toHaveText('1/4 đã chọn');
     for (const tile of await poses(page).getByRole('button').all()) await expect(tile).toHaveAttribute('aria-pressed', 'false');
+    // A marketplace preset replaces the picks and sets the background. With the own words filled they take a slot, so only the preset's first three poses come.
+    await chip(page, 'Amazon').click();
+    await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Quay lưng', 'Nghiêng một bên']);
+    await expect(poses(page).getByRole('button', { name: 'Xoay 3/4', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    await expect(count(page)).toContainText('4/4 đã chọn');
+    await expect(chip(page, 'Amazon')).toHaveAttribute('aria-pressed', 'true');
+    await expect(background(page, 'Studio trắng')).toBeChecked();
+    // Without them all four, Amazon's own: front, back, side and 3/4 views, on white.
+    await page.getByLabel(OWN_POSE).fill('');
+    await expect(chip(page, 'Amazon')).toHaveAttribute('aria-pressed', 'false'); // the preset is four poses now, the picks three
+    await chip(page, 'Amazon').click();
+    await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Xoay 3/4', 'Quay lưng', 'Nghiêng một bên']);
+    await expect(count(page)).toHaveText('4/4 đã chọn · Bỏ chọn hết');
+    await expect(chip(page, 'Amazon')).toHaveAttribute('aria-pressed', 'true');
+    for (const name of ['Etsy', 'Shopify']) await expect(chip(page, name)).toHaveAttribute('aria-pressed', 'false');
+    await expect(background(page, 'Studio trắng')).toBeChecked();
+    // One tile changed, or the background, and it no longer is the preset.
+    await poses(page).getByRole('button', { name: 'Quay lưng', exact: true }).click();
+    await expect(chip(page, 'Amazon')).toHaveAttribute('aria-pressed', 'false');
+    await chip(page, 'Etsy').click();
+    await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Tay chống hông', 'Xoay 3/4', 'Bước ngang']);
+    await expect(background(page, 'Lifestyle')).toBeChecked();
+    await expect(chip(page, 'Etsy')).toHaveAttribute('aria-pressed', 'true');
+    await background(page, 'Giữ nền gốc').check();
+    await expect(chip(page, 'Etsy')).toHaveAttribute('aria-pressed', 'false');
+    await chip(page, 'Shopify').click();
+    await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Xoay 3/4', 'Bước ngang', 'Quay lưng']);
+    await expect(background(page, 'Studio trắng')).toBeChecked();
+    // A pressed chip is a toggle: pressed again it clears the picks and puts the photo's own background back.
+    await chip(page, 'Shopify').click();
+    await expect(chip(page, 'Shopify')).toHaveAttribute('aria-pressed', 'false');
+    await expect(poses(page).getByRole('button', { pressed: true })).toHaveCount(0);
+    await expect(background(page, 'Giữ nền gốc')).toBeChecked();
+    // Back to the form the rest of the test goes on with: the own words only, on the photo's background.
+    await page.getByLabel(OWN_POSE).fill('  ngồi trên bậc thềm,  tay chống cằm ');
+    await expect(count(page)).toHaveText('1/4 đã chọn');
     // Keys 1 to 9 toggle the first nine poses while one has focus.
     const second = poses(page).getByRole('button').nth(1);
     await poses(page).getByRole('button').first().focus();
@@ -101,6 +141,8 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await page.keyboard.press('2');
     await expect(second).toHaveAttribute('aria-pressed', 'false');
     for (const name of ['Mặt trước', 'Quỳ một gối']) await poses(page).getByRole('button', { name, exact: true }).click();
+    await background(page, 'Studio trắng').check(); // the Run's jobs all carry it, and the prompt shown is theirs
+    await expect(preview(page)).toContainText(`Mặt trước: ${posePrompt(poseOf('front')!.words, 'white')}`);
 
     // The run on the mock model: one job per pose, in the list's order and the own words last, cleaned, each with its own prompt and one batch id.
     await pickModel(page, /Mock pets E2E/);
@@ -111,8 +153,8 @@ test('picks a model photo, two library poses and own words, sees the price of th
     const own = 'ngồi trên bậc thềm, tay chống cằm';
     const batch = sent[0]?.params.batch;
     expect(batch).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-    expect(sent.map((b) => b.params)).toEqual([{ resolution: '1K', pose: 'front', batch }, { resolution: '1K', pose: 'kneel', batch }, { resolution: '1K', poseText: own, batch }]);
-    expect(sent.map((b) => b.prompt)).toEqual([posePrompt(poseOf('front')!.words), posePrompt(poseOf('kneel')!.words), posePrompt(own)]);
+    expect(sent.map((b) => b.params)).toEqual([{ resolution: '1K', pose: 'front', background: 'white', batch }, { resolution: '1K', pose: 'kneel', background: 'white', batch }, { resolution: '1K', poseText: own, background: 'white', batch }]);
+    expect(sent.map((b) => b.prompt)).toEqual([posePrompt(poseOf('front')!.words, 'white'), posePrompt(poseOf('kneel')!.words, 'white'), posePrompt(own, 'white')]);
     for (const b of sent) expect(b.assetIds).toHaveLength(1);
     await expect.poll(async () => (await mine(page)).map((j) => [j.pose, j.poseText, j.status]).sort(), { timeout: 90_000 }).toEqual([
       [null, own, 'succeeded'], ['front', null, 'succeeded'], ['kneel', null, 'succeeded'],
@@ -139,7 +181,16 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await expect(slot(page).getByRole('img', { name: 'model.png' })).toBeVisible();
     for (const name of ['Mặt trước', 'Quỳ một gối']) await expect(poses(page).getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByLabel(OWN_POSE)).toHaveValue(own);
+    await expect(background(page, 'Studio trắng')).toBeChecked();
     await expect(cost(page)).toContainText('3 ảnh ×');
+    // A job from before the background existed comes back on the photo's own: the same job, served without one.
+    await page.route(/\/api\/jobs\/[\w-]+$/, async (route) => {
+      const res = await route.fetch();
+      await route.fulfill({ response: res, json: { ...(await res.json()), background: null } });
+    });
+    await page.goto(`/apps/pose-generator?reuse=${jobs.find((j) => j.pose === 'kneel')!.id}`);
+    await expect(poses(page).getByRole('button', { name: 'Quỳ một gối', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(background(page, 'Giữ nền gốc')).toBeChecked();
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
