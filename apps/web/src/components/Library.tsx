@@ -453,10 +453,20 @@ export function RecipeText({ label, text }: { label: string; text: string }) {
   );
 }
 
-/** The picture repeated tile × tile in a box of its own ratio, so none is stretched (an odd ratio draws square) and the edges that meet can be judged. */
+/**
+ * The picture repeated tile × tile in a box of its own shape, so no tile is stretched and the edges that meet can be judged. The shape is the picture's
+ * own, read once it loads (an 'auto' job, or a model that rounds the size, does not match the ratio asked); until then the asked ratio, else square.
+ */
 export function RepeatTiles({ src, label, tile, ratio }: { src: string; label: string; tile: number; ratio: string }) {
+  const [natural, setNatural] = useState<number | null>(null);
+  useEffect(() => {
+    const im = new Image();
+    im.onload = () => setNatural(im.naturalWidth / im.naturalHeight);
+    im.src = src;
+    return () => void (im.onload = null);
+  }, [src]);
   const [w, h] = ratio.split(':').map(Number);
-  const aspect = w! > 0 && h! > 0 ? w! / h! : 1;
+  const aspect = natural ?? (w! > 0 && h! > 0 ? w! / h! : 1);
   return (
     <div className="lightbox-tile-box">
       <div
