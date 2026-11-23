@@ -639,7 +639,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   });
   // Reframe & download, the same way: two at a time per worker within the shared ffmpeg slots, a failure left to pg-boss.
   await boss.createQueue(REFRAME_QUEUE, REFRAME_QUEUE_OPTIONS);
-  await boss.work<ReframeJobData>(REFRAME_QUEUE, { localConcurrency: 2, pollingIntervalSeconds: o.pollingIntervalSeconds }, async ([job]) => {
+  // One at a time: with Compress's two, that is three full-size encodes beside the video jobs' own ffmpeg work on a shared host.
+  await boss.work<ReframeJobData>(REFRAME_QUEUE, { localConcurrency: 1, pollingIntervalSeconds: o.pollingIntervalSeconds }, async ([job]) => {
     await reframeVideoAsset(pool, job!.data, job!.signal).catch((e) => {
       log(`reframe ${job!.data.assetId} ${job!.data.ratio} ${job!.data.fill}`, e);
       throw e;

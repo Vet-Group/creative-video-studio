@@ -120,7 +120,7 @@ test('hands out the stored copy under the original download rules once it is rea
   const file = await download(body.downloadUrl, 'clip', 'owner');
   expect(file.status).toBe(200);
   expect(file.headers.get('content-type')).toBe('video/mp4');
-  expect(file.headers.get('content-disposition')).toContain('clip-9x16.mp4');
+  expect(file.headers.get('content-disposition')).toContain('clip-9x16-blur.mp4');
   expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([1, 2, 3, 4]);
   expect((await download(body.downloadUrl, 'clip', 'other')).status).toBe(403); // the link is the owner's
   expect((await download(body.downloadUrl.replace('fill=blur', 'fill=black'), 'clip', 'owner')).status).toBe(404); // not made

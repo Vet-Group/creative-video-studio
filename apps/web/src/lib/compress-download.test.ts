@@ -64,7 +64,7 @@ test('a reframed video is asked for once, polled until ready, and saved named wi
     await vi.advanceTimersByTimeAsync(2_000);
     await done;
     expect(calls).toEqual(['POST /api/assets/a1/reframe?ratio=4:5&fill=black', 'GET /api/assets/a1/reframe?ratio=4:5&fill=black', 'GET /api/assets/a1/reframe?ratio=4:5&fill=black']);
-    expect(saved).toEqual([{ download: '20261124-an-1a2b3c4d-4x5.mp4', href: '/api/assets/a1/download?t=x&variant=reframed&ratio=4:5&fill=black' }]);
+    expect(saved).toEqual([{ download: '20261124-an-1a2b3c4d-4x5-black.mp4', href: '/api/assets/a1/download?t=x&variant=reframed&ratio=4:5&fill=black' }]);
 
     state = 'failed';
     await expect(downloadReframedVideo('a1', '9:16', 'blur')).rejects.toThrow('reframe failed');

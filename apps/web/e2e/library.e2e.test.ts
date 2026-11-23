@@ -512,7 +512,7 @@ test('Dùng khung hình này in a video’s detail opens Create video with the f
     await reframe.getByRole('button', { name: 'Nền đen' }).click();
     await expect(reframe.getByRole('button', { pressed: true })).toHaveText(['1:1', 'Nền đen']);
     const [reframed] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), reframe.getByRole('button', { name: 'Tải về' }).click()]);
-    expect(reframed.suggestedFilename()).toMatch(/-1x1\.mp4$/);
+    expect(reframed.suggestedFilename()).toMatch(/-1x1-black\.mp4$/);
     await detail.getByRole('button', { name: 'Dùng khung hình', exact: true }).click();
     await expect(page.getByRole('region', { name: 'Thông báo' })).toContainText('Đã tải khung hình lên, đang mở Tạo video'); // the page is about to change: say why
     await expect(page).toHaveURL(/\/create\?image=[\w-]+$/);

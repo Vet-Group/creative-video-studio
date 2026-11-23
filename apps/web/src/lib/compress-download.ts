@@ -73,10 +73,10 @@ export async function downloadCompressedVideo(assetId: string, name?: string): P
 
 /**
  * Saves a video result reframed by the worker into a 9:16, 4:5 or 1:1 frame over a blurred or black fill (POST /api/assets/[id]/reframe, then polls): made
- * once per shape and fill and kept, as a compressed copy is. `name` is the original's download name; the copy's carries the shape (`-9x16`).
+ * once per shape and fill and kept, as a compressed copy is. `name` is the original's download name; the copy's carries the shape and fill (`-9x16-blur`).
  */
 export async function downloadReframedVideo(assetId: string, ratio: ReframeRatio, fill: ReframeFill, name?: string): Promise<void> {
   const r = await workerCopy(`/api/assets/${assetId}/reframe?ratio=${ratio}&fill=${fill}`);
   if (r.status !== 'ready') throw new Error(`reframe ${r.status}`);
-  open(r.downloadUrl!, name && `${name.replace(/\.[^.]+$/, '')}-${ratio.replace(':', 'x')}.mp4`);
+  open(r.downloadUrl!, name && `${name.replace(/\.[^.]+$/, '')}-${ratio.replace(':', 'x')}-${fill}.mp4`);
 }

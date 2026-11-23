@@ -255,6 +255,11 @@ describe('Đổi khung (reframe)', () => {
     expect(graph).toContain('[bg][fg]overlay=(W-w)/2:(H-h)/2[v]');
     expect(blur.join(' ')).toContain('-map 0:a:0 -af loudnorm=I=-14:TP=-1.5:LRA=11,afade=t=out:st=4.700:d=0.3 -c:a aac');
     expect(blur.join(' ')).toContain('-pix_fmt yuv420p -movflags +faststart out.mp4');
+    // Hiss under QUIET_LUFS keeps its level and only fades; NaN (no reading) still gets loudnorm.
+    const hiss = reframeArgs('in.mp4', 'out.mp4', { width: 1920, height: 1080, seconds: 5, audio: true, lufs: -69.4 }, '9:16', 'black');
+    expect(hiss.join(' ')).toContain('-map 0:a:0 -af afade=t=out:st=4.700:d=0.3 -c:a aac');
+    expect(reframeArgs('in.mp4', 'out.mp4', { width: 1920, height: 1080, seconds: 0.2, audio: true, lufs: -69.4 }, '9:16', 'black').join(' ')).toContain('-map 0:a:0 -c:a aac');
+    expect(reframeArgs('in.mp4', 'out.mp4', { width: 1920, height: 1080, seconds: 5, audio: true, lufs: Number.NaN }, '9:16', 'black').join(' ')).toContain('-af loudnorm=');
     const silent = reframeArgs('in.mp4', 'out.mp4', { width: 1920, height: 1080, seconds: 5, audio: false }, '1:1', 'black');
     expect(silent.join(' ')).not.toMatch(/0:a|loudnorm|-c:a/);
   });
@@ -272,6 +277,14 @@ describe('Đổi khung (reframe)', () => {
     const portrait = join(dir, 'portrait.mp4');
     await reframeClip(source, portrait, '4:5', 'black');
     expect(await probeSize(portrait)).toEqual({ width: 512, height: 640 });
+
+    // Faint hiss stays faint rather than being lifted to -14 LUFS.
+    const hissy = join(dir, 'hiss.mp4');
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:size=180x320:rate=24', '-f', 'lavfi', '-i', 'anoisesrc=a=0.0005:c=white', '-t', '2', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', hissy]);
+    const hissOut = join(dir, 'hiss-out.mp4');
+    await reframeClip(hissy, hissOut, '1:1', 'black');
+    const hissLevel = (await run(requireFfmpeg(), ['-hide_banner', '-i', hissOut, '-map', '0:a', '-af', 'ebur128', '-f', 'null', '-'])).stderr;
+    expect(Number([...hissLevel.matchAll(/I:\s+(-?[\d.]+) LUFS/g)].at(-1)![1])).toBeLessThan(-50);
 
     const wide = join(dir, 'wide-silent.mp4');
     await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=24', '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', wide]);

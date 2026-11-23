@@ -85,9 +85,10 @@ const even = (n: number) => Math.max(2, Math.floor(n / 2) * 2);
  * The ffmpeg arguments that put a `width` x `height` clip into a `ratio` frame. Every shape offered is portrait or square, so the frame's height is the
  * clip's long side (at most 1920 px) and its width follows the ratio. The clip is fitted inside, which never crops it and, with that height, never enlarges
  * it, and centred over a blurred, darkened copy of itself scaled to cover the frame ('blur') or over black. Its sound, when it has any, is brought to -14 LUFS
- * (the level social apps play at; loudnorm in one pass) and fades out over the last 0.3 s. H.264 yuv420p and AAC with the index up front.
+ * (the level social apps play at; loudnorm in one pass) and fades out over the last 0.3 s; `lufs`, the sound's measured loudness, keeps hiss below QUIET_LUFS
+ * as it is. H.264 yuv420p and AAC with the index up front.
  */
-export function reframeArgs(video: string, out: string, clip: { width: number; height: number; seconds: number; audio: boolean }, ratio: ReframeRatio, fill: ReframeFill): string[] {
+export function reframeArgs(video: string, out: string, clip: { width: number; height: number; seconds: number; audio: boolean; lufs?: number }, ratio: ReframeRatio, fill: ReframeFill): string[] {
   const [rw, rh] = ratio.split(':').map(Number) as [number, number];
   const h = even(Math.min(1920, Math.max(clip.width, clip.height)));
   const w = even((h * rw) / rh);
@@ -97,11 +98,15 @@ export function reframeArgs(video: string, out: string, clip: { width: number; h
     fill === 'black'
       ? `[0:v:0]${fit},pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:black[v]`
       : `[0:v:0]split[a][b];[a]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},gblur=sigma=${Math.round(w / 20)},eq=brightness=-0.15,setsar=1[bg];[b]${fit}[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[v]`;
-  const fade = clip.seconds > 0.3 ? `,afade=t=out:st=${(clip.seconds - 0.3).toFixed(3)}:d=0.3` : '';
+  const fade = clip.seconds > 0.3 ? `afade=t=out:st=${(clip.seconds - 0.3).toFixed(3)}:d=0.3` : '';
+  const af = [clip.lufs !== undefined && clip.lufs < QUIET_LUFS ? '' : 'loudnorm=I=-14:TP=-1.5:LRA=11', fade].filter(Boolean).join(',');
   // loudnorm works at 192 kHz, so the sound is set back to 48 kHz.
-  const sound = clip.audio ? ['-map', '0:a:0', '-af', `loudnorm=I=-14:TP=-1.5:LRA=11${fade}`, '-c:a', 'aac', '-b:a', '128k', '-ar', '48000'] : [];
+  const sound = clip.audio ? ['-map', '0:a:0', ...(af ? ['-af', af] : []), '-c:a', 'aac', '-b:a', '128k', '-ar', '48000'] : [];
   return ['-y', '-v', 'error', '-i', video, '-filter_complex', graph, '-map', '[v]', ...sound, ...H264, out];
 }
+
+/** Below this a clip's sound is only background hiss: one-pass loudnorm would lift it about 50 dB into a roar (measured: -66 dB noise came out at -17 dB). */
+export const QUIET_LUFS = -45;
 
 /** Reframes `video` into `out` (reframeArgs), bounded like a compression: a hung ffmpeg must not hold a slot for good. */
 export async function reframeClip(video: string, out: string, ratio: ReframeRatio, fill: ReframeFill, { signal, timeoutMs = COMPRESS_TIMEOUT_MS }: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
@@ -109,7 +114,12 @@ export async function reframeClip(video: string, out: string, ratio: ReframeRati
   const { streams = [], format } = JSON.parse(stdout) as { streams?: { codec_type: string; width?: number; height?: number }[]; format?: { duration?: string } };
   const v = streams.find((s) => s.codec_type === 'video');
   if (!v?.width || !v.height) throw new Error('the clip has no video stream');
-  const clip = { width: v.width, height: v.height, seconds: Number(format?.duration) || 0, audio: streams.some((s) => s.codec_type === 'audio') };
+  const clip = { width: v.width, height: v.height, seconds: Number(format?.duration) || 0, audio: streams.some((s) => s.codec_type === 'audio'), lufs: undefined as number | undefined };
+  if (clip.audio) {
+    // ebur128's summary (framelog=verbose keeps its 10 readings a second out of stderr); digital silence reads -70.
+    const { stderr } = await run(requireFfmpeg(), ['-hide_banner', '-nostats', '-i', video, '-map', '0:a:0', '-af', 'ebur128=framelog=verbose', '-f', 'null', '-'], { timeout: timeoutMs, signal });
+    clip.lufs = Number([...stderr.matchAll(/I:\s+(-?[\d.]+) LUFS/g)].at(-1)?.[1] ?? Number.NaN);
+  }
   await run(requireFfmpeg(), reframeArgs(video, out, clip, ratio, fill), { timeout: timeoutMs, signal });
 }
 
