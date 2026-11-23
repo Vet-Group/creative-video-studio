@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
-import { OWN_POSE, posePrompt } from '../src/lib/apps';
+import { OWN_POSE, posePrompt, poseRefPrompt } from '../src/lib/apps';
 import { poseOf, POSES } from '../src/lib/try-on-stock';
 import { gotoTryOn, jpg, openTab, pickModel, png, settled, signIn } from './support.test';
 
 // The pose generator: one model photo in, one job per pose picked (a pose of Try On's list, or the member's own words), up to four, each with the prompt its pose
-// makes and all of one Run sharing one batch id; and the shortcut to it on an AI model's and a Try On's result.
+// makes and all of one Run sharing one batch id (a pose photo is one more pose, sent as the second image); and the shortcut to it on an AI model's and a Try On's result.
 const runButton = (page: Page) => page.getByRole('button', { name: /^Chạy(?! lại)/ }); // not a History card's rerun button
 const reason = (page: Page) => page.locator('.form-message').getByRole('status');
 const cost = (page: Page) => page.getByRole('status').filter({ hasText: 'ảnh ×' });
@@ -16,7 +16,7 @@ const background = (page: Page, name: string) => page.getByRole('radiogroup', { 
 const chip = (page: Page, name: string) => page.getByRole('group', { name: 'Chọn nhanh theo sàn' }).getByRole('button', { name, exact: true });
 const slot = (page: Page) => page.getByRole('group', { name: 'Người mẫu', exact: true });
 const toast = (page: Page, text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
-type Job = { id: string; outputAssetId: string | null; feature: string; status: string; batch: string | null; pose: string | null; poseText: string | null };
+type Job = { id: string; outputAssetId: string | null; feature: string; status: string; batch: string | null; pose: string | null; poseText: string | null; poseRef: string | null; inputAssetIds: string[] };
 const mine = async (page: Page) => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: Job[] }).jobs.filter((j) => j.feature === 'pose_generator');
 
 test('picks a model photo, two library poses and own words, sees the price of three images, refuses a fifth pose, runs one job per pose and titles each card by its pose', async ({ page }) => {
@@ -262,4 +262,105 @@ test('Đổi tư thế on an AI model result and on a Try On result opens the po
   await expect(tried.getByRole('button', { name: 'Đổi tư thế' })).toBeVisible({ timeout: 90_000 });
   await tried.getByRole('button', { name: 'Đổi tư thế' }).click();
   await opened();
+});
+
+test('pose photos: each is one more pose beside the tiles and the own words, up to the same four, sent as the second image, titled "Theo ảnh mẫu" and put back by Reuse', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'posec');
+  await page.goto('/apps/pose-generator');
+  const photos = page.getByRole('group', { name: /^Ảnh tư thế mẫu/ });
+  const photoInput = page.getByLabel('Ảnh tư thế mẫu', { exact: true });
+  const add = page.getByRole('button', { name: 'Tải lên Ảnh tư thế mẫu' });
+  const tile = (name: string) => poses(page).getByRole('button', { name, exact: true });
+  const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
+  await page.getByLabel('Ảnh người mẫu', { exact: true }).setInputFiles(file('model.png'));
+  await expect(slot(page).getByRole('img', { name: 'model.png' })).toBeVisible();
+  await pickModel(page, /Mock pets priced/);
+
+  // The box sits under the own words, is optional and takes nothing alone: the Run still waits for a pose.
+  const ownBox = (await page.getByLabel(OWN_POSE).boundingBox())!;
+  expect((await photos.boundingBox())!.y).toBeGreaterThan(ownBox.y + ownBox.height);
+  await expect(photos).toContainText('Tuỳ chọn');
+  await expect(reason(page)).toHaveText('Chọn ít nhất một tư thế, hoặc tự tả một tư thế.');
+
+  // One tile and one pose photo are two poses, two images at one price each.
+  await tile('Mặt trước').click();
+  await photoInput.setInputFiles(file('ref-a.png'));
+  await expect(photos.getByRole('img', { name: 'ref-a.png' })).toBeVisible();
+  await expect(count(page)).toContainText('2/4 đã chọn');
+  await expect(cost(page)).toHaveText('2 ảnh × $0.15 = $0.30');
+  // With three tiles picked only one pose photo fits: the fifth pose is refused, and the box has no room for more.
+  for (const name of ['Quỳ một gối', 'Xoay 3/4']) await tile(name).click();
+  await expect(count(page)).toContainText('4/4 đã chọn');
+  await tile('Quay lưng').click();
+  await expect(toast(page, 'Tối đa 4 tư thế mỗi lần chạy')).toBeVisible();
+  await expect(add).toHaveCount(0);
+  await expect(page.getByText('còn chỗ cho 0 ảnh')).toBeVisible();
+  // Taking the photo out gives its place back, to one photo and no more.
+  await photos.getByRole('button', { name: 'Bỏ ảnh ref-a.png' }).click();
+  await expect(count(page)).toContainText('3/4 đã chọn');
+  await expect(photoInput).not.toHaveJSProperty('multiple', true);
+  await photoInput.setInputFiles(file('ref-b.png'));
+  await expect(photos.getByRole('img', { name: 'ref-b.png' })).toBeVisible();
+  await expect(count(page)).toContainText('4/4 đã chọn');
+  await expect(add).toHaveCount(0);
+
+  // The marketplace chips leave room for the pose photo as for the own words: one photo, so only the first three poses of a preset come.
+  await chip(page, 'Amazon').click();
+  await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Quay lưng', 'Nghiêng một bên']);
+  await expect(count(page)).toContainText('4/4 đã chọn');
+  await expect(chip(page, 'Amazon')).toHaveAttribute('aria-pressed', 'true');
+  // Two tiles and two photos: the box takes the second photo.
+  await page.getByRole('button', { name: 'Bỏ chọn hết' }).click();
+  await expect(count(page)).toHaveText('1/4 đã chọn');
+  for (const name of ['Mặt trước', 'Quỳ một gối']) await tile(name).click();
+  await photoInput.setInputFiles(file('ref-c.png'));
+  await expect(photos.getByRole('img', { name: 'ref-c.png' })).toBeVisible();
+  await expect(count(page)).toContainText('4/4 đã chọn');
+  await expect(cost(page)).toHaveText('4 ảnh × $0.15 = $0.60');
+  await background(page, 'Studio trắng').check();
+  await expect(preview(page)).toContainText(`Mặt trước: ${posePrompt(poseOf('front')!.words, 'white')}`);
+
+  // The run on the mock model: a job per tile, then one per pose photo, whose second image is that photo and whose prompt copies only its pose.
+  await pickModel(page, /Mock pets E2E/);
+  const sent: { params: Record<string, string>; prompt: string; assetIds: string[] }[] = [];
+  page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/jobs' && sent.push(r.postDataJSON())));
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
+  const batch = sent[0]?.params.batch;
+  expect(sent.map((b) => b.assetIds.length)).toEqual([1, 1, 2, 2]);
+  expect(sent.map((b) => b.params)).toEqual([
+    { resolution: '1K', pose: 'front', background: 'white', batch },
+    { resolution: '1K', pose: 'kneel', background: 'white', batch },
+    { resolution: '1K', poseRef: sent[2]!.assetIds[1], background: 'white', batch },
+    { resolution: '1K', poseRef: sent[3]!.assetIds[1], background: 'white', batch },
+  ]);
+  expect(sent.map((b) => b.prompt)).toEqual([posePrompt(poseOf('front')!.words, 'white'), posePrompt(poseOf('kneel')!.words, 'white'), poseRefPrompt('white'), poseRefPrompt('white')]);
+  expect(new Set(sent.map((b) => b.assetIds[0])).size).toBe(1); // the person is the first image of every job
+  expect(sent[2]!.assetIds[1]).not.toBe(sent[3]!.assetIds[1]);
+  await expect.poll(async () => (await mine(page)).filter((j) => j.status === 'succeeded').length, { timeout: 90_000 }).toBe(4);
+  const made = await mine(page);
+  for (const j of made.filter((x) => x.poseRef)) expect(j.inputAssetIds).toEqual([sent[0]!.assetIds[0], j.poseRef]);
+  await expect(page.getByRole('heading', { name: 'Tạo tư thế · Theo ảnh mẫu', level: 3 })).toHaveCount(2);
+
+  // Reuse one pose photo job: the model photo back in its slot, the Run's two tiles and both pose photos, on its background.
+  const reusing = made.find((j) => j.poseRef === sent[2]!.assetIds[1])!;
+  await page.goto(`/apps/pose-generator?reuse=${reusing.id}`);
+  await expect(slot(page).getByRole('img', { name: 'model.png' })).toBeVisible();
+  await expect(photos.getByRole('img')).toHaveCount(2);
+  for (const name of ['ref-b.png', 'ref-c.png']) await expect(photos.getByRole('img', { name })).toBeVisible();
+  for (const name of ['Mặt trước', 'Quỳ một gối']) await expect(tile(name)).toHaveAttribute('aria-pressed', 'true');
+  await expect(count(page)).toContainText('4/4 đã chọn');
+  await expect(background(page, 'Studio trắng')).toBeChecked();
+  await expect(cost(page)).toContainText('4 ảnh ×');
+  // A pose photo deleted since is lost like any other input: the rest comes back and the form says one photo did not.
+  await page.route(/\/api\/jobs\/[\w-]+$/, async (route) => {
+    const res = await route.fetch();
+    const json = (await res.json()) as { poseImages: { id: string }[] };
+    await route.fulfill({ response: res, json: { ...json, poseImages: json.poseImages.slice(0, 1) } });
+  });
+  await page.goto(`/apps/pose-generator?reuse=${reusing.id}`);
+  await expect(photos.getByRole('img')).toHaveCount(1);
+  await expect(page.getByText('1 ảnh đầu vào (đã bị xoá)')).toBeVisible();
+  await expect(count(page)).toContainText('3/4 đã chọn');
 });

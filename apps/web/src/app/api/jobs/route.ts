@@ -101,7 +101,7 @@ export async function GET(request: Request) {
       text: r.params.brief ?? r.params.poseText ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
       traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, style: r.params.style ?? null, product: r.params.product ?? null, name: r.params.name ?? null,
       // The pose generator's pose (Try On keeps its own pose too, which its card does not name) or its own words.
-      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
+      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, poseRef: r.params.poseRef ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
     })),
   });
 }
@@ -129,8 +129,9 @@ export async function GET(request: Request) {
  * `breed_swap` (the breed swap app) takes `params.breed`, one of DOG_BREEDS, and exactly the prompt breedSwapPrompt makes of it: one job per breed, the page sends one per breed picked.
  * `pet_portrait` takes `params.style` (an id of PET_STYLES), `mockup_pack` `params.product` (an id of MOCKUP_PRODUCTS) with the design and an optional blank product photo, and `name_swap`
  * `params.name` (one name nameOk takes, already clean) and an optional `params.breed`; each takes exactly the prompt its item makes (itemPrompt), one job per item.
- * `pose_generator` takes exactly one image (the person) and one of `params.pose` (a value of POSES) or `params.poseText` (the member's own words, clean as a name is, 1 to
- * MAX_POSE_TEXT characters), not both, and an optional `params.background` (a value of POSE_BACKGROUNDS), with exactly the prompt posePrompt makes of them: one job per pose.
+ * `pose_generator` takes one image (the person) and one of `params.pose` (a value of POSES) or `params.poseText` (the member's own words, clean as a name is, 1 to
+ * MAX_POSE_TEXT characters), or two (the person, then a pose photo) and `params.poseRef` naming that second image; exactly one of the three, and an optional `params.background` (a value of
+ * POSE_BACKGROUNDS), with exactly the prompt posePrompt (poseRefPrompt for a pose photo) makes of them: one job per pose.
  * The batch apps (BATCH_FEATURES) and Create image (a Run of 2 or 4 pictures) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again. As on the pages, a Run
  * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs (a pose generator Run MAX_POSES), and a mockup pack Run with a blank product photo one job (400 for one more).
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
@@ -185,7 +186,7 @@ export async function POST(request: Request) {
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced', 'unboxing' or 'review'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText', 'background'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText', 'poseRef', 'background'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -198,10 +199,11 @@ export async function POST(request: Request) {
     // A name goes into the prompt as it is, so it is held to the rule the page checks the box with.
     if (feature === 'name_swap' && (given.name === undefined || given.name !== cleanName(given.name) || !nameOk(given.name))) return bad(`params.name must be one name of up to ${MAX_NAME} letters, digits, spaces, apostrophes or hyphens`);
     if (feature === 'name_swap' && given.breed !== undefined && !DOG_BREEDS.includes(given.breed)) return bad(`params.breed must be one of ${DOG_BREEDS.join(', ')}`);
-    // One person in, one pose out: a pose of the list or the member's own words, never both in one job, so they cannot pull the prompt two ways.
+    // One person in, one pose out: a pose of the list, the member's own words or a pose photo (the second image), never two of them in one job, so they cannot pull the prompt two ways.
     if (feature === 'pose_generator') {
-      if (assetIds.length !== 1) return bad('the pose generator takes exactly one image: the person');
-      if ((given.pose === undefined) === (given.poseText === undefined)) return bad('the pose generator takes params.pose or params.poseText, not both and not neither');
+      if (assetIds.length !== (given.poseRef === undefined ? 1 : 2)) return bad('the pose generator takes one image (the person), or two (the person, then the pose photo) with params.poseRef');
+      if (given.poseRef !== undefined && given.poseRef !== assetIds[1]) return bad('params.poseRef must be the second image: the pose photo');
+      if ([given.pose, given.poseText, given.poseRef].filter((v) => v !== undefined).length !== 1) return bad('the pose generator takes one of params.pose, params.poseText or params.poseRef, not two and not none');
       if (given.pose !== undefined && !poseOf(given.pose)) return bad(`params.pose must be one of ${POSES.map((p) => p.value).join(', ')}`);
       if (given.background !== undefined && !POSE_BACKGROUNDS.some((b) => b.value === given.background)) return bad(`params.background must be one of ${POSE_BACKGROUNDS.map((b) => b.value).join(', ')}`);
       // Own words go into the prompt as they are, so they are held to the page's cleaning (as a name is) and its length.

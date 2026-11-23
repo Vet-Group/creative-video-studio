@@ -3,7 +3,7 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
 import { POSE_PRESETS, POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isNewApp, itemLabel, itemPrompt, jobImages, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isNewApp, itemLabel, itemPrompt, jobImages, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, REF_POSE, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -136,7 +136,7 @@ describe('filterApps', () => {
 describe('unsentPicks', () => {
   it('keeps picked only the items of the jobs a stopped batch Run did not send', () => {
     const runs = [{ breed: 'Pug' }, { breed: 'Boxer' }, { breed: 'Beagle' }];
-    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Boxer', 'Beagle'], style: [], product: [], name: [], pose: [], poseText: [], left: [] });
+    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Boxer', 'Beagle'], style: [], product: [], name: [], pose: [], poseText: [], poseRef: [], left: [] });
     expect(unsentPicks([{ view: 'back' }, { view: 'left' }], 1)).toMatchObject({ view: ['left'], left: [] });
     expect(unsentPicks([{ name: 'Max' }, { name: 'Bella' }], 1)).toMatchObject({ name: ['Bella'], breed: [], left: [] });
   });
@@ -148,11 +148,18 @@ describe('unsentPicks', () => {
     expect(unsentPicks(runs, 3)).toMatchObject({ pose: [], poseText: [], left: [] });
   });
 
+  it('keeps the pose photos that were not sent, and drops the sent ones', () => {
+    const runs = [{ pose: 'front' }, { poseRef: 'ref-1' }, { poseRef: 'ref-2' }];
+    expect(unsentPicks(runs, 1)).toMatchObject({ pose: [], poseRef: ['ref-1', 'ref-2'], left: [] });
+    expect(unsentPicks(runs, 2)).toMatchObject({ poseRef: ['ref-2'], left: [] });
+    expect(unsentPicks(runs, 3)).toMatchObject({ poseRef: [], left: [] });
+  });
+
   it('drops a name whose breeds were partly sent and names its jobs not sent instead, so nothing is sent twice', () => {
     const runs = ['Max', 'Bella'].flatMap((name) => ['Pug', 'Boxer'].map((breed) => ({ name, breed })));
-    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Pug', 'Boxer'], style: [], product: [], name: ['Bella'], pose: [], poseText: [], left: [{ name: 'Max', breed: 'Boxer' }] });
+    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Pug', 'Boxer'], style: [], product: [], name: ['Bella'], pose: [], poseText: [], poseRef: [], left: [{ name: 'Max', breed: 'Boxer' }] });
     expect(unsentPicks(runs, 2)).toMatchObject({ name: ['Bella'], breed: ['Pug', 'Boxer'], left: [] });
-    expect(unsentPicks(runs, 3)).toEqual({ view: [], breed: [], style: [], product: [], name: [], pose: [], poseText: [], left: [{ name: 'Bella', breed: 'Boxer' }] });
+    expect(unsentPicks(runs, 3)).toEqual({ view: [], breed: [], style: [], product: [], name: [], pose: [], poseText: [], poseRef: [], left: [{ name: 'Bella', breed: 'Boxer' }] });
   });
 });
 
@@ -445,6 +452,36 @@ describe('Tạo tư thế người mẫu', () => {
     expect(itemPrompt('pose_generator', { poseText: 'ngồi trên ghế gỗ', background: 'lifestyle' })).toBe(posePrompt('ngồi trên ghế gỗ', 'lifestyle'));
   });
 
+  it('writes the pose photo prompt: the first image is the person, the second only shows the pose, and the background clause follows the choice as the pose prompt does', () => {
+    const keep = poseRefPrompt('keep');
+    expect(keep).toBe(
+      "Keep the person in the first image: the face, identity, hair, skin, body shape and outfit, and the first image's lighting and background, exactly unchanged, and show the same person in the pose, body angle and framing of the person in the second image. Use the second image only for the pose: do not copy its person's face, identity, hair, clothes or background. Photorealistic, with the same camera quality as the first image. Do not add any text, logos or watermarks.",
+    );
+    for (const same of [null, undefined, 'no-such-background']) expect(poseRefPrompt(same)).toBe(keep);
+    for (const b of POSE_BACKGROUNDS.filter((x) => x.scene)) {
+      const p = poseRefPrompt(b.value);
+      expect(p).toContain(`Replace the background with ${b.scene}.`);
+      expect(p).toContain('Keep the person in the first image: the face, identity, hair, skin, body shape and outfit exactly unchanged');
+      expect(p).not.toContain("the first image's lighting and background");
+      expect(p).toContain("do not copy its person's face, identity, hair, clothes or background");
+      expect(p.endsWith('Photorealistic, with the same camera quality as the first image. Do not add any text, logos or watermarks.')).toBe(true);
+    }
+    expect(poseRefPrompt('white')).toContain('seamless pure white');
+    expect(poseRefPrompt('lifestyle')).toContain('warm-white wall');
+    for (const p of [keep, poseRefPrompt('white'), poseRefPrompt('lifestyle')]) expect(p).toMatch(/^[ -~]+$/);
+    // itemPrompt gives it to a pose photo job, and the other pose prompts stay as they were.
+    expect(itemPrompt('pose_generator', { poseRef: 'ref-1', background: 'white' })).toBe(poseRefPrompt('white'));
+    expect(itemPrompt('pose_generator', { poseRef: 'ref-1' })).toBe(keep);
+    expect(itemPrompt('pose_generator', { pose: 'kneel', background: 'white' })).toBe(posePrompt('kneeling on one knee and facing the camera, full body', 'white'));
+  });
+
+  it('counts a pose photo job as two images for the model, whatever the poses picked', () => {
+    expect(appReason(app, { ...d(['a'], 1), poseRefs: 1 })).toBeNull();
+    expect(appReason(app, { ...d(['a'], 1), poseRefs: 1, models: [{ maxImages: 1 }] })).toBe('Mô hình này nhận tối đa 1 ảnh.');
+    expect(appReason(app, { ...d(['a'], 1), models: [{ maxImages: 1 }] })).toBeNull();
+    expect(appReason(app, { ...d(['a'], 5), poseRefs: 2 })).toBe('Tối đa 4 tư thế mỗi lần chạy, đang là 5: bỏ bớt một tư thế.');
+  });
+
   it('has marketplace presets of known poses, within a Run, on a known background', () => {
     expect(POSE_PRESETS.map((p) => [p.id, p.label, p.background])).toEqual([['amazon', 'Amazon', 'white'], ['etsy', 'Etsy', 'lifestyle'], ['shopify', 'Shopify', 'white']]);
     for (const pr of POSE_PRESETS) {
@@ -468,6 +505,8 @@ describe('the batch apps', () => {
     expect(itemLabel({ name: 'Max', breed: null })).toBe('Max');
     expect(itemLabel({ pose: 'hand-on-hip' })).toBe('Tay chống hông');
     expect(itemLabel({ pose: null, poseText: 'ngồi trên ghế gỗ' })).toBe(OWN_POSE);
+    expect(itemLabel({ pose: null, poseText: null, poseRef: 'ref-1' })).toBe(REF_POSE);
+    expect(REF_POSE).toBe('Theo ảnh mẫu');
     expect(itemLabel({ pose: 'no-such-pose' })).toBeNull();
     expect(itemLabel({ view: null, breed: null, style: null, product: null, name: null, pose: null, poseText: null })).toBeNull();
     expect(itemPrompt('breed_swap', { breed: 'Pug' })).toBe(breedSwapPrompt('Pug'));

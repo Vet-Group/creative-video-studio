@@ -187,6 +187,9 @@ export interface ReuseJob {
   /** Try On's pose, and the pose generator's (its own words in `poseText`). */
   pose?: string | null;
   poseText?: string | null;
+  /** The pose generator's pose photo (an asset id), and the Run's pose photos that still exist (the creator's). */
+  poseRef?: string | null;
+  poseImages?: Img[];
   /** The pose generator's background (a value of POSE_BACKGROUNDS); null on a job from before it. */
   background?: string | null;
   enhance: boolean | null;
