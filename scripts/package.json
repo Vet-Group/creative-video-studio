@@ -11,7 +11,7 @@
     "bakeoff:judge": "tsx bakeoff/judge.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1165.0",
+    "@aws-sdk/client-s3": "3.1175.0",
     "@cvs/core": "workspace:*",
     "ffmpeg-static": "5.2.0",
     "ffprobe-static": "3.1.0"
