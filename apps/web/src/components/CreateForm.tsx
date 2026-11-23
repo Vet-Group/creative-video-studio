@@ -748,6 +748,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
       value={sec ? prompt : freeText}
       onChange={sec ? setPrompt : setFreeText}
       maxLength={room}
+      refs={chosen ? images.slice(0, maxImages) : undefined}
       onRun={() => (canRun ? void run() : (reason?.text ?? false))}
       disabled={presetId !== ''}
       placeholder={presetId === '' ? 'Ví dụ: The camera orbits slowly around the product in soft light (nên viết bằng tiếng Anh)' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'}

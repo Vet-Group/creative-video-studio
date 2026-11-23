@@ -497,7 +497,8 @@ export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; re
       const endpoint = text ? FAL_TEXT_ENDPOINTS[req.model.endpoint] : req.model.endpoint;
       if (!endpoint) throw new ImageReadError(`fal image: ${req.model.endpoint} needs an input image`);
       // Built before any network call, so a request the model cannot take submits nothing.
-      const body = build(req, req.imageUrls.length > MAX_INLINE_INPUTS ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage));
+      // The app names its images [Image1].. (see imageTokens); no image schema reads that, so they get the plain words "image 1"..
+      const body = build({ ...req, prompt: imageTokens(req.prompt, plainImage) }, req.imageUrls.length > MAX_INLINE_INPUTS ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage));
       if (text) {
         delete body.image_urls;
         // Nano Banana's text endpoint has no 'auto' ratio; without one each takes its own default.

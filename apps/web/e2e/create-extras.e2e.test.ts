@@ -348,3 +348,34 @@ test('a saved template and History’s Dùng lại refill the end frame and the 
   await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
   expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
 });
+
+test('two attached images show one chip each that puts its [ImageN] token at the caret, keeps the caret in the box, and is off once the limit leaves no room', async ({ page }) => {
+  await signIn(page, 'cvxa');
+  const box = page.getByRole('textbox', { name: 'Mô tả chuyển động', exact: true });
+  const chips = page.getByRole('group', { name: 'Chèn ảnh vào mô tả:' });
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(png1('one.png'));
+  await expect(photos(page).getByRole('img')).toHaveCount(1);
+  await expect(chips).toHaveCount(0); // one image: nothing to tell apart
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(png1('two.png'));
+  await expect(chips.getByRole('button')).toHaveCount(2);
+
+  // The caret is after "put" while the focus is on the chip; the token lands there, in the order the images are listed and sent, and typing goes on after it.
+  await box.fill('put on a table');
+  await box.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(3, 3));
+  await chips.getByRole('button', { name: 'Chèn [Image2] vào mô tả (Ảnh 2)' }).click();
+  await expect(box).toHaveValue('put [Image2] on a table');
+  await expect(box).toBeFocused();
+  await page.keyboard.type(',');
+  await expect(box).toHaveValue('put [Image2], on a table');
+
+  // A selection is replaced.
+  await box.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(4, 12));
+  await chips.getByRole('button', { name: 'Chèn [Image1] vào mô tả (Ảnh 1)' }).click();
+  await expect(box).toHaveValue('put [Image1], on a table');
+
+  // With no room for a token the chips are off, and nothing is added.
+  const max = Number(await box.getAttribute('maxlength'));
+  await box.fill('x'.repeat(max - 5));
+  await expect(chips.getByRole('button').first()).toBeDisabled();
+  await expect(chips.getByRole('button').last()).toBeDisabled();
+});
