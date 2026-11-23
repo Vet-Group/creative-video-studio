@@ -33,6 +33,7 @@ const READERS: Record<string, string[]> = {
   garments: ['components/TryOn.tsx'],
   pose: ['components/TryOn.tsx', 'components/AppPage.tsx'], // Try On's pose and the pose generator's
   poseText: ['components/AppPage.tsx'], // the pose generator's own words
+  background: ['components/AppPage.tsx'], // the pose generator's background
   format: ['components/MarketingStudio.tsx'],
   hook: ['components/MarketingStudio.tsx'],
   location: ['components/MarketingStudio.tsx'],

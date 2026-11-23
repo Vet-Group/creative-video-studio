@@ -496,10 +496,26 @@ export const MAX_POSE_TEXT = 200;
 /** What the pose generator calls a job of the member's own words, on its box and on the job's History card. */
 export const OWN_POSE = 'Tư thế tự tả';
 
-/** The prompt of one pose generator job: the person of the photo, unchanged, in the pose `words` say (a pose's of POSES, or the member's own). POST /api/jobs takes no other. */
-export const posePrompt = (words: string): string =>
-  "Keep the person's face, identity, hair, skin, body shape and outfit, and the photo's lighting and background, exactly unchanged, " +
-  `and show the same person in this pose and framing: ${words}. Photorealistic, with the same camera quality as the photo. Do not add any text, logos or watermarks.`;
+/** The backgrounds of the pose generator: the value a job keeps as `params.background`, the page's label and the scene the prompt puts the person in (none: the photo's own). The lifestyle scene is
+ * one fixed description, so every pose of a Run shares the same background. */
+export const POSE_BACKGROUNDS = [
+  { value: 'keep', label: 'Giữ nền gốc', scene: null },
+  { value: 'white', label: 'Studio trắng', scene: 'a seamless pure white (#FFFFFF) studio backdrop with soft, even lighting and a soft shadow under the feet' },
+  { value: 'lifestyle', label: 'Lifestyle', scene: 'a bright minimal interior with a plain warm-white wall, a light wood floor and soft window daylight' },
+] as const;
+
+/** The prompt of one pose generator job: the person of the photo, unchanged, in the pose `words` say (a pose's of POSES, or the member's own), on the photo's own background or the `background`'s scene.
+ * POST /api/jobs takes no other. */
+export const posePrompt = (words: string, background?: string | null): string => {
+  const scene = POSE_BACKGROUNDS.find((b) => b.value === background)?.scene;
+  return (
+    "Keep the person's face, identity, hair, skin, body shape and outfit" +
+    (scene ? ' ' : ", and the photo's lighting and background, ") +
+    `exactly unchanged, and show the same person in this pose and framing: ${words}. ` +
+    (scene ? `Replace the background with ${scene}. ` : '') +
+    'Photorealistic, with the same camera quality as the photo. Do not add any text, logos or watermarks.'
+  );
+};
 
 /** The products of the mockup pack: the id a job keeps as `params.product`, the page's label, what the product is and the scene of its mockup. */
 export const MOCKUP_PRODUCTS: { id: string; label: string; product: string; scene: string }[] = [
@@ -584,6 +600,7 @@ export interface BatchItem {
   name?: string | null;
   pose?: string | null;
   poseText?: string | null;
+  background?: string | null;
 }
 
 /**
@@ -617,6 +634,6 @@ export function itemPrompt(feature: string, p: BatchItem, blank = false): string
   if (feature === 'pet_portrait') return petPortraitPrompt(p.style!);
   if (feature === 'mockup_pack') return mockupPrompt(p.product!, blank);
   if (feature === 'name_swap') return nameSwapPrompt(p.name!, p.breed ?? undefined);
-  if (feature === 'pose_generator') return posePrompt(poseOf(p.pose)?.words ?? p.poseText!);
+  if (feature === 'pose_generator') return posePrompt(poseOf(p.pose)?.words ?? p.poseText!, p.background);
   return undefined;
 }

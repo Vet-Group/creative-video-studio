@@ -187,6 +187,8 @@ export interface ReuseJob {
   /** Try On's pose, and the pose generator's (its own words in `poseText`). */
   pose?: string | null;
   poseText?: string | null;
+  /** The pose generator's background (a value of POSE_BACKGROUNDS); null on a job from before it. */
+  background?: string | null;
   enhance: boolean | null;
   ratio: string | null;
   resolution: string | null;

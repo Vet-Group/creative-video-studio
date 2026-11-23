@@ -2,8 +2,8 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
-import { POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isNewApp, itemLabel, itemPrompt, jobImages, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, posePrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { POSE_PRESETS, POSES } from './try-on-stock';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isNewApp, itemLabel, itemPrompt, jobImages, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -419,6 +419,42 @@ describe('Tạo tư thế người mẫu', () => {
     }
     for (const p of POSES) expect(posePrompt(p.words).replace(p.words, 'X')).toBe(front.replace(POSES[0]!.words, 'X'));
     expect(front).toMatch(/^[ -~]+$/); // English only; the member's own words are theirs
+  });
+
+  it("keeps today's prompt for the original background, and swaps it for one fixed scene for white and lifestyle", () => {
+    const words = POSES[0]!.words;
+    const keep = posePrompt(words);
+    expect(keep).toBe(
+      "Keep the person's face, identity, hair, skin, body shape and outfit, and the photo's lighting and background, exactly unchanged, and show the same person in this pose and framing: standing straight and facing the camera, arms relaxed at the sides, full body. Photorealistic, with the same camera quality as the photo. Do not add any text, logos or watermarks.",
+    );
+    for (const same of ['keep', null, undefined, 'no-such-background']) expect(posePrompt(words, same)).toBe(keep);
+    expect(POSE_BACKGROUNDS.map((b) => [b.value, b.label])).toEqual([['keep', 'Giữ nền gốc'], ['white', 'Studio trắng'], ['lifestyle', 'Lifestyle']]);
+    const white = posePrompt(words, 'white');
+    expect(white).toContain('Replace the background with a seamless pure white (#FFFFFF) studio backdrop with soft, even lighting and a soft shadow under the feet.');
+    expect(white).toContain("Keep the person's face, identity, hair, skin, body shape and outfit exactly unchanged, and show the same person in this pose and framing: standing straight");
+    const lifestyle = posePrompt(words, 'lifestyle');
+    expect(lifestyle).toContain('Replace the background with a bright minimal interior with a plain warm-white wall, a light wood floor and soft window daylight.');
+    for (const p of [white, lifestyle]) {
+      expect(p).not.toContain("the photo's lighting and background");
+      expect(p).toMatch(/^[ -~]+$/);
+      expect(p).toContain('Photorealistic, with the same camera quality as the photo. Do not add any text');
+    }
+    // Every pose of a Run gets the same scene words, so the Run shares one background.
+    for (const p of POSES) expect(posePrompt(p.words, 'lifestyle').replace(p.words, 'X')).toBe(lifestyle.replace(words, 'X'));
+    expect(itemPrompt('pose_generator', { pose: 'kneel', background: 'white' })).toBe(posePrompt('kneeling on one knee and facing the camera, full body', 'white'));
+    expect(itemPrompt('pose_generator', { poseText: 'ngồi trên ghế gỗ', background: 'lifestyle' })).toBe(posePrompt('ngồi trên ghế gỗ', 'lifestyle'));
+  });
+
+  it('has marketplace presets of known poses, within a Run, on a known background', () => {
+    expect(POSE_PRESETS.map((p) => [p.id, p.label, p.background])).toEqual([['amazon', 'Amazon', 'white'], ['etsy', 'Etsy', 'lifestyle'], ['shopify', 'Shopify', 'white']]);
+    for (const pr of POSE_PRESETS) {
+      expect(pr.poses.length).toBeLessThanOrEqual(MAX_POSES);
+      expect(new Set(pr.poses).size).toBe(pr.poses.length);
+      for (const v of pr.poses) expect(POSES.map((p) => p.value)).toContain(v);
+      expect(POSE_BACKGROUNDS.map((b) => b.value)).toContain(pr.background);
+    }
+    // Amazon's main image: full-body standing views only.
+    for (const v of POSE_PRESETS[0].poses) expect(POSES.find((p) => p.value === v)!.words).toMatch(/^(standing|walking)\b.*full body$/);
   });
 });
 

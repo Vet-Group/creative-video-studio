@@ -1617,6 +1617,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .theme-choice label:has(:disabled) { opacity: .5; }
 .theme-choice input:disabled { cursor: not-allowed; }
 .angle-choice { flex-wrap: wrap; justify-self: start; max-width: 100%; } /* Create's camera angles: chips that wrap on a phone */
+/* The pose generator's marketplace presets: text buttons in the segmented frame, which is sized for icons. */
+.segmented.preset-chips button { width: auto; padding: 0 12px; font-size: 13px; line-height: 18px; font-weight: 500; }
 /* An app's multi-pick chips (views, breeds, styles, products): a picked one carries a check, as the raised fill alone read like an unpicked chip at a glance. */
 .app-page .angle-choice label:has(:checked)::before { content: '\2713'; font-weight: 700; }
 .pick-count { color: var(--text-muted); font-size: 13px; line-height: 18px; white-space: nowrap; }

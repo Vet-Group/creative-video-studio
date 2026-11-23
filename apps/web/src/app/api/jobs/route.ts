@@ -13,7 +13,7 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
-import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES } from '@/lib/apps';
+import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS } from '@/lib/apps';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
@@ -130,7 +130,7 @@ export async function GET(request: Request) {
  * `pet_portrait` takes `params.style` (an id of PET_STYLES), `mockup_pack` `params.product` (an id of MOCKUP_PRODUCTS) with the design and an optional blank product photo, and `name_swap`
  * `params.name` (one name nameOk takes, already clean) and an optional `params.breed`; each takes exactly the prompt its item makes (itemPrompt), one job per item.
  * `pose_generator` takes exactly one image (the person) and one of `params.pose` (a value of POSES) or `params.poseText` (the member's own words, clean as a name is, 1 to
- * MAX_POSE_TEXT characters), not both, with exactly the prompt posePrompt makes of it: one job per pose.
+ * MAX_POSE_TEXT characters), not both, and an optional `params.background` (a value of POSE_BACKGROUNDS), with exactly the prompt posePrompt makes of them: one job per pose.
  * The batch apps (BATCH_FEATURES) and Create image (a Run of 2 or 4 pictures) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again. As on the pages, a Run
  * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs (a pose generator Run MAX_POSES), and a mockup pack Run with a blank product photo one job (400 for one more).
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced', 'unboxing' or 'review'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText', 'background'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -203,6 +203,7 @@ export async function POST(request: Request) {
       if (assetIds.length !== 1) return bad('the pose generator takes exactly one image: the person');
       if ((given.pose === undefined) === (given.poseText === undefined)) return bad('the pose generator takes params.pose or params.poseText, not both and not neither');
       if (given.pose !== undefined && !poseOf(given.pose)) return bad(`params.pose must be one of ${POSES.map((p) => p.value).join(', ')}`);
+      if (given.background !== undefined && !POSE_BACKGROUNDS.some((b) => b.value === given.background)) return bad(`params.background must be one of ${POSE_BACKGROUNDS.map((b) => b.value).join(', ')}`);
       // Own words go into the prompt as they are, so they are held to the page's cleaning (as a name is) and its length.
       if (given.poseText !== undefined && (given.poseText !== cleanName(given.poseText) || given.poseText === '' || given.poseText.length > MAX_POSE_TEXT || /\p{Cc}/u.test(given.poseText))) {
         return bad(`params.poseText must be the pose in your own words, trimmed, 1 to ${MAX_POSE_TEXT} characters`);
