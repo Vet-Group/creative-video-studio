@@ -8,6 +8,6 @@ export default {
     'Khi đang chọn nhiều mục, bấm một ô rồi giữ Shift và bấm ô khác: mọi mục ở giữa cũng được chọn (hoặc bỏ chọn) theo, tiện khi tải .zip, ghép lookbook hay đánh dấu hàng loạt.',
   ],
   href: '/library',
-  prs: [0],
+  prs: [637],
   audience: 'all',
 } satisfies ChangeEntry;
