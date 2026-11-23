@@ -74,7 +74,7 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
 
   // A user picks a preset or writes a prompt: the prompt box opens only for "Tự viết mô tả", and Run waits for some text.
   await expect(page.getByLabel('Mô tả chuyển động')).toBeDisabled();
-  const enhance = page.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
+  const enhance = page.getByRole('button', { name: /^Cải thiện: / });
   await expect(enhance).toHaveCount(0); // a preset's tested prompt is not rewritten
   await pickPreset(page, '');
   // Enhance sits in the prompt box, on by default as on Fash, and flips with a click.

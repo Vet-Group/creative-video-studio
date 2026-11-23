@@ -93,7 +93,7 @@ export function FeedbackDetail({ id, isAdmin, shipped = [] }: { id: string; isAd
       {back}
       <article className="fb-card">
         <header className="fb-detail-head">
-          <button type="button" className={`fb-vote${item.voted ? ' on' : ''}`} onClick={() => void toggleVote()} aria-pressed={item.voted} aria-label={`Bình chọn (${item.votes})`}>
+          <button type="button" className={`fb-vote${item.voted ? ' on' : ''}`} onClick={() => void toggleVote()} aria-pressed={item.voted} aria-label={`${item.votes} bình chọn`}>
             <span aria-hidden="true">▲</span>
             {item.votes}
           </button>

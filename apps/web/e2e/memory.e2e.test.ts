@@ -9,7 +9,7 @@ async function upload(page: Page, label: string, name: string): Promise<void> {
   await page.getByLabel(label).setInputFiles(file(name));
 }
 const sent = (page: Page) => expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
-const enhance = (page: Page) => page.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
+const enhance = (page: Page) => page.getByRole('button', { name: /^Cải thiện: / });
 
 /** A fresh browser (no cookies) signed in as `who`: the memory is on the account, not in the browser. */
 async function elsewhere(browser: Browser, who: UserKey): Promise<Page> {

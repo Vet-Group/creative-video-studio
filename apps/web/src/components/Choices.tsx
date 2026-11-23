@@ -22,17 +22,16 @@ export type ChoiceKind = keyof typeof BUILT_IN_CHOICES;
 export function ChoiceBox({ label, icon, value, media, onOpen, onClear }: { label: string; icon: IconName; value: string | undefined; media?: { video: string | null; poster: string | null }; onOpen: () => void; onClear: () => void }) {
   const filled = value !== undefined && media !== undefined && (media.video ?? media.poster) !== null;
   const name = label.replace(' (tuỳ chọn)', '');
-  const labelId = useId();
-  const valueId = useId();
   return (
     <div className="field">
-      <button type="button" className="choice-box" data-filled={filled || undefined} aria-haspopup="dialog" aria-labelledby={`${labelId} ${valueId}`} onClick={onOpen}>
+      {/* Named by its text: the name, the optional note and the value (WCAG 2.5.3 Label in Name). */}
+      <button type="button" className="choice-box" data-filled={filled || undefined} aria-haspopup="dialog" onClick={onOpen}>
         {filled && <CardMedia video={media.poster ? null : media.video} poster={media.poster} />}
         <span className="slot-icon" aria-hidden="true">
           <Icon name={icon} size={16} />
         </span>
         {/* One line: the name, with the optional note for screen readers only; the eye gets the Optional chip under it. */}
-        <span id={labelId} className="choice-label">
+        <span className="choice-label">
           {name}
           {name !== label && <span className="sr-only"> (tuỳ chọn)</span>}
         </span>
@@ -41,7 +40,7 @@ export function ChoiceBox({ label, icon, value, media, onOpen, onClear }: { labe
             Tuỳ chọn
           </span>
         )}
-        <span id={valueId} className={value ? 'choice-value' : 'choice-value sr-only'}>
+        <span className={value ? 'choice-value' : 'choice-value sr-only'}>
           {value ?? 'Chưa chọn'}
         </span>
       </button>

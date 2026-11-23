@@ -131,7 +131,7 @@ export function Feedback() {
         <ul className="fb-list">
           {shown.map((it) => (
             <li key={it.id} className="fb-item">
-              <button type="button" className={`fb-vote${it.voted ? ' on' : ''}`} onClick={() => void toggleVote(it)} aria-pressed={it.voted} aria-label={`Bình chọn (${it.votes})`}>
+              <button type="button" className={`fb-vote${it.voted ? ' on' : ''}`} onClick={() => void toggleVote(it)} aria-pressed={it.voted} aria-label={`${it.votes} bình chọn`}>
                 <span aria-hidden="true">▲</span>
                 {it.votes}
               </button>

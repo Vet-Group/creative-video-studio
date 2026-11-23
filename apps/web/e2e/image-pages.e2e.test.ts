@@ -429,7 +429,7 @@ test('Image Generation: the form needs a prompt (and an image only on a model wi
   await expect(ratio).toHaveAttribute('data-value', '1:1'); // back on the roomy model, the earlier choice returns
 
   // Enhance sits in the form, on by default; the job stores the member's choice (a mock job is never rewritten).
-  const enhance = form.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
+  const enhance = form.getByRole('button', { name: /^Cải thiện: / });
   await expect(enhance).toHaveAttribute('aria-pressed', 'true');
   await enhance.click();
   await expect(enhance).toHaveText('Cải thiện: tắt');

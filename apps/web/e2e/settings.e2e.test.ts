@@ -26,7 +26,7 @@ test('a user renames themselves and picks an avatar colour; both stay after a re
   await expect(settings.getByRole('button', { name: 'Sửa tên, màu và email' })).toBeFocused();
 
   await page.keyboard.press('Escape');
-  await expect(accountButton(page)).toHaveAccessibleName('Tài khoản: E2E Đổi Tên'); // router.refresh() reran the layout
+  await expect(accountButton(page)).toHaveAccessibleName('Tài khoản: ET E2E Đổi Tên seta@e2e.test'); // router.refresh() reran the layout
   await expect(page.locator('.account-chip .avatar')).toHaveCSS('background-color', 'rgb(67, 56, 202)');
   await page.reload();
   await expect(page.locator('.account-chip .account-name')).toHaveText('E2E Đổi Tên');

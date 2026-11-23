@@ -238,7 +238,7 @@ test('Create starts on a free prompt as on the live form: the prompt box open an
   await openCreate(page);
   await expect(presetOf(page)).toHaveAttribute('data-value', '');
   await expect(page.getByLabel('Mô tả chuyển động')).toBeEnabled();
-  const enhance = page.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
+  const enhance = page.getByRole('button', { name: /^Cải thiện: / });
   await expect(enhance).toHaveAttribute('aria-pressed', 'true');
   await expect(enhance).toHaveCSS('background-color', 'rgb(26, 26, 26)'); // filled when on, so its white label reads
 });
@@ -658,7 +658,7 @@ for (const width of [1440, 1280, 390]) {
         return el.getAttribute('aria-label') ?? copy.textContent?.trim();
       });
     // The account chip closes the sidebar (the top bar's avatar below 1024 px); the open tab takes the tab stop.
-    const account = 'Tài khoản: E2E Member 5';
+    const account = 'Tài khoản: E5 E2E Member 5 member5@e2e.test';
     const order = wideScreen ? ['Bỏ qua đến nội dung', 'Thu gọn thanh bên', 'Khám phá', 'Tìm nhanh', 'Chọn công cụ nào?', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Ứng dụng nhanh', 'Thư viện', 'Góp ý', 'Có gì mới (có mục mới)', 'Hướng dẫn', account, 'Ví dụ'] : ['Bỏ qua đến nội dung', 'Mở menu', account, 'Tạo'];
 
     for (const name of order) {

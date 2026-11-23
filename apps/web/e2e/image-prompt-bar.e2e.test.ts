@@ -67,7 +67,7 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
     bar.getByRole('button', { name: 'Ảnh đã tải cho Ảnh tham chiếu' }),
     prompt,
     bar.getByRole('group', { name: 'Gợi ý nhanh' }),
-    bar.getByRole('button', { name: 'Cải thiện mô tả bằng AI' }),
+    bar.getByRole('button', { name: /^Cải thiện: / }),
     bar.getByRole('button', { name: 'Gợi ý AI' }),
     bar.getByRole('button', { name: 'Mở rộng' }),
     bar.getByRole('button', { name: 'Phong cách', exact: true }),
@@ -127,7 +127,7 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
   const chips = order.slice(order.indexOf('Phong cách'));
   expect(chips.map((n) => n.replace(/ .*/, ''))).toEqual(['Phong', 'Mô', 'Tỉ', 'Độ', 'Tuỳ', 'Tạo']);
   expect(chips[1]).toMatch(/^Mô hình Mock image E2E/);
-  expect(order.slice(0, order.indexOf('Phong cách'))).toEqual(expect.arrayContaining(['Cải thiện mô tả bằng AI', 'Gợi ý AI', 'Mở rộng']));
+  expect(order.slice(0, order.indexOf('Phong cách'))).toEqual(expect.arrayContaining(['Cải thiện: bật', 'Gợi ý AI', 'Mở rộng']));
   await expect(run).toBeFocused();
 
   // The menus open over the gallery, upward from the foot of the screen, whole: the bar clips none of them.

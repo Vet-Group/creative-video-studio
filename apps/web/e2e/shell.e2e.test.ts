@@ -123,7 +123,7 @@ test('the sidebar collapses to a 64 px icon rail that keeps its labels for scree
   await expect(nav(page).getByRole('link', { name: 'Thư viện' })).toHaveAttribute('title', 'Thư viện');
   // The account chip shrinks to its avatar, named and titled by the user; the group labels are clipped like the item labels.
   const chip = accountButton(page);
-  await expect(chip).toHaveAccessibleName('Tài khoản: E2E Member 1');
+  await expect(chip).toHaveAccessibleName('Tài khoản: E1 E2E Member 1 member1@e2e.test');
   await expect(chip).toHaveAttribute('title', 'E2E Member 1');
   await expect(chip.locator('.account-who')).toBeHidden();
   const c = (await chip.boundingBox())!;
@@ -322,7 +322,7 @@ test('Ctrl+, opens Settings from anywhere, even while typing, and not a second t
 test('at 390 px the top bar shows the avatar, which opens the account menu below it, inside the screen', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, 'member1');
-  const avatar = page.locator('.topbar').getByRole('button', { name: 'Tài khoản: E2E Member 1' });
+  const avatar = page.locator('.topbar').getByRole('button', { name: 'Tài khoản: E1 E2E Member 1' });
   await expect(page.locator('.topbar .vet-logo')).toHaveCount(0); // the drawer's brand row has the logo
   const a = (await avatar.boundingBox())!;
   expect(a.x + a.width).toBeLessThanOrEqual(390 - 6 + 0.5);
@@ -343,7 +343,7 @@ test('at 390 px the top bar shows the avatar, which opens the account menu below
 
   // The drawer has the same chip at its bottom.
   await page.getByRole('button', { name: 'Mở menu' }).click();
-  const chip = page.locator('.sidebar').getByRole('button', { name: 'Tài khoản: E2E Member 1' });
+  const chip = page.locator('.sidebar').getByRole('button', { name: 'Tài khoản: E1 E2E Member 1' });
   await expect(chip).toBeVisible();
   const c = (await chip.boundingBox())!;
   expect(c.y + c.height).toBeGreaterThan(844 - 80);
