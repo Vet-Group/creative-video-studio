@@ -474,6 +474,14 @@ test('the Library detail fetches its image neighbours’ large previews ahead, s
     await page.locator(`article[data-clip-id="${newer}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
     await expect(page.getByRole('dialog').getByText('the open picture', { exact: true })).toBeVisible();
     await ahead; // asked for while the newer picture is open, before any arrow
+    // The repeat preview is off, then tiles the open picture 2×2 in its own box without moving the media box.
+    const detail = page.getByRole('dialog');
+    const media = detail.locator('.lightbox-media');
+    const size = await media.boundingBox();
+    await expect(detail.getByRole('button', { name: 'Tắt' })).toHaveAttribute('aria-pressed', 'true');
+    await detail.getByRole('button', { name: '2×2' }).click();
+    await expect(media.getByRole('img', { name: /lặp 2×2$/ })).toBeVisible();
+    expect(await media.boundingBox()).toEqual(size);
   } finally {
     for (const id of [older, newer]) expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
   }

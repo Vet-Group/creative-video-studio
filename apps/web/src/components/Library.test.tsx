@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest';
 import type { Clip } from '@/lib/api';
 import LibraryPage from '@/app/(app)/library/page';
 import { filtersFromSearch } from '@/lib/library-view';
-import { ClipCard, ClipDetail, clipLabel, emptyNoun, gridStep, Library, RecipeText } from './Library';
+import { ClipCard, ClipDetail, clipLabel, emptyNoun, gridStep, Library, RecipeText, RepeatTiles } from './Library';
 import { UndoNotice } from './UndoNotice';
 
 test('the empty Library names photos under a photo filter, clips under a video one, and results under a mixed one', () => {
@@ -25,6 +25,26 @@ const detail = (c: Clip) => renderToStaticMarkup(<ClipDetail clips={[c]} index={
 test('the clip detail offers Nén & tải về on a video as well as on an image', () => {
   expect(detail(clip('video'))).toContain('aria-label="Nén &amp; tải về"');
   expect(detail(clip('image'))).toContain('aria-label="Nén &amp; tải về"');
+});
+
+test('the clip detail offers Xem lặp on a picture only, off by default', () => {
+  const html = detail(clip('image'));
+  expect(html).toContain('role="group" aria-label="Xem lặp"');
+  expect(html).toMatch(/aria-pressed="true">Tắt<\/button><button type="button" aria-pressed="false">2×2<\/button><button type="button" aria-pressed="false">3×3<\/button>/);
+  expect(html).not.toContain('lightbox-tile');
+  expect(html).toContain('<img');
+  expect(detail(clip('video'))).not.toContain('Xem lặp');
+});
+
+test('Xem lặp tiles the picture 2×2 and 3×3 in its own ratio', () => {
+  const two = renderToStaticMarkup(<RepeatTiles src="/p.jpg" label="out" tile={2} ratio="3:4" />);
+  expect(two).toContain('aria-label="out, lặp 2×2"');
+  expect(two).toContain('background-image:url(/p.jpg)');
+  expect(two).toContain('background-size:calc(100% / 2) calc(100% / 2)');
+  expect(two).toContain('aspect-ratio:0.75');
+  const three = renderToStaticMarkup(<RepeatTiles src="/p.jpg" label="out" tile={3} ratio="x" />);
+  expect(three).toContain('background-size:calc(100% / 3) calc(100% / 3)');
+  expect(three).toContain('aspect-ratio:1');
 });
 
 test('the clip detail names Download and Use this frame in words, and a video gets a first stop that skips its player', () => {
