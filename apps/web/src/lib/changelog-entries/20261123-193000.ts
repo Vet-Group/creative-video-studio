@@ -9,6 +9,6 @@ export default {
     'Trong 6 giây sau đó có nút "Hoàn tác" ở góc dưới bên trái để đưa mục đó về đúng chỗ cũ, kể cả khi nó đang nằm ở mục Ví dụ.',
   ],
   href: '/library',
-  prs: [],
+  prs: [634],
   audience: 'all',
 } satisfies ChangeEntry;
