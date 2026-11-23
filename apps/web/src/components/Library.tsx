@@ -453,6 +453,22 @@ export function RecipeText({ label, text }: { label: string; text: string }) {
   );
 }
 
+/** The picture repeated tile × tile in a box of its own ratio, so none is stretched (an odd ratio draws square) and the edges that meet can be judged. */
+export function RepeatTiles({ src, label, tile, ratio }: { src: string; label: string; tile: number; ratio: string }) {
+  const [w, h] = ratio.split(':').map(Number);
+  const aspect = w! > 0 && h! > 0 ? w! / h! : 1;
+  return (
+    <div className="lightbox-tile-box">
+      <div
+        className="lightbox-tile"
+        role="img"
+        aria-label={`${label}, lặp ${tile}×${tile}`}
+        style={{ aspectRatio: aspect, width: `min(100cqw, calc(100cqh * ${aspect}))`, backgroundImage: `url(${src})`, backgroundSize: `calc(100% / ${tile}) calc(100% / ${tile})` }}
+      />
+    </div>
+  );
+}
+
 /**
  * Fash's item detail (survey L3), grown into the recipe of the result: the result large on the left; beside it the title and mark, the words behind it
  * (the creator's prompt, or Marketing's brief and script, the enhanced prompt and the prompt the model got), the inputs, the model, template and
@@ -469,6 +485,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
   const [rerunning, setRerunning] = useState(false);
   const [shown, setShown] = useState<{ id: string; filename: string } | null>(null); // an input photo shown large in the result's place, instead of a new tab
   const [full, setFull] = useState<string | null>(null); // the picture full screen loaded at its own size (the box shows a 1600 px preview)
+  const [tile, setTile] = useState(1); // Xem lặp: the picture tiled tile × tile, to check that an all-over print's edges meet; kept while stepping, as the size slider is
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const side = useRef<HTMLDivElement>(null);
   const inputs = useRef<HTMLUListElement>(null); // Về kết quả puts focus back on the photo it showed, not on the page
@@ -482,6 +499,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
     box.current.style.transform = dx ? `translateX(${dx}px)` : '';
   };
   const content = (id: string) => `/api/assets/${id}/content`;
+  const resultSrc = full === clip.videoAssetId ? content(clip.videoAssetId) : thumbUrl(clip.videoAssetId, PREVIEW_W);
   useEffect(() => {
     setJob(null);
     setNote('');
@@ -644,8 +662,10 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
           </>
         ) : comparing && original ? (
           <CompareSlider before={content(original.id)} after={content(clip.videoAssetId)} beforeAlt={`Ảnh gốc ${original.filename}`} afterAlt={clip.downloadName} />
+        ) : image && tile > 1 ? (
+          <RepeatTiles src={resultSrc} label={clip.downloadName} tile={tile} ratio={clip.ratio} />
         ) : image ? (
-          <img ref={media} src={full === clip.videoAssetId ? content(clip.videoAssetId) : thumbUrl(clip.videoAssetId, PREVIEW_W)} alt={clip.downloadName} />
+          <img ref={media} src={resultSrc} alt={clip.downloadName} />
         ) : (
           <>
             {/* The player's controls are six Tab stops before the side; this first stop, shown on focus, goes past them. */}
@@ -661,6 +681,18 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
           {title}
           {mark && <span className={`lib-mark${verdictClass(clip.verdict!)}`}>{mark}</span>}
         </h2>
+        {image && (
+          <div className="repeat-preview">
+            <span aria-hidden="true">Xem lặp</span>
+            <div className="segmented preset-chips" role="group" aria-label="Xem lặp">
+              {[1, 2, 3].map((n) => (
+                <button key={n} type="button" aria-pressed={tile === n} onClick={() => setTile(n)}>
+                  {n === 1 ? 'Tắt' : `${n}×${n}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {words('Hook tự viết', job?.hookText)}
         {words('Mô tả', (own ?? job?.brief)?.replaceAll('**', ''))}
         {words('Lời thoại', job?.script)}
