@@ -23,8 +23,8 @@
 .starter { flex: none; height: 28px; padding: 0 10px; border: 1px dashed var(--border-button); border-radius: 999px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; }
 .starter:hover { border-style: solid; color: var(--ink); }
 
-/* Image chips: one per input image, above the toolbar; a chip is a pill like a starter, with the photo's thumbnail. */
-.refs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; border-top: 1px solid var(--field-border); }
+/* Image chips: one per input image, between the box and the toolbar; a chip is a pill like a starter, with the photo's thumbnail. */
+.refs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 10px 6px; } /* no rule or top padding: it sits where the starters do, and the compact image bar has room for one row only */
 .refsLabel { color: var(--text-muted); font-size: 12px; line-height: 18px; }
 .ref { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 3px; border: 1px solid var(--border-button); border-radius: 999px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; }
 .ref:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
