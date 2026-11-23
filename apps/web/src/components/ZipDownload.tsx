@@ -3,11 +3,19 @@
 // With `hover` (the Library) every item has its checkbox, shown on hover or focus by CSS; picking one starts the selection, and Esc or the clear button ends it.
 // `flip` picks or drops an item from elsewhere than its checkbox (the Library's picture, while a selection is on); `pickMany` and `dropMany` take several (History's batch, a Library day).
 // `actions` adds the page's own controls for the picked ids to the bar (the Library's marks and store).
-import { type ReactNode, useEffect, useState } from 'react';
+// Shift with a click (on a checkbox, or on a Library picture while selecting) picks or drops every item between it and the one clicked before, in page order.
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { api, ApiError, sendJson } from '@/lib/api';
 import { Icon } from './Icon';
 
 const MAX = 50; // what /api/library/zip takes
+
+/** The ids from `anchor` to `id` in `order` (both ends included, either direction), or just `id` when either is not in it. */
+export function span(order: string[], anchor: string | null, id: string): string[] {
+  const a = anchor === null ? -1 : order.indexOf(anchor);
+  const b = order.indexOf(id);
+  return a < 0 || b < 0 ? [id] : order.slice(Math.min(a, b), Math.max(a, b) + 1);
+}
 
 export function useZipDownload({ hover = false, actions }: { hover?: boolean; actions?: (ids: string[]) => ReactNode } = {}): {
   active: boolean;
@@ -25,6 +33,17 @@ export function useZipDownload({ hover = false, actions }: { hover?: boolean; ac
   const [busy, setBusy] = useState(false);
   const active = on || ids.length > 0;
   const clear = () => (setOn(false), setIds([]), setProblem(''));
+  const anchor = useRef<string | null>(null); // the item the last single pick or drop was on
+  const shift = useRef(false); // whether that click held Shift; read in the capture phase, before the checkbox or picture handles it
+
+  useEffect(() => {
+    const read = (e: MouseEvent) => {
+      shift.current = e.shiftKey;
+      if (e.shiftKey && active) window.getSelection()?.removeAllRanges(); // a Shift click also selects the text between, which is not what was meant
+    };
+    document.addEventListener('click', read, true);
+    return () => document.removeEventListener('click', read, true);
+  }, [active]);
 
   useEffect(() => {
     if (!hover || !active) return;
@@ -36,8 +55,13 @@ export function useZipDownload({ hover = false, actions }: { hover?: boolean; ac
 
   function pick(id: string, yes: boolean) {
     setProblem('');
-    if (yes && ids.length >= MAX) return setProblem(`Tối đa ${MAX} mục mỗi lần tải.`);
-    setIds((cur) => (yes ? [...cur, id] : cur.filter((x) => x !== id)));
+    // The page order is the checkboxes' order in the document, so the Library and History need not pass their lists.
+    const order = shift.current ? [...document.querySelectorAll<HTMLInputElement>('input[data-zip-id]')].map((el) => el.dataset.zipId!) : [];
+    const many = span(order, anchor.current, id);
+    anchor.current = id;
+    if (yes && new Set([...ids, ...many]).size > MAX) setProblem(`Tối đa ${MAX} mục mỗi lần tải.`);
+    if (yes && ids.length >= MAX) return;
+    setIds((cur) => (yes ? [...new Set([...cur, ...many])].slice(0, MAX) : cur.filter((x) => !many.includes(x))));
   }
 
   async function download() {
@@ -90,7 +114,7 @@ export function useZipDownload({ hover = false, actions }: { hover?: boolean; ac
     check: (id, label) =>
       (on || hover) && (
         <label className="zip-check">
-          <input type="checkbox" checked={ids.includes(id)} onChange={(e) => pick(id, e.target.checked)} aria-label={`Chọn ${label}`} />
+          <input type="checkbox" data-zip-id={id} checked={ids.includes(id)} onChange={(e) => pick(id, e.target.checked)} aria-label={`Chọn ${label}`} />
         </label>
       ),
     flip: (id) => pick(id, !ids.includes(id)),

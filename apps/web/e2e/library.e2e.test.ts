@@ -212,6 +212,31 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await expect(page.locator('.library-empty').getByRole('link', { name: 'Tạo ảnh' })).toHaveAttribute('href', '/image-generation');
 });
 
+test('Shift with a click picks every item between it and the item clicked before, and drops them the same way', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'librange');
+  const ids = [await runViaApi(page), await runViaApi(page), await runViaApi(page)];
+  await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length, { timeout: 60_000 }).toBe(3);
+  try {
+    await page.goto('/library');
+    await page.getByLabel('Người tạo').selectOption({ label: 'E2E Library Range' });
+    await expect(page.getByRole('article')).toHaveCount(3);
+    const boxes = page.getByRole('article').getByRole('checkbox');
+    const bar = page.getByRole('group', { name: 'Tải nhiều mục' });
+    await boxes.nth(0).check();
+    await boxes.nth(2).click({ modifiers: ['Shift'] });
+    await expect(bar).toContainText('Đã chọn 3');
+    for (let i = 0; i < 3; i++) await expect(boxes.nth(i)).toBeChecked();
+    // Unchecking with Shift drops the span from the last click (the third) back to the second, and leaves the first.
+    await boxes.nth(1).click({ modifiers: ['Shift'] });
+    await expect(bar).toContainText('Đã chọn 1');
+    await expect(boxes.nth(0)).toBeChecked();
+    await expect(boxes.nth(2)).not.toBeChecked();
+  } finally {
+    for (const id of ids) expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
+  }
+});
+
 test('Library days: a heading per day whose checkbox picks every item of that day, in both orders and both views', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'libd');
