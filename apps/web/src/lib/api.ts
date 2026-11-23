@@ -133,6 +133,9 @@ export interface TrayJob {
   pose: string | null;
   poseText: string | null;
   poseRef: string | null;
+  /** A product recolor job's colour (#RRGGBB) and a listing set job's shot (an id of LISTING_SHOTS); null for any other job. */
+  color: string | null;
+  shot: string | null;
   /** The id every job of one Run of a batch app shares (BATCH_FEATURES); null for any other job. */
   batch: string | null;
   favorite: boolean;

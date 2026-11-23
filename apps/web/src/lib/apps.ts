@@ -57,6 +57,11 @@ export interface AppConfig {
   /** Shows the poses (POSES, by their pictures) and a box for the member's own words, up to MAX_POSES in all (the pose generator): Run sends one job per pose, each with its
    * `params.pose` or `params.poseText` and the prompt posePrompt makes, or, for a pose photo, `params.poseRef` and the prompt poseRefPrompt makes. */
   poses?: boolean;
+  /** Shows the colour swatches (RECOLOR_COLORS) and a box for the member's own #RRGGBB colours, up to MAX_PICTURES in all (product recolor): Run sends one job per colour, each
+   * with its `params.color` (the hex) and the prompt recolorPrompt makes. */
+  colors?: boolean;
+  /** Shows the listing shots (LISTING_SHOTS) to pick, by group (the listing set): Run sends one job per shot, each with its `params.shot` and the prompt listingShotPrompt makes. */
+  shots?: boolean;
   /** Its first slot takes up to MAX_BATCH photos: Run sends one job per photo, each with the same settings, the other slots and one `params.batch`. */
   bulk?: boolean;
   /** An app that is not built yet: its page says so, and why. */
@@ -289,6 +294,30 @@ export const APPS: AppConfig[] = [
     poses: true,
   },
   {
+    // Ours too (owner-approved 2026-11-23): one product photo, one picture per colour of the blank, the print and the rest of the photo kept; mainly print-on-demand apparel.
+    slug: 'product-recolor',
+    added: '2026-11-24',
+    feature: 'product_recolor',
+    name: 'Đổi màu sản phẩm',
+    description: 'Từ một ảnh sản phẩm (áo, cốc, túi…), tạo một ảnh cho mỗi màu đã chọn, giữ nguyên hình in, chữ, nếp vải, ánh sáng và bối cảnh.',
+    keywords: 'recolor, color variants, colour',
+    category: 'photo',
+    slots: [{ label: 'Sản phẩm', inputLabel: 'Ảnh sản phẩm', empty: 'Thêm 1 ảnh sản phẩm: áo trơn hoặc đã in, cốc, túi…' }],
+    colors: true,
+  },
+  {
+    // Ours too (owner-approved 2026-11-23): one product photo, a set of Etsy, Amazon and Shopify listing pictures, one per shot picked, the product kept exactly.
+    slug: 'listing-set',
+    added: '2026-11-24',
+    feature: 'listing_set',
+    name: 'Bộ ảnh listing',
+    description: 'Từ một ảnh sản phẩm, tạo bộ ảnh đăng bán cho Etsy, Amazon, Shopify: ảnh chính nền trắng, lifestyle, cận cảnh, theo mùa…, sản phẩm giữ y nguyên.',
+    keywords: 'listing photos, listing images, Etsy, Amazon, Shopify, lifestyle',
+    category: 'photo',
+    slots: [{ label: 'Sản phẩm', inputLabel: 'Ảnh sản phẩm', empty: 'Thêm 1 ảnh rõ nét của sản phẩm' }],
+    shots: true,
+  },
+  {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
     // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
     slug: 'smart-remake',
@@ -343,6 +372,10 @@ export interface AppDraft {
   poses?: number;
   /** How many of those are pose photos, whose jobs send the person's photo and the pose photo, on an app with `poses`. */
   poseRefs?: number;
+  /** How many colours are picked, on an app with `colors`. */
+  colors?: number;
+  /** How many shots are picked, on an app with `shots`. */
+  shots?: number;
 }
 
 /** The first thing that stops Run, in the order the form is filled; null when it can go. */
@@ -360,6 +393,10 @@ export function appReason(app: AppConfig, d: AppDraft): string | null {
   if (app.products && !d.products) return 'Chọn ít nhất một sản phẩm.';
   if (app.poses && !d.poses) return 'Chọn ít nhất một tư thế, hoặc tự tả một tư thế.';
   if (app.poses && d.poses! > MAX_POSES) return `Tối đa ${MAX_POSES} tư thế mỗi lần chạy, đang là ${d.poses}: bỏ bớt một tư thế.`;
+  if (app.colors && !d.colors) return 'Chọn ít nhất một màu.';
+  if (app.shots && !d.shots) return 'Chọn ít nhất một cảnh.';
+  const pictures = app.colors ? d.colors! : app.shots ? d.shots! : 0;
+  if (pictures > MAX_PICTURES) return `Tối đa ${MAX_PICTURES} ảnh mỗi lần chạy, đang là ${pictures}: bỏ bớt ${app.colors ? 'màu' : 'cảnh'}.`;
   // The blank is one product, so its mockup is that one only.
   if (app.products && d.images[1]!.length > 0 && d.products! > 1) return 'Có ảnh sản phẩm trơn thì chỉ chọn một sản phẩm: đúng loại trong ảnh đó.';
   if (app.names) {
@@ -465,7 +502,7 @@ export const breedSwapPrompt = (breed: string): string =>
 
 /** The batch apps: a Run sends one job per item picked (or per photo, on a `bulk` app), all with one `params.batch` id (a UUID), by which History's Reuse and
  * "Chọn cả lô" find the whole Run. */
-export const BATCH_FEATURES = ['multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'background_changer', 'image_upscale', 'background_remover'];
+export const BATCH_FEATURES = ['multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'background_changer', 'image_upscale', 'background_remover', 'product_recolor', 'listing_set'];
 export const isBatchId = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s);
 
 /** The most jobs one Run of a batch app sends (the name swap app's names, or its names times its breeds, can reach it); POST /api/jobs holds every Run to it. */
@@ -610,7 +647,77 @@ export const nameSwapPrompt = (name: string, breed?: string): string =>
   (breed ? `Also replace the dog with ${/^[AEIOU]/.test(breed) ? 'an' : 'a'} ${breed}, with the coat, colours and markings typical of the breed, in the same pose, at the same size and in the same position, facing the same way. ` : '') +
   'Keep everything else exactly unchanged: the artwork, every other text and number, the layout, the background, the product and its shape, the lighting and the style. Do not add any other text, logos or watermarks.';
 
-/** One job of a batch app, as its params keep it: the view, breed, style, product, name or pose (one of POSES, or the member's own words) it made. */
+/** The most pictures one Run of product recolor (its colours) or the listing set (its shots) makes; POST /api/jobs holds each such Run to it. */
+export const MAX_PICTURES = 15;
+
+/** The blank colours product recolor offers, the common print-on-demand ones: the page's label, the hex a job keeps as `params.color` and the English name its prompt takes. */
+export const RECOLOR_COLORS: { label: string; hex: string; name: string }[] = [
+  { label: 'Đen', hex: '#111111', name: 'black' },
+  { label: 'Trắng', hex: '#FFFFFF', name: 'white' },
+  { label: 'Navy', hex: '#1F2A44', name: 'navy blue' },
+  { label: 'Xám heather', hex: '#9EA3A8', name: 'heather grey' },
+  { label: 'Đỏ', hex: '#C8102E', name: 'red' },
+  { label: 'Xanh royal', hex: '#1D4F91', name: 'royal blue' },
+  { label: 'Xanh lá đậm', hex: '#154734', name: 'forest green' },
+  { label: 'Đỏ đô', hex: '#5C1F2B', name: 'maroon' },
+  { label: 'Be cát', hex: '#D8C3A5', name: 'sand beige' },
+  { label: 'Hồng nhạt', hex: '#F4C2C2', name: 'light pink' },
+  { label: 'Xanh nhạt', hex: '#A7C6ED', name: 'light blue' },
+  { label: 'Xanh quân đội', hex: '#4B5320', name: 'military green' },
+];
+
+/** Whether `s` is a colour as a product recolor job keeps it: #RRGGBB in capitals. */
+export const isHexColor = (s: string): boolean => /^#[0-9A-F]{6}$/.test(s);
+
+/** A colour the member typed (RRGGBB, with or without #, any case) as a job keeps it, else null. */
+export function parseHexColor(text: string): string | null {
+  const hex = `#${text.trim().replace(/^#/, '').toUpperCase()}`;
+  return isHexColor(hex) ? hex : null;
+}
+
+/** What the page and a History card call a colour: its swatch's name, else "Mã #RRGGBB" for the member's own. */
+export const colorLabel = (hex: string): string => RECOLOR_COLORS.find((c) => c.hex === hex)?.label ?? `Mã ${hex}`;
+
+/** The prompt of one product recolor job: only the base colour of the product's own material changes, to `hex` (a swatch's, by its name too, or the member's own), and the
+ * print and the rest of the photo stay as they are. POST /api/jobs takes no other. */
+export function recolorPrompt(hex: string): string {
+  const swatch = RECOLOR_COLORS.find((c) => c.hex === hex);
+  return (
+    `Recolor only the product's own material (the fabric, ceramic, canvas or other material it is made of) to ${swatch ? `${swatch.name} (hex ${hex})` : `the exact color with hex code ${hex}`}: ` +
+    'an even, realistic color, as the same product made in that color would look in this photo. ' +
+    'Do not recolor the printed design. Keep every print, graphic, text, logo and label exactly as it is: the same colors, spelling, size and position, with crisp edges, ' +
+    'not tinted, darkened, faded or blended into the new color, so it stays as clearly legible as in the original photo; on a dark new color the white and light parts of the print stay bright. ' +
+    "Keep everything else pixel-faithful: the product's shape, folds, wrinkles, seams, stitching and fabric texture, its highlights and shadows (shading the new color the same way), " +
+    'the lighting, the background, any person or props, and the framing and crop. Do not add any text, logos or watermarks.'
+  );
+}
+
+/** The shots of the listing set, in the page's two groups: the id a job keeps as `params.shot`, the page's label and the English scene its prompt takes. */
+export const LISTING_SHOTS: { id: string; label: string; group: 'basic' | 'seasonal'; scene: string }[] = [
+  { id: 'white', label: 'Nền trắng', group: 'basic', scene: 'an Amazon main image, with the product alone, centered, on a pure white (#FFFFFF) background, filling about 85% of the frame, with no props, no text and no other objects' },
+  { id: 'lifestyle', label: 'Lifestyle trong nhà', group: 'basic', scene: 'a lifestyle shot in a bright, tasteful home interior where the product is naturally used, placed naturally on a surface in soft daylight, the background softly out of focus' },
+  { id: 'detail', label: 'Cận cảnh chi tiết', group: 'basic', scene: "a close-up detail shot of the product's print, material and finish, filling the frame, showing the texture and print quality up close" },
+  { id: 'flat-lay', label: 'Flat lay', group: 'basic', scene: 'a flat lay photographed from directly above on a clean neutral surface, with a few small, tasteful props around the product that do not cover it' },
+  { id: 'in-hand', label: 'Cầm trên tay', group: 'basic', scene: "the product held in a person's hands, only the hands and wrists in view, so its real size is clear, against a softly blurred background" },
+  { id: 'gift', label: 'Gói quà', group: 'basic', scene: 'the product presented as a gift, beside an open gift box with tissue paper and a ribbon on a table, the product fully visible' },
+  { id: 'outdoor', label: 'Ngoài trời', group: 'basic', scene: 'an outdoor shot in natural daylight in a fitting setting such as a garden, park or patio, the background softly out of focus' },
+  { id: 'in-use', label: 'Trên người mẫu / đang dùng', group: 'basic', scene: 'the product worn or used naturally by a person in a realistic everyday moment, clearly visible and in focus' },
+  { id: 'studio-color', label: 'Nền màu studio tối giản', group: 'basic', scene: 'a minimal studio shot on a seamless backdrop of one soft, muted solid color that suits the product, with soft even light, a soft shadow and no props' },
+  { id: 'unboxing', label: 'Mở hộp', group: 'basic', scene: 'an unboxing moment: the product being lifted out of an open shipping box with tissue paper, on a table, seen from slightly above' },
+  { id: 'christmas', label: 'Giáng sinh', group: 'seasonal', scene: 'a cozy Christmas setting with a decorated tree, warm string lights and a few wrapped presents around the product, nothing covering it' },
+  { id: 'autumn', label: 'Halloween / mùa thu', group: 'seasonal', scene: 'a cozy autumn and Halloween setting with pumpkins, fallen leaves and warm light around the product' },
+  { id: 'valentine', label: 'Valentine', group: 'seasonal', scene: "a romantic Valentine's Day setting in soft pink and red tones, with a few roses and small hearts around the product" },
+  { id: 'summer', label: 'Mùa hè / bãi biển', group: 'seasonal', scene: 'a bright summer setting on a sunny beach, with sand and blue water softly out of focus behind the product' },
+  { id: 'parents-day', label: 'Ngày của Mẹ / Ngày của Cha', group: 'seasonal', scene: "a warm Mother's Day or Father's Day gift setting at home, with flowers, a blank greeting card and simple gift wrap beside the product" },
+];
+
+/** The prompt of one listing set job: the product of the photo, reproduced exactly, in the scene of `shot` (an id of LISTING_SHOTS). POST /api/jobs takes no other. */
+export const listingShotPrompt = (shot: string): string =>
+  `Make a professional e-commerce listing photo of the product in [Image1]: ${LISTING_SHOTS.find((s) => s.id === shot)!.scene}. ` +
+  'Reproduce the product exactly as it is in [Image1]: the same shape, proportions, colors, material, print, text and spelling, logo and every detail, not redrawn, restyled, recolored, mirrored or simplified. ' +
+  'Show a single one of this product, in sharp focus, photorealistic, with natural light and shadows. Do not add any other text, logos, watermarks, price tags or badges.';
+
+/** One job of a batch app, as its params keep it: the view, breed, style, product, name, pose (one of POSES, or the member's own words), colour or shot it made. */
 export interface BatchItem {
   view?: string | null;
   breed?: string | null;
@@ -622,22 +729,24 @@ export interface BatchItem {
   /** The pose photo (an asset id) a job copied the pose of. */
   poseRef?: string | null;
   background?: string | null;
+  color?: string | null;
+  shot?: string | null;
 }
 
 /**
  * What stays picked after a batch Run stopped once `done` of its `runs` were sent, so Run again sends only the rest: each key's items of the jobs not sent.
  * A name with some of its breeds sent is dropped too (picking it again would resend those), and its jobs not sent come back in `left` for the page to name.
  */
-export function unsentPicks(runs: BatchItem[], done: number): Record<'view' | 'breed' | 'style' | 'product' | 'name' | 'pose' | 'poseText' | 'poseRef', string[]> & { left: BatchItem[] } {
+export function unsentPicks(runs: BatchItem[], done: number): Record<'view' | 'breed' | 'style' | 'product' | 'name' | 'pose' | 'poseText' | 'poseRef' | 'color' | 'shot', string[]> & { left: BatchItem[] } {
   const started = new Set(runs.slice(0, done).map((r) => r.name).filter(Boolean));
   const rest = runs.slice(done);
   const kept = rest.filter((r) => !r.name || !started.has(r.name));
   const all = (k: keyof BatchItem) => [...new Set(kept.map((r) => r[k]).filter((v): v is string => !!v))];
-  return { view: all('view'), breed: all('breed'), style: all('style'), product: all('product'), name: all('name'), pose: all('pose'), poseText: all('poseText'), poseRef: all('poseRef'), left: rest.filter((r) => !kept.includes(r)) };
+  return { view: all('view'), breed: all('breed'), style: all('style'), product: all('product'), name: all('name'), pose: all('pose'), poseText: all('poseText'), poseRef: all('poseRef'), color: all('color'), shot: all('shot'), left: rest.filter((r) => !kept.includes(r)) };
 }
 
-/** What one job of a batch app made, for its History card's title: the view's, style's, product's or pose's label (OWN_POSE for the member's own words, REF_POSE for a pose photo), the name (with its breed)
- * or the breed; null for any other job. */
+/** What one job of a batch app made, for its History card's title: the view's, style's, product's, pose's or shot's label (OWN_POSE for the member's own words, REF_POSE for a pose photo),
+ * the colour's (colorLabel), the name (with its breed) or the breed; null for any other job. */
 export const itemLabel = (p: BatchItem): string | null =>
   (p.view && VIEW_LABELS[p.view]) ||
   (p.style && PET_STYLES.find((s) => s.id === p.style)?.label) ||
@@ -645,11 +754,13 @@ export const itemLabel = (p: BatchItem): string | null =>
   (p.pose && poseOf(p.pose)?.label) ||
   (p.poseText && OWN_POSE) ||
   (p.poseRef && REF_POSE) ||
+  (p.color && isHexColor(p.color) && colorLabel(p.color)) ||
+  (p.shot && LISTING_SHOTS.find((s) => s.id === p.shot)?.label) ||
   (p.name && [p.name, p.breed].filter(Boolean).join(' · ')) ||
   p.breed ||
   null;
 
-/** The prompt of one job of an app that writes its own (breed swap, pet portrait, mockup pack, name swap, pose generator), which POST /api/jobs holds the job to; undefined for any other app.
+/** The prompt of one job of an app that writes its own (breed swap, pet portrait, mockup pack, name swap, pose generator, product recolor, listing set), which POST /api/jobs holds the job to; undefined for any other app.
  * `blank`: the mockup pack's job has the member's blank product photo. */
 export function itemPrompt(feature: string, p: BatchItem, blank = false): string | undefined {
   if (feature === 'breed_swap') return breedSwapPrompt(p.breed!);
@@ -657,5 +768,7 @@ export function itemPrompt(feature: string, p: BatchItem, blank = false): string
   if (feature === 'mockup_pack') return mockupPrompt(p.product!, blank);
   if (feature === 'name_swap') return nameSwapPrompt(p.name!, p.breed ?? undefined);
   if (feature === 'pose_generator') return p.poseRef ? poseRefPrompt(p.background) : posePrompt(poseOf(p.pose)?.words ?? p.poseText!, p.background);
+  if (feature === 'product_recolor') return recolorPrompt(p.color!);
+  if (feature === 'listing_set') return listingShotPrompt(p.shot!);
   return undefined;
 }

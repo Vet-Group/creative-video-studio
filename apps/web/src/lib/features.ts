@@ -15,6 +15,8 @@ export const FEATURE_LABELS: Record<string, string> = {
   pet_portrait: 'Chân dung thú cưng',
   mockup_pack: 'Mockup sản phẩm',
   name_swap: 'Đổi tên',
+  product_recolor: 'Đổi màu sản phẩm',
+  listing_set: 'Bộ ảnh listing',
   background_changer: 'Đổi nền',
   reframe: 'Đổi khung hình',
   image_upscale: 'Tăng độ phân giải',

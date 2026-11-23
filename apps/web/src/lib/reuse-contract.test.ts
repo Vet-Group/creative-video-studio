@@ -36,6 +36,8 @@ const READERS: Record<string, string[]> = {
   poseRef: ['components/AppPage.tsx'], // the pose generator's pose photo
   poseImages: ['components/AppPage.tsx'], // the pose photos of its Run that still exist
   background: ['components/AppPage.tsx'], // the pose generator's background
+  color: ['components/AppPage.tsx'], // the product recolor app's colour
+  shot: ['components/AppPage.tsx'], // the listing set's shot
   format: ['components/MarketingStudio.tsx'],
   hook: ['components/MarketingStudio.tsx'],
   location: ['components/MarketingStudio.tsx'],

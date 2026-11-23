@@ -1,0 +1,9 @@
+ALTER TABLE "jobs" DROP CONSTRAINT "jobs_feature_check";--> statement-breakpoint
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_feature_check" CHECK ("jobs"."feature" in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on', 'fashion_model', 'multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set'));--> statement-breakpoint
+-- Two product photo apps (owner-approved 2026-11-23): product recolor (feature `product_recolor`, one picture per colour picked, the print and the photo kept, only the
+-- product's base colour changed) and the listing set (`listing_set`, one listing picture per shot picked, the product kept exactly). Each job carries the prompt its item makes
+-- (apps/web/src/lib/apps.ts), as the pet apps do (0109). They run on the Nano Banana edit rows the mockup pack runs on: Nano Banana 2.1 and Nano Banana Pro, each with its
+-- Vertex twin (0075). No row is enabled or repriced here. Each gets a soft cap of 50 USD a month, as the pet apps did.
+INSERT INTO "feature_caps" ("feature", "monthly_usd") VALUES ('product_recolor', 50), ('listing_set', 50) ON CONFLICT DO NOTHING;--> statement-breakpoint
+UPDATE "model_configs" SET "features" = array_append("features", 'product_recolor') WHERE "id" IN ('nano-banana-2.1', 'nano-banana-2.1-vertex', 'nano-banana-pro', 'nano-banana-pro-vertex') AND NOT ('product_recolor' = ANY("features"));--> statement-breakpoint
+UPDATE "model_configs" SET "features" = array_append("features", 'listing_set') WHERE "id" IN ('nano-banana-2.1', 'nano-banana-2.1-vertex', 'nano-banana-pro', 'nano-banana-pro-vertex') AND NOT ('listing_set' = ANY("features"));
