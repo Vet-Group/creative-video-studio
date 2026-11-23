@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-23T21:00:00+07:00',
+  at: '2026-11-24T00:15:00+07:00',
   kind: 'new',
   title: 'Tạo tư thế người mẫu theo ảnh mẫu: tải ảnh một người ở đúng tư thế bạn muốn',
   details: [
