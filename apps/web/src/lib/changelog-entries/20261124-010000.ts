@@ -9,6 +9,6 @@ export default {
     'Âm thanh được chỉnh về độ to chuẩn của mạng xã hội và nhỏ dần ở cuối. Không tốn phí và không cần tạo lại video.',
   ],
   href: '/library',
-  prs: [0],
+  prs: [636],
   audience: 'all',
 } satisfies ChangeEntry;
