@@ -574,7 +574,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
     }, 'Không nén và tải xuống được.');
     setCompressing(false);
   };
-  // Đổi khung: the video in a 9:16, 4:5 or 1:1 frame over a blurred copy of itself or black, made by the worker for free, then downloaded as Compress does.
+  // Tải theo tỉ lệ khác: the video in a 9:16, 4:5 or 1:1 frame over a blurred copy of itself or black, made by the worker for free, then downloaded as Compress does.
   const [frame, setFrame] = useState<{ ratio: ReframeRatio; fill: ReframeFill }>({ ratio: '9:16', fill: 'blur' });
   const [reframing, setReframing] = useState(false);
   const frameLabel = useId();
@@ -806,7 +806,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
         </div>
         {!image && (
           <div className="reframe" role="group" aria-labelledby={frameLabel}>
-            <span id={frameLabel}>Đổi khung</span>
+            <span id={frameLabel}>Tải theo tỉ lệ khác</span>
             <div className="segmented" role="group" aria-label="Tỉ lệ khung">
               {REFRAME_RATIOS.map((ratio) => (
                 <button key={ratio} type="button" aria-pressed={frame.ratio === ratio} onClick={() => setFrame({ ...frame, ratio })}>
@@ -821,7 +821,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
                 </button>
               ))}
             </div>
-            <button type="button" className="icon-button labelled" disabled={reframing} aria-busy={reframing} onClick={() => void reframe()} title="Đổi khung và tải về">
+            <button type="button" className="icon-button labelled" disabled={reframing} aria-busy={reframing} onClick={() => void reframe()} title="Tải về theo tỉ lệ đã chọn">
               <Icon name="download" />
               Tải về
             </button>
