@@ -8,6 +8,6 @@ export default {
     'Khi mở một ứng dụng, khung ảnh minh hoạ được giữ chỗ ngay từ đầu, nên phần giới thiệu bên dưới không còn bị đẩy xuống khi ảnh tải xong.',
   ],
   href: '/apps',
-  prs: [0],
+  prs: [630],
   audience: 'all',
 } satisfies ChangeEntry;
