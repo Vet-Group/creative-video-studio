@@ -627,3 +627,26 @@ for (const scheme of ['light', 'dark'] as const) {
     expect.soft(await blocking(page), 'filled, with the options and a menu open').toEqual([]);
   });
 }
+
+test('two reference photos show one chip each that inserts its [ImageN] token into the prompt, in the order the photos are listed', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'pbarf');
+  await page.goto('/image-generation');
+  const bar = barOf(page);
+  const box = bar.getByRole('textbox', { name: 'Mô tả', exact: true });
+  const chips = bar.getByRole('group', { name: 'Chèn ảnh vào mô tả:' });
+  await expect(modelButton(page)).toContainText('Mock image E2E');
+  await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('only.png'));
+  await expect(bar.getByRole('img', { name: 'only.png' })).toBeVisible();
+  await expect(chips).toHaveCount(0);
+  await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('second.png'));
+  await expect(chips.getByRole('button')).toHaveCount(2);
+
+  // An empty box that never had the focus: the token goes in, and the caret stays in the box after it.
+  await chips.getByRole('button', { name: 'Chèn [Image1] vào mô tả (Ảnh 1)' }).click();
+  await expect(box).toHaveValue('[Image1]');
+  await expect(box).toBeFocused();
+  await chips.getByRole('button', { name: 'Chèn [Image2] vào mô tả (Ảnh 2)' }).click();
+  await expect(box).toHaveValue('[Image1] [Image2]');
+  expect((await uncovered(chips.getByRole('button').first())), 'a chip nothing covers').toBe(true);
+});

@@ -264,6 +264,7 @@ ${style.prompt}` : prompt.trim();
             value={prompt}
             onChange={setPrompt}
             maxLength={chosen?.maxPromptChars}
+            refs={chosen ? images.slice(0, max) : undefined}
             onRun={() => (canRun ? void run() : (reason ?? false))}
             placeholder="Mô tả cảnh bạn muốn tạo…"
             ask={chosen ? () => ({ field: 'prompt', feature: 'image', text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}

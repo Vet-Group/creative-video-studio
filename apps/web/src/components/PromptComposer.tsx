@@ -1,8 +1,11 @@
 'use client';
 // The one prompt field of every form (Create, Marketing Studio and its lines, Try On, the apps): the label with an Optional chip, a box that
 // grows with the text, starter chips while it is empty, a toolbar (Enhance when the page has it, AI suggestions, recent words, the tall editor)
-// and a meta row with the Ctrl+Enter hint while typing and the count, red near the model's limit.
-import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// and a meta row with the Ctrl+Enter hint while typing and the count, red near the model's limit. With 2 or more input images the box also holds one
+// chip per image that puts its [ImageN] token in the words.
+import { type ReactNode, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { thumbUrl } from '@/lib/api';
+import { imageToken, insertImageToken } from '@/lib/image-refs';
 import type { ParamFormat } from '@/lib/marketing';
 import { runKey } from '@/lib/run-guard';
 import { inSeason, type Starter, STARTERS } from '@/lib/prompt-starters';
@@ -91,11 +94,27 @@ interface Props {
   /** Left of the count instead of the Ctrl+Enter hint (Advanced's word count). */
   meta?: ReactNode;
   required?: boolean;
+  /** The input images in the order the job sends them (the Nth is [ImageN], see lib/image-refs.ts): 2 or more show the chips that insert their tokens. */
+  refs?: { id: string }[];
 }
 
-export function PromptComposer({ id, label, optional, feature, format, value, onChange, maxLength, onRun, placeholder, disabled, ask, aiLabel, parts, enhance, starters, meta, required }: Props) {
+export function PromptComposer({ id, label, optional, feature, format, value, onChange, maxLength, onRun, placeholder, disabled, ask, aiLabel, parts, enhance, starters, meta, required, refs }: Props) {
   const near = maxLength !== undefined && value.length >= maxLength * NEAR;
   // One list per feature, so the chip row's layout effect does not run again on every render.
+  const input = useRef<HTMLTextAreaElement>(null);
+  const touched = useRef(false); // until the box has had focus its caret is not the member's: the token goes at the end
+  const refsId = useId();
+  /** Puts image `n`'s token at the caret (over the selection), and gives the caret back to the box right after it. */
+  function addRef(n: number) {
+    const el = input.current;
+    if (!el) return;
+    const at = touched.current ? [el.selectionStart, el.selectionEnd] : [value.length, value.length];
+    const put = insertImageToken(value, n, at[0]!, at[1]!, maxLength);
+    if (!put) return;
+    touched.current = true;
+    onChange(put.text);
+    requestAnimationFrame(() => (el.focus(), el.setSelectionRange(put.caret, put.caret))); // after the render, which would move the caret to the end
+  }
   const chips = useMemo(() => starters ?? inSeason(STARTERS[feature] ?? []), [starters, feature]);
   return (
     <div className={`field ${s.composer}`}>
@@ -112,8 +131,21 @@ export function PromptComposer({ id, label, optional, feature, format, value, on
         )}
       </div>
       <div className={`prompt-box ${s.box}`} data-disabled={disabled || undefined}>
-        <textarea id={id} className={s.input} value={disabled ? '' : value} maxLength={maxLength} disabled={disabled} aria-required={required || undefined} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} onKeyDown={runKey(() => void onRun())} />
+        <textarea ref={input} id={id} className={s.input} value={disabled ? '' : value} maxLength={maxLength} disabled={disabled} aria-required={required || undefined} placeholder={placeholder} onFocus={() => (touched.current = true)} onChange={(e) => onChange(e.target.value)} onKeyDown={runKey(() => void onRun())} />
         {!disabled && !value && chips.length > 0 && <Starters starters={chips} onPick={onChange} />}
+        {!disabled && refs && refs.length >= 2 && (
+          <div className={s.refs} role="group" aria-labelledby={refsId}>
+            <span id={refsId} className={s.refsLabel}>
+              Chèn ảnh vào mô tả:
+            </span>
+            {refs.map((r, i) => (
+              <button key={r.id} type="button" className={s.ref} disabled={insertImageToken(value, i + 1, value.length, value.length, maxLength) === null} title={`Chèn ${imageToken(i + 1)} vào mô tả`} aria-label={`Chèn ${imageToken(i + 1)} vào mô tả (Ảnh ${i + 1})`} onClick={() => addRef(i + 1)}>
+                <img src={thumbUrl(r.id, 40)} alt="" width={20} height={20} />
+                Ảnh {i + 1}
+              </button>
+            ))}
+          </div>
+        )}
         {!disabled && (
           <div className={s.toolbar}>
             {enhance}

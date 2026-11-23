@@ -23,6 +23,15 @@
 .starter { flex: none; height: 28px; padding: 0 10px; border: 1px dashed var(--border-button); border-radius: 999px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; }
 .starter:hover { border-style: solid; color: var(--ink); }
 
+/* Image chips: one per input image, above the toolbar; a chip is a pill like a starter, with the photo's thumbnail. */
+.refs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; border-top: 1px solid var(--field-border); }
+.refsLabel { color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.ref { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 3px; border: 1px solid var(--border-button); border-radius: 999px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; }
+.ref:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+.ref:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.ref:disabled { opacity: .5; cursor: not-allowed; }
+.ref img { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
+
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px; border-top: 1px solid var(--field-border); }
 .tools { display: contents; }
 .tool { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); font: inherit; font-size: 12px; font-weight: 500; line-height: 18px; white-space: nowrap; cursor: pointer; }
@@ -78,7 +87,7 @@
 :global(.imagebar) .input:not(dialog *) { min-height: 40px; max-height: 30vh; }
 :global(.imagebar) .composer:not(:focus-within, dialog *) .meta:not(:has(.count)) { display: flex; }
 @media (pointer: coarse) {
-  :global(.imagebar) :is(.tool, .starter, .toolbar > :global(.enhance)):not(dialog *) { height: 44px; }
+  :global(.imagebar) :is(.tool, .starter, .ref, .toolbar > :global(.enhance)):not(dialog *) { height: 44px; }
   :global(.imagebar) .iconTool:not(dialog *) { width: 44px; }
 }
 @media (min-width: 1024px) {
@@ -89,10 +98,11 @@
 /* Phones: the tools and the starter pills take a 44 px tap through an invisible ::after. The toolbar's padding and the strip's padding hold it,
    so it neither reaches another control (a wrapped toolbar row keeps 12 px apart) nor is clipped by the folded strip. */
 @media (max-width: 480px) {
-  .tool, .starter { position: relative; }
-  .tool::after, .starter::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .tool, .starter, .ref { position: relative; }
+  .tool::after, .starter::after, .ref::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
   .iconTool { width: 44px; }
   .toolbar { row-gap: 12px; }
+  .refs { row-gap: 16px; padding-top: 8px; padding-bottom: 8px; } /* wrapped chips keep their taps apart */
   .starters { padding-top: 8px; padding-bottom: 8px; }
   .starterList { row-gap: 16px; } /* unfolded rows keep their taps apart */
 }
