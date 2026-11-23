@@ -9,6 +9,6 @@ export default {
     'Với hai video, bấm phát, tạm dừng hoặc tua một video thì video kia làm theo; cả hai tắt tiếng sẵn, bấm nút loa để bật.',
   ],
   href: '/library',
-  prs: [],
+  prs: [632],
   audience: 'all',
 } satisfies ChangeEntry;
