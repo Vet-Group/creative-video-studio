@@ -1618,7 +1618,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .theme-choice input:disabled { cursor: not-allowed; }
 .angle-choice { flex-wrap: wrap; justify-self: start; max-width: 100%; } /* Create's camera angles: chips that wrap on a phone */
 /* The pose generator's marketplace presets: text buttons in the segmented frame, which is sized for icons. */
-.segmented.preset-chips button { width: auto; padding: 0 12px; font-size: 13px; line-height: 18px; font-weight: 500; }
+.segmented.preset-chips button { width: auto; padding: 0 12px; color: var(--text-2); font-size: 13px; line-height: 18px; font-weight: 500; } /* text-subtle read 3.8:1 on the track, as the labels' did */
+.segmented.preset-chips button:hover { color: var(--ink); }
 /* An app's multi-pick chips (views, breeds, styles, products): a picked one carries a check, as the raised fill alone read like an unpicked chip at a glance. */
 .app-page .angle-choice label:has(:checked)::before { content: '\2713'; font-weight: 700; }
 .pick-count { color: var(--text-muted); font-size: 13px; line-height: 18px; white-space: nowrap; }
@@ -2791,8 +2792,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 /* Phones: a 44 px hit area around the controls that draw smaller, which keep their look. Each control's own ::after is its hit area, so none reaches under another control:
    the image tile's actions get the gap that makes room for it, and the Library's two view buttons split the gap between them and use the free side. */
 @media (max-width: 480px) {
-  .tabs button, .remake-item > .link-button, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-back, .fb-admin-note-head .link-button { position: relative; }
-  :is(.tabs button, .remake-item > .link-button, .tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .theme-choice label, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-thumbs button, .fb-back, .fb-admin-note-head .link-button)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .tabs button, .remake-item > .link-button, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-back, .fb-admin-note-head .link-button, .preset-chips button { position: relative; }
+  :is(.tabs button, .remake-item > .link-button, .tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .theme-choice label, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-thumbs button, .fb-back, .fb-admin-note-head .link-button, .preset-chips button)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
   .fb-thumbs button { z-index: 1; } /* its hit area lies over the next photo, which takes no tap */
   .fb-form .fb-uploads { gap: 18px; } /* a photo's remove hit area ends where the attach button begins */
   .fb-admin .fb-admin-note { gap: 10px; } /* the preview toggle's hit area ends where the reply box begins */

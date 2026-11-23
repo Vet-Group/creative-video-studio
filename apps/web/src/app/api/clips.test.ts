@@ -899,6 +899,16 @@ describe('GET /api/jobs/:id', () => {
     expect(await (await detail(admin.cookie, max)).json()).toMatchObject({ batchItems: null });
   });
 
+  test("gives Reuse a pose generator job's background, and null for a job from before it", async () => {
+    const pose = async (params: Record<string, string>) => {
+      const id = await clip(alice.id, {});
+      await pool.query(`update jobs set feature = 'pose_generator', params = $2 where id = $1`, [id, { resolution: '1K', pose: 'front', ...params }]);
+      return id;
+    };
+    expect(await (await detail(alice.cookie, await pose({ background: 'white' }))).json()).toMatchObject({ pose: 'front', background: 'white' });
+    expect(await (await detail(alice.cookie, await pose({}))).json()).toMatchObject({ pose: 'front', background: null });
+  });
+
   test('leaves out a store that is hidden now, hides a job that is not a clip from other Members but not from its owner or an Admin, and 404s a deleted one', async () => {
     const hidden = await clip(alice.id, { storeId: 'store-hidden' });
     expect(((await (await detail(alice.cookie, hidden)).json()) as { storeId: string | null }).storeId).toBeNull();

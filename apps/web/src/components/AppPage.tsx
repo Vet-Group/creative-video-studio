@@ -178,6 +178,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const poseTextId = useId();
   const genderName = useId();
   const backgroundName = useId();
+  const backgroundId = useId();
+  const presetHelpId = useId();
   const { models, failed } = useImageModels(app.feature);
   const count = jobImages(app, images);
   const pick = useImageChoice(models, Math.max(1, count));
@@ -528,7 +530,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                       </span>
                     )}
                   </div>
-                  <div className="segmented theme-choice preset-chips" role="group" aria-label="Chọn nhanh theo sàn">
+                  <div className="segmented theme-choice preset-chips" role="group" aria-label="Chọn nhanh theo sàn" aria-describedby={presetHelpId}>
                     {POSE_PRESETS.map((pr) => (
                       <button
                         key={pr.id}
@@ -536,16 +538,22 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                         aria-pressed={presetOn(pr)}
                         disabled={busy}
                         onClick={() => {
-                          setPoses([...presetPoses(pr)]);
-                          setBackground(pr.background);
+                          // A pressed chip toggles off: no picks and the photo's own background.
+                          setPoses(presetOn(pr) ? [] : [...presetPoses(pr)]);
+                          setBackground(presetOn(pr) ? 'keep' : pr.background);
                         }}
                       >
                         {pr.label}
                       </button>
                     ))}
                   </div>
-                  <p className="help">Chọn nhanh 4 tư thế và nền hợp quy định ảnh của từng sàn.</p>
-                  <div className="segmented theme-choice" role="radiogroup" aria-label="Nền">
+                  <p id={presetHelpId} className="help">
+                    {`Chọn nhanh tư thế và nền hợp quy định ảnh của từng sàn (${MAX_POSES} tư thế, hoặc ${MAX_POSES - 1} khi đã có ô ${OWN_POSE}).`}
+                  </p>
+                  <span id={backgroundId} className="field-label">
+                    Nền
+                  </span>
+                  <div className="segmented theme-choice" role="radiogroup" aria-labelledby={backgroundId}>
                     {POSE_BACKGROUNDS.map((b) => (
                       <label key={b.value}>
                         <input type="radio" name={backgroundName} checked={background === b.value} disabled={busy} onChange={() => setBackground(b.value)} />

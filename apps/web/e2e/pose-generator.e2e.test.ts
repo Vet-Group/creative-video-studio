@@ -124,9 +124,12 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await chip(page, 'Shopify').click();
     await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Xoay 3/4', 'Bước ngang', 'Quay lưng']);
     await expect(background(page, 'Studio trắng')).toBeChecked();
+    // A pressed chip is a toggle: pressed again it clears the picks and puts the photo's own background back.
+    await chip(page, 'Shopify').click();
+    await expect(chip(page, 'Shopify')).toHaveAttribute('aria-pressed', 'false');
+    await expect(poses(page).getByRole('button', { pressed: true })).toHaveCount(0);
+    await expect(background(page, 'Giữ nền gốc')).toBeChecked();
     // Back to the form the rest of the test goes on with: the own words only, on the photo's background.
-    await page.getByRole('button', { name: 'Bỏ chọn hết' }).click();
-    await background(page, 'Giữ nền gốc').check();
     await page.getByLabel(OWN_POSE).fill('  ngồi trên bậc thềm,  tay chống cằm ');
     await expect(count(page)).toHaveText('1/4 đã chọn');
     // Keys 1 to 9 toggle the first nine poses while one has focus.
@@ -180,6 +183,14 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await expect(page.getByLabel(OWN_POSE)).toHaveValue(own);
     await expect(background(page, 'Studio trắng')).toBeChecked();
     await expect(cost(page)).toContainText('3 ảnh ×');
+    // A job from before the background existed comes back on the photo's own: the same job, served without one.
+    await page.route(/\/api\/jobs\/[\w-]+$/, async (route) => {
+      const res = await route.fetch();
+      await route.fulfill({ response: res, json: { ...(await res.json()), background: null } });
+    });
+    await page.goto(`/apps/pose-generator?reuse=${jobs.find((j) => j.pose === 'kneel')!.id}`);
+    await expect(poses(page).getByRole('button', { name: 'Quỳ một gối', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(background(page, 'Giữ nền gốc')).toBeChecked();
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
