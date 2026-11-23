@@ -643,10 +643,10 @@ test('two reference photos show one chip each that inserts its [ImageN] token in
   await expect(chips.getByRole('button')).toHaveCount(2);
 
   // An empty box that never had the focus: the token goes in, and the caret stays in the box after it.
-  await chips.getByRole('button', { name: 'Chèn [Image1] vào mô tả (Ảnh 1)' }).click();
+  await chips.getByRole('button', { name: 'Ảnh 1: chèn [Image1] vào mô tả' }).click();
   await expect(box).toHaveValue('[Image1]');
   await expect(box).toBeFocused();
-  await chips.getByRole('button', { name: 'Chèn [Image2] vào mô tả (Ảnh 2)' }).click();
+  await chips.getByRole('button', { name: 'Ảnh 2: chèn [Image2] vào mô tả' }).click();
   await expect(box).toHaveValue('[Image1] [Image2]');
   expect((await uncovered(chips.getByRole('button').first())), 'a chip nothing covers').toBe(true);
 });

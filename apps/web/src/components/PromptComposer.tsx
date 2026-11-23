@@ -139,7 +139,7 @@ export function PromptComposer({ id, label, optional, feature, format, value, on
               Chèn ảnh vào mô tả:
             </span>
             {refs.map((r, i) => (
-              <button key={r.id} type="button" className={s.ref} disabled={insertImageToken(value, i + 1, value.length, value.length, maxLength) === null} title={`Chèn ${imageToken(i + 1)} vào mô tả`} aria-label={`Chèn ${imageToken(i + 1)} vào mô tả (Ảnh ${i + 1})`} onClick={() => addRef(i + 1)}>
+              <button key={r.id} type="button" className={s.ref} disabled={insertImageToken(value, i + 1, value.length, value.length, maxLength) === null} title={`Chèn ${imageToken(i + 1)} vào mô tả`} aria-label={`Ảnh ${i + 1}: chèn ${imageToken(i + 1)} vào mô tả`} onClick={() => addRef(i + 1)}>
                 <img src={thumbUrl(r.id, 40)} alt="" width={20} height={20} />
                 Ảnh {i + 1}
               </button>
