@@ -63,12 +63,18 @@ export async function POST(request: Request) {
   const lone = cells.length % 2 === 1 ? cells.length - 1 : -1;
   const placed = cells.map((input, i) => ({ input, left: GAP + (i === lone ? (CELL + GAP) / 2 : (i % 2) * (CELL + GAP)), top: top + GAP + Math.floor(i / 2) * (cellHeight + GAP) }));
   if (pdf) {
-    // The title shrinks to stay inside the page's width, sized for its widest letter (W is about 1.04 em in DejaVu Sans Bold); DejaVu Sans, on the server, covers Vietnamese.
-    const size = Math.min(84, Math.floor((WIDTH - 2 * GAP) / ([...title].length * 1.05)));
+    // DejaVu Sans, on the server, covers Vietnamese. The title is drawn once on a wide strip and its ink measured (trim), so it shrinks to stay inside the page whatever font the server has.
+    const svg = (width: number, body: string) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${HEADER}" font-family="DejaVu Sans, Liberation Sans, sans-serif">${body}</svg>`);
+    const heading = (size: number) => `<text x="${GAP}" y="120" font-size="${size}" font-weight="bold" fill="#111">${xml(title)}</text>`;
+    let size = 84;
+    try {
+      const { info } = await sharp(svg(8000, heading(size))).flatten({ background: '#fff' }).trim({ background: '#fff' }).toBuffer({ resolveWithObject: true });
+      size = Math.min(size, Math.floor((size * 0.98 * (WIDTH - 2 * GAP)) / info.width));
+    } catch {
+      // Nothing was drawn to measure (no usable font): the band keeps the full size.
+    }
     const date = new Date().toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-    const text = Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEADER}" font-family="DejaVu Sans, Liberation Sans, sans-serif"><text x="${GAP}" y="120" font-size="${size}" font-weight="bold" fill="#111">${xml(title)}</text><text x="${GAP}" y="195" font-size="44" fill="#666">${xml(date)}</text></svg>`,
-    );
+    const text = svg(WIDTH, `${heading(size)}<text x="${GAP}" y="195" font-size="44" fill="#666">${xml(date)}</text>`);
     placed.push({ input: text, left: 0, top: 0 });
   }
   const jpeg = await sheet.composite(placed).jpeg({ quality: 88 }).toBuffer();
