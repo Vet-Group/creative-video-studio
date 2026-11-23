@@ -18,7 +18,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { cardSample, GALLERY_SAMPLES } from '@/lib/examples';
-import { sampleThumb, useSamples } from '@/lib/use-samples';
+import { sampleThumb, samplesPending, useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { CsvNames } from './CsvNames';
@@ -71,10 +71,11 @@ function ItemChecks({ label, items, picked, onChange, single, children }: { labe
 export function AppArt({ app, page }: { app: AppConfig; page?: boolean }) {
   const media = cardSample(useSamples(), `app-${app.slug}`);
   const has = Boolean(media.video || media.poster);
-  if (page && !has) return null; // on its own page an app with no art shows nothing rather than a bare tile
+  // On its own page an app with no art shows nothing rather than a bare tile; while the sample list loads, the empty box keeps the art's place, so the About text below does not jump down when the art arrives.
+  if (page && !has && !samplesPending()) return null;
   return (
     <span className="app-art" data-category={app.category} data-page={page || undefined} aria-hidden="true">
-      {has ? <CardMedia {...media} /> : <Icon name={CATEGORY_ICON[app.category]} size={36} />}
+      {has ? <CardMedia {...media} /> : !page && <Icon name={CATEGORY_ICON[app.category]} size={36} />}
     </span>
   );
 }
