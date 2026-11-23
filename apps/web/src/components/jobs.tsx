@@ -208,11 +208,14 @@ export function photoDrag(put: ((role: PhotoRole) => void) | undefined) {
   };
 }
 
-/** One of a detail's pieces: a button that puts it on the form beside it, or the plain piece where there is none. */
+/**
+ * One of a detail's pieces: a button that puts it on the form beside it, or the plain piece where there is none. The button is named by the piece it
+ * shows (WCAG 2.5.3 Label in Name); `label` says what a click does, as its title and so its description.
+ */
 export function Tap({ on, label, className, children }: { on?: () => void; label?: string; className?: string; children: ReactNode }) {
   if (!on) return className ? <span className={className}>{children}</span> : <>{children}</>;
   return (
-    <button type="button" className={className ? `tap ${className}` : 'tap'} aria-label={label} title={label} onClick={on}>
+    <button type="button" className={className ? `tap ${className}` : 'tap'} title={label} onClick={on}>
       {children}
     </button>
   );
@@ -297,6 +300,7 @@ export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void })
       () => done('failed'),
     );
   };
+  const copyText = copied === 'ok' ? 'Đã chép' : copied === 'failed' ? 'Không chép được' : 'Sao chép';
   return (
     <div ref={box} className="job-prompt" data-open={open || undefined}>
       <Tap on={onUse} label="Chép vào ô mô tả" className="job-text">
@@ -308,9 +312,9 @@ export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void })
             {open ? 'Thu gọn' : 'Xem thêm'}
           </button>
         )}
-        <button type="button" onClick={copy} aria-label="Chép mô tả">
+        <button type="button" onClick={copy} aria-label={`${copyText} mô tả`}>
           <Icon name={copied === 'ok' ? 'check' : 'copy'} size={12} />
-          {copied === 'ok' ? 'Đã chép' : copied === 'failed' ? 'Không chép được' : 'Sao chép'}
+          {copyText}
         </button>
         {/* A Vietnamese reading of English words, to read only; the job keeps its prompt. */}
         {!isVietnamese(text) && (

@@ -160,7 +160,7 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
   await expect(bar.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(bar).toBeInViewport(); // still docked over History
   // A toast shows at the top of the screen, clear of Run at the foot.
-  await page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('button', { name: 'Chép vào ô mô tả' }).first().click();
+  await page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByTitle('Chép vào ô mô tả').first().click();
   const toast = page.getByRole('region', { name: 'Thông báo' }).getByText('Đã chép mô tả');
   await expect(toast).toBeVisible();
   expect((await toast.boundingBox())!.y).toBeLessThan(100);

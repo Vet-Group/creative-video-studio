@@ -246,7 +246,7 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await detail.getByRole('button', { name: 'Seamless White' }).click();
     await expect(note('Đã chọn bối cảnh')).toBeVisible();
     await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();
-    await detail.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
+    await detail.getByTitle('Chép vào ô mô tả').click();
     await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue(details.brief);
     await detail.getByRole('button', { name: '3:4', exact: true }).click();
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');

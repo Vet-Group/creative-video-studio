@@ -405,7 +405,7 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await detail.getByRole('button', { name: 'example-2-ref.jpg' }).click();
     await expect(note('Đã thêm ảnh tham chiếu')).toBeVisible();
     await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name: 'example-2-ref.jpg' })).toBeVisible();
-    await detail.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
+    await detail.getByTitle('Chép vào ô mô tả').click();
     await expect(page.getByRole('textbox', { name: 'Mô tả chuyển động' })).toHaveValue(details.prompt);
     await detail.getByRole('button', { name: '1:1', exact: true }).click();
     await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
@@ -453,7 +453,7 @@ test("as on Fash's Recreate, a sample's model name and its resolution put that m
     await openTile(page, 'Tự viết mô tả');
     const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
     const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
-    await detail.getByRole('button', { name: 'Dùng mô hình Short model' }).click();
+    await detail.getByTitle('Dùng mô hình Short model').click();
     await expect(note('Đã chọn mô hình Short model')).toBeVisible();
     await expect(modelButton(page)).toContainText('Short model');
 
