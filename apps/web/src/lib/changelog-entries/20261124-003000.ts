@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-23T19:30:00+07:00',
+  at: '2026-11-24T00:30:00+07:00',
   kind: 'improved',
   title: 'Xoá trong Thư viện không còn hỏi lại, và có nút Hoàn tác',
   details: [
