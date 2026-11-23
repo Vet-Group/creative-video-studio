@@ -16,6 +16,7 @@ import { alignInputs, reuseHref } from '@/lib/reuse';
 import { SWIPE_START_PX, swipeStep } from '@/lib/swipe';
 import { useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
+import { CompareButton } from './CompareItems';
 import { CompareSlider } from './CompareSlider';
 import { EmptyArt } from './EmptyArt';
 import { Icon } from './Icon';
@@ -1022,6 +1023,7 @@ function BulkActions({ ids, clips, stores, onChange }: { ids: string[]; clips: C
           </select>
         </label>
       )}
+      <CompareButton clips={picked} />
       {note && (
         <span className="bulk-note" role="status">
           {note}

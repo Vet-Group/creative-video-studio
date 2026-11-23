@@ -238,8 +238,20 @@ test('Library days: a heading per day whose checkbox picks every item of that da
   await expect(page.getByRole('button', { name: 'Chọn', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(item(first).getByRole('checkbox')).toBeChecked();
   await expect(item(second).getByRole('checkbox')).toBeChecked();
+  // With two picked, So sánh opens both side by side; Esc closes only that dialog and focus returns to the button.
+  const compare = bar.getByRole('button', { name: 'So sánh' });
+  await compare.click();
+  const pair = page.locator('dialog.compare-two');
+  await expect(pair).toBeVisible();
+  await expect(pair.locator('video')).toHaveCount(2);
+  await expect(pair.locator('video').first()).toHaveJSProperty('muted', true);
+  await page.keyboard.press('Escape');
+  await expect(pair).toBeHidden();
+  await expect(compare).toBeFocused();
+  await expect(bar).toContainText('Đã chọn 2');
   await item(first).getByRole('checkbox').uncheck();
   await expect(bar).toContainText('Đã chọn 1');
+  await expect(compare).toBeDisabled();
   await expect(day).toBeChecked({ indeterminate: true });
   await day.click();
   await expect(bar).toContainText('Đã chọn 2');
