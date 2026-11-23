@@ -583,7 +583,8 @@ button.job-reuse, button.lightbox-reuse, button.gallery-use { border: 0; font-fa
 .toast a { color: var(--toast-link); }
 .toast-bad { background: var(--toast-bad); }
 .toast button { background: transparent; border: 0; color: inherit; padding: 0 .25rem; }
-.undo-notice { position: fixed; left: 1rem; bottom: 1rem; z-index: 10; max-width: calc(100vw - 2rem); }
+/* Bottom centre: the left corner is under the sidebar on a wide screen, the right one is where job toasts appear. */
+.undo-notice { position: fixed; left: 50%; bottom: 1rem; translate: -50% 0; z-index: 10; width: max-content; max-width: calc(100vw - 2rem); }
 .undo-notice .toast button { min-height: 44px; padding: 0 .75rem; font-weight: 600; text-decoration: underline; }
 
 /* Admin › Settings: one checkbox per model. */
