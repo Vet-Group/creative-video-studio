@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-23T19:20:00+07:00',
+  at: '2026-11-24T00:30:10+07:00',
   kind: 'new',
   title: 'So sánh hai kết quả cạnh nhau trong Thư viện',
   details: [
