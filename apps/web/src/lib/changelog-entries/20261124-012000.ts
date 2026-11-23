@@ -10,6 +10,6 @@ export default {
     'Mỗi màu hay mỗi cảnh là một ảnh riêng, tối đa 15 ảnh mỗi lần chạy; tổng tiền hiện trước khi bấm Chạy.',
   ],
   href: '/apps',
-  prs: [0],
+  prs: [638],
   audience: 'all',
 } satisfies ChangeEntry;

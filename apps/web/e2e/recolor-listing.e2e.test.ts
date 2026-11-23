@@ -99,7 +99,7 @@ test('product recolor: picks a swatch and an own colour code, sees the price of 
   await expect(toast(page, 'Tối đa 15 màu mỗi lần chạy')).toBeVisible();
   await expect(colors.getByRole('checkbox')).toHaveCount(15);
   // Unticking an own colour takes it off the list.
-  await colors.getByRole('checkbox', { name: 'Mã #000002' }).uncheck();
+  await colors.getByRole('checkbox', { name: 'Mã #000002' }).click(); // not uncheck(): the chip goes, so there is no unticked box to see
   await expect(colors.getByRole('checkbox', { name: 'Mã #000002' })).toHaveCount(0);
   await expect(cost(page)).toContainText('14 ảnh ×');
 });
