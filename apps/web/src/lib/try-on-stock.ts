@@ -76,8 +76,8 @@ export const poseOf = (value: string | null | undefined) => POSES.find((p) => p.
  * so its poses are full-body standing views, none seated and no props; Etsy's are natural poses on a lifestyle scene; Shopify's are the usual product-page views on white. */
 export const POSE_PRESETS = [
   { id: 'amazon', label: 'Amazon', background: 'white', poses: ['front', 'back-view', 'side-profile', 'three-quarter'] },
-  { id: 'etsy', label: 'Etsy', background: 'lifestyle', poses: ['front', 'side-walk', 'hand-on-hip', 'three-quarter'] },
-  { id: 'shopify', label: 'Shopify', background: 'white', poses: ['front', 'back-view', 'three-quarter', 'side-walk'] },
+  { id: 'etsy', label: 'Etsy', background: 'lifestyle', poses: ['front', 'power-stride', 'hand-on-hip', 'three-quarter'] },
+  { id: 'shopify', label: 'Shopify', background: 'white', poses: ['front', 'back-view', 'three-quarter', 'power-stride'] },
 ] as const;
 
 /** Fash's model catalog (#tryon-model-catalog, read 2026-11-18): a portrait per model, the sample `try-on-portrait-<gender>-<name>.jpg`, with what its filters read. */
