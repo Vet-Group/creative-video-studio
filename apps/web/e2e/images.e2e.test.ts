@@ -68,7 +68,11 @@ test('a mock image job made through the API is an image card under "Tất cả �
   expect(download.suggestedFilename()).toMatch(new RegExp(`^${today()}-e2e-member-8-[0-9a-f]{8}\.png$`));
 
   await card.getByRole('button', { name: 'Xoá', exact: true }).click();
-  await expect(page.getByRole('alertdialog', { name: 'Xác nhận xoá' })).toContainText('Xoá ảnh này?');
-  await page.getByRole('button', { name: 'Xác nhận xoá' }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'Đã xoá ảnh.' })).toBeVisible();
+  // Hoàn tác puts the picture back; the next delete is left to stand (the Library is shared by every spec).
+  await page.getByRole('button', { name: 'Hoàn tác' }).click();
+  await expect(card).toHaveCount(1);
+  await card.getByRole('button', { name: 'Xoá', exact: true }).click();
   await expect(card).toHaveCount(0);
 });

@@ -203,7 +203,6 @@ test('an Admin re-assigns a clip store from the Library and Reuse follows it', a
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
   const mine = page.locator(`article[data-clip-id="${await page.getByRole('article').first().getAttribute('data-clip-id')}"]`);
   await mine.getByRole('button', { name: 'Xoá', exact: true }).click();
-  await mine.getByRole('button', { name: 'Xác nhận xoá' }).click();
   await expect(mine).toHaveCount(0);
 });
 
