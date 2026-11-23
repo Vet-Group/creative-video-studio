@@ -114,6 +114,35 @@ describe('/api/library/lookbook', () => {
     expect((await POST(new Request('http://localhost/api/library/lookbook', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids: [a, b] }) }))).status).toBe(401);
   });
 
+  test('format pdf answers one A4 page: the grid under a title band, embedded as a JPEG', async () => {
+    const ids = [await job(alice.id, 'pdf-a', await png(300, 400, 250)), await job(bob.id, 'pdf-b', await png(300, 400, 100))];
+    const res = await POST(req(alice.cookie, { ids, format: 'pdf', title: 'Bộ sưu tập <Thu> & "Đông"\u0007' }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="lookbook.pdf"');
+    const pdf = Buffer.from(await res.arrayBuffer());
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(res.headers.get('content-length')).toBe(String(pdf.length));
+    // The JPEG is the 2-wide grid (24 + 2 x 1048 wide, one row of 1365 high cells) under the 260 px title band.
+    const text = pdf.toString('latin1');
+    expect(text).toContain(`/Width ${24 + 2 * (1024 + 24)} /Height ${260 + 24 + 1365 + 24}`);
+    const start = pdf.indexOf(Buffer.from([0xff, 0xd8, 0xff]));
+    expect(await sharp(pdf.subarray(start)).metadata()).toMatchObject({ format: 'jpeg', width: 24 + 2 * (1024 + 24), height: 260 + 24 + 1365 + 24 });
+    // Any title, an empty or an over-long one included, still makes a page; `format: 'jpg'` is the JPEG as before.
+    for (const title of ['', '   ', 'x'.repeat(500), '\u0000\u0001']) expect((await POST(req(alice.cookie, { ids, format: 'pdf', title }))).status).toBe(200);
+    expect((await POST(req(alice.cookie, { ids, format: 'jpg' }))).headers.get('content-type')).toBe('image/jpeg');
+  });
+
+  test('format pdf refuses what the JPG refuses, a format it does not know and a title that is not text', async () => {
+    const a = await job(alice.id, 'pdfr-a', await png(10, 10, 1));
+    const b = await job(alice.id, 'pdfr-b', await png(10, 10, 1));
+    expect((await POST(req(alice.cookie, { ids: [a, b], format: 'gif' }))).status).toBe(400);
+    expect((await POST(req(alice.cookie, { ids: [a, b], format: 'pdf', title: 5 }))).status).toBe(400);
+    expect((await POST(req(alice.cookie, { ids: [a], format: 'pdf' }))).status).toBe(400);
+    expect((await POST(req(alice.cookie, { ids: [a, 'no-such-job'], format: 'pdf' }))).status).toBe(403);
+    expect((await POST(new Request('http://localhost/api/library/lookbook', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids: [a, b], format: 'pdf' }) }))).status).toBe(401);
+  });
+
   test('answers 422 for an output that is not a readable picture', async () => {
     const a = await job(alice.id, 'bad-a', await png(10, 10, 1));
     const broken = await job(alice.id, 'bad-b', new TextEncoder().encode('garbage'), 'image/png');
