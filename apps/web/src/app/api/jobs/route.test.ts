@@ -18,7 +18,7 @@ const { GET: listJobs, POST } = await import('./route');
 const { GET } = await import('../stores/route');
 const { settle } = await import('@cvs/core/ledger');
 const { FEATURE_PROMPTS } = await import('@cvs/core/models');
-const { breedSwapPrompt, MAX_BATCH, mockupPrompt, nameSwapPrompt, petPortraitPrompt, posePrompt, poseRefPrompt } = await import('@/lib/apps');
+const { breedSwapPrompt, itemLabel, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, mockupPrompt, nameSwapPrompt, petPortraitPrompt, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt } = await import('@/lib/apps');
 const { forgetFalBalance } = await import('@/lib/provider-credit');
 
 const PASSWORD = 'correct-horse-battery';
@@ -717,7 +717,7 @@ describe('POST /api/jobs for an image feature', () => {
       ['app-char', 'character_swap', 2, 'auto'], ['app-model', 'model_swap', 2, 'auto'], ['app-bg', 'background_changer', 2, 'auto'], ['app-reframe', 'reframe', 1, '1:1,16:9'],
       ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 4, 'auto'], ['app-lingerie', 'lingerie_try_on', 4, 'auto'], ['app-fashion', 'fashion_model', 1, '3:4,auto'],
       ['app-angles', 'multi_angle', 1, 'auto'], ['app-breeds', 'breed_swap', 1, 'auto'], ['app-pets', 'pet_portrait', 1, 'auto'], ['app-mockups', 'mockup_pack', 3, 'auto'], ['app-names', 'name_swap', 1, 'auto'],
-      ['app-poses', 'pose_generator', 2, 'auto'],
+      ['app-poses', 'pose_generator', 2, 'auto'], ['app-recolor', 'product_recolor', 2, 'auto'], ['app-listing', 'listing_set', 2, 'auto'],
     ];
     beforeAll(async () => {
       for (const [id, feature, max, ratios] of appModels) {
@@ -990,6 +990,62 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await send([m.asset], { pose: 'kneel', batch: run4 }, posePrompt('kneeling on one knee and facing the camera, full body'))).status).toBe(201);
       expect((await send([m.asset, `${m.id}-ref3`], { poseRef: `${m.id}-ref3`, batch: run4 })).status).toBe(201);
       expect((await send([m.asset, ref], { poseRef: ref, batch: run4 })).error).toBe('a pose generator Run (params.batch) takes at most 4 poses');
+    });
+
+    test("product recolor takes one product photo and one colour per job as #RRGGBB, a swatch's or the member's own, with exactly the prompt it makes, and at most 15 per Run", async () => {
+      const post = await runner('product_recolor', 2);
+      const navy = { prompt: recolorPrompt('#1F2A44'), params: { resolution: '1K', color: '#1F2A44', batch: BATCH } };
+      const before = await jobCount();
+      // A colour name, lower case, too short or long, no #, a space, or no colour at all: the page sends #RRGGBB in capitals.
+      const refused = 'params.color must be one color as #RRGGBB, in capitals';
+      for (const bad of ['navy', '#1f2a44', '#1F2A4', '#1F2A445', '1F2A44', ' #1F2A44', '']) expect([bad, (await post({ ...navy, params: { ...navy.params, color: bad } }, 1)).error]).toEqual([bad, refused]);
+      expect((await post({ prompt: navy.prompt, params: { resolution: '1K', batch: BATCH } }, 1)).error).toBe(refused);
+      expect((await post({ ...navy, prompt: recolorPrompt('#111111') }, 1)).error).toBe('the prompt must be the one the color makes');
+      expect((await post({ ...navy, prompt: `${navy.prompt} Make it a hoodie.` }, 1)).error).toBe('the prompt must be the one the color makes');
+      expect((await post({ params: navy.params }, 1)).error).toBe('the prompt must be the one the color makes');
+      expect((await post(navy, 2)).error).toBe('the product recolor takes exactly one image: the product');
+      expect((await post({ ...navy, params: { ...navy.params, shot: 'white' } }, 1)).error).toMatch(/^params may hold only resolution, quality, thinking, brief, color and batch/);
+      expect(await jobCount()).toBe(before);
+      const ok = await post(navy, 1);
+      expect([ok.status, ok.job]).toEqual([201, { feature: 'product_recolor', model: 'app-recolor', prompt: navy.prompt, aspect: 'auto', params: { resolution: '1K', color: '#1F2A44', batch: BATCH }, workspace_id: 'ws_vet' }]);
+      const own = { prompt: recolorPrompt('#2E8B57'), params: { resolution: '1K', color: '#2E8B57', batch: BATCH } }; // the member's own colour, by its code
+      expect(await post(own, 1)).toMatchObject({ status: 201, job: { prompt: own.prompt, params: { color: '#2E8B57' } } });
+      // A Run makes at most 15 pictures, as the page lets the member pick: 13 more pass (15 in all), a 16th of the same Run is refused and nothing is made.
+      for (const color of [...RECOLOR_COLORS.map((c) => c.hex).filter((h) => h !== '#1F2A44'), '#000001', '#000002']) {
+        expect([color, (await post({ prompt: recolorPrompt(color), params: { resolution: '1K', color, batch: BATCH } }, 1)).status]).toEqual([color, 201]);
+      }
+      const count = await jobCount();
+      expect((await post({ prompt: recolorPrompt('#000003'), params: { resolution: '1K', color: '#000003', batch: BATCH } }, 1)).error).toBe('a product recolor Run (params.batch) takes at most 15 pictures');
+      expect(await jobCount()).toBe(count);
+    });
+
+    test('the listing set takes one product photo and one known shot per job, with exactly the prompt that shot makes, and at most 15 pictures per Run', async () => {
+      const post = await runner('listing_set', 2);
+      const gift = { prompt: listingShotPrompt('gift'), params: { resolution: '1K', shot: 'gift', batch: BATCH } };
+      const before = await jobCount();
+      for (const bad of ['beach', 'Gift', '']) expect((await post({ ...gift, params: { ...gift.params, shot: bad } }, 1)).error).toMatch(/^params.shot must be one of white, lifestyle, detail, flat-lay, /);
+      expect((await post({ prompt: gift.prompt, params: { resolution: '1K', batch: BATCH } }, 1)).error).toMatch(/^params.shot must be one of /);
+      expect((await post({ ...gift, prompt: listingShotPrompt('white') }, 1)).error).toBe('the prompt must be the one the shot makes');
+      expect((await post({ ...gift, prompt: `${gift.prompt} Add a SALE badge.` }, 1)).error).toBe('the prompt must be the one the shot makes');
+      expect((await post(gift, 2)).error).toBe('the listing set takes exactly one image: the product');
+      expect((await post({ ...gift, params: { ...gift.params, color: '#111111' } }, 1)).error).toMatch(/^params may hold only resolution, quality, thinking, brief, shot and batch/);
+      expect(await jobCount()).toBe(before);
+      const ok = await post(gift, 1);
+      expect([ok.status, ok.job]).toEqual([201, { feature: 'listing_set', model: 'app-listing', prompt: gift.prompt, aspect: 'auto', params: { resolution: '1K', shot: 'gift', batch: BATCH }, workspace_id: 'ws_vet' }]);
+      // Every shot fits one Run of 15: the 14 others pass, a 16th job of the same Run is refused and nothing is made.
+      for (const { id } of LISTING_SHOTS.filter((x) => x.id !== 'gift')) expect([id, (await post({ prompt: listingShotPrompt(id), params: { resolution: '1K', shot: id, batch: BATCH } }, 1)).status]).toEqual([id, 201]);
+      const count = await jobCount();
+      expect((await post(gift, 1)).error).toBe('a listing set Run (params.batch) takes at most 15 pictures');
+      expect(await jobCount()).toBe(count);
+    });
+
+    test("History's list carries a product recolor job's colour and a listing set job's shot, which title its card", async () => {
+      const m = await newMember();
+      const send = (feature: string, modelId: string, prompt: string, params: Record<string, string>) => run(m.cookie, { assetIds: [m.asset], modelId, feature, ratio: 'auto', prompt, params: { resolution: '1K', batch: BATCH, ...params } });
+      expect((await send('product_recolor', 'app-recolor', recolorPrompt('#C8102E'), { color: '#C8102E' })).status).toBe(201);
+      expect((await send('listing_set', 'app-listing', listingShotPrompt('flat-lay'), { shot: 'flat-lay' })).status).toBe(201);
+      const mine = (await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: m.cookie } }))).json()) as { jobs: { feature: string; color: string | null; shot: string | null }[] };
+      expect(mine.jobs.map((j) => [j.feature, j.color, j.shot, itemLabel(j)])).toEqual([['listing_set', null, 'flat-lay', 'Flat lay'], ['product_recolor', '#C8102E', null, 'Đỏ']]);
     });
 
     test("History's list names a pose generator job's pose or own words, and not a Try On job's pose", async () => {

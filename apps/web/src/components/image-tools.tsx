@@ -208,6 +208,9 @@ export interface ReuseJob {
   style?: string | null;
   product?: string | null;
   name?: string | null;
+  /** The product recolor app's colour (#RRGGBB) and the listing set's shot. */
+  color?: string | null;
+  shot?: string | null;
   /** The item of every job of the creator's batch Run (lib/apps.ts BATCH_FEATURES), which Reuse picks all again; null for any other job. */
   batchItems?: BatchItem[] | null;
 }

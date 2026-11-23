@@ -1,6 +1,7 @@
 // The About tabs as data: one typed page per tool, rendered by components/About.tsx. The section order follows the reference site's About pages;
 // every fact (models, limits, prices in USD, the Library) is this app's own. Media fields name samples in the bucket (`<name>.mp4` and/or `<name>.jpg`);
 // a missing sample keeps its slot as the empty stripes, so the layout does not move when it is uploaded.
+import { MAX_PICTURES } from './apps';
 import { HOOKS, LOCATIONS } from './marketing';
 import type { AboutCard, AboutPage } from './about-specs';
 export * from './about-specs';
@@ -2681,6 +2682,92 @@ export const APP_ABOUT: Record<string, AboutPage> = {
             faq: [
               ['Mỗi tư thế tốn bao nhiêu?', `${APP_COST} Mỗi tư thế là một ảnh nên tổng tiền bằng giá một ảnh nhân số tư thế đã chọn.`],
               ['Chọn tư thế trong thư viện và tự tả cùng lúc thì sao?', 'Mỗi tư thế chạy thành một ảnh riêng, nên tư thế tự tả không làm đổi các tư thế đã chọn.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  'product-recolor': {
+    title: 'Một ảnh sản phẩm, đủ các màu',
+    sections: [
+      {
+        title: 'Đổi màu sản phẩm là gì?',
+        blocks: [
+          'Từ một ảnh sản phẩm (áo thun trơn hoặc đã in, hoodie, cốc, túi tote…), ứng dụng tạo một ảnh cho mỗi màu bạn chọn: 12 màu phôi POD phổ biến như Đen, Trắng, Navy, Xám heather, Đỏ, Be cát, hoặc mã màu riêng của bạn. Mỗi màu là một ảnh riêng.',
+          `AI chỉ đổi màu chất liệu của sản phẩm (vải, sứ, canvas…). Hình in, chữ, logo, nếp vải, đường may, ánh sáng, bóng đổ, nền và khung hình giữ nguyên như ảnh gốc. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Đổi màu trong 3 bước',
+        lead: 'Tải ảnh sản phẩm, chọn màu, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải ảnh sản phẩm', text: 'Dùng một ảnh rõ nét, đủ sáng, thấy trọn sản phẩm; ảnh mockup hoặc ảnh chụp thật đều được. Sản phẩm màu sáng (trắng, xám nhạt) thường đổi màu đẹp nhất.' },
+              { title: 'Chọn màu', text: `Bấm các ô màu cần tạo, hoặc nhập mã màu riêng dạng #RRGGBB rồi bấm Thêm màu. Tối đa ${MAX_PICTURES} màu mỗi lần chạy; mỗi màu tạo một ảnh và tính tiền riêng.` },
+              { title: 'Chạy', text: 'Bấm Chạy. Mỗi màu là một lượt trong tab Lịch sử; "Chọn cả lô" trên một thẻ chọn mọi ảnh của lần chạy đó để tải về một tệp .zip.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Mẹo để ảnh đẹp',
+        blocks: [
+          'Chọn màu tương phản với hình in: hình in tối nên đi với màu sáng, hình in trắng hay sáng nên đi với màu tối. AI giữ nguyên màu hình in, nên chữ đen trên áo đen sẽ khó đọc.',
+          'Mã màu riêng hợp với màu phôi của nhà in bạn dùng; màu trên ảnh vẫn có thể lệch nhẹ so với vải thật, hãy so trước khi đăng bán. Nano Banana Pro (nếu Admin đã bật) giữ chữ và chi tiết hình in tốt hơn.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Mỗi màu tốn bao nhiêu?', `${APP_COST} Mỗi màu là một ảnh nên tổng tiền bằng giá một ảnh nhân số màu đã chọn.`],
+              ['Bỏ một màu riêng đã thêm thế nào?', 'Bỏ chọn ô màu đó: màu riêng biến khỏi danh sách. Cần lại thì nhập mã và bấm Thêm màu lần nữa.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  'listing-set': {
+    title: 'Bộ ảnh đăng bán từ một ảnh sản phẩm',
+    sections: [
+      {
+        title: 'Bộ ảnh listing là gì?',
+        blocks: [
+          'Từ một ảnh sản phẩm, ứng dụng tạo bộ ảnh để đăng bán trên Etsy, Amazon hay Shopify. Bạn chọn những cảnh cần: nhóm Cơ bản có ảnh chính nền trắng, lifestyle trong nhà, cận cảnh chi tiết, flat lay, cầm trên tay, gói quà, ngoài trời, trên người mẫu hoặc đang dùng, nền màu studio và mở hộp; nhóm Theo mùa có Giáng sinh, Halloween và mùa thu, Valentine, mùa hè và Ngày của Mẹ hay của Cha. Mỗi cảnh là một ảnh riêng.',
+          `AI giữ y nguyên sản phẩm trong mọi cảnh: hình dáng, tỉ lệ, màu, hình in và chữ. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Tạo bộ ảnh trong 3 bước',
+        lead: 'Tải ảnh sản phẩm, chọn cảnh, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải ảnh sản phẩm', text: 'Dùng một ảnh rõ nét, thấy trọn sản phẩm, càng ít vật khác càng tốt; ảnh nền trắng hoặc ảnh đã xoá nền cho kết quả sạch nhất.' },
+              { title: 'Chọn cảnh', text: `Đánh dấu các cảnh cần tạo, tối đa ${MAX_PICTURES} ảnh mỗi lần chạy; mỗi cảnh tạo một ảnh và tính tiền riêng.` },
+              { title: 'Chạy', text: 'Bấm Chạy. Mỗi cảnh là một lượt trong tab Lịch sử; "Chọn cả lô" trên một thẻ chọn mọi ảnh của lần chạy đó để tải về một tệp .zip.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Nên chọn cảnh nào?',
+        blocks: [
+          'Amazon cần ảnh chính nền trắng tinh, sản phẩm chiếm khoảng 85% khung hình, không đạo cụ và không chữ: chọn Nền trắng. Etsy và Shopify chuộng ảnh lifestyle, cận cảnh và ảnh cầm trên tay để người mua thấy kích thước thật. Cảnh Theo mùa hợp để đổi ảnh bìa trước các dịp lễ.',
+          'Cảnh "Trên người mẫu / đang dùng" hợp nhất với đồ mặc hoặc đồ dùng hằng ngày như áo, túi, cốc. Chữ nhỏ trên sản phẩm đôi khi bị vẽ lại khác đi một chút; Nano Banana Pro (nếu Admin đã bật) giữ chữ tốt hơn. Hãy xem lại từng ảnh trước khi đăng bán.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Mỗi cảnh tốn bao nhiêu?', `${APP_COST} Mỗi cảnh là một ảnh nên tổng tiền bằng giá một ảnh nhân số cảnh đã chọn.`],
+              ['Muốn thêm một biến thể của cùng một cảnh?', 'Dùng nút Chạy lại trên thẻ của cảnh đó trong Lịch sử: mỗi lần chạy lại ra một ảnh mới cho cùng cảnh.'],
             ],
           },
         ],

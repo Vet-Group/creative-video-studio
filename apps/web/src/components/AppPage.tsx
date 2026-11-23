@@ -5,7 +5,7 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseNames, PET_STYLES, POSE_BACKGROUNDS, POSE_PHOTOS, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, colorLabel, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseHexColor, parseNames, PET_STYLES, POSE_BACKGROUNDS, POSE_PHOTOS, RECOLOR_COLORS, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { waitLabel } from '@/lib/explore';
 import { parseFashionTraits } from '@/lib/fashion-model';
 import { usable } from '@/lib/fashion-models';
@@ -44,10 +44,13 @@ const REST_NOTE: Record<string, string> = {
   mockup_pack: 'sản phẩm còn lại dùng prompt như trên, chỉ khác phần mô tả sản phẩm.',
   name_swap: 'ảnh còn lại dùng prompt như trên, chỉ khác tên (và giống chó).',
   pose_generator: 'tư thế còn lại dùng prompt như trên, chỉ khác phần mô tả tư thế.',
+  product_recolor: 'màu còn lại dùng prompt như trên, chỉ khác tên và mã màu.',
+  listing_set: 'cảnh còn lại dùng prompt như trên, chỉ khác phần mô tả cảnh.',
 };
 
-/** A batch app's items to pick (the pet portrait's styles, the mockup pack's products) as a row of checkbox chips, as the views and breeds are; `children` add the help and the price under them. */
-function ItemChecks({ label, items, picked, onChange, single, children }: { label: string; items: { id: string; label: string }[]; picked: string[]; onChange: (ids: string[]) => void; single?: boolean; children: ReactNode }) {
+/** A batch app's items to pick (the pet portrait's styles, the mockup pack's products, the recolor's colours, the listing set's shots) as a row of checkbox chips, as the views and breeds are;
+ * `children` add the help and the price under them. */
+function ItemChecks({ label, items, picked, onChange, single, children }: { label: string; items: { id: string; label: ReactNode }[]; picked: string[]; onChange: (ids: string[]) => void; single?: boolean; children?: ReactNode }) {
   const id = useId();
   return (
     <div className="field">
@@ -169,6 +172,10 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const [poseRefs, setPoseRefs] = useState<Img[]>([]); // pictures of someone in the wanted pose, each one more pose and a job of its own (the person's photo is the first image of the job, the picture the second)
   const [background, setBackground] = useState('keep'); // the pose generator's background: the photo's own, a white studio or one lifestyle scene (POSE_BACKGROUNDS)
   const [poseGender, setPoseGender] = useState<'woman' | 'man' | null>(null); // the pose pictures' gender the member chose, else the photo's
+  const [colors, setColors] = useState<string[]>([]); // product recolor: one job per colour (#RRGGBB, a swatch's or the member's own), none until picked
+  const [hexText, setHexText] = useState(''); // its box for one more colour of the member's own
+  const [hexProblem, setHexProblem] = useState('');
+  const [shots, setShots] = useState<string[]>([]); // the listing set: one job per shot, none until picked
   const promptId = useId();
   const reasonId = useId();
   const viewsId = useId();
@@ -182,6 +189,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const backgroundName = useId();
   const backgroundId = useId();
   const presetHelpId = useId();
+  const hexId = useId();
+  const hexErrorId = useId();
   const { models, failed } = useImageModels(app.feature);
   const count = jobImages(app, images) + (poseRefs.length > 0 ? 1 : 0); // a pose photo job sends the person and the picture
   const pick = useImageChoice(models, Math.max(1, count));
@@ -197,6 +206,16 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const posesPicked = poses.length + (ownPose ? 1 : 0) + poseRefs.length;
   const poseRoom = MAX_POSES - poses.length - (ownPose ? 1 : 0); // how many pose photos the picked tiles and own words leave room for, those already added included
   const togglePose = (v: string) => (poses.includes(v) ? setPoses(poses.filter((x) => x !== v)) : posesPicked >= MAX_POSES ? notify(`Tối đa ${MAX_POSES} tư thế mỗi lần chạy`) : setPoses([...poses, v]));
+  // A colour past the Run's MAX_PICTURES is refused, as a fifth pose is; the member's own colour is added (picked) by its box, and unticking it takes it off the list.
+  const pickColors = (next: string[]) => (next.length > MAX_PICTURES ? notify(`Tối đa ${MAX_PICTURES} màu mỗi lần chạy`) : setColors(next));
+  const addHex = () => {
+    const hex = parseHexColor(hexText);
+    if (!hex) return setHexProblem('Nhập mã màu dạng #RRGGBB, ví dụ #2E8B57.');
+    setHexProblem('');
+    if (!colors.includes(hex) && colors.length >= MAX_PICTURES) return notify(`Tối đa ${MAX_PICTURES} màu mỗi lần chạy`);
+    if (!colors.includes(hex)) setColors([...colors, hex]);
+    setHexText('');
+  };
   // A marketplace preset's poses; the own words and each pose photo take one of the Run's slots, so only the first of the preset that are left are used.
   const presetPoses = (pr: (typeof POSE_PRESETS)[number]) => pr.poses.slice(0, MAX_POSES - (ownPose ? 1 : 0) - poseRefs.length);
   const presetOn = (pr: (typeof POSE_PRESETS)[number]) => presetPoses(pr).length > 0 && background === pr.background && poses.length === presetPoses(pr).length && presetPoses(pr).every((v) => poses.includes(v));
@@ -248,6 +267,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
         setPoseRefs(found);
         setBackground(j.background ?? 'keep');
       }
+      if (j.color) setColors(all('color'));
+      if (j.shot) setShots(all('shot'));
       pick.refill({ ...j, lost: (j.lost ?? 0) + gone, ...(extra > 0 && { extra: { count: extra, max: slots!.flat().length } }) });
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
@@ -258,7 +279,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   // Background Changer: a reference photo stands in for the description, whose box is off meanwhile; its words stay in the box's state but are not used.
   const reference = app.prompt === 'background' && images[1]!.length > 0;
   const used = reference ? '' : prompt;
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt: used, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked, poseRefs: poseRefs.length }) ?? (poseRefs.some((r) => r.id === person?.id) ? `${POSE_PHOTOS} không được trùng ảnh người mẫu: bỏ một trong hai.` : null) ?? promptTooLong(chosen, used.trim() ? used.trim().length + fixed : 0);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt: used, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked, colors: colors.length, shots: shots.length, poseRefs: poseRefs.length }) ?? (poseRefs.some((r) => r.id === person?.id) ? `${POSE_PHOTOS} không được trùng ảnh người mẫu: bỏ một trong hai.` : null) ?? promptTooLong(chosen, used.trim() ? used.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
   /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
   const sent = basePrompt(app.feature, appInputs(app, { images, prompt: used }).prompt);
@@ -282,9 +303,13 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
             ? parseNames(names).names.flatMap((name) => (pickedBreeds.length > 0 ? pickedBreeds.map((breed) => ({ name, breed })) : [{ name }]))
             : app.poses
               ? [...POSES.filter((p) => poses.includes(p.value)).map((p) => ({ pose: p.value, background })), ...(ownPose ? [{ poseText: ownPose, background }] : []), ...poseRefs.map((r) => ({ poseRef: r.id, background }))]
-              : app.bulk
-                ? images[0]!.map(() => ({})) // one job per photo of the first slot
-                : [{}];
+              : app.colors
+                ? colors.map((color) => ({ color })) // in the order picked
+                : app.shots
+                  ? LISTING_SHOTS.filter((s) => shots.includes(s.id)).map((s) => ({ shot: s.id }))
+                  : app.bulk
+                    ? images[0]!.map(() => ({})) // one job per photo of the first slot
+                    : [{}];
   // A bulk app with one photo runs as before: one job, no batch.
   const batchApp = BATCH_FEATURES.includes(app.feature) && !(app.bulk && runs.length < 2);
   // What is wrong with the typed names, said under the box; an empty box only waits, as the reason under Run says.
@@ -407,6 +432,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
           setPoseText(p.poseText[0] ?? '');
           setPoseRefs((cur) => cur.filter((r) => p.poseRef.includes(r.id)));
         }
+        if (app.colors) setColors(p.color);
+        if (app.shots) setShots(p.shot);
         sent = ` Đã gửi ${done}/${runs.length} ảnh và bỏ chọn các mục đã gửi.${p.left.length > 0 ? ` Chưa gửi: ${p.left.map(itemLabel).join(', ')}.` : ''}`;
       }
       setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${sent}`);
@@ -639,6 +666,65 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                   Mỗi ảnh là một tư thế, tạo một ảnh riêng và tính tiền riêng; còn chỗ cho {Math.max(0, poseRoom - poseRefs.length)} ảnh. AI chỉ lấy tư thế, góc người và khung hình từ ảnh này; khuôn mặt, tóc, dáng người và trang phục vẫn theo ảnh người mẫu, còn nền theo mục Nền.
                 </p>
                 {runCost}
+              </>
+            )}
+
+            {app.colors && (
+              <>
+                <ItemChecks
+                  label="Màu cần tạo"
+                  // The swatches, then the member's own colours, each with its patch of colour.
+                  items={[...RECOLOR_COLORS.map((c) => c.hex), ...colors.filter((h) => !RECOLOR_COLORS.some((c) => c.hex === h))].map((hex) => ({
+                    id: hex,
+                    label: (
+                      <>
+                        <span className="swatch" style={{ background: hex }} aria-hidden="true" />
+                        {RECOLOR_COLORS.some((c) => c.hex === hex) ? `${colorLabel(hex)} ${hex}` : colorLabel(hex)}
+                      </>
+                    ),
+                  }))}
+                  picked={colors}
+                  onChange={pickColors}
+                />
+                <div className="field">
+                  <label htmlFor={hexId} className="field-label">
+                    Màu riêng (tuỳ chọn)
+                  </label>
+                  <div className="hex-add">
+                    <input
+                      id={hexId}
+                      value={hexText}
+                      placeholder="#2E8B57"
+                      maxLength={7}
+                      spellCheck={false}
+                      disabled={busy}
+                      aria-invalid={hexProblem ? true : undefined}
+                      aria-describedby={hexProblem ? hexErrorId : undefined}
+                      onChange={(e) => (setHexText(e.target.value), setHexProblem(''))}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addHex())}
+                    />
+                    <button type="button" disabled={busy || !hexText.trim()} onClick={addHex}>
+                      Thêm màu
+                    </button>
+                  </div>
+                  {hexProblem && (
+                    <p id={hexErrorId} className="error">
+                      {hexProblem}
+                    </p>
+                  )}
+                  <p className="help">Mỗi màu tạo một ảnh riêng và tính tiền riêng, tối đa {MAX_PICTURES} màu mỗi lần chạy. Màu riêng thêm vào danh sách ở trên; bỏ chọn là xoá. AI chỉ đổi màu chất liệu của sản phẩm, giữ nguyên hình in, chữ, nếp vải, ánh sáng và nền; nên chọn màu tương phản với hình in để chữ vẫn rõ, và xem lại từng ảnh trước khi đăng bán.</p>
+                  {runCost}
+                </div>
+              </>
+            )}
+
+            {app.shots && (
+              <>
+                <ItemChecks label="Cảnh cơ bản" items={LISTING_SHOTS.filter((s) => s.group === 'basic')} picked={shots} onChange={setShots} />
+                <ItemChecks label="Cảnh theo mùa" items={LISTING_SHOTS.filter((s) => s.group === 'seasonal')} picked={shots} onChange={setShots}>
+                  <p className="help">Mỗi cảnh tạo một ảnh riêng và tính tiền riêng, tối đa {MAX_PICTURES} ảnh mỗi lần chạy. Nền trắng là ảnh chính chuẩn Amazon. AI giữ nguyên hình dáng, màu, hình in và chữ của sản phẩm; hãy xem lại từng ảnh trước khi đăng bán.</p>
+                  {runCost}
+                </ItemChecks>
               </>
             )}
 

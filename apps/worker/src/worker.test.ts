@@ -1116,6 +1116,7 @@ describe('image jobs', () => {
     ['try_on', [[600, 800], [500, 500]], 0], // person, garment
     ['background_changer', [[600, 800], [1600, 900]], 0], // photo, reference background
     ['pose_generator', [[600, 800], [1600, 900]], 0], // the model photo, a pose photo
+    ['product_recolor', [[600, 800]], 0], // the product photo, its only input
     ['character_swap', [[500, 500], [600, 800]], 1], // new character, target
     ['jewelry_try_on', [[500, 500], [900, 400], [600, 800]], 2], // two pieces, wearer
     ['lingerie_try_on', [[500, 500], [900, 400], [600, 800]], 2], // two pieces, model

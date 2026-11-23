@@ -172,6 +172,9 @@ export const USERS = {
   posea: { email: 'posea@e2e.test', name: 'E2E Poses A', role: 'member' },
   poseb: { email: 'poseb@e2e.test', name: 'E2E Poses B', role: 'member' },
   posec: { email: 'posec@e2e.test', name: 'E2E Poses C', role: 'member' }, // the pose photos
+  // recolor-listing.e2e: product recolor's and the listing set's Runs of one job per colour or shot.
+  recolora: { email: 'recolora@e2e.test', name: 'E2E Recolor A', role: 'member' },
+  listinga: { email: 'listinga@e2e.test', name: 'E2E Listing A', role: 'member' },
   // result-tools.e2e: a breed swap's ZIP named by breed, History's Background Remover button on an image result, and Media Optimizer's listing preset.
   toolsa: { email: 'toolsa@e2e.test', name: 'E2E Tools A', role: 'member' },
   toolsb: { email: 'toolsb@e2e.test', name: 'E2E Tools B', role: 'member' },

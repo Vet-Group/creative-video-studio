@@ -3,19 +3,19 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
 import { POSE_PRESETS, POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isNewApp, itemLabel, itemPrompt, jobImages, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, REF_POSE, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has nineteen apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
-    expect(APPS).toHaveLength(19);
-    expect(new Set(APPS.map((a) => a.slug)).size).toBe(19);
+  it('has twenty-one apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
+    expect(APPS).toHaveLength(21);
+    expect(new Set(APPS.map((a) => a.slug)).size).toBe(21);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
-      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && !['breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator'].includes(a.feature) && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
+      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && !['breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set'].includes(a.feature) && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
     }
   });
 
@@ -23,13 +23,13 @@ describe('the app list', () => {
     expect(appBySlug('smart-remake')).toMatchObject({ slots: [], feature: 'video', category: 'video' });
   });
 
-  it('offers Smart Remake only when its flags are on: the first eighteen apps keep their places and it comes last', () => {
-    expect(visibleApps(false)).toHaveLength(18);
+  it('offers Smart Remake only when its flags are on: the first twenty apps keep their places and it comes last', () => {
+    expect(visibleApps(false)).toHaveLength(20);
     expect(visibleApps(false).map((a) => a.slug)).not.toContain('smart-remake');
     expect(visibleApps(true).at(-1)!.slug).toBe('smart-remake');
-    expect(filterApps('all', '')).toHaveLength(18); // off unless asked for
+    expect(filterApps('all', '')).toHaveLength(20); // off unless asked for
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
-    expect(filterApps('all', '', true)).toHaveLength(19);
+    expect(filterApps('all', '', true)).toHaveLength(21);
     expect(filterApps('video', '', true).map((a) => a.slug)).toEqual(['motion-control', 'smart-remake']);
     expect(filterApps('all', 'remake', true).map((a) => a.slug)).toEqual(['smart-remake']);
     expect(filterApps('all', 'remake')).toEqual([]);
@@ -112,8 +112,8 @@ describe('the app About tabs', () => {
 
 describe('filterApps', () => {
   it('filters by category and by name or description, ignoring accents and case', () => {
-    expect(filterApps('all', '')).toHaveLength(18);
-    expect(filterApps('all', '').at(-1)!.slug).toBe('pose-generator'); // ours comes after the live apps, which keep their order
+    expect(filterApps('all', '')).toHaveLength(20);
+    expect(filterApps('all', '').at(-1)!.slug).toBe('listing-set'); // ours comes after the live apps, which keep their order
     expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on', 'lingerie-try-on', 'ai-fashion-model', 'pose-generator']);
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
     expect(filterApps('all', 'DOI NEN').map((a) => a.slug)).toEqual(['background-changer']);
@@ -136,7 +136,7 @@ describe('filterApps', () => {
 describe('unsentPicks', () => {
   it('keeps picked only the items of the jobs a stopped batch Run did not send', () => {
     const runs = [{ breed: 'Pug' }, { breed: 'Boxer' }, { breed: 'Beagle' }];
-    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Boxer', 'Beagle'], style: [], product: [], name: [], pose: [], poseText: [], poseRef: [], left: [] });
+    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Boxer', 'Beagle'], style: [], product: [], name: [], pose: [], poseText: [], color: [], shot: [], poseRef: [], left: [] });
     expect(unsentPicks([{ view: 'back' }, { view: 'left' }], 1)).toMatchObject({ view: ['left'], left: [] });
     expect(unsentPicks([{ name: 'Max' }, { name: 'Bella' }], 1)).toMatchObject({ name: ['Bella'], breed: [], left: [] });
   });
@@ -145,7 +145,7 @@ describe('unsentPicks', () => {
     const runs = [{ pose: 'front' }, { pose: 'kneel' }, { poseText: 'ngồi trên ghế gỗ' }];
     expect(unsentPicks(runs, 1)).toMatchObject({ pose: ['kneel'], poseText: ['ngồi trên ghế gỗ'], left: [] });
     expect(unsentPicks(runs, 2)).toMatchObject({ pose: [], poseText: ['ngồi trên ghế gỗ'], left: [] });
-    expect(unsentPicks(runs, 3)).toMatchObject({ pose: [], poseText: [], left: [] });
+    expect(unsentPicks(runs, 3)).toMatchObject({ pose: [], poseText: [], color: [], shot: [], left: [] });
   });
 
   it('keeps the pose photos that were not sent, and drops the sent ones', () => {
@@ -157,9 +157,9 @@ describe('unsentPicks', () => {
 
   it('drops a name whose breeds were partly sent and names its jobs not sent instead, so nothing is sent twice', () => {
     const runs = ['Max', 'Bella'].flatMap((name) => ['Pug', 'Boxer'].map((breed) => ({ name, breed })));
-    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Pug', 'Boxer'], style: [], product: [], name: ['Bella'], pose: [], poseText: [], poseRef: [], left: [{ name: 'Max', breed: 'Boxer' }] });
+    expect(unsentPicks(runs, 1)).toEqual({ view: [], breed: ['Pug', 'Boxer'], style: [], product: [], name: ['Bella'], pose: [], poseText: [], color: [], shot: [], poseRef: [], left: [{ name: 'Max', breed: 'Boxer' }] });
     expect(unsentPicks(runs, 2)).toMatchObject({ name: ['Bella'], breed: ['Pug', 'Boxer'], left: [] });
-    expect(unsentPicks(runs, 3)).toEqual({ view: [], breed: [], style: [], product: [], name: [], pose: [], poseText: [], poseRef: [], left: [{ name: 'Bella', breed: 'Boxer' }] });
+    expect(unsentPicks(runs, 3)).toEqual({ view: [], breed: [], style: [], product: [], name: [], pose: [], poseText: [], color: [], shot: [], poseRef: [], left: [{ name: 'Bella', breed: 'Boxer' }] });
   });
 });
 
@@ -495,6 +495,85 @@ describe('Tạo tư thế người mẫu', () => {
   });
 });
 
+describe('Đổi màu sản phẩm', () => {
+  const app = appBySlug('product-recolor')!;
+  const d = (images: string[], colors: number): AppDraft => ({ images: [images.map(img)], prompt: '', models: [{ maxImages: 2 }], failed: false, colors });
+  it('takes one product photo among the photo apps, and offers the twelve common blank colours, each with its hex', () => {
+    expect(app).toMatchObject({ feature: 'product_recolor', category: 'photo', colors: true, added: '2026-11-24' });
+    expect(app.slots.map((s) => [s.label, s.inputLabel, !!s.optional])).toEqual([['Sản phẩm', 'Ảnh sản phẩm', false]]);
+    expect(RECOLOR_COLORS.map((c) => `${c.label} ${c.hex}`)).toEqual([
+      'Đen #111111', 'Trắng #FFFFFF', 'Navy #1F2A44', 'Xám heather #9EA3A8', 'Đỏ #C8102E', 'Xanh royal #1D4F91',
+      'Xanh lá đậm #154734', 'Đỏ đô #5C1F2B', 'Be cát #D8C3A5', 'Hồng nhạt #F4C2C2', 'Xanh nhạt #A7C6ED', 'Xanh quân đội #4B5320',
+    ]);
+    for (const c of RECOLOR_COLORS) expect(isHexColor(c.hex)).toBe(true);
+    expect(MAX_PICTURES).toBe(15);
+  });
+
+  it('takes a typed colour as #RRGGBB in capitals, with or without its #, and names one that is not a swatch by its code', () => {
+    expect(parseHexColor('#2e8b57')).toBe('#2E8B57');
+    expect(parseHexColor(' 2E8B57 ')).toBe('#2E8B57');
+    for (const bad of ['', '#', '#2E8B5', '#2E8B577', 'teal', '#GGGGGG', '##2E8B57', '#2E 8B57']) expect([bad, parseHexColor(bad)]).toEqual([bad, null]);
+    for (const bad of ['#2e8b57', '2E8B57', '#2E8B5', 'navy', '#2E8B57 ']) expect([bad, isHexColor(bad)]).toEqual([bad, false]);
+    expect(colorLabel('#111111')).toBe('Đen');
+    expect(colorLabel('#2E8B57')).toBe('Mã #2E8B57');
+  });
+
+  it('asks for the photo, then a colour, and holds a Run to fifteen colours', () => {
+    expect(appReason(app, d([], 2))).toBe('Tải lên ảnh: Sản phẩm.');
+    expect(appReason(app, d(['a'], 0))).toBe('Chọn ít nhất một màu.');
+    expect(appReason(app, d(['a'], 15))).toBeNull();
+    expect(appReason(app, d(['a'], 16))).toBe('Tối đa 15 ảnh mỗi lần chạy, đang là 16: bỏ bớt màu.');
+  });
+
+  it('writes one English prompt per colour that changes only the material, keeps the print legible and the photo as it is, and only the colour differs', () => {
+    const black = recolorPrompt('#111111');
+    for (const kept of [
+      "Recolor only the product's own material (the fabric, ceramic, canvas or other material it is made of) to black (hex #111111)",
+      'Do not recolor the printed design.',
+      'not tinted, darkened, faded or blended into the new color, so it stays as clearly legible as in the original photo; on a dark new color the white and light parts of the print stay bright',
+      'folds, wrinkles, seams, stitching and fabric texture',
+      'the lighting, the background, any person or props, and the framing and crop',
+      'Do not add any text, logos or watermarks.',
+    ]) expect(black).toContain(kept);
+    expect(recolorPrompt('#2E8B57')).toContain('to the exact color with hex code #2E8B57: ');
+    for (const c of RECOLOR_COLORS) expect(recolorPrompt(c.hex).replace(`${c.name} (hex ${c.hex})`, 'X')).toBe(black.replace('black (hex #111111)', 'X'));
+    for (const c of RECOLOR_COLORS) expect(recolorPrompt(c.hex)).toMatch(/^[ -~]+$/); // English only
+  });
+});
+
+describe('Bộ ảnh listing', () => {
+  const app = appBySlug('listing-set')!;
+  const d = (images: string[], shots: number): AppDraft => ({ images: [images.map(img)], prompt: '', models: [{ maxImages: 2 }], failed: false, shots });
+  it('takes one product photo among the photo apps, and offers fifteen shots: ten basic and five seasonal', () => {
+    expect(app).toMatchObject({ feature: 'listing_set', category: 'photo', shots: true, added: '2026-11-24' });
+    expect(app.slots.map((s) => [s.label, s.inputLabel, !!s.optional])).toEqual([['Sản phẩm', 'Ảnh sản phẩm', false]]);
+    expect(LISTING_SHOTS.filter((s) => s.group === 'basic').map((s) => s.label)).toEqual([
+      'Nền trắng', 'Lifestyle trong nhà', 'Cận cảnh chi tiết', 'Flat lay', 'Cầm trên tay', 'Gói quà', 'Ngoài trời', 'Trên người mẫu / đang dùng', 'Nền màu studio tối giản', 'Mở hộp',
+    ]);
+    expect(LISTING_SHOTS.filter((s) => s.group === 'seasonal').map((s) => s.label)).toEqual(['Giáng sinh', 'Halloween / mùa thu', 'Valentine', 'Mùa hè / bãi biển', 'Ngày của Mẹ / Ngày của Cha']);
+    expect(new Set(LISTING_SHOTS.map((s) => s.id)).size).toBe(15);
+    expect(LISTING_SHOTS.length).toBeLessThanOrEqual(MAX_PICTURES); // every shot fits one Run
+  });
+
+  it('asks for the photo, then a shot, and holds a Run to fifteen pictures', () => {
+    expect(appReason(app, d([], 1))).toBe('Tải lên ảnh: Sản phẩm.');
+    expect(appReason(app, d(['a'], 0))).toBe('Chọn ít nhất một cảnh.');
+    expect(appReason(app, d(['a'], 15))).toBeNull();
+    expect(appReason(app, d(['a'], 16))).toBe('Tối đa 15 ảnh mỗi lần chạy, đang là 16: bỏ bớt cảnh.');
+  });
+
+  it('writes one English prompt per shot that reproduces the product exactly from [Image1], and only the scene differs', () => {
+    const white = listingShotPrompt('white');
+    expect(white).toMatch(/^Make a professional e-commerce listing photo of the product in \[Image1\]: an Amazon main image, with the product alone, centered, on a pure white \(#FFFFFF\) background, filling about 85% of the frame, with no props, no text and no other objects\. /);
+    expect(white).toContain('Reproduce the product exactly as it is in [Image1]: the same shape, proportions, colors, material, print, text and spelling, logo and every detail');
+    expect(listingShotPrompt('in-use')).toContain('worn or used naturally');
+    for (const s of LISTING_SHOTS) {
+      expect(listingShotPrompt(s.id).replace(s.scene, 'X')).toBe(white.replace(LISTING_SHOTS[0]!.scene, 'X'));
+      expect(listingShotPrompt(s.id)).toMatch(/^[ -~]+$/); // English only
+    }
+  });
+});
+
 describe('the batch apps', () => {
   it('title each job with its item, and give each app that writes its own prompt the prompt of an item', () => {
     expect(itemLabel({ view: 'back' })).toBe('Mặt sau');
@@ -508,19 +587,26 @@ describe('the batch apps', () => {
     expect(itemLabel({ pose: null, poseText: null, poseRef: 'ref-1' })).toBe(REF_POSE);
     expect(REF_POSE).toBe('Theo ảnh mẫu');
     expect(itemLabel({ pose: 'no-such-pose' })).toBeNull();
-    expect(itemLabel({ view: null, breed: null, style: null, product: null, name: null, pose: null, poseText: null })).toBeNull();
+    expect(itemLabel({ color: '#1F2A44' })).toBe('Navy');
+    expect(itemLabel({ color: '#2E8B57' })).toBe('Mã #2E8B57');
+    expect(itemLabel({ color: 'navy' })).toBeNull();
+    expect(itemLabel({ shot: 'in-hand' })).toBe('Cầm trên tay');
+    expect(itemLabel({ shot: 'no-such-shot' })).toBeNull();
+    expect(itemLabel({ view: null, breed: null, style: null, product: null, name: null, pose: null, poseText: null, color: null, shot: null })).toBeNull();
     expect(itemPrompt('breed_swap', { breed: 'Pug' })).toBe(breedSwapPrompt('Pug'));
     expect(itemPrompt('pet_portrait', { style: 'oil' })).toBe(petPortraitPrompt('oil'));
     expect(itemPrompt('mockup_pack', { product: 'canvas' }, true)).toBe(mockupPrompt('canvas', true));
     expect(itemPrompt('name_swap', { name: 'Max', breed: 'Pug' })).toBe(nameSwapPrompt('Max', 'Pug'));
     expect(itemPrompt('pose_generator', { pose: 'kneel' })).toBe(posePrompt('kneeling on one knee and facing the camera, full body'));
     expect(itemPrompt('pose_generator', { poseText: 'ngồi trên ghế gỗ' })).toBe(posePrompt('ngồi trên ghế gỗ'));
+    expect(itemPrompt('product_recolor', { color: '#111111' })).toBe(recolorPrompt('#111111'));
+    expect(itemPrompt('listing_set', { shot: 'gift' })).toBe(listingShotPrompt('gift'));
     expect(itemPrompt('multi_angle', { view: 'back' })).toBeUndefined();
     expect(itemPrompt('reframe', {})).toBeUndefined();
   });
 
   it('are the apps that pick items or take many photos, and their Run id is a UUID', () => {
-    expect(APPS.filter((a) => a.views || a.breeds || a.styles || a.products || a.names || a.poses || a.bulk).map((a) => a.feature).sort()).toEqual([...BATCH_FEATURES].sort());
+    expect(APPS.filter((a) => a.views || a.breeds || a.styles || a.products || a.names || a.poses || a.colors || a.shots || a.bulk).map((a) => a.feature).sort()).toEqual([...BATCH_FEATURES].sort());
     expect(APPS.filter((a) => a.bulk).map((a) => a.slug)).toEqual(['background-changer', 'image-upscale', 'background-remover']);
     expect(isBatchId('7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11')).toBe(true);
     for (const bad of ['', 'batch-1', '7D0E2F54-3C55-4A0E-9A59-2F3F0C8B1A11', '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11 ']) expect(isBatchId(bad)).toBe(false);

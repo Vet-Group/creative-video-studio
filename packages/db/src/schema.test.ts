@@ -364,8 +364,8 @@ describe('migration 0007 image models', () => {
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.281', '2K': '0.301', '4K': '0.530' }],
       ['nano-banana', 'fal-ai/nano-banana/edit', ['image', 'try_on', 'jewelry_try_on'], { '1K': '0.0398' }],
       ['nano-banana-2', 'fal-ai/nano-banana-2/edit', ['image', 'fashion_model'], { '1K': '0.08' }],
-      ['nano-banana-2.1', 'google/nano-banana-2.1/edit', ['image', 'try_on', 'jewelry_try_on', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator'], { '1K': '0.04', '2K': '0.059' }],
-      ['nano-banana-pro', 'fal-ai/nano-banana-pro/edit', ['image', 'try_on', 'jewelry_try_on', 'lingerie_try_on', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator'], { '1K': '0.15', '2K': '0.15', '4K': '0.30' }],
+      ['nano-banana-2.1', 'google/nano-banana-2.1/edit', ['image', 'try_on', 'jewelry_try_on', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set'], { '1K': '0.04', '2K': '0.059' }],
+      ['nano-banana-pro', 'fal-ai/nano-banana-pro/edit', ['image', 'try_on', 'jewelry_try_on', 'lingerie_try_on', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set'], { '1K': '0.15', '2K': '0.15', '4K': '0.30' }],
       ['seedream-5-pro', 'bytedance/seedream/v5/pro/edit', ['image', 'lingerie_try_on'], { '1K': '0.0675', '2K': '0.135' }],
     ]);
     for (const r of rows) {
@@ -1087,5 +1087,22 @@ describe('migration 0112 pose generator', () => {
     const id = await insertJob(userId);
     await pool.query(`update jobs set feature = 'pose_generator', params = '{"resolution": "1K", "pose": "front", "batch": "7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11"}' where id = $1`, [id]);
     await expect(pool.query(`update jobs set feature = 'pose_maker' where id = $1`, [id])).rejects.toThrow(/jobs_feature_check/);
+  });
+});
+
+describe('migration 0117 recolor and listing apps', () => {
+  test('adds product recolor and the listing set to the Nano Banana 2.1 and Pro rows and their Vertex twins (none enabled or repriced), a 50 USD soft cap each, and their jobs', async () => {
+    for (const feature of ['product_recolor', 'listing_set']) {
+      const { rows } = await pool.query(`select id, enabled, image_prices from model_configs where $1 = any(features) order by id`, [feature]);
+      expect(rows.map((r) => [r.id, r.enabled])).toEqual([['nano-banana-2.1', false], ['nano-banana-2.1-vertex', false], ['nano-banana-pro', false], ['nano-banana-pro-vertex', false]]);
+      expect(rows.find((r) => r.id === 'nano-banana-pro').image_prices).toEqual({ '1K': '0.15', '2K': '0.15', '4K': '0.30' });
+      expect((await pool.query(`select monthly_usd::int as usd from feature_caps where feature = $1`, [feature])).rows[0].usd).toBe(50);
+      const id = await insertJob(userId);
+      await pool.query(`update jobs set feature = $2, params = '{"resolution": "1K", "batch": "7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11"}' where id = $1`, [id, feature]);
+    }
+    // The features before it stay allowed, an unknown one is still refused.
+    const id = await insertJob(userId);
+    await pool.query(`update jobs set feature = 'pose_generator' where id = $1`, [id]);
+    await expect(pool.query(`update jobs set feature = 'recolor' where id = $1`, [id])).rejects.toThrow(/jobs_feature_check/);
   });
 });

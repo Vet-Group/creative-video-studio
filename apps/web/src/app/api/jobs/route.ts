@@ -13,7 +13,7 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
-import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS } from '@/lib/apps';
+import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, isHexColor, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS } from '@/lib/apps';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
@@ -48,7 +48,7 @@ type Spec = {
   useBrand: boolean;
 };
 /** What the item of each app that writes its own prompt is called, in the refusal of another prompt. */
-const ITEM: Record<string, string> = { breed_swap: 'breed', pet_portrait: 'style', mockup_pack: 'product', name_swap: 'name', pose_generator: 'pose' };
+const ITEM: Record<string, string> = { breed_swap: 'breed', pet_portrait: 'style', mockup_pack: 'product', name_swap: 'name', pose_generator: 'pose', product_recolor: 'color', listing_set: 'shot' };
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 
 /**
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
       text: r.params.brief ?? r.params.poseText ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
       traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, style: r.params.style ?? null, product: r.params.product ?? null, name: r.params.name ?? null,
       // The pose generator's pose (Try On keeps its own pose too, which its card does not name) or its own words.
-      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, poseRef: r.params.poseRef ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
+      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, poseRef: r.params.poseRef ?? null, color: r.params.color ?? null, shot: r.params.shot ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
     })),
   });
 }
@@ -132,8 +132,10 @@ export async function GET(request: Request) {
  * `pose_generator` takes one image (the person) and one of `params.pose` (a value of POSES) or `params.poseText` (the member's own words, clean as a name is, 1 to
  * MAX_POSE_TEXT characters), or two (the person, then a pose photo) and `params.poseRef` naming that second image; exactly one of the three, and an optional `params.background` (a value of
  * POSE_BACKGROUNDS), with exactly the prompt posePrompt (poseRefPrompt for a pose photo) makes of them: one job per pose.
+ * `product_recolor` and `listing_set` take exactly one image (the product) and `params.color` (#RRGGBB in capitals, a swatch's or the member's own) or `params.shot` (an id of
+ * LISTING_SHOTS), with exactly the prompt its item makes: one job per colour or shot.
  * The batch apps (BATCH_FEATURES) and Create image (a Run of 2 or 4 pictures) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again. As on the pages, a Run
- * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs (a pose generator Run MAX_POSES), and a mockup pack Run with a blank product photo one job (400 for one more).
+ * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs (a pose generator Run MAX_POSES, a product recolor or listing set Run MAX_PICTURES), and a mockup pack Run with a blank product photo one job (400 for one more).
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * A store of another team than the caller's billing team is refused with 403 and `code` STORE_TEAM_CODE (lib/billing.ts); not naming a store stays allowed.
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
@@ -186,7 +188,7 @@ export async function POST(request: Request) {
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced', 'unboxing' or 'review'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText', 'poseRef', 'background'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText', 'poseRef', 'background'] : feature === 'product_recolor' ? ['color'] : feature === 'listing_set' ? ['shot'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -211,6 +213,10 @@ export async function POST(request: Request) {
         return bad(`params.poseText must be the pose in your own words, trimmed, 1 to ${MAX_POSE_TEXT} characters`);
       }
     }
+    // One product photo in, one colour or one listing shot out.
+    if ((feature === 'product_recolor' || feature === 'listing_set') && assetIds.length !== 1) return bad(`the ${feature === 'product_recolor' ? 'product recolor' : 'listing set'} takes exactly one image: the product`);
+    if (feature === 'product_recolor' && !isHexColor(given.color ?? '')) return bad('params.color must be one color as #RRGGBB, in capitals');
+    if (feature === 'listing_set' && !LISTING_SHOTS.some((s) => s.id === given.shot)) return bad(`params.shot must be one of ${LISTING_SHOTS.map((s) => s.id).join(', ')}`);
     // The apps that write their own prompt per item take exactly that one (with the mockup pack's blank as the second image).
     const own = itemPrompt(feature, given, assetIds.length > 1);
     if (own !== undefined && (typeof freePrompt !== 'string' || freePrompt.trim() !== own)) return bad(`the prompt must be the one the ${ITEM[feature]} makes`);
@@ -373,6 +379,7 @@ export async function POST(request: Request) {
       ).rows[0] as { jobs: number; blanks: number };
       if (sent.jobs >= MAX_BATCH) return bad(`a Run (params.batch) takes at most ${MAX_BATCH} jobs`);
       if (spec.feature === 'pose_generator' && sent.jobs >= MAX_POSES) return bad(`a pose generator Run (params.batch) takes at most ${MAX_POSES} poses`);
+      if ((spec.feature === 'product_recolor' || spec.feature === 'listing_set') && sent.jobs >= MAX_PICTURES) return bad(`a ${spec.feature === 'product_recolor' ? 'product recolor' : 'listing set'} Run (params.batch) takes at most ${MAX_PICTURES} pictures`);
       if (sent.jobs > 0 && (sent.blanks > 0 || (spec.feature === 'mockup_pack' && spec.assetIds.length > 1))) return bad('with a blank product photo the mockup pack makes one product per Run');
     }
     // The model, preset, store and assets are read under the lock, so one disabled or hidden meanwhile is refused.
