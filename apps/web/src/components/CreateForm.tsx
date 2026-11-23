@@ -3,6 +3,7 @@ import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState 
 import { resolutionVariants } from '@/lib/resolution-variants';
 import { api, type Clip as LibraryClip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, DEMO_TITLE, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
+import { endFrameModel } from '@/lib/end-frame-model';
 import { adjustNote } from '@/lib/video-adjust';
 import { anglePrompt, CAMERA_ANGLES, MAX_ANGLES } from '@/lib/camera-angles';
 import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
@@ -178,7 +179,7 @@ export function runReason(f: {
   return null;
 }
 
-export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?: string; preset?: string; model?: string; image?: string; seedPrompt?: string }) {
+export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { reuse?: string; preset?: string; model?: string; image?: string; end?: string; seedPrompt?: string }) {
   const { refresh, notify, loading } = useJobs();
   const recreated = useRecreated();
   const hydrated = useHydrated();
@@ -215,6 +216,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   /** Said when the form changed a setting itself; it shows only while the form still has the values it set. */
   const [adjusted, setAdjusted] = useState<{ text: string; ratio: string; durationSec: number; modelId?: string } | null>(null);
   const wanted = useRef(model); // the Explore choice, honoured once: the form takes its ratio and duration rather than dropping it
+  const endWanted = useRef(end !== undefined); // the two pictures from History: once the models are listed with the end frame, the form moves to one that takes it
   const left = useRef<{ modelLabel: string | null; lost: number; store: boolean } | null>(null); // what a refill left out; the models fetch that follows tells it with the model, once
   const [storeId, setStoreId] = useState('');
   const [stores, setStores] = useState<StoreOption[]>([]);
@@ -330,17 +332,24 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     };
   }, [picking, canEdit]);
 
-  // A picture from History (Fash's Generate Video): it becomes the first image, the rest of the form stays at its defaults.
+  // A picture from History (Fash's Generate Video): it becomes the first image, the rest of the form stays at its defaults. With `end` (two pictures picked there) the second is the end frame.
   useEffect(() => {
     if (!image) return;
     let stale = false;
-    photoImg({ asset: image })
-      .then((img) => !stale && (setImages([img]), setEndFrame(null))) // an end frame that was one of the images it replaces would be refused without them
+    // The end frame loads on its own: a lost one leaves the start image.
+    const endLoaded = end ? photoImg({ asset: end }).catch(() => undefined) : Promise.resolve(null);
+    Promise.all([photoImg({ asset: image }), endLoaded])
+      .then(([img, endImg]) => {
+        if (stale) return;
+        setImages([img]);
+        setEndFrame(endImg ?? null); // an end frame that was one of the images it replaces would be refused without them
+        if (endImg === undefined) setError('Không tìm thấy ảnh khung hình cuối, video sẽ chỉ bắt đầu từ ảnh đầu.');
+      })
       .catch(() => setError('Không tìm thấy ảnh để tạo video.'));
     return () => {
       stale = true;
     };
-  }, [image]);
+  }, [image, end]);
 
   // Reuse: fill the form from the source clip; everything stays editable. A preset switched off since falls back to its prompt as a free prompt.
   useEffect(() => {
@@ -431,7 +440,12 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         }
         const cur = modelRef.current;
         const kept = r.models.find((m) => (m.id === cur || m.pairIds.includes(cur)) && m.supported);
-        const next = kept?.id ?? r.defaultModelId ?? '';
+        // From History's two pictures, the end frame needs a model that takes it: the chosen (else the default) one if it does, else the best one the picker would let the member pick.
+        const needEnd = endWanted.current && withEnd;
+        if (withEnd) endWanted.current = false;
+        const base = kept?.id ?? r.defaultModelId ?? '';
+        const endModel = needEnd ? endFrameModel(r.models, base, audio) : undefined;
+        const next = endModel?.id ?? base;
         const out = left.current;
         left.current = null;
         // A model the list lacks altogether is switched off or hidden (one that does not take the ratio or duration is in the list, as unsupported).
@@ -443,6 +457,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         const nextLabel = r.models.find((m) => m.id === next)?.label;
         const note = [
           out && skippedNote(images.length, { lost: out.lost, store: out.store, ...(gone && { model: { label: out.modelLabel, instead: nextLabel ?? null } }) }),
+          endModel && base !== '' && endModel.id !== base && `Đã chuyển sang ${endModel.label} vì mô hình trước không nhận khung hình cuối.`,
+          needEnd && !endModel && 'Hiện chưa có mô hình nào nhận khung hình cuối cho bạn, nên ảnh thứ hai chưa được dùng.',
           adjustNote({ ...(toDuration !== durationSec && { durationSec: { from: durationSec, to: toDuration } }), ...(cur !== '' && !kept && !gone && nextLabel && { model: { label: nextLabel, ratio, durationSec } }) }),
         ]
           .filter(Boolean)

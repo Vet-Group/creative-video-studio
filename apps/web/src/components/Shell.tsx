@@ -500,14 +500,15 @@ function HistoryEmpty({ feature }: { feature: string }) {
   );
 }
 
-/** History's "Ghép lookbook": 2 to 4 picked pictures as one JPEG, two per row (/api/library/lookbook), saved as a download. */
+/** History's "Ghép lookbook": 2 to 4 picked pictures as one JPEG, two per row (/api/library/lookbook), saved as a download; "Tải PDF" makes it one A4 page under the typed title. */
 function LookbookButton({ ids, notify }: { ids: string[]; notify: (text: string) => void }) {
-  const [busy, setBusy] = useState(false);
-  async function make() {
+  const [busy, setBusy] = useState<'jpg' | 'pdf' | null>(null); // the format being made
+  const [title, setTitle] = useState('');
+  async function make(format: 'jpg' | 'pdf') {
     if (ids.length < 2 || ids.length > 4) return notify('Chọn 2 đến 4 ảnh để ghép lookbook.');
-    setBusy(true);
+    setBusy(format);
     try {
-      const res = await fetch('/api/library/lookbook', withWorkspace(sendJson('POST', { ids })));
+      const res = await fetch('/api/library/lookbook', withWorkspace(sendJson('POST', format === 'pdf' ? { ids, format, title } : { ids })));
       // What api() does for any call: a lost session signs in again, a workspace switched in another tab says so.
       if (res.status === 401) return window.location.assign(loginFor(window.location.pathname + window.location.search));
       if (res.status === 409) return window.dispatchEvent(new Event(WORKSPACE_CHANGED_EVENT));
@@ -518,7 +519,7 @@ function LookbookButton({ ids, notify }: { ids: string[]; notify: (text: string)
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'lookbook.jpg';
+      a.download = `lookbook.${format}`;
       document.body.append(a);
       a.click();
       a.remove();
@@ -526,13 +527,19 @@ function LookbookButton({ ids, notify }: { ids: string[]; notify: (text: string)
     } catch {
       notify('Không ghép được lookbook, hãy thử lại.');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
   return (
-    <button type="button" className="link-button" disabled={busy} onClick={() => void make()}>
-      {busy ? 'Đang ghép…' : 'Ghép lookbook'}
-    </button>
+    <>
+      <button type="button" className="link-button" disabled={busy !== null} onClick={() => void make('jpg')}>
+        {busy === 'jpg' ? 'Đang ghép…' : 'Ghép lookbook'}
+      </button>
+      <input type="text" className="lookbook-title" aria-label="Tiêu đề lookbook" placeholder="Lookbook" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} />
+      <button type="button" className="link-button" disabled={busy !== null} onClick={() => void make('pdf')}>
+        {busy === 'pdf' ? 'Đang ghép…' : 'Tải PDF'}
+      </button>
+    </>
   );
 }
 
@@ -545,7 +552,25 @@ export function Tray({ feature, format }: { feature?: string; format?: string })
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature && (format === undefined || (j.format ?? 'ugc') === format)) : all.jobs;
   // A page of pictures (an image job has no duration) can also lay 2 to 4 picked ones out as one lookbook.
   const pictures = jobs.some((j) => j.durationSec === 0 && j.outputAssetId);
-  const zip = useZipDownload({ actions: pictures ? (ids) => <LookbookButton ids={ids} notify={all.notify} /> : undefined });
+  // Exactly two picked pictures can also start a video: the first picked is its start frame, the second its end frame (Create video, never run from here).
+  const pair = (ids: string[]) => {
+    const [a, b] = ids.map((id) => jobs.find((j) => j.id === id && j.durationSec === 0)?.outputAssetId);
+    return ids.length === 2 && a && b ? `/create?image=${a}&end=${b}` : null;
+  };
+  const zip = useZipDownload({
+    actions: pictures
+      ? (ids) => (
+          <>
+            <LookbookButton ids={ids} notify={all.notify} />
+            {pair(ids) && (
+              <Link href={pair(ids)!} className="link-button">
+                Tạo video từ 2 ảnh
+              </Link>
+            )}
+          </>
+        )
+      : undefined,
+  });
   // A batch app's card offers its Run when the list shows another result of it. The Run's results are read from the job, as a Run can hold more than the 20 latest jobs.
   const inBatch = (j: TrayJob) => !!j.batch && jobs.some((b) => b.id !== j.id && b.batch === j.batch && b.status === 'succeeded' && b.outputAssetId);
   async function selectBatch(j: TrayJob) {

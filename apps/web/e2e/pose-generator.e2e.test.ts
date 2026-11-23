@@ -16,7 +16,7 @@ const background = (page: Page, name: string) => page.getByRole('radiogroup', { 
 const chip = (page: Page, name: string) => page.getByRole('group', { name: 'Chọn nhanh theo sàn' }).getByRole('button', { name, exact: true });
 const slot = (page: Page) => page.getByRole('group', { name: 'Người mẫu', exact: true });
 const toast = (page: Page, text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
-type Job = { id: string; feature: string; status: string; batch: string | null; pose: string | null; poseText: string | null };
+type Job = { id: string; outputAssetId: string | null; feature: string; status: string; batch: string | null; pose: string | null; poseText: string | null };
 const mine = async (page: Page) => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: Job[] }).jobs.filter((j) => j.feature === 'pose_generator');
 
 test('picks a model photo, two library poses and own words, sees the price of three images, refuses a fifth pose, runs one job per pose and titles each card by its pose', async ({ page }) => {
@@ -171,12 +171,41 @@ test('picks a model photo, two library poses and own words, sees the price of th
     expect(lookbook.suggestedFilename()).toBe('lookbook.jpg');
     const bytes = await readFile((await lookbook.path())!);
     expect([...bytes.subarray(0, 3)]).toEqual([0xff, 0xd8, 0xff]);
+    // Under a typed title, "Tải PDF" saves the same grid as one A4 page.
+    await page.getByLabel('Tiêu đề lookbook').fill('Bộ sưu tập Thu Đông');
+    const savedPdf = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Tải PDF' }).click();
+    const pdf = await savedPdf;
+    expect(pdf.suggestedFilename()).toBe('lookbook.pdf');
+    expect((await readFile((await pdf.path())!)).subarray(0, 5).toString('latin1')).toBe('%PDF-');
     for (const title of [OWN_POSE, 'Quỳ một gối']) await page.getByRole('checkbox', { name: new RegExp(`^Chọn Tạo tư thế · ${title} `) }).uncheck();
     await page.getByRole('button', { name: 'Ghép lookbook' }).click();
     await expect(toast(page, 'Chọn 2 đến 4 ảnh để ghép lookbook.')).toBeVisible();
 
+    // Exactly two pictures also start a video: the first picked is the start frame, the second the end frame. The form opens with both and waits for Run.
+    const made = await mine(page);
+    const startJob = made.find((j) => j.pose === 'front')!;
+    const endJob = made.find((j) => j.pose === 'kneel')!;
+    await expect(page.getByRole('link', { name: 'Tạo video từ 2 ảnh' })).toHaveCount(0); // one picked
+    for (const title of ['Mặt trước', OWN_POSE, 'Quỳ một gối']) await page.getByRole('checkbox', { name: new RegExp(`^Chọn Tạo tư thế · ${title} `) }).uncheck();
+    for (const title of ['Mặt trước', 'Quỳ một gối']) await page.getByRole('checkbox', { name: new RegExp(`^Chọn Tạo tư thế · ${title} `) }).check();
+    // The mock model takes no end frame, so the models answer lists one that does, which the form must move to.
+    await page.route('**/api/models?*', async (route) => {
+      const res = await route.fetch();
+      const json = (await res.json()) as { models: Record<string, unknown>[] };
+      json.models.push({ ...json.models.find((m) => m.id === 'mock-e2e')!, id: 'mock-end', label: 'Mock End Frame', pairIds: [], recommended: false, endFrame: true });
+      await route.fulfill({ response: res, json });
+    });
+    await page.getByRole('link', { name: 'Tạo video từ 2 ảnh' }).click();
+    await expect(page).toHaveURL(new RegExp(`/create\\?image=${startJob.outputAssetId}&end=${endJob.outputAssetId}$`));
+    const path = page.getByRole('figure', { name: 'Đầu → Cuối' });
+    await expect(path.getByRole('img', { name: 'Ảnh đầu' })).toBeVisible();
+    await expect(path.getByRole('img', { name: 'Khung hình cuối' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Mô hình / })).toContainText('Mock End Frame');
+    await page.unrouteAll({ behavior: 'ignoreErrors' }); // not Run: a paid clip is never made from a test
+
     // Reuse one card: the photo back in its slot, and the two poses and the own words of its Run picked again.
-    const jobs = await mine(page);
+    const jobs = made;
     await page.goto(`/apps/pose-generator?reuse=${jobs.find((j) => j.pose === 'kneel')!.id}`);
     await expect(slot(page).getByRole('img', { name: 'model.png' })).toBeVisible();
     for (const name of ['Mặt trước', 'Quỳ một gối']) await expect(poses(page).getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
