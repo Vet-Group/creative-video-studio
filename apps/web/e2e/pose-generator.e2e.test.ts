@@ -116,13 +116,13 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await poses(page).getByRole('button', { name: 'Quay lưng', exact: true }).click();
     await expect(chip(page, 'Amazon')).toHaveAttribute('aria-pressed', 'false');
     await chip(page, 'Etsy').click();
-    await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Tay chống hông', 'Xoay 3/4', 'Bước ngang']);
+    await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Tay chống hông', 'Xoay 3/4', 'Sải bước']);
     await expect(background(page, 'Lifestyle')).toBeChecked();
     await expect(chip(page, 'Etsy')).toHaveAttribute('aria-pressed', 'true');
     await background(page, 'Giữ nền gốc').check();
     await expect(chip(page, 'Etsy')).toHaveAttribute('aria-pressed', 'false');
     await chip(page, 'Shopify').click();
-    await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Xoay 3/4', 'Bước ngang', 'Quay lưng']);
+    await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Xoay 3/4', 'Quay lưng', 'Sải bước']);
     await expect(background(page, 'Studio trắng')).toBeChecked();
     // A pressed chip is a toggle: pressed again it clears the picks and puts the photo's own background back.
     await chip(page, 'Shopify').click();
@@ -189,6 +189,13 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await expect(page.getByRole('link', { name: 'Tạo video từ 2 ảnh' })).toHaveCount(0); // one picked
     for (const title of ['Mặt trước', OWN_POSE, 'Quỳ một gối']) await page.getByRole('checkbox', { name: new RegExp(`^Chọn Tạo tư thế · ${title} `) }).uncheck();
     for (const title of ['Mặt trước', 'Quỳ một gối']) await page.getByRole('checkbox', { name: new RegExp(`^Chọn Tạo tư thế · ${title} `) }).check();
+    // On a phone each control of the select bar is drawn 44 px tall: the bar wraps into rows, so a wider hit area would reach into the next one.
+    const wide = page.viewportSize()!;
+    await page.setViewportSize({ width: 390, height: 844 });
+    const barControls = page.locator('.zip-tools').locator('button, a, input');
+    await expect(barControls).toHaveCount(6); // Chọn, Tải xuống .zip, Ghép lookbook, the title, Tải PDF, Tạo video từ 2 ảnh
+    for (const control of await barControls.all()) expect((await control.boundingBox())!.height, (await control.getAttribute('aria-label')) ?? (await control.textContent())!).toBeGreaterThanOrEqual(44);
+    await page.setViewportSize(wide);
     // The mock model takes no end frame, so the models answer lists one that does, which the form must move to.
     await page.route('**/api/models?*', async (route) => {
       const res = await route.fetch();
