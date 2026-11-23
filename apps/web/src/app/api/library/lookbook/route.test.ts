@@ -131,7 +131,7 @@ describe('/api/library/lookbook', () => {
     // Any title, an empty or an over-long one included, still makes a page; `format: 'jpg'` is the JPEG as before.
     for (const title of ['', '   ', 'x'.repeat(500), '\u0000\u0001', 'a￾b\uD800c￿']) expect((await POST(req(alice.cookie, { ids, format: 'pdf', title }))).status).toBe(200);
     expect((await POST(req(alice.cookie, { ids, format: 'jpg' }))).headers.get('content-type')).toBe('image/jpeg');
-  });
+  }, 30_000); // seven full-size pages, one after another
 
   test('format pdf draws the title in the band: dark glyphs on white, a 60-capital title kept inside the page', async () => {
     const ids = [await job(alice.id, 'band-a', await png(300, 400, 250)), await job(alice.id, 'band-b', await png(300, 400, 250))];

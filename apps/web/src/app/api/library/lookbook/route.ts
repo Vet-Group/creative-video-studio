@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     const heading = (size: number) => `<text x="${GAP}" y="120" font-size="${size}" font-weight="bold" fill="#111">${xml(title)}</text>`;
     let size = 84;
     try {
-      const { info } = await sharp(svg(8000, heading(size))).flatten({ background: '#fff' }).trim({ background: '#fff' }).toBuffer({ resolveWithObject: true });
+      const { info } = await sharp(svg(Math.min(8000, 2 * GAP + [...title].length * size * 1.5), heading(size))).flatten({ background: '#fff' }).trim({ background: '#fff' }).toBuffer({ resolveWithObject: true });
       size = Math.min(size, Math.floor((size * 0.98 * (WIDTH - 2 * GAP)) / info.width));
     } catch {
       // Nothing was drawn to measure (no usable font): the band keeps the full size.
