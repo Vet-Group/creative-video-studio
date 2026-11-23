@@ -94,8 +94,8 @@ export interface RunningWorker {
 
 const log = (what: string, e: unknown) => console.error(`worker: ${what}:`, e instanceof Error ? e.message : e);
 
-/** The input whose frame the result keeps, by the order the pages send (lib/apps.ts slots): Try On's person, Background Changer's photo and the pose generator's model photo (its pose photo comes second) come first, a swap's target, Jewelry Try-On's wearer and the mockup pack's blank (else its design) last. */
-const KEPT_INPUT: Partial<Record<string, 0 | -1>> = { try_on: 0, background_changer: 0, pose_generator: 0, character_swap: -1, model_swap: -1, face_swap: -1, jewelry_try_on: -1, lingerie_try_on: -1, mockup_pack: -1 };
+/** The input whose frame the result keeps, by the order the pages send (lib/apps.ts slots): Try On's person, Background Changer's photo, the pose generator's model photo (its pose photo comes second) and product recolor's product photo (its only input, so a new colour keeps the framing) come first, a swap's target, Jewelry Try-On's wearer and the mockup pack's blank (else its design) last. */
+const KEPT_INPUT: Partial<Record<string, 0 | -1>> = { try_on: 0, background_changer: 0, pose_generator: 0, product_recolor: 0, character_swap: -1, model_swap: -1, face_swap: -1, jewelry_try_on: -1, lingerie_try_on: -1, mockup_pack: -1 };
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
