@@ -829,10 +829,10 @@ describe('GET /api/jobs/:id', () => {
     const res = await detail(bob.cookie, id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, breed: null, style: null, product: null, name: null, ratio: '1:1', garments: null, pose: null, poseText: null, background: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, traits: null, durationSec: 8, modelId: 'fal-test',
+      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, breed: null, style: null, product: null, name: null, ratio: '1:1', garments: null, pose: null, poseText: null, poseRef: null, background: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, traits: null, durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', storeLost: false, modelLabel: 'Fal test', inputCount: 3, inputIds: ['d-in-2', 'd-in-gone', 'd-in-1'], outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }],
-      endFrame: null, videoRef: null, clips: [], batchItems: null,
+      endFrame: null, videoRef: null, clips: [], poseImages: [], batchItems: null,
     });
   });
 
@@ -885,9 +885,9 @@ describe('GET /api/jobs/:id', () => {
     const own = (await (await detail(alice.cookie, max)).json()) as { name: string; breed: string; batchItems: unknown };
     expect([own.name, own.breed]).toEqual(['Max', 'Pug']);
     expect(own.batchItems).toEqual([
-      { view: null, breed: 'Pug', style: null, product: null, name: 'Max', pose: null, poseText: null, background: null, id: max, status: 'succeeded', outputAssetId: `${max}-video` },
-      { view: null, breed: 'Pug', style: null, product: null, name: 'Bella', pose: null, poseText: null, background: null, id: bella, status: 'failed', outputAssetId: null },
-      { view: null, breed: 'Pug', style: null, product: null, name: 'Rio', pose: null, poseText: null, background: null, id: rio, status: 'succeeded', outputAssetId: null },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Max', pose: null, poseText: null, poseRef: null, background: null, id: max, status: 'succeeded', outputAssetId: `${max}-video` },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Bella', pose: null, poseText: null, poseRef: null, background: null, id: bella, status: 'failed', outputAssetId: null },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Rio', pose: null, poseText: null, poseRef: null, background: null, id: rio, status: 'succeeded', outputAssetId: null },
     ]);
     // A Run of more than the 20 jobs History loads: every one, for the select-the-Run button.
     const big = '0c8a7a0e-9d6e-4a54-8a39-6d1c4c7f2b12';
@@ -907,6 +907,28 @@ describe('GET /api/jobs/:id', () => {
     };
     expect(await (await detail(alice.cookie, await pose({ background: 'white' }))).json()).toMatchObject({ pose: 'front', background: 'white' });
     expect(await (await detail(alice.cookie, await pose({}))).json()).toMatchObject({ pose: 'front', background: null });
+  });
+
+  test("gives Reuse a pose generator job's pose photo, and the pose photos of its Run that still exist, to the creator only", async () => {
+    const batch = '0c8a7a0e-9d6e-4a54-8a39-6d1c4c7f2b20';
+    for (const id of ['pr-person', 'pr-keep', 'pr-gone', 'pr-other']) await input(id, alice.id);
+    await pool.query(`update assets set deleted_at = now() where id = 'pr-gone'`);
+    const pose = async (params: Record<string, string>, inputs: string[], at: string) => {
+      const id = await clip(alice.id, { inputs, createdAt: at });
+      await pool.query(`update jobs set feature = 'pose_generator', params = $2 where id = $1`, [id, { resolution: '1K', batch, ...params }]);
+      return id;
+    };
+    const first = await pose({ poseRef: 'pr-keep' }, ['pr-person', 'pr-keep'], '2026-11-23T01:00:00Z');
+    await pose({ pose: 'front' }, ['pr-person'], '2026-11-23T01:00:01Z');
+    await pose({ poseRef: 'pr-gone' }, ['pr-person', 'pr-gone'], '2026-11-23T01:00:02Z');
+    await pose({ poseRef: 'pr-other' }, ['pr-person', 'pr-other'], '2026-11-23T01:00:03Z');
+    const got = (await (await detail(alice.cookie, first)).json()) as { poseRef: string; poseImages: { id: string; filename: string }[]; batchItems: { poseRef: string | null }[]; images: { id: string }[] };
+    expect(got.poseRef).toBe('pr-keep');
+    expect(got.batchItems.map((i) => i.poseRef)).toEqual(['pr-keep', null, 'pr-gone', 'pr-other']);
+    expect(got.poseImages.map((i) => i.id)).toEqual(['pr-keep', 'pr-other']); // the deleted one is not
+    expect(got.images.map((i) => i.id)).toEqual(['pr-person', 'pr-keep']); // the job's own inputs, as ever
+    // Another Member gets the one job: its poseRef and the photo among its inputs, none of the Run's.
+    expect(await (await detail(bob.cookie, first)).json()).toMatchObject({ poseRef: 'pr-keep', poseImages: [], batchItems: null });
   });
 
   test('leaves out a store that is hidden now, hides a job that is not a clip from other Members but not from its owner or an Admin, and 404s a deleted one', async () => {

@@ -5,7 +5,7 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseNames, PET_STYLES, POSE_BACKGROUNDS, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, MAX_BATCH, MAX_NAME, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseNames, PET_STYLES, POSE_BACKGROUNDS, POSE_PHOTOS, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { waitLabel } from '@/lib/explore';
 import { parseFashionTraits } from '@/lib/fashion-model';
 import { usable } from '@/lib/fashion-models';
@@ -166,6 +166,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const [names, setNames] = useState(''); // the name swap app's box: one job per name (or per name and breed)
   const [poses, setPoses] = useState<string[]>([]); // the pose generator: one job per pose, none until picked
   const [poseText, setPoseText] = useState(''); // its own words for one more pose, a job of their own
+  const [poseRefs, setPoseRefs] = useState<Img[]>([]); // pictures of someone in the wanted pose, each one more pose and a job of its own (the person's photo is the first image of the job, the picture the second)
   const [background, setBackground] = useState('keep'); // the pose generator's background: the photo's own, a white studio or one lifestyle scene (POSE_BACKGROUNDS)
   const [poseGender, setPoseGender] = useState<'woman' | 'man' | null>(null); // the pose pictures' gender the member chose, else the photo's
   const promptId = useId();
@@ -182,7 +183,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const backgroundId = useId();
   const presetHelpId = useId();
   const { models, failed } = useImageModels(app.feature);
-  const count = jobImages(app, images);
+  const count = jobImages(app, images) + (poseRefs.length > 0 ? 1 : 0); // a pose photo job sends the person and the picture
   const pick = useImageChoice(models, Math.max(1, count));
   const { chosen } = pick;
   // The saved AI models a slot offers (the pose generator's model photo), as Try On's model picker does.
@@ -193,11 +194,12 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const aiGender = parseFashionTraits(aiModels.find((m) => m.assetId === person?.id)?.traits)?.gender;
   const gender = poseGender ?? portraitGender(person?.filename ?? '') ?? (aiGender === 'male' ? 'man' : aiGender === 'female' ? 'woman' : null) ?? (pictured('woman') ? 'woman' : 'man');
   const ownPose = cleanName(poseText.replace(/\p{Cc}/gu, ' ')); // the box's words as a job takes them: control characters (pasted) as spaces, trimmed, one space between words
-  const posesPicked = poses.length + (ownPose ? 1 : 0);
+  const posesPicked = poses.length + (ownPose ? 1 : 0) + poseRefs.length;
+  const poseRoom = MAX_POSES - poses.length - (ownPose ? 1 : 0); // how many pose photos the picked tiles and own words leave room for, those already added included
   const togglePose = (v: string) => (poses.includes(v) ? setPoses(poses.filter((x) => x !== v)) : posesPicked >= MAX_POSES ? notify(`Tối đa ${MAX_POSES} tư thế mỗi lần chạy`) : setPoses([...poses, v]));
-  // A marketplace preset's poses; the own words take one of the Run's slots, so with them filled only the first (MAX_POSES - 1) of the preset are used.
-  const presetPoses = (pr: (typeof POSE_PRESETS)[number]) => pr.poses.slice(0, MAX_POSES - (ownPose ? 1 : 0));
-  const presetOn = (pr: (typeof POSE_PRESETS)[number]) => background === pr.background && poses.length === presetPoses(pr).length && presetPoses(pr).every((v) => poses.includes(v));
+  // A marketplace preset's poses; the own words and each pose photo take one of the Run's slots, so only the first of the preset that are left are used.
+  const presetPoses = (pr: (typeof POSE_PRESETS)[number]) => pr.poses.slice(0, MAX_POSES - (ownPose ? 1 : 0) - poseRefs.length);
+  const presetOn = (pr: (typeof POSE_PRESETS)[number]) => presetPoses(pr).length > 0 && background === pr.background && poses.length === presetPoses(pr).length && presetPoses(pr).every((v) => poses.includes(v));
   // The member's last model and settings, unless a refill opens the page.
   const recall = useRecall(
     app.feature,
@@ -225,7 +227,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
       const slots = j.images ? splitImages(app, alignInputs(j.inputIds, j.images)) : null;
       const placed = slots?.map((s) => s.filter((i) => i !== null));
       if (placed) setImages(placed);
-      const extra = j.images && placed ? j.images.length - placed.flat().length : 0;
+      // A pose-photo job's second input is its pose photo: it goes back in its own box below, so it is no extra photo.
+      const extra = j.images && placed ? j.images.length - placed.flat().length - (j.poseRef && j.images.some((i) => i.id === j.poseRef) ? 1 : 0) : 0;
       setPrompt(j.brief ?? '');
       // A batch app's job brings back every item of its Run, so the member changes one thing and runs the batch again (another member's job, only its own).
       const items: BatchItem[] = j.batchItems ?? [j];
@@ -235,12 +238,17 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
       if (j.style) setStyles(all('style'));
       if (j.product) setProducts(all('product'));
       if (j.name) setNames(all('name').join('\n'));
-      if (j.pose || j.poseText) {
+      // The Run's pose photos that still exist, in the order sent; one that was deleted is lost like any other input (the job's own is already counted in `j.lost`).
+      const refs = all('poseRef');
+      const found = refs.flatMap((id) => [...(j.poseImages ?? []), ...(j.images ?? [])].find((i) => i.id === id) ?? []);
+      const gone = refs.length - found.length - (j.poseRef && !found.some((i) => i.id === j.poseRef) ? 1 : 0);
+      if (j.pose || j.poseText || j.poseRef) {
         setPoses(all('pose'));
         setPoseText(all('poseText')[0] ?? '');
+        setPoseRefs(found);
         setBackground(j.background ?? 'keep');
       }
-      pick.refill({ ...j, ...(extra > 0 && { extra: { count: extra, max: slots!.flat().length } }) });
+      pick.refill({ ...j, lost: (j.lost ?? 0) + gone, ...(extra > 0 && { extra: { count: extra, max: slots!.flat().length } }) });
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
@@ -250,7 +258,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   // Background Changer: a reference photo stands in for the description, whose box is off meanwhile; its words stay in the box's state but are not used.
   const reference = app.prompt === 'background' && images[1]!.length > 0;
   const used = reference ? '' : prompt;
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt: used, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked }) ?? promptTooLong(chosen, used.trim() ? used.trim().length + fixed : 0);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt: used, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked, poseRefs: poseRefs.length }) ?? (poseRefs.some((r) => r.id === person?.id) ? `${POSE_PHOTOS} không được trùng ảnh người mẫu: bỏ một trong hai.` : null) ?? promptTooLong(chosen, used.trim() ? used.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
   /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
   const sent = basePrompt(app.feature, appInputs(app, { images, prompt: used }).prompt);
@@ -273,7 +281,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
           : app.names
             ? parseNames(names).names.flatMap((name) => (pickedBreeds.length > 0 ? pickedBreeds.map((breed) => ({ name, breed })) : [{ name }]))
             : app.poses
-              ? [...POSES.filter((p) => poses.includes(p.value)).map((p) => ({ pose: p.value, background })), ...(ownPose ? [{ poseText: ownPose, background }] : [])]
+              ? [...POSES.filter((p) => poses.includes(p.value)).map((p) => ({ pose: p.value, background })), ...(ownPose ? [{ poseText: ownPose, background }] : []), ...poseRefs.map((r) => ({ poseRef: r.id, background }))]
               : app.bulk
                 ? images[0]!.map(() => ({})) // one job per photo of the first slot
                 : [{}];
@@ -293,14 +301,14 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     </p>
   );
 
-  function add(slot: number) {
+  /** The files of an upload box, uploaded and handed to `put`. */
+  function upload(put: (assets: Img[]) => void) {
     return async (files: File[]) => {
       if (files.length === 0) return;
       setError('');
       setBusy(true);
       try {
-        const assets = await uploadImages(files).finally(loading('Đang tải lên…'));
-        setImages((cur) => cur.map((list, i) => (i === slot ? [...list, ...assets] : list)));
+        put(await uploadImages(files).finally(loading('Đang tải lên…')));
       } catch (e) {
         setError(uploadError(e));
       } finally {
@@ -308,6 +316,9 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
       }
     };
   }
+
+  const add = (slot: number) => upload((assets) => setImages((cur) => cur.map((list, i) => (i === slot ? [...list, ...assets] : list))));
+  const addPoseRefs = upload((assets) => setPoseRefs((cur) => [...cur, ...assets]));
 
   /** History's Dùng kết quả: the result, copied as the member's own input, in the last required slot (the picture the app works on: the swaps' target,
    * the try-ons' wearer, a one-slot app's photo), so it goes through this app again. */
@@ -357,10 +368,12 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     try {
       for (const [n, one] of runs.entries()) {
         const own = itemPrompt(app.feature, one, blank);
+        const inputs = appInputs(app, { images: app.bulk ? images.map((list, i) => (i === 0 ? [list[n]!] : list)) : images, prompt: used });
         const body = {
           feature: app.feature,
           modelId: pick.modelId,
-          ...appInputs(app, { images: app.bulk ? images.map((list, i) => (i === 0 ? [list[n]!] : list)) : images, prompt: used }),
+          ...inputs,
+          ...(one.poseRef && { assetIds: [...inputs.assetIds, one.poseRef] }), // the pose photo goes second
           ...(own && { prompt: own }),
           ratio: pick.ratio,
           params: { resolution: pick.resolution, ...(app.prompt && used.trim() && { brief: used.trim() }), ...one, ...(batch && { batch }) }, // the member's own text, kept for reuse
@@ -392,6 +405,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
         if (app.poses) {
           setPoses(p.pose);
           setPoseText(p.poseText[0] ?? '');
+          setPoseRefs((cur) => cur.filter((r) => p.poseRef.includes(r.id)));
         }
         sent = ` Đã gửi ${done}/${runs.length} ảnh và bỏ chọn các mục đã gửi.${p.left.length > 0 ? ` Chưa gửi: ${p.left.map(itemLabel).join(', ')}.` : ''}`;
       }
@@ -537,7 +551,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                         key={pr.id}
                         type="button"
                         aria-pressed={presetOn(pr)}
-                        disabled={busy}
+                        disabled={busy || presetPoses(pr).length === 0} // no room left for a pose of the preset: the pose photos and own words fill the Run
                         onClick={() => {
                           // A pressed chip toggles off: no picks and the photo's own background.
                           setPoses(presetOn(pr) ? [] : [...presetPoses(pr)]);
@@ -549,7 +563,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     ))}
                   </div>
                   <p id={presetHelpId} className="help">
-                    {`Chọn nhanh tư thế và nền hợp quy định ảnh của từng sàn (${MAX_POSES} tư thế, hoặc ${MAX_POSES - 1} khi đã có ô ${OWN_POSE}).`}
+                    {`Chọn nhanh tư thế và nền hợp quy định ảnh của từng sàn (${MAX_POSES} tư thế, hoặc ít hơn khi đã có ô ${OWN_POSE} hoặc ảnh tư thế mẫu).`}
                   </p>
                   <span id={backgroundId} className="field-label">
                     Nền
@@ -563,7 +577,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     ))}
                   </div>
                   {(pictured('woman') || pictured('man')) && (
-                    <div className="segmented theme-choice" role="radiogroup" aria-label="Ảnh tư thế mẫu">
+                    <div className="segmented theme-choice" role="radiogroup" aria-label="Giới tính ảnh tư thế">
                       {(['woman', 'man'] as const).map((g) => (
                         <label key={g}>
                           <input type="radio" name={genderName} checked={gender === g} onChange={() => setPoseGender(g)} />
@@ -606,8 +620,25 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                   </label>
                   <textarea id={poseTextId} className="names-box" rows={2} maxLength={MAX_POSE_TEXT} value={poseText} placeholder="Ví dụ: ngồi trên bậc thềm, tay chống cằm, nhìn ra xa" onChange={(e) => setPoseText(e.target.value)} />
                   <p className="help">Mỗi tư thế tạo một ảnh riêng và tính tiền riêng, tối đa {MAX_POSES} tư thế mỗi lần chạy. Ô này tính là một tư thế và chạy thành ảnh riêng, không trộn với tư thế đã chọn. AI giữ khuôn mặt, tóc, dáng người và trang phục; hãy xem lại từng ảnh. Ô đã chọn hiện ảnh kết quả mẫu để bạn hình dung trước. Đang ở một ô tư thế, bấm phím 1 đến 9 để chọn nhanh chín tư thế đầu.</p>
-                  {runCost}
                 </div>
+                {/* Pictures of someone in the wanted pose: each is one more pose, up to what is left of the Run's four. */}
+                <Slot
+                  label={POSE_PHOTOS}
+                  empty="Thêm ảnh một người ở đúng tư thế muốn tạo"
+                  inputLabel={POSE_PHOTOS}
+                  images={poseRefs}
+                  max={poseRoom}
+                  count
+                  optional
+                  busy={busy}
+                  onAdd={addPoseRefs}
+                  onRemove={(id) => setPoseRefs((cur) => cur.filter((x) => x.id !== id))}
+                  onPick={(img) => setPoseRefs((cur) => (poseRoom === 1 ? [img] : [...cur, img]))}
+                />
+                <p className="help">
+                  Mỗi ảnh là một tư thế, tạo một ảnh riêng và tính tiền riêng; còn chỗ cho {Math.max(0, poseRoom - poseRefs.length)} ảnh. AI chỉ lấy tư thế, góc người và khung hình từ ảnh này; khuôn mặt, tóc, dáng người và trang phục vẫn theo ảnh người mẫu, còn nền theo mục Nền.
+                </p>
+                {runCost}
               </>
             )}
 

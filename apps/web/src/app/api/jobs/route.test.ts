@@ -18,7 +18,7 @@ const { GET: listJobs, POST } = await import('./route');
 const { GET } = await import('../stores/route');
 const { settle } = await import('@cvs/core/ledger');
 const { FEATURE_PROMPTS } = await import('@cvs/core/models');
-const { breedSwapPrompt, MAX_BATCH, mockupPrompt, nameSwapPrompt, petPortraitPrompt, posePrompt } = await import('@/lib/apps');
+const { breedSwapPrompt, MAX_BATCH, mockupPrompt, nameSwapPrompt, petPortraitPrompt, posePrompt, poseRefPrompt } = await import('@/lib/apps');
 const { forgetFalBalance } = await import('@/lib/provider-credit');
 
 const PASSWORD = 'correct-horse-battery';
@@ -916,8 +916,8 @@ describe('POST /api/jobs for an image feature', () => {
       const own = (poseText: string) => ({ prompt: posePrompt(poseText), params: { resolution: '1K', poseText, batch: BATCH } });
       const before = await jobCount();
       expect((await post({ ...kneel, params: { ...kneel.params, pose: 'cartwheel' } }, 1)).error).toMatch(/^params.pose must be one of front, hand-on-hip, three-quarter, /);
-      expect((await post({ ...kneel, params: { ...kneel.params, poseText: 'ngồi trên ghế' } }, 1)).error).toBe('the pose generator takes params.pose or params.poseText, not both and not neither');
-      expect((await post({ prompt: kneel.prompt, params: { resolution: '1K', batch: BATCH } }, 1)).error).toBe('the pose generator takes params.pose or params.poseText, not both and not neither');
+      expect((await post({ ...kneel, params: { ...kneel.params, poseText: 'ngồi trên ghế' } }, 1)).error).toBe('the pose generator takes one of params.pose, params.poseText or params.poseRef, not two and not none');
+      expect((await post({ prompt: kneel.prompt, params: { resolution: '1K', batch: BATCH } }, 1)).error).toBe('the pose generator takes one of params.pose, params.poseText or params.poseRef, not two and not none');
       // Over 200 characters, empty, untrimmed, two spaces, a line break and a control character: the page sends its words clean.
       const refused = 'params.poseText must be the pose in your own words, trimmed, 1 to 200 characters';
       for (const bad of ['x'.repeat(201), '', ' ngồi', 'ngồi  xổm', 'ngồi\nxổm', 'ngồi\u0007']) expect([bad, (await post(own(bad), 1)).error]).toEqual([bad, refused]);
@@ -925,8 +925,8 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await post({ ...kneel, prompt: `${kneel.prompt} Make her smile.` }, 1)).error).toBe('the prompt must be the one the pose makes');
       expect((await post({ params: kneel.params }, 1)).error).toBe('the prompt must be the one the pose makes');
       expect((await post(kneel, 0)).error).toMatch(/^assetIds must list 1 to /);
-      expect((await post(kneel, 2)).error).toBe('the pose generator takes exactly one image: the person');
-      expect((await post({ ...kneel, params: { ...kneel.params, garments: '1' } }, 1)).error).toMatch(/^params may hold only resolution, quality, thinking, brief, pose, poseText, background and batch/);
+      expect((await post(kneel, 2)).error).toBe('the pose generator takes one image (the person), or two (the person, then the pose photo) with params.poseRef');
+      expect((await post({ ...kneel, params: { ...kneel.params, garments: '1' } }, 1)).error).toMatch(/^params may hold only resolution, quality, thinking, brief, pose, poseText, poseRef, background and batch/);
       // The background is one of the three, and the prompt must be the one that background makes; it is for the pose generator only.
       const on = (background: string, prompt = posePrompt('kneeling on one knee and facing the camera, full body', background)) => ({ prompt, params: { ...kneel.params, background } });
       for (const bad of ['studio', 'White', '']) expect([bad, (await post(on(bad), 1)).error]).toEqual([bad, 'params.background must be one of keep, white, lifestyle']);
@@ -947,6 +947,49 @@ describe('POST /api/jobs for an image feature', () => {
       const count = await jobCount();
       expect((await post(own('ngồi xổm'), 1)).error).toBe('a pose generator Run (params.batch) takes at most 4 poses');
       expect(await jobCount()).toBe(count);
+    });
+
+    test('the pose generator takes a pose photo as the second image of a job, named by params.poseRef, never with a pose or own words, with exactly the prompt it makes', async () => {
+      const m = await newMember();
+      const other = await newMember();
+      for (const id of ['ref', 'ref2', 'ref3']) await insertAsset(`${m.id}-${id}`, m.id);
+      await insertAsset(`${other.id}-theirs`, other.id);
+      const ref = `${m.id}-ref`;
+      const send = async (assetIds: string[], params: Record<string, string>, prompt = poseRefPrompt()) => {
+        const res = await run(m.cookie, { assetIds, modelId: 'app-poses', feature: 'pose_generator', ratio: 'auto', prompt, params: { resolution: '1K', batch: crypto.randomUUID(), ...params } });
+        const body = (await res.json()) as { id?: string; error?: string };
+        const job = body.id ? (await pool.query('select feature, model, prompt, aspect, params, input_asset_ids from jobs where id = $1', [body.id])).rows[0] : undefined;
+        return { status: res.status, error: body.error, job };
+      };
+      const before = await jobCount();
+      const one = 'the pose generator takes one image (the person), or two (the person, then the pose photo) with params.poseRef';
+      const exactly = 'the pose generator takes one of params.pose, params.poseText or params.poseRef, not two and not none';
+      expect((await send([m.asset, ref], {})).error).toBe(one); // two images without poseRef
+      expect((await send([m.asset], { poseRef: ref })).error).toBe(one); // poseRef with one image
+      expect((await send([m.asset, ref, `${m.id}-ref2`], { poseRef: ref })).error).toBe(one); // three images
+      expect((await send([m.asset, ref], { poseRef: m.asset })).error).toBe('params.poseRef must be the second image: the pose photo'); // not the second image
+      expect((await send([m.asset, ref], { poseRef: `${m.id}-ref2` })).error).toBe('params.poseRef must be the second image: the pose photo');
+      expect((await send([m.asset, ref], { poseRef: ref, pose: 'kneel' })).error).toBe(exactly);
+      expect((await send([m.asset, ref], { poseRef: ref, poseText: 'ngồi trên ghế' })).error).toBe(exactly);
+      expect((await send([m.asset, ref], { poseRef: ref, background: 'studio' })).error).toBe('params.background must be one of keep, white, lifestyle');
+      // The prompt must be the one it makes, with the photo's own background unless another is named.
+      expect((await send([m.asset, ref], { poseRef: ref }, posePrompt('standing straight'))).error).toBe('the prompt must be the one the pose makes');
+      expect((await send([m.asset, ref], { poseRef: ref, background: 'white' })).error).toBe('the prompt must be the one the pose makes');
+      // The second image goes through the same ownership check as the first: another member's photo cannot be used, and nor can the same photo twice.
+      expect((await send([m.asset, `${other.id}-theirs`], { poseRef: `${other.id}-theirs` })).error).toBe('one or more assets do not exist or cannot be used');
+      expect((await send([m.asset, m.asset], { poseRef: m.asset })).error).toMatch(/^assetIds must list 1 to \d+ different asset ids$/);
+      expect(await jobCount()).toBe(before);
+      for (const background of ['keep', 'white', 'lifestyle']) {
+        const ok = await send([m.asset, ref], { poseRef: ref, background }, poseRefPrompt(background));
+        expect([ok.status, ok.job]).toEqual([201, { feature: 'pose_generator', model: 'app-poses', prompt: poseRefPrompt(background), aspect: 'auto', params: { resolution: '1K', poseRef: ref, background, batch: ok.job.params.batch }, input_asset_ids: [m.asset, ref] }]);
+      }
+      // Without a background it is the photo's own, and a pose photo job shares a Run's four poses with the others.
+      const run4 = crypto.randomUUID();
+      expect((await send([m.asset, ref], { poseRef: ref, batch: run4 })).status).toBe(201);
+      expect((await send([m.asset, `${m.id}-ref2`], { poseRef: `${m.id}-ref2`, batch: run4 })).status).toBe(201);
+      expect((await send([m.asset], { pose: 'kneel', batch: run4 }, posePrompt('kneeling on one knee and facing the camera, full body'))).status).toBe(201);
+      expect((await send([m.asset, `${m.id}-ref3`], { poseRef: `${m.id}-ref3`, batch: run4 })).status).toBe(201);
+      expect((await send([m.asset, ref], { poseRef: ref, batch: run4 })).error).toBe('a pose generator Run (params.batch) takes at most 4 poses');
     });
 
     test("History's list names a pose generator job's pose or own words, and not a Try On job's pose", async () => {

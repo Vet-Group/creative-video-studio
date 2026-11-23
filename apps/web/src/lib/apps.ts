@@ -55,7 +55,7 @@ export interface AppConfig {
   /** Shows the names box and the breeds as an option (the name swap app): Run sends one job per name, or per name and breed, each with its `params.name` (and `params.breed`) and the prompt nameSwapPrompt makes. */
   names?: boolean;
   /** Shows the poses (POSES, by their pictures) and a box for the member's own words, up to MAX_POSES in all (the pose generator): Run sends one job per pose, each with its
-   * `params.pose` or `params.poseText` and the prompt posePrompt makes. */
+   * `params.pose` or `params.poseText` and the prompt posePrompt makes, or, for a pose photo, `params.poseRef` and the prompt poseRefPrompt makes. */
   poses?: boolean;
   /** Its first slot takes up to MAX_BATCH photos: Run sends one job per photo, each with the same settings, the other slots and one `params.batch`. */
   bulk?: boolean;
@@ -339,8 +339,10 @@ export interface AppDraft {
   products?: number;
   /** The names box, on an app with `names`. */
   names?: string;
-  /** How many poses are picked, the member's own words counting as one, on an app with `poses`. */
+  /** How many poses are picked, the member's own words and each pose photo counting as one, on an app with `poses`. */
   poses?: number;
+  /** How many of those are pose photos, whose jobs send the person's photo and the pose photo, on an app with `poses`. */
+  poseRefs?: number;
 }
 
 /** The first thing that stops Run, in the order the form is filled; null when it can go. */
@@ -372,7 +374,7 @@ export function appReason(app: AppConfig, d: AppDraft): string | null {
     if (reference && written) return 'Chọn mô tả nền hoặc ảnh nền tham chiếu, không dùng cả hai.';
     if (!reference && !written) return 'Nhập mô tả nền mới hoặc tải lên ảnh nền tham chiếu.';
   }
-  const count = jobImages(app, d.images);
+  const count = jobImages(app, d.images) + ((d.poseRefs ?? 0) > 0 ? 1 : 0);
   if (count > model.maxImages) return `Mô hình này nhận tối đa ${model.maxImages} ảnh.`;
   return null;
 }
@@ -495,6 +497,9 @@ export const MAX_POSES = 4;
 export const MAX_POSE_TEXT = 200;
 /** What the pose generator calls a job of the member's own words, on its box and on the job's History card. */
 export const OWN_POSE = 'Tư thế tự tả';
+/** What the pose generator calls its box of pose photos, and what its History card calls a job of one. */
+export const POSE_PHOTOS = 'Ảnh tư thế mẫu';
+export const REF_POSE = 'Theo ảnh mẫu';
 
 /** The backgrounds of the pose generator: the value a job keeps as `params.background`, the page's label and the scene the prompt puts the person in (none: the photo's own). The lifestyle scene is
  * one fixed description, so every pose of a Run shares the same background. */
@@ -514,6 +519,20 @@ export const posePrompt = (words: string, background?: string | null): string =>
     `exactly unchanged, and show the same person in this pose and framing: ${words}. ` +
     (scene ? `Replace the background with ${scene}. ` : '') +
     'Photorealistic, with the same camera quality as the photo. Do not add any text, logos or watermarks.'
+  );
+};
+
+/** The prompt of one pose generator job of a pose photo: the person of the first image, unchanged, in the pose, body angle and framing of the second image, which is used for the pose only,
+ * on the first photo's own background or the `background`'s scene. POST /api/jobs takes no other. */
+export const poseRefPrompt = (background?: string | null): string => {
+  const scene = POSE_BACKGROUNDS.find((b) => b.value === background)?.scene;
+  return (
+    "Keep the person in the first image: the face, identity, hair, skin, body shape and outfit" +
+    (scene ? ' ' : ", and the first image's lighting and background, ") +
+    'exactly unchanged, and show the same person in the pose, body angle and framing of the person in the second image. ' +
+    "Use the second image only for the pose: do not copy its person's face, identity, hair, clothes or background. " +
+    (scene ? `Replace the background with ${scene}. ` : '') +
+    'Photorealistic, with the same camera quality as the first image. Do not add any text, logos or watermarks.'
   );
 };
 
@@ -600,6 +619,8 @@ export interface BatchItem {
   name?: string | null;
   pose?: string | null;
   poseText?: string | null;
+  /** The pose photo (an asset id) a job copied the pose of. */
+  poseRef?: string | null;
   background?: string | null;
 }
 
@@ -607,15 +628,15 @@ export interface BatchItem {
  * What stays picked after a batch Run stopped once `done` of its `runs` were sent, so Run again sends only the rest: each key's items of the jobs not sent.
  * A name with some of its breeds sent is dropped too (picking it again would resend those), and its jobs not sent come back in `left` for the page to name.
  */
-export function unsentPicks(runs: BatchItem[], done: number): Record<'view' | 'breed' | 'style' | 'product' | 'name' | 'pose' | 'poseText', string[]> & { left: BatchItem[] } {
+export function unsentPicks(runs: BatchItem[], done: number): Record<'view' | 'breed' | 'style' | 'product' | 'name' | 'pose' | 'poseText' | 'poseRef', string[]> & { left: BatchItem[] } {
   const started = new Set(runs.slice(0, done).map((r) => r.name).filter(Boolean));
   const rest = runs.slice(done);
   const kept = rest.filter((r) => !r.name || !started.has(r.name));
   const all = (k: keyof BatchItem) => [...new Set(kept.map((r) => r[k]).filter((v): v is string => !!v))];
-  return { view: all('view'), breed: all('breed'), style: all('style'), product: all('product'), name: all('name'), pose: all('pose'), poseText: all('poseText'), left: rest.filter((r) => !kept.includes(r)) };
+  return { view: all('view'), breed: all('breed'), style: all('style'), product: all('product'), name: all('name'), pose: all('pose'), poseText: all('poseText'), poseRef: all('poseRef'), left: rest.filter((r) => !kept.includes(r)) };
 }
 
-/** What one job of a batch app made, for its History card's title: the view's, style's, product's or pose's label (OWN_POSE for the member's own words), the name (with its breed)
+/** What one job of a batch app made, for its History card's title: the view's, style's, product's or pose's label (OWN_POSE for the member's own words, REF_POSE for a pose photo), the name (with its breed)
  * or the breed; null for any other job. */
 export const itemLabel = (p: BatchItem): string | null =>
   (p.view && VIEW_LABELS[p.view]) ||
@@ -623,6 +644,7 @@ export const itemLabel = (p: BatchItem): string | null =>
   (p.product && MOCKUP_PRODUCTS.find((m) => m.id === p.product)?.label) ||
   (p.pose && poseOf(p.pose)?.label) ||
   (p.poseText && OWN_POSE) ||
+  (p.poseRef && REF_POSE) ||
   (p.name && [p.name, p.breed].filter(Boolean).join(' · ')) ||
   p.breed ||
   null;
@@ -634,6 +656,6 @@ export function itemPrompt(feature: string, p: BatchItem, blank = false): string
   if (feature === 'pet_portrait') return petPortraitPrompt(p.style!);
   if (feature === 'mockup_pack') return mockupPrompt(p.product!, blank);
   if (feature === 'name_swap') return nameSwapPrompt(p.name!, p.breed ?? undefined);
-  if (feature === 'pose_generator') return posePrompt(poseOf(p.pose)?.words ?? p.poseText!, p.background);
+  if (feature === 'pose_generator') return p.poseRef ? poseRefPrompt(p.background) : posePrompt(poseOf(p.pose)?.words ?? p.poseText!, p.background);
   return undefined;
 }
