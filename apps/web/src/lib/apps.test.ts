@@ -2,7 +2,7 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
-import { POSE_PRESETS, POSES } from './try-on-stock';
+import { GARMENT_PRESETS, POSE_PRESETS, POSES } from './try-on-stock';
 import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
@@ -501,6 +501,16 @@ describe('Tạo tư thế người mẫu', () => {
     }
     // Amazon's main image: full-body standing views only.
     for (const v of POSE_PRESETS[0].poses) expect(POSES.find((p) => p.value === v)!.words).toMatch(/^(standing|walking)\b.*full body$/);
+  });
+
+  it('has garment presets of four distinct known poses and no background', () => {
+    expect(GARMENT_PRESETS.map((p) => [p.id, p.label])).toEqual([['dress', 'Váy/Đầm'], ['top', 'Áo'], ['bottom', 'Quần'], ['outerwear', 'Áo khoác']]);
+    for (const pr of GARMENT_PRESETS) {
+      expect(pr.poses).toHaveLength(4);
+      expect(new Set(pr.poses).size).toBe(4);
+      for (const v of pr.poses) expect(POSES.map((p) => p.value)).toContain(v);
+      expect(pr).not.toHaveProperty('background');
+    }
   });
 });
 

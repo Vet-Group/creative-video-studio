@@ -12,7 +12,7 @@ import { usable } from '@/lib/fashion-models';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { alignInputs, placesOf, type Skipped, skippedNote } from '@/lib/reuse';
 import { confirmRun, sendRun, usd } from '@/lib/run-guard';
-import { portraitGender, POSE_PRESETS, POSES } from '@/lib/try-on-stock';
+import { GARMENT_PRESETS, portraitGender, POSE_PRESETS, POSES } from '@/lib/try-on-stock';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
@@ -189,6 +189,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const backgroundName = useId();
   const backgroundId = useId();
   const presetHelpId = useId();
+  const garmentHelpId = useId();
   const hexId = useId();
   const hexErrorId = useId();
   const { models, failed } = useImageModels(app.feature);
@@ -216,9 +217,10 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     if (!colors.includes(hex)) setColors([...colors, hex]);
     setHexText('');
   };
-  // A marketplace preset's poses; the own words and each pose photo take one of the Run's slots, so only the first of the preset that are left are used.
-  const presetPoses = (pr: (typeof POSE_PRESETS)[number]) => pr.poses.slice(0, MAX_POSES - (ownPose ? 1 : 0) - poseRefs.length);
-  const presetOn = (pr: (typeof POSE_PRESETS)[number]) => presetPoses(pr).length > 0 && background === pr.background && poses.length === presetPoses(pr).length && presetPoses(pr).every((v) => poses.includes(v));
+  // A preset's poses (marketplace or garment); the own words and each pose photo take one of the Run's slots, so only the first of the preset that are left are used.
+  const presetPoses = (pr: { poses: readonly string[] }) => pr.poses.slice(0, MAX_POSES - (ownPose ? 1 : 0) - poseRefs.length);
+  const posesOn = (pr: { poses: readonly string[] }) => presetPoses(pr).length > 0 && poses.length === presetPoses(pr).length && presetPoses(pr).every((v) => poses.includes(v));
+  const presetOn = (pr: (typeof POSE_PRESETS)[number]) => posesOn(pr) && background === pr.background;
   // The member's last model and settings, unless a refill opens the page.
   const recall = useRecall(
     app.feature,
@@ -603,6 +605,22 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                   </div>
                   <p id={presetHelpId} className="help">
                     {`Chọn nhanh tư thế và nền hợp quy định ảnh của từng sàn (${MAX_POSES} tư thế, hoặc ít hơn khi đã có ô ${OWN_POSE} hoặc ảnh tư thế mẫu).`}
+                  </p>
+                  <div className="segmented theme-choice preset-chips" role="group" aria-label="Chọn nhanh theo trang phục" aria-describedby={garmentHelpId}>
+                    {GARMENT_PRESETS.map((pr) => (
+                      <button
+                        key={pr.id}
+                        type="button"
+                        aria-pressed={posesOn(pr)}
+                        disabled={busy || presetPoses(pr).length === 0} // no room left for a pose of the preset: the pose photos and own words fill the Run
+                        onClick={() => setPoses(posesOn(pr) ? [] : [...presetPoses(pr)])} // the background stays as picked
+                      >
+                        {pr.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p id={garmentHelpId} className="help">
+                    {`Chọn nhanh ${MAX_POSES} tư thế hợp loại trang phục (hoặc ít hơn khi đã có ô ${OWN_POSE} hoặc ảnh tư thế mẫu); nền giữ như đang chọn.`}
                   </p>
                   <span id={backgroundId} className="field-label">
                     Nền
