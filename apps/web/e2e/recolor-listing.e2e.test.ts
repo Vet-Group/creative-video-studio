@@ -32,6 +32,7 @@ const sentJobs = (page: Page) => {
 test('product recolor: picks a swatch and an own colour code, sees the price of two pictures, runs one job per colour, reuses the batch and holds a Run to 15 colours', async ({ page }) => {
   await signIn(page, 'recolora');
   await openApp(page, 'Đổi màu sản phẩm', 'product-recolor');
+  await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']); // an Admin may put results on its Examples tab
   const colors = page.getByRole('group', { name: 'Màu cần tạo' });
 
   // Twelve swatches, none picked until the member picks one, as each costs a job; the art-less page still renders.
@@ -107,6 +108,7 @@ test('product recolor: picks a swatch and an own colour code, sees the price of 
 test('listing set: picks a basic and a seasonal shot for a product photo, sees the price of two pictures, runs one job per shot, selects the batch and reuses it', async ({ page }) => {
   await signIn(page, 'listinga');
   await openApp(page, 'Bộ ảnh listing', 'listing-set');
+  await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']);
   const basic = page.getByRole('group', { name: 'Cảnh cơ bản' });
   const seasonal = page.getByRole('group', { name: 'Cảnh theo mùa' });
 
