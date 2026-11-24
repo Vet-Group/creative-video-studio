@@ -2375,7 +2375,8 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Ảnh nhiều góc là gì?',
         blocks: [
-          'Ảnh nhiều góc xoay sản phẩm trong một ảnh mặt trước sang các góc khác: mặt sau, bên trái, bên phải, góc 3/4 và nhìn từ trên. Mỗi góc là một ảnh riêng.',
+          'Ảnh nhiều góc xoay sản phẩm hoặc người mẫu trong một ảnh mặt trước sang các góc khác: mặt sau, bên trái, bên phải, góc 3/4, sau chéo và nhìn từ trên. Mỗi góc là một ảnh riêng.',
+          'Nút Vòng xoay 360° chọn sẵn 7 góc ngang; khi cả 7 ảnh xong, app tự ghép ảnh gốc và 7 góc thành một video xoay 360° (MP4, miễn phí) ngay dưới các ảnh trong tab Lịch sử.',
           `Dùng các ảnh này làm ảnh tham chiếu ở Tạo video hay Marketing Studio: mô hình video thấy sản phẩm từ nhiều phía nên giữ hình in quanh sản phẩm tốt hơn. ${APP_COST}`,
         ],
       },

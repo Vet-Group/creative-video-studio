@@ -1,7 +1,7 @@
 // The purge against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`).
 import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { reframedKeys } from '@cvs/core/queue';
+import { reframedKeys, turntableKey } from '@cvs/core/queue';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -171,5 +171,23 @@ describe('purgeDeletedClips', () => {
     expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(1);
     expect((await pool.query(`select id from assets where id = 'an-source'`)).rows).toEqual([{ id: 'an-source' }]);
     expect(await keys()).toContain('assets/an-source');
+  });
+
+  test("removes a Run's turntable with a purged horizontal view job, and not with a top view or another app's job", async () => {
+    await asset('tt-photo', 'input');
+    const turntable = (batch: string) => turntableKey(batch, 'tt-photo');
+    for (const batch of ['run-a', 'run-b', 'run-c']) await putObject(turntable(batch), new Uint8Array(1), 'video/mp4');
+    const view = async (id: string, batch: string, v: string, feature = 'multi_angle') => {
+      await clip(id, ['tt-photo'], 31, { batch, view: v });
+      await pool.query(`update jobs set feature = $2 where id = $1`, [id, feature]);
+    };
+    await view('tt-top', 'run-a', 'top'); // the top view is no frame of the turntable
+    await view('tt-other-app', 'run-b', 'back', 'pet_portrait');
+    expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(2);
+    expect(await keys()).toEqual(expect.arrayContaining([turntable('run-a'), turntable('run-b'), turntable('run-c')]));
+    await view('tt-back', 'run-c', 'back');
+    expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(1);
+    expect(await keys()).toEqual(expect.arrayContaining([turntable('run-a'), turntable('run-b')]));
+    expect(await keys()).not.toContain(turntable('run-c'));
   });
 });

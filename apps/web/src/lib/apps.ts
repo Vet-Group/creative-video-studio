@@ -2,6 +2,7 @@
 // The rules mirror POST /api/jobs: the swaps and Face Swap take exactly 2 images, Jewelry Try-On 2 or more (the pieces, then the person); Background Changer takes a prompt with 1 image, or a reference image as the 2nd, not both and not neither.
 
 import { MOTION_IMAGE_MAX_SEC } from '@cvs/core/models';
+import { TURNTABLE_VIEWS } from '@cvs/core/turntable';
 import { poseOf, POSES } from './try-on-stock';
 
 export type AppCategory = 'fashion' | 'photo' | 'video' | 'utility';
@@ -225,10 +226,10 @@ export const APPS: AppConfig[] = [
     added: '2026-11-18',
     feature: 'multi_angle',
     name: 'Ảnh nhiều góc',
-    description: 'Từ một ảnh sản phẩm, tạo ảnh mặt sau, hai bên hoặc góc 3/4, mỗi góc một ảnh riêng.',
+    description: 'Từ một ảnh sản phẩm hoặc người mẫu, tạo ảnh mặt sau, hai bên hoặc góc 3/4, mỗi góc một ảnh riêng, hoặc cả vòng xoay 360° ghép thành video.',
     keywords: 'multi angle, product views',
     category: 'photo',
-    slots: [{ label: 'Sản phẩm', inputLabel: 'Ảnh sản phẩm', empty: 'Thêm 1 ảnh mặt trước của sản phẩm' }],
+    slots: [{ label: 'Sản phẩm', inputLabel: 'Ảnh sản phẩm', empty: 'Thêm 1 ảnh mặt trước của sản phẩm hoặc người mẫu' }],
     views: true,
   },
   {
@@ -479,11 +480,15 @@ export function appInputs(app: AppConfig, d: Pick<AppDraft, 'images' | 'prompt'>
 
 /** What the multi-angle app calls each of PRODUCT_VIEWS. */
 export const VIEW_LABELS: Record<string, string> = {
-  back: 'Mặt sau', left: 'Bên trái', right: 'Bên phải', 'three-quarter-left': 'Góc 3/4 trái', 'three-quarter-right': 'Góc 3/4 phải', top: 'Nhìn từ trên',
+  back: 'Mặt sau', left: 'Bên trái', right: 'Bên phải', 'three-quarter-left': 'Góc 3/4 trái', 'three-quarter-right': 'Góc 3/4 phải', 'back-three-quarter-right': 'Sau chéo phải', 'back-three-quarter-left': 'Sau chéo trái', top: 'Nhìn từ trên',
 };
 
 /** The views the multi-angle app starts with: the back and both sides, which the front photo shows least. */
 export const DEFAULT_VIEWS = ['back', 'left', 'right'];
+
+/** The "Vòng xoay 360°" chip is on while exactly the 7 horizontal views are picked; pressing it picks them, pressing it again clears the picks. */
+export const turntableOn = (views: string[]): boolean => views.length === TURNTABLE_VIEWS.length && TURNTABLE_VIEWS.every((v) => views.includes(v));
+export const toggleTurntable = (views: string[]): string[] => (turntableOn(views) ? [] : [...TURNTABLE_VIEWS]);
 
 /** What a Run of `runs` jobs at `unit` USD each costs, with the 4 decimals of a job's estimate; undefined while the price is unknown. */
 export const runTotal = (unit: string | undefined, runs: number): string | undefined => (unit === undefined ? undefined : (Number(unit) * runs).toFixed(4));

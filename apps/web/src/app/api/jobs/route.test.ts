@@ -778,7 +778,7 @@ describe('POST /api/jobs for an image feature', () => {
     });
 
     test('the multi-angle app takes one photo and one known view per job, kept with the job beside its fixed instruction', async () => {
-      expect((await app('multi_angle', 1)).error).toBe('params.view must be one of back, left, right, three-quarter-left, three-quarter-right, top');
+      expect((await app('multi_angle', 1)).error).toBe('params.view must be one of back, left, right, three-quarter-left, three-quarter-right, back-three-quarter-right, back-three-quarter-left, top');
       expect((await app('multi_angle', 1, { params: { resolution: '1K', view: 'under' } })).error).toMatch(/^params.view must be one of back,/);
       expect((await app('multi_angle', 2, { params: { resolution: '1K', view: 'back' } })).error).toMatch(/number of images/);
       expect((await app('image_upscale', 1, { params: { resolution: '1K', view: 'back' } })).error).toMatch(/^params may hold only/); // no other app takes a view

@@ -104,6 +104,8 @@ export const PRODUCT_VIEWS = [
   { id: 'right', horizontal: 90, vertical: 0 },
   { id: 'three-quarter-left', horizontal: 315, vertical: 0 },
   { id: 'three-quarter-right', horizontal: 45, vertical: 0 },
+  { id: 'back-three-quarter-right', horizontal: 135, vertical: 0 },
+  { id: 'back-three-quarter-left', horizontal: 225, vertical: 0 },
   { id: 'top', horizontal: 0, vertical: 60 },
 ] as const;
 

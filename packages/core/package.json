@@ -28,6 +28,7 @@
     "./ledger": "./src/ledger.ts",
     "./limits": "./src/limits.ts",
     "./queue": "./src/queue.ts",
+    "./turntable": "./src/turntable.ts",
     "./suggest": "./src/suggest.ts"
   },
   "scripts": {
