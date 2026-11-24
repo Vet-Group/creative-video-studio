@@ -75,12 +75,15 @@ export function imagePricesFor(
   return level !== undefined && m.thinking_prices && Object.hasOwn(m.thinking_prices, level) ? m.thinking_prices[level]! : m.image_prices;
 }
 
+/** Try On's rule for a person photo cropped tighter than the garment needs: a chest-up portrait came back with a big head on a short body (Lingerie, 2026-11-24). */
+export const NATURAL_PROPORTIONS = "Keep the person's natural body proportions: if the photo is cropped too tightly to show the whole garment, widen the shot to show more of the body rather than enlarging the head or shortening the torso or legs.";
+
 /**
  * The prompt of an app that has no prompt field of its own (or only an optional one), stored with the job and sent when the Run names none.
  * The two swaps send the new person as the first image and the photo to change as the second. For Background Changer it stands for "the second image is the new background".
  */
 export const FEATURE_PROMPTS: Record<string, string> = {
-  try_on: 'Dress the person in the first image in the garment from the other image(s). Keep the person, face, pose, body and background exactly unchanged. Do not add any text, logos or watermarks.',
+  try_on: `Dress the person in the first image in the garment from the other image(s). Keep the person, face, pose, body and background unchanged. ${NATURAL_PROPORTIONS} Do not add any text, logos or watermarks.`,
   character_swap: 'replace the whole person in the second image with the person from the first image, keep the background',
   model_swap: 'replace the person in the second image with the model from the first image, keep the clothing, pose and background exactly',
   background_changer: 'Replace the background with the one in the reference image.',

@@ -1,3 +1,4 @@
+import { NATURAL_PROPORTIONS } from '@cvs/core/models';
 import { describe, expect, it } from 'vitest';
 import { tryOnPrompt } from './try-on-prompt';
 
@@ -38,14 +39,15 @@ describe('tryOnPrompt', () => {
   it('gives a chosen pose its words in place of keeping the pose, even with one garment and no text, and ignores an unknown one', () => {
     const p = tryOnPrompt(1, false, '', 'hand-on-hip')!;
     expect(p).toContain("Keep the person's face and identity exactly unchanged, and show them in this pose and framing: standing facing the camera with one hand on the hip");
-    expect(p).not.toContain('pose and body exactly unchanged');
+    expect(p).not.toContain('pose and body unchanged');
+    expect(p).not.toContain(NATURAL_PROPORTIONS); // a pose names its own framing, a close-up among them
     expect(tryOnPrompt(1, false, '', 'cartwheel')).toBeUndefined();
-    expect(tryOnPrompt(2, false, '', null)).toContain("Keep the person's face, pose and body exactly unchanged.");
+    expect(tryOnPrompt(2, false, '', null)).toContain(`Keep the person's face, pose and body unchanged. ${NATURAL_PROPORTIONS} Do not add`);
   });
 
   it('stops keeping the pose when the member wrote text and chose none, so the text can ask for one', () => {
     const p = tryOnPrompt(1, false, 'sitting on a chair')!;
-    expect(p).toContain("Keep the person's face and body exactly unchanged.");
+    expect(p).toContain(`Keep the person's face and body unchanged. ${NATURAL_PROPORTIONS}`);
     expect(p).not.toContain('pose');
     expect(p.endsWith(' sitting on a chair')).toBe(true);
     expect(tryOnPrompt(1, false, 'red', 'hand-on-hip')).toContain("Keep the person's face and identity exactly unchanged, and show them in this pose");
