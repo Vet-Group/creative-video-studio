@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-24T21:30:00+07:00',
+  at: '2026-11-24T20:25:00+07:00',
   kind: 'new',
   title: 'Video xoay 360° từ một ảnh sản phẩm hoặc người mẫu',
   details: [
