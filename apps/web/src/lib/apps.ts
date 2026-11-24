@@ -62,7 +62,8 @@ export interface AppConfig {
   colors?: boolean;
   /** Shows the listing shots (LISTING_SHOTS) to pick, by group (the listing set): Run sends one job per shot, each with its `params.shot` and the prompt listingShotPrompt makes. */
   shots?: boolean;
-  /** Its first slot takes up to MAX_BATCH photos: Run sends one job per photo, each with the same settings, the other slots and one `params.batch`. */
+  /** Its first slot takes up to MAX_BATCH photos: Run sends one job per photo, each with the same settings, the other slots and one `params.batch`. On the pose generator it takes up
+   * to MAX_MODELS model photos, and Run sends one job per photo and pose, photo by photo. */
   bulk?: boolean;
   /** An app that is not built yet: its page says so, and why. */
   soon?: string;
@@ -282,16 +283,17 @@ export const APPS: AppConfig[] = [
     names: true,
   },
   {
-    // Ours too (owner-approved 2026-11-20): one model photo, the same person in other poses, one job per pose; a fashion app beside the AI model generator, whose models it poses.
+    // Ours too (owner-approved 2026-11-20): one model photo (up to MAX_MODELS since 2026-11-24, a catalogue), the same person in other poses, one job per pose; a fashion app beside the AI model generator, whose models it poses.
     slug: 'pose-generator',
     added: '2026-11-20',
     feature: 'pose_generator',
     name: 'Tạo tư thế người mẫu',
-    description: 'Từ một ảnh người mẫu, tạo cùng người mẫu ấy trong tối đa 4 tư thế, mỗi tư thế một ảnh riêng, giữ nguyên người và trang phục.',
+    description: 'Từ một hoặc nhiều ảnh người mẫu (tối đa 6), tạo cùng người mẫu ấy trong tối đa 4 tư thế, mỗi ảnh và mỗi tư thế một ảnh riêng, giữ nguyên người và trang phục.',
     keywords: 'pose, pose generator, model poses',
     category: 'fashion',
-    slots: [{ label: 'Người mẫu', inputLabel: 'Ảnh người mẫu', empty: 'Ảnh người mẫu (rõ mặt, thấy người)', aiModels: true }],
+    slots: [{ label: 'Người mẫu', inputLabel: 'Ảnh người mẫu', empty: 'Thêm 1 hoặc nhiều ảnh người mẫu (rõ mặt, thấy người)', aiModels: true }],
     poses: true,
+    bulk: true,
   },
   {
     // Ours too (owner-approved 2026-11-23): one product photo, one picture per colour of the blank, the print and the rest of the photo kept; mainly print-on-demand apparel.
@@ -455,7 +457,7 @@ export function stockGroups(slot: AppSlot, have: ReadonlySet<string>): { label?:
 /** How many photos one job of the app sends: a bulk app's job takes one photo of its first slot. */
 export const jobImages = (app: AppConfig, images: unknown[][]): number => images.reduce<number>((n, list, i) => n + (app.bulk && i === 0 ? Math.min(list.length, 1) : list.length), 0);
 
-export const slotMax = (app: AppConfig, i: number, maxImages: number): number => (app.bulk && i === 0 ? MAX_BATCH : app.slots[i]?.many ? Math.max(1, maxImages - (app.slots.length - 1)) : 1);
+export const slotMax = (app: AppConfig, i: number, maxImages: number): number => (app.bulk && i === 0 ? (app.poses ? MAX_MODELS : MAX_BATCH) : app.slots[i]?.many ? Math.max(1, maxImages - (app.slots.length - 1)) : 1);
 
 /** Puts a job's images back in the slots they were sent from: one per slot, except a `many` slot, which takes all those between its neighbours. */
 export function splitImages<T>(app: AppConfig, images: T[]): T[][] {
@@ -530,6 +532,8 @@ export const petPortraitPrompt = (style: string): string =>
 
 /** The most poses one Run of the pose generator makes, its own words included. */
 export const MAX_POSES = 4;
+/** The most model photos one Run of the pose generator takes: 6 × MAX_POSES = 24 ≤ MAX_BATCH. */
+export const MAX_MODELS = 6;
 /** The longest own words for a pose, in characters. */
 export const MAX_POSE_TEXT = 200;
 /** What the pose generator calls a job of the member's own words, on its box and on the job's History card. */

@@ -2662,7 +2662,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         blocks: [
           {
             steps: [
-              { title: 'Chọn ảnh người mẫu', text: 'Tải lên một ảnh rõ mặt, thấy người, hoặc chọn trong Ảnh đã tải hay một người mẫu AI đã lưu. Trên kết quả của Tạo người mẫu AI và Thử đồ, nút Đổi tư thế mở sẵn ảnh đó ở đây.' },
+              { title: 'Chọn ảnh người mẫu', text: 'Tải lên một ảnh rõ mặt, thấy người, hoặc chọn trong Ảnh đã tải hay một người mẫu AI đã lưu. Ô Người mẫu nhận tối đa 6 ảnh, và ảnh nào cũng được tạo đủ các tư thế đã chọn. Trên kết quả của Tạo người mẫu AI và Thử đồ, nút Đổi tư thế mở sẵn ảnh đó ở đây.' },
               { title: 'Chọn tư thế', text: 'Chọn tối đa 4 tư thế trong thư viện, hoặc tả tư thế trong ô Tư thế tự tả; ô này tính là một tư thế. Ô Ảnh tư thế mẫu nhận tối đa 4 ảnh một người ở đúng tư thế bạn muốn, mỗi ảnh cũng là một tư thế: AI chỉ lấy tư thế, góc người và khung hình, không lấy mặt, tóc, trang phục hay nền của người trong ảnh đó. Mỗi tư thế tạo một ảnh riêng và tính tiền riêng; tổng tiền hiện trước khi chạy. Mục Nền cho giữ nền gốc, đổi sang nền studio trắng hoặc một cảnh lifestyle chung cho mọi ảnh của lần chạy. Các nút Amazon, Etsy và Shopify chọn nhanh 4 tư thế và nền hợp quy định ảnh của từng sàn.' },
               { title: 'Chạy', text: 'Bấm Chạy. Mỗi tư thế là một lượt trong tab Lịch sử; "Chọn cả lô" trên một thẻ chọn mọi ảnh của lần chạy đó để tải về một tệp .zip.' },
             ],

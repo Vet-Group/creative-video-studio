@@ -279,7 +279,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   // Background Changer: a reference photo stands in for the description, whose box is off meanwhile; its words stay in the box's state but are not used.
   const reference = app.prompt === 'background' && images[1]!.length > 0;
   const used = reference ? '' : prompt;
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt: used, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked, colors: colors.length, shots: shots.length, poseRefs: poseRefs.length }) ?? (poseRefs.some((r) => r.id === person?.id) ? `${POSE_PHOTOS} không được trùng ảnh người mẫu: bỏ một trong hai.` : null) ?? promptTooLong(chosen, used.trim() ? used.trim().length + fixed : 0);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt: used, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length, breeds: breeds.length, styles: styles.length, products: products.length, names, poses: posesPicked, colors: colors.length, shots: shots.length, poseRefs: poseRefs.length }) ?? (images[0]!.some((m) => poseRefs.some((r) => r.id === m.id)) ? `${POSE_PHOTOS} không được trùng ảnh người mẫu: bỏ một trong hai.` : null) ?? promptTooLong(chosen, used.trim() ? used.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
   /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
   const sent = basePrompt(app.feature, appInputs(app, { images, prompt: used }).prompt);
@@ -291,6 +291,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const pickedBreeds = DOG_BREEDS.filter((b) => breeds.includes(b));
   // A batch app sends one job per item picked, in the order of its list (PRODUCT_VIEWS, DOG_BREEDS, PET_STYLES, MOCKUP_PRODUCTS), and the name swap app one per name, or per name and breed,
   // each with the prompt its item makes (itemPrompt) but the multi-angle app's; every other app one job with none.
+  // The pose generator's picks, made for every model photo: photo by photo, each photo's poses in this order.
+  const poseItems: BatchItem[] = app.poses ? [...POSES.filter((p) => poses.includes(p.value)).map((p) => ({ pose: p.value, background })), ...(ownPose ? [{ poseText: ownPose, background }] : []), ...poseRefs.map((r) => ({ poseRef: r.id, background }))] : [];
   const runs: BatchItem[] = app.views
     ? PRODUCT_VIEWS.filter((v) => views.includes(v.id)).map((v) => ({ view: v.id }))
     : app.breeds
@@ -302,7 +304,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
           : app.names
             ? parseNames(names).names.flatMap((name) => (pickedBreeds.length > 0 ? pickedBreeds.map((breed) => ({ name, breed })) : [{ name }]))
             : app.poses
-              ? [...POSES.filter((p) => poses.includes(p.value)).map((p) => ({ pose: p.value, background })), ...(ownPose ? [{ poseText: ownPose, background }] : []), ...poseRefs.map((r) => ({ poseRef: r.id, background }))]
+              ? Array.from({ length: Math.max(1, images[0]!.length) }, () => poseItems).flat()
               : app.colors
                 ? colors.map((color) => ({ color })) // in the order picked
                 : app.shots
@@ -310,8 +312,10 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                   : app.bulk
                     ? images[0]!.map(() => ({})) // one job per photo of the first slot
                     : [{}];
-  // A bulk app with one photo runs as before: one job, no batch.
-  const batchApp = BATCH_FEATURES.includes(app.feature) && !(app.bulk && runs.length < 2);
+  const perPhoto = app.poses ? poseItems.length : 1; // jobs per photo of the first slot
+  const catalogue = !!app.poses && images[0]!.length > 1; // the pose generator with several model photos
+  // A bulk app with one photo runs as before: one job, no batch. The pose generator is always batched.
+  const batchApp = BATCH_FEATURES.includes(app.feature) && !(app.bulk && !app.poses && runs.length < 2);
   // What is wrong with the typed names, said under the box; an empty box only waits, as the reason under Run says.
   const namesProblem = app.names && names.trim() ? parseNames(names).problem : null;
   // Nothing picked yet on a batch app, or names it cannot run, show no price rather than a free-looking $0.00 or one that counts the bad names.
@@ -342,7 +346,8 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     };
   }
 
-  const add = (slot: number) => upload((assets) => setImages((cur) => cur.map((list, i) => (i === slot ? [...list, ...assets] : list))));
+  // A photo the member already has comes back from an upload as the same asset; on the pose generator's model slot it is kept once, as the server counts a model photo by its asset.
+  const add = (slot: number) => upload((assets) => setImages((cur) => cur.map((list, i) => (i !== slot ? list : app.poses && slot === 0 ? [...new Map([...list, ...assets].map((x) => [x.id, x])).values()] : [...list, ...assets]))));
   const addPoseRefs = upload((assets) => setPoseRefs((cur) => [...cur, ...assets]));
 
   /** History's Dùng kết quả: the result, copied as the member's own input, in the last required slot (the picture the app works on: the swaps' target,
@@ -393,7 +398,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     try {
       for (const [n, one] of runs.entries()) {
         const own = itemPrompt(app.feature, one, blank);
-        const inputs = appInputs(app, { images: app.bulk ? images.map((list, i) => (i === 0 ? [list[n]!] : list)) : images, prompt: used });
+        const inputs = appInputs(app, { images: app.bulk ? images.map((list, i) => (i === 0 ? [list[Math.floor(n / perPhoto)]!] : list)) : images, prompt: used });
         const body = {
           feature: app.feature,
           modelId: pick.modelId,
@@ -414,7 +419,14 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
       await refresh();
     } catch (e) {
       let sent = '';
-      if (done > 0 && app.bulk) {
+      if (done > 0 && catalogue) {
+        // Only the model photos all of whose poses were sent leave the slot, by id; one sent in part stays, and Run again makes all its poses again.
+        const whole = Math.floor(done / perPhoto);
+        const part = done % perPhoto;
+        const gone = new Set(images[0]!.slice(0, whole).map((x) => x.id));
+        setImages((cur) => cur.map((list, i) => (i === 0 ? list.filter((x) => !gone.has(x.id)) : list)));
+        sent = ` Đã gửi ${done}/${runs.length} ảnh${whole > 0 ? ` và bỏ ${whole} ảnh người mẫu đã gửi đủ khỏi ô Người mẫu` : ''}.${part > 0 ? ` Ảnh người mẫu thứ ${whole + 1} mới gửi ${part}/${perPhoto} tư thế: chạy lại sẽ tạo lại cả các tư thế ấy.` : ''}`;
+      } else if (done > 0 && app.bulk && !app.poses) {
         // The photos sent leave the slot, by id (one may have been removed meanwhile), so Run again sends only the rest.
         const gone = new Set(images[0]!.slice(0, done).map((x) => x.id));
         setImages((cur) => cur.map((list, i) => (i === 0 ? list.filter((x) => !gone.has(x.id)) : list)));
@@ -485,14 +497,14 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                 );
               })}
             </div>
-            {app.bulk && runs.length > 1 && runCost}
+            {app.bulk && !app.poses && runs.length > 1 && runCost}
             <PhotoDialog
               open={picker !== null}
               title={picker === null ? '' : (app.slots[picker]!.stock?.title ?? 'Chọn người mẫu')}
               tiles={stock.filter((g) => !g.label).flatMap((g) => stockTiles(picker!, g.names, 'Người mẫu có sẵn'))}
               groups={[
                 ...stock.filter((g) => g.label).map((g) => ({ title: g.label!, tiles: stockTiles(picker!, g.names, g.label!) })),
-                ...(picker !== null && app.slots[picker]!.aiModels ? [{ title: 'Người mẫu AI', tiles: fashionTiles(aiModels, (img) => setImages((cur) => cur.map((list, j) => (j === picker ? [img] : list)))) }] : []),
+                ...(picker !== null && app.slots[picker]!.aiModels ? [{ title: 'Người mẫu AI', tiles: fashionTiles(aiModels, (img) => setImages((cur) => cur.map((list, j) => (j !== picker ? list : !app.bulk ? [img] : list.some((x) => x.id === img.id) || list.length >= slotMax(app, j, chosen?.maxImages ?? 1) ? list : [...list, img])))) }] : []),
               ]}
               // Many groups make a long dialog (Jewelry's 7), so their names at the top jump to each one.
               filter={
@@ -646,7 +658,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     {OWN_POSE} (tuỳ chọn)
                   </label>
                   <textarea id={poseTextId} className="names-box" rows={2} maxLength={MAX_POSE_TEXT} value={poseText} placeholder="Ví dụ: ngồi trên bậc thềm, tay chống cằm, nhìn ra xa" onChange={(e) => setPoseText(e.target.value)} />
-                  <p className="help">Mỗi tư thế tạo một ảnh riêng và tính tiền riêng, tối đa {MAX_POSES} tư thế mỗi lần chạy. Ô này tính là một tư thế và chạy thành ảnh riêng, không trộn với tư thế đã chọn. AI giữ khuôn mặt, tóc, dáng người và trang phục; hãy xem lại từng ảnh. Ô đã chọn hiện ảnh kết quả mẫu để bạn hình dung trước. Đang ở một ô tư thế, bấm phím 1 đến 9 để chọn nhanh chín tư thế đầu.</p>
+                  <p className="help">Mỗi tư thế tạo một ảnh riêng và tính tiền riêng, tối đa {MAX_POSES} tư thế cho mỗi ảnh người mẫu. Có nhiều ảnh người mẫu thì ảnh nào cũng được tạo đủ các tư thế đã chọn: mỗi ảnh × tư thế là một ảnh riêng và tính tiền riêng. Ô này tính là một tư thế và chạy thành ảnh riêng, không trộn với tư thế đã chọn. AI giữ khuôn mặt, tóc, dáng người và trang phục; hãy xem lại từng ảnh. Ô đã chọn hiện ảnh kết quả mẫu để bạn hình dung trước. Đang ở một ô tư thế, bấm phím 1 đến 9 để chọn nhanh chín tư thế đầu.</p>
                 </div>
                 {/* Pictures of someone in the wanted pose: each is one more pose, up to what is left of the Run's four. */}
                 <Slot

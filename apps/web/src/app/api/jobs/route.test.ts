@@ -945,8 +945,37 @@ describe('POST /api/jobs for an image feature', () => {
       // A Run makes at most 4 poses, as the page lets the member pick: two more pass, a 5th of the same Run is refused and nothing is made.
       for (const more of ['ngồi trên ghế', 'đứng dựa tường']) expect((await post(own(more), 1)).status).toBe(201);
       const count = await jobCount();
-      expect((await post(own('ngồi xổm'), 1)).error).toBe('a pose generator Run (params.batch) takes at most 4 poses');
+      expect((await post(own('ngồi xổm'), 1)).error).toBe('a pose generator Run (params.batch) takes at most 4 poses per model photo');
       expect(await jobCount()).toBe(count);
+    });
+
+    test('a pose generator Run is a catalogue: up to 4 poses for each of up to 6 model photos, 8 jobs for 2 photos, the old limits for one', async () => {
+      const m = await newMember();
+      const photos = [m.asset];
+      for (let i = 1; i <= 6; i++) {
+        photos.push(`${m.id}-m${i}`);
+        await insertAsset(photos[i]!, m.id);
+      }
+      const batch = crypto.randomUUID();
+      const words = ['ngồi trên ghế', 'đứng dựa tường', 'tay chống hông', 'quay lưng lại'];
+      const send = async (photo: string, poseText: string, into = batch) => {
+        const res = await run(m.cookie, { assetIds: [photo], modelId: 'app-poses', feature: 'pose_generator', ratio: 'auto', prompt: posePrompt(poseText), params: { resolution: '1K', poseText, batch: into } });
+        return { status: res.status, error: ((await res.json()) as { error?: string }).error };
+      };
+      // 2 photos x 4 poses, sent photo by photo: all 8 pass.
+      for (const photo of photos.slice(0, 2)) for (const w of words) expect([photo, w, (await send(photo, w)).status]).toEqual([photo, w, 201]);
+      // A 5th pose for the first photo is refused, though the Run has room for more photos.
+      const fifth = await send(photos[0]!, 'ngồi xổm');
+      expect([fifth.status, fifth.error]).toEqual([400, 'a pose generator Run (params.batch) takes at most 4 poses per model photo']);
+      // Photos 3 to 6 join, the 7th distinct photo is refused; a photo already in the Run is not a new one.
+      for (const photo of photos.slice(2, 6)) expect((await send(photo, words[0]!)).status).toBe(201);
+      const seventh = await send(photos[6]!, words[0]!);
+      expect([seventh.status, seventh.error]).toEqual([400, 'a pose generator Run (params.batch) takes at most 6 model photos']);
+      expect((await send(photos[5]!, words[1]!)).status).toBe(201);
+      // One photo keeps its old limit of 4 poses in a Run of its own.
+      const alone = crypto.randomUUID();
+      for (const w of words) expect((await send(photos[6]!, w, alone)).status).toBe(201);
+      expect((await send(photos[6]!, 'ngồi xổm', alone)).error).toBe('a pose generator Run (params.batch) takes at most 4 poses per model photo');
     });
 
     test('the pose generator takes a pose photo as the second image of a job, named by params.poseRef, never with a pose or own words, with exactly the prompt it makes', async () => {
@@ -989,7 +1018,7 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await send([m.asset, `${m.id}-ref2`], { poseRef: `${m.id}-ref2`, batch: run4 })).status).toBe(201);
       expect((await send([m.asset], { pose: 'kneel', batch: run4 }, posePrompt('kneeling on one knee and facing the camera, full body'))).status).toBe(201);
       expect((await send([m.asset, `${m.id}-ref3`], { poseRef: `${m.id}-ref3`, batch: run4 })).status).toBe(201);
-      expect((await send([m.asset, ref], { poseRef: ref, batch: run4 })).error).toBe('a pose generator Run (params.batch) takes at most 4 poses');
+      expect((await send([m.asset, ref], { poseRef: ref, batch: run4 })).error).toBe('a pose generator Run (params.batch) takes at most 4 poses per model photo');
     });
 
     test("product recolor takes one product photo and one colour per job as #RRGGBB, a swatch's or the member's own, with exactly the prompt it makes, and at most 15 per Run", async () => {

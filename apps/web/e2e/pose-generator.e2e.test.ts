@@ -39,7 +39,7 @@ test('picks a model photo, two library poses and own words, sees the price of th
     await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']); // the company's poses as examples
 
     // The slot says what photo it wants; every pose is a tile, none picked until the member picks one, as each costs a job.
-    await expect(page.getByRole('button', { name: 'Tải lên Người mẫu' })).toHaveAttribute('title', 'Ảnh người mẫu (rõ mặt, thấy người)');
+    await expect(page.getByRole('button', { name: 'Tải lên Người mẫu' })).toHaveAttribute('title', 'Thêm 1 hoặc nhiều ảnh người mẫu (rõ mặt, thấy người)');
     await expect(poses(page).getByRole('button')).toHaveCount(POSES.length);
     for (const tile of await poses(page).getByRole('button').all()) await expect(tile).toHaveAttribute('aria-pressed', 'false');
     await expect(reason(page)).toHaveText('Tải lên ảnh: Người mẫu.');
@@ -372,4 +372,78 @@ test('pose photos: each is one more pose beside the tiles and the own words, up 
   for (const name of ['Amazon', 'Etsy', 'Shopify']) await expect(chip(page, name)).toBeDisabled();
   await page.getByLabel(OWN_POSE).fill('ngồi trên bậc thềm');
   await expect(page.getByText('còn chỗ cho 0 ảnh')).toBeVisible();
+});
+
+test('catalogue: two model photos and two poses are four images, sent photo by photo under one batch id, shown as four cards; the slot stops at six photos', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'posed');
+  await page.goto('/apps/pose-generator');
+  const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
+  const input = page.getByLabel('Ảnh người mẫu', { exact: true });
+  const tile = (name: string) => poses(page).getByRole('button', { name, exact: true });
+  await input.setInputFiles([file('cat-a.png'), file('cat-b.png')]);
+  for (const name of ['cat-a.png', 'cat-b.png']) await expect(slot(page).getByRole('img', { name })).toBeVisible();
+  await expect(page.getByText('2/6')).toBeVisible();
+
+  // Photos x poses, priced once (a second price line would make this locator match twice).
+  await pickModel(page, /Mock pets priced/);
+  await tile('Mặt trước').click();
+  await tile('Quỳ một gối').click();
+  await expect(cost(page)).toHaveText('4 ảnh × $0.15 = $0.60');
+  await expect(runButton(page)).toContainText('$0.60');
+
+  // The run on the mock model: photo 1's poses in order, then photo 2's, one batch id on all four.
+  await pickModel(page, /Mock pets E2E/);
+  const sent: { params: Record<string, string>; prompt: string; assetIds: string[] }[] = [];
+  page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/jobs' && sent.push(r.postDataJSON())));
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
+  const uploaded = ((await (await page.request.get('/api/assets?recent=uploads')).json()) as { assets: { id: string; filename: string }[] }).assets;
+  const idOf = (name: string) => uploaded.find((a) => a.filename === name)!.id;
+  const batch = sent[0]?.params.batch;
+  expect(batch).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  expect(sent.map((b) => b.assetIds)).toEqual([[idOf('cat-a.png')], [idOf('cat-a.png')], [idOf('cat-b.png')], [idOf('cat-b.png')]]);
+  expect(sent.map((b) => b.params)).toEqual([
+    { resolution: '1K', pose: 'front', background: 'keep', batch },
+    { resolution: '1K', pose: 'kneel', background: 'keep', batch },
+    { resolution: '1K', pose: 'front', background: 'keep', batch },
+    { resolution: '1K', pose: 'kneel', background: 'keep', batch },
+  ]);
+  const front = posePrompt(poseOf('front')!.words);
+  const kneel = posePrompt(poseOf('kneel')!.words);
+  expect(sent.map((b) => b.prompt)).toEqual([front, kneel, front, kneel]);
+  await expect.poll(async () => (await mine(page)).filter((j) => j.status === 'succeeded').length, { timeout: 90_000 }).toBe(4);
+  const made = await mine(page);
+  expect(new Set(made.map((j) => j.batch))).toEqual(new Set([batch]));
+  expect(made.map((j) => j.inputAssetIds[0]).sort()).toEqual([idOf('cat-a.png'), idOf('cat-a.png'), idOf('cat-b.png'), idOf('cat-b.png')].sort());
+  await expect(page.getByRole('heading', { name: 'Tạo tư thế · Mặt trước', level: 3 })).toHaveCount(2);
+  await expect(page.getByRole('heading', { name: 'Tạo tư thế · Quỳ một gối', level: 3 })).toHaveCount(2);
+
+  // The slot takes six photos and no more: once full it has no add tile left.
+  await input.setInputFiles(['a', 'b', 'c', 'd'].map((n) => file(`six-${n}.png`))); // the two photos stay in the slot after a Run, so four more fill it
+  await expect(slot(page).getByRole('img')).toHaveCount(6);
+  await expect(page.getByText('6/6')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tải lên Người mẫu' })).toHaveCount(0);
+});
+
+test('catalogue: a Run that stops part way keeps the model photo it only half sent, and drops the ones it sent whole', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'posee');
+  await page.goto('/apps/pose-generator');
+  const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
+  await page.getByLabel('Ảnh người mẫu', { exact: true }).setInputFiles([file('half-a.png'), file('half-b.png')]);
+  await expect(slot(page).getByRole('img', { name: 'half-b.png' })).toBeVisible();
+  for (const name of ['Mặt trước', 'Quỳ một gối']) await poses(page).getByRole('button', { name, exact: true }).click();
+  await pickModel(page, /Mock pets E2E/);
+  // The server refuses the 4th job: photo 1 went whole, photo 2 with one of its two poses.
+  let posts = 0;
+  await page.route('**/api/jobs', async (route) => {
+    if (route.request().method() === 'POST' && ++posts === 4) return route.fulfill({ status: 400, json: { error: 'refused' } });
+    return route.continue();
+  });
+  await runButton(page).click();
+  await expect(page.locator('.form-message').getByRole('alert')).toContainText('Đã gửi 3/4 ảnh và bỏ 1 ảnh người mẫu đã gửi đủ khỏi ô Người mẫu. Ảnh người mẫu thứ 2 mới gửi 1/2 tư thế: chạy lại sẽ tạo lại cả các tư thế ấy.');
+  await expect(slot(page).getByRole('img', { name: 'half-a.png' })).toHaveCount(0);
+  await expect(slot(page).getByRole('img', { name: 'half-b.png' })).toBeVisible();
+  await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Quỳ một gối']); // the picks stay: photo 2 still needs both
 });
