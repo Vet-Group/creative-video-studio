@@ -76,7 +76,7 @@ export function imagePricesFor(
 }
 
 /** Try On's rule for a person photo cropped tighter than the garment needs: a chest-up portrait came back with a big head on a short body (Lingerie, 2026-11-24). */
-export const NATURAL_PROPORTIONS = 'Keep natural adult proportions: if the photo is cropped too tightly to show the whole garment, widen the shot to show more of the body rather than enlarging the head or shortening the torso or legs.';
+export const NATURAL_PROPORTIONS = "Keep the person's natural body proportions: if the photo is cropped too tightly to show the whole garment, widen the shot to show more of the body rather than enlarging the head or shortening the torso or legs.";
 
 /**
  * The prompt of an app that has no prompt field of its own (or only an optional one), stored with the job and sent when the Run names none.
