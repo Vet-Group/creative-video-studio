@@ -67,7 +67,7 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
     bar.getByRole('button', { name: 'Ảnh đã tải cho Ảnh tham chiếu' }),
     prompt,
     bar.getByRole('group', { name: 'Gợi ý nhanh' }),
-    bar.getByRole('button', { name: 'Cải thiện mô tả bằng AI' }),
+    bar.getByRole('button', { name: /^Cải thiện: / }),
     bar.getByRole('button', { name: 'Gợi ý AI' }),
     bar.getByRole('button', { name: 'Mở rộng' }),
     bar.getByRole('button', { name: 'Phong cách', exact: true }),
@@ -127,7 +127,7 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
   const chips = order.slice(order.indexOf('Phong cách'));
   expect(chips.map((n) => n.replace(/ .*/, ''))).toEqual(['Phong', 'Mô', 'Tỉ', 'Độ', 'Tuỳ', 'Tạo']);
   expect(chips[1]).toMatch(/^Mô hình Mock image E2E/);
-  expect(order.slice(0, order.indexOf('Phong cách'))).toEqual(expect.arrayContaining(['Cải thiện mô tả bằng AI', 'Gợi ý AI', 'Mở rộng']));
+  expect(order.slice(0, order.indexOf('Phong cách'))).toEqual(expect.arrayContaining(['Cải thiện: bật', 'Gợi ý AI', 'Mở rộng']));
   await expect(run).toBeFocused();
 
   // The menus open over the gallery, upward from the foot of the screen, whole: the bar clips none of them.
@@ -160,7 +160,7 @@ test('at 1440 the prompt bar floats under the full-width tabs and holds every co
   await expect(bar.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(bar).toBeInViewport(); // still docked over History
   // A toast shows at the top of the screen, clear of Run at the foot.
-  await page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('button', { name: 'Chép vào ô mô tả' }).first().click();
+  await page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByTitle('Chép vào ô mô tả').first().click();
   const toast = page.getByRole('region', { name: 'Thông báo' }).getByText('Đã chép mô tả');
   await expect(toast).toBeVisible();
   expect((await toast.boundingBox())!.y).toBeLessThan(100);
@@ -643,10 +643,10 @@ test('two reference photos show one chip each that inserts its [ImageN] token in
   await expect(chips.getByRole('button')).toHaveCount(2);
 
   // An empty box that never had the focus: the token goes in, and the caret stays in the box after it.
-  await chips.getByRole('button', { name: 'Chèn [Image1] vào mô tả (Ảnh 1)' }).click();
+  await chips.getByRole('button', { name: 'Ảnh 1: chèn [Image1] vào mô tả' }).click();
   await expect(box).toHaveValue('[Image1]');
   await expect(box).toBeFocused();
-  await chips.getByRole('button', { name: 'Chèn [Image2] vào mô tả (Ảnh 2)' }).click();
+  await chips.getByRole('button', { name: 'Ảnh 2: chèn [Image2] vào mô tả' }).click();
   await expect(box).toHaveValue('[Image1] [Image2]');
   expect((await uncovered(chips.getByRole('button').first())), 'a chip nothing covers').toBe(true);
 });

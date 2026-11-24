@@ -533,20 +533,27 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         )}
         {/* Empty, the whole slot is the upload button, a grey circle over its hint as on the live pages; with images, a small tile adds more. */}
         {!full && (
-          <button ref={addRef} type="button" className="slot-add" aria-label={onBrowse ? `Tải lên ${label} hoặc chọn ảnh có sẵn` : `Tải lên ${label}`} aria-haspopup={onBrowse ? 'dialog' : undefined} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => (onBrowse ? onBrowse() : input.current?.click())}>
+          <button ref={addRef} type="button" className="slot-add" aria-haspopup={onBrowse ? 'dialog' : undefined} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => (onBrowse ? onBrowse() : input.current?.click())}>
             <span className="slot-icon" aria-hidden="true">
               <Icon name={images.length === 0 && offer.length === 0 ? icon : 'plus'} size={16} />
               {offer.length > 0 && <span>Tải lên</span>}
             </span>
+            {/* Named by its text, so the name holds the hint it shows (WCAG 2.5.3 Label in Name); the shown name and pill are said here once. */}
+            <span className="sr-only">{`Tải lên ${label}${optional ? ', tuỳ chọn' : ''}`}</span>
             {/* A half-width slot shows just its name, as on the live pages; the full hint is its tooltip there. */}
             {images.length === 0 && offer.length === 0 && <span className="slot-hint">{empty}</span>}
-            {images.length === 0 && offer.length === 0 && <span className="slot-name">{label}</span>}
+            {images.length === 0 && offer.length === 0 && (
+              <span className="slot-name" aria-hidden="true">
+                {label}
+              </span>
+            )}
             {/* A half-width tile has no room beside its name, so the optional pill takes a line of its own under it. */}
             {optional && images.length === 0 && offer.length === 0 && (
               <span className="choice-optional slot-optional" aria-hidden="true">
                 Tuỳ chọn
               </span>
             )}
+            {onBrowse && <span className="sr-only"> hoặc chọn ảnh có sẵn</span>}
           </button>
         )}
       </div>

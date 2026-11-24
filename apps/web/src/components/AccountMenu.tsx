@@ -76,7 +76,8 @@ export function AccountMenu({ name, email, color, variant, onSettings }: { name:
         ref={button}
         type="button"
         className={variant === 'chip' ? 'account-chip' : 'account-button'}
-        aria-label={label}
+        // Holds every word it shows, in order (WCAG 2.5.3 Label in Name): the initials, alone on the avatar and the collapsed chip, then the name and email.
+        aria-label={`Tài khoản: ${initials(name)} ${name} ${email}`}
         title={variant === 'chip' ? name : undefined}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -87,10 +88,12 @@ export function AccountMenu({ name, email, color, variant, onSettings }: { name:
         <span className="avatar" aria-hidden="true">
           {initials(name)}
         </span>
+        {/* The spaces keep the shown words apart, as the label has them; a flex or grid box does not draw them. */}
         {variant === 'chip' && (
           <>
+            {' '}
             <span className="account-who">
-              <span className="account-name">{name}</span>
+              <span className="account-name">{name}</span>{' '}
               <span className="account-email">{email}</span>
             </span>
             <span className="account-chevron">

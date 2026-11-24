@@ -26,7 +26,7 @@ test('a developer Admin signs in as a member, sees the banner on their pages, an
 
   // A full reload to the home page: the member's pages, with the banner at phone width too.
   await expect(page.getByText('Bạn đang đăng nhập thay E2E Imp Member. Mọi thao tác được tính cho tài khoản này.')).toBeVisible();
-  await expect(accountButton(page)).toHaveAccessibleName('Tài khoản: E2E Imp Member');
+  await expect(accountButton(page)).toHaveAccessibleName('Tài khoản: EM E2E Imp Member impmember@e2e.test');
   await expect(page.getByRole('link', { name: 'Quản trị', exact: true })).toHaveCount(0);
   await page.goto('/admin/users');
   await expect(page.getByText('Khu vực quản trị chỉ dành cho Admin.')).toBeVisible();

@@ -182,8 +182,8 @@ test("as on Fash, a History card's words, inputs and result go on the form besid
   await expect(viewer).toBeHidden();
   await expect(chosen.getByRole('img', { name: 'piece-1.png' })).toBeVisible();
   // The same note twice in a row is one toast that counts, not a stack.
-  await card.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
-  await card.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
+  await card.getByTitle('Chép vào ô mô tả').click();
+  await card.getByTitle('Chép vào ô mô tả').click();
   await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('pieces shot');
   await expect(page.getByRole('region', { name: 'Thông báo' }).locator('.toast', { hasText: 'Đã chép mô tả' })).toHaveText(['Đã chép mô tả ×2×']);
   await card.getByRole('button', { name: 'Dùng kết quả' }).click(); // Fash's Use Result: the result as one more input

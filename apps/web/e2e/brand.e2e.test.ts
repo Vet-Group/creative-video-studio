@@ -33,7 +33,7 @@ test.describe('narrow', () => {
 
   test('the top bar shows the account avatar at its right end and keeps the title at x=52', async ({ page }) => {
     await signIn(page, 'member1');
-    const avatar = page.locator('.topbar').getByRole('button', { name: 'Tài khoản: E2E Member 1' });
+    const avatar = page.locator('.topbar').getByRole('button', { name: 'Tài khoản: E1 E2E Member 1' });
     await expect(avatar).toBeVisible();
     const b = (await avatar.boundingBox())!;
     expect(b.x + b.width).toBeLessThanOrEqual(390 - 6 + 0.5);

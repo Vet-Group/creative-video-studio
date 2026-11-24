@@ -238,7 +238,7 @@ test('Create starts on a free prompt as on the live form: the prompt box open an
   await openCreate(page);
   await expect(presetOf(page)).toHaveAttribute('data-value', '');
   await expect(page.getByLabel('Mô tả chuyển động')).toBeEnabled();
-  const enhance = page.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
+  const enhance = page.getByRole('button', { name: /^Cải thiện: / });
   await expect(enhance).toHaveAttribute('aria-pressed', 'true');
   await expect(enhance).toHaveCSS('background-color', 'rgb(26, 26, 26)'); // filled when on, so its white label reads
 });
@@ -405,7 +405,7 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await detail.getByRole('button', { name: 'example-2-ref.jpg' }).click();
     await expect(note('Đã thêm ảnh tham chiếu')).toBeVisible();
     await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name: 'example-2-ref.jpg' })).toBeVisible();
-    await detail.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
+    await detail.getByTitle('Chép vào ô mô tả').click();
     await expect(page.getByRole('textbox', { name: 'Mô tả chuyển động' })).toHaveValue(details.prompt);
     await detail.getByRole('button', { name: '1:1', exact: true }).click();
     await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
@@ -453,7 +453,7 @@ test("as on Fash's Recreate, a sample's model name and its resolution put that m
     await openTile(page, 'Tự viết mô tả');
     const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
     const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
-    await detail.getByRole('button', { name: 'Dùng mô hình Short model' }).click();
+    await detail.getByTitle('Dùng mô hình Short model').click();
     await expect(note('Đã chọn mô hình Short model')).toBeVisible();
     await expect(modelButton(page)).toContainText('Short model');
 
@@ -658,7 +658,7 @@ for (const width of [1440, 1280, 390]) {
         return el.getAttribute('aria-label') ?? copy.textContent?.trim();
       });
     // The account chip closes the sidebar (the top bar's avatar below 1024 px); the open tab takes the tab stop.
-    const account = 'Tài khoản: E2E Member 5';
+    const account = 'Tài khoản: E5 E2E Member 5 member5@e2e.test';
     const order = wideScreen ? ['Bỏ qua đến nội dung', 'Thu gọn thanh bên', 'Khám phá', 'Tìm nhanh', 'Chọn công cụ nào?', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Ứng dụng nhanh', 'Thư viện', 'Góp ý', 'Có gì mới (có mục mới)', 'Hướng dẫn', account, 'Ví dụ'] : ['Bỏ qua đến nội dung', 'Mở menu', account, 'Tạo'];
 
     for (const name of order) {

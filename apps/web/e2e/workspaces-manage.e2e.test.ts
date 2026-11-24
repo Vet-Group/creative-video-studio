@@ -257,7 +257,7 @@ test('an Admin creates a partner workspace and adds a company member, its owner 
   await switcher(both).click();
   await both.getByRole('listbox', { name: 'Không gian làm việc' }).getByRole('option', { name: 'VET Group' }).click();
   await expect(switcher(both)).toHaveText('VET Group Công ty');
-  await stale.getByRole('listitem').filter({ hasText: BOARD_ITEM }).getByRole('button', { name: /^Bình chọn/ }).click();
+  await stale.getByRole('listitem').filter({ hasText: BOARD_ITEM }).getByRole('button', { name: /bình chọn$/ }).click();
   const changed = stale.getByRole('dialog', { name: 'Đã đổi không gian làm việc' });
   await expect(changed).toBeVisible();
   await shot(stale, 'workspace-changed-1440-light');

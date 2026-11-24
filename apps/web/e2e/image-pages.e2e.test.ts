@@ -246,7 +246,7 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await detail.getByRole('button', { name: 'Seamless White' }).click();
     await expect(note('Đã chọn bối cảnh')).toBeVisible();
     await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();
-    await detail.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
+    await detail.getByTitle('Chép vào ô mô tả').click();
     await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue(details.brief);
     await detail.getByRole('button', { name: '3:4', exact: true }).click();
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
@@ -429,7 +429,7 @@ test('Image Generation: the form needs a prompt (and an image only on a model wi
   await expect(ratio).toHaveAttribute('data-value', '1:1'); // back on the roomy model, the earlier choice returns
 
   // Enhance sits in the form, on by default; the job stores the member's choice (a mock job is never rewritten).
-  const enhance = form.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
+  const enhance = form.getByRole('button', { name: /^Cải thiện: / });
   await expect(enhance).toHaveAttribute('aria-pressed', 'true');
   await enhance.click();
   await expect(enhance).toHaveText('Cải thiện: tắt');
