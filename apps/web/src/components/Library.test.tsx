@@ -47,6 +47,16 @@ test('Xem lặp tiles the picture 2×2 and 3×3 in its own ratio', () => {
   expect(three).toContain('aspect-ratio:1');
 });
 
+test('a video’s detail offers Tải theo tỉ lệ khác: the three shapes and the two fills as pressed choices, 9:16 on a blurred fill first, then its download', () => {
+  const html = detail(clip('video'));
+  const group = html.match(/<div class="reframe" role="group" aria-labelledby="([^"]+)"><span id="\1">Tải theo tỉ lệ khác<\/span>([\s\S]*?Tải về)<\/button><\/div>/)?.[2] ?? '';
+  const choices = (label: string) => [...(group.match(new RegExp(`aria-label="${label}">([\\s\\S]*?)</div>`))?.[1] ?? '').matchAll(/aria-pressed="(true|false)">([^<]+)</g)].map((m) => `${m[2]}${m[1] === 'true' ? '*' : ''}`);
+  expect(choices('Tỉ lệ khung')).toEqual(['9:16*', '4:5', '1:1']);
+  expect(choices('Nền')).toEqual(['Nền mờ*', 'Nền đen']);
+  expect(group).toMatch(/<button type="button" class="icon-button labelled" aria-busy="false" title="Tải về theo tỉ lệ đã chọn">.*?Tải về$/);
+  expect(detail(clip('image'))).not.toContain('class="reframe"'); // a picture has the image Reframe app among its tools instead
+});
+
 test('the clip detail names Download and Use this frame in words, and a video gets a first stop that skips its player', () => {
   const html = detail(clip('video'));
   expect(html).toMatch(/<button type="button" class="icon-button labelled" title="Tải xuống">.*?Tải xuống<\/button>/);

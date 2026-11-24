@@ -15,7 +15,7 @@ import { bookLlm, close24h, lateBill, type LedgerPool, release, settle, withTran
 import { type ImageModelConfig, imagePricesFor, type ModelConfig, MOTION_IMAGE_MAX_SEC, promptLimit, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { ImageReadError, ProviderHttpError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
-import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, type AnalyzeJobData, COMPRESS_QUEUE, COMPRESS_QUEUE_OPTIONS, type CompressJobData, PURGE_CRON, PURGE_QUEUE, REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS, type RemakeJobData, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
+import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, type AnalyzeJobData, COMPRESS_QUEUE, COMPRESS_QUEUE_OPTIONS, type CompressJobData, PURGE_CRON, PURGE_QUEUE, REFRAME_QUEUE, REFRAME_QUEUE_OPTIONS, type ReframeJobData, REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS, type RemakeJobData, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
 import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
@@ -23,6 +23,7 @@ import { type Job, PgBoss } from 'pg-boss';
 import { burnEndText, closestRatio, ensureH264, extractPoster, probeSeconds, probeSize, probeVideoSeconds, sniffImage } from './media';
 import { compressVideoAsset } from './compress';
 import { purgeDeletedClips } from './purge';
+import { reframeVideoAsset } from './reframe';
 import { dropPreview, storePreview } from './preview';
 import { deleteObject, getObject, putObject } from './storage';
 import { closeStaleAnalyses, reaAnalyzeEnabled, runReaAnalyze } from './analyze';
@@ -633,6 +634,15 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   await boss.work<CompressJobData>(COMPRESS_QUEUE, { localConcurrency: 2, pollingIntervalSeconds: o.pollingIntervalSeconds }, async ([job]) => {
     await compressVideoAsset(pool, job!.data.assetId, job!.signal).catch((e) => {
       log(`compress ${job!.data.assetId}`, e);
+      throw e;
+    });
+  });
+  // Reframe & download, the same way: two at a time per worker within the shared ffmpeg slots, a failure left to pg-boss.
+  await boss.createQueue(REFRAME_QUEUE, REFRAME_QUEUE_OPTIONS);
+  // One at a time: with Compress's two, that is three full-size encodes beside the video jobs' own ffmpeg work on a shared host.
+  await boss.work<ReframeJobData>(REFRAME_QUEUE, { localConcurrency: 1, pollingIntervalSeconds: o.pollingIntervalSeconds }, async ([job]) => {
+    await reframeVideoAsset(pool, job!.data, job!.signal).catch((e) => {
+      log(`reframe ${job!.data.assetId} ${job!.data.ratio} ${job!.data.fill}`, e);
       throw e;
     });
   });

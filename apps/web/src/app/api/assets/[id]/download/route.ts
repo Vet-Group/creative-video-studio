@@ -1,4 +1,4 @@
-import { compressedKey } from '@cvs/core/queue';
+import { compressedKey, reframedKey, reframeOf } from '@cvs/core/queue';
 import { readableAsset, streamAsset, type RouteContext } from '@/lib/assets';
 import { clipDownloadName } from '@/lib/clips';
 import { verifyDownloadToken } from '@/lib/download-token';
@@ -22,6 +22,16 @@ export async function GET(request: Request, { params }: RouteContext) {
     const stored = await headObject(compressedKey(id)).catch(() => null);
     if (!stored) return Response.json({ error: 'not found' }, { status: 404 });
     return streamAsset(request, { s3Key: compressedKey(id), bytes: stored.size, mime: 'video/mp4', filename: `${filename.replace(/\.[^.]+$/, '')}-nen.mp4` }, 'attachment');
+  }
+  // `variant=reframed&ratio=…&fill=…`: one of its reframed copies (POST /api/assets/[id]/reframe), likewise, named with the shape and fill (`-9x16-blur`).
+  const query = new URL(request.url).searchParams;
+  if (query.get('variant') === 'reframed') {
+    const shape = reframeOf(query.get('ratio'), query.get('fill'));
+    if (!shape) return Response.json({ error: 'not found' }, { status: 404 });
+    const key = reframedKey(id, shape.ratio, shape.fill);
+    const stored = await headObject(key).catch(() => null);
+    if (!stored) return Response.json({ error: 'not found' }, { status: 404 });
+    return streamAsset(request, { s3Key: key, bytes: stored.size, mime: 'video/mp4', filename: `${filename.replace(/\.[^.]+$/, '')}-${shape.ratio.replace(':', 'x')}-${shape.fill}.mp4` }, 'attachment');
   }
   return streamAsset(request, { ...found.asset, filename }, 'attachment');
 }

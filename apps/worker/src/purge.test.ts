@@ -1,6 +1,7 @@
 // The purge against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`).
 import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { reframedKeys } from '@cvs/core/queue';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -72,6 +73,7 @@ describe('purgeDeletedClips', () => {
     for (const id of ['in-solo', 'in-shared']) await putObject(`thumbs/${id}`, new Uint8Array(1), 'image/jpeg');
     // The compressed copies the worker made of the old clip's video and of a live clip's.
     for (const id of ['old-video', 'live-video']) await putObject(`compressed/${id}.mp4`, new Uint8Array(1), 'video/mp4');
+    for (const id of ['old-video', 'live-video']) await putObject(`reframed/${id}-9x16-blur.mp4`, new Uint8Array(1), 'video/mp4'); // and a reframed one of each
     await putObject('thumbs/in-solo-1600', new Uint8Array(1), 'image/webp'); // and the 1600 px preview of the one that goes
     await clip('old', ['in-shared', 'in-own', 'in-solo'], 31);
     await clip('live', ['in-shared'], null);
@@ -99,7 +101,7 @@ describe('purgeDeletedClips', () => {
       { id: 'v-old', output_asset_id: null },
       { id: 'v-recent', output_asset_id: 'recent-video' },
     ]);
-    expect(await keys()).toEqual(['assets/in-other-live', 'assets/in-own', 'assets/in-shared', 'assets/live-poster', 'assets/live-video', 'assets/recent-poster', 'assets/recent-video', 'compressed/live-video.mp4', 'thumbs/in-shared']);
+    expect(await keys()).toEqual(['assets/in-other-live', 'assets/in-own', 'assets/in-shared', 'assets/live-poster', 'assets/live-video', 'assets/recent-poster', 'assets/recent-video', 'compressed/live-video.mp4', 'reframed/live-video-9x16-blur.mp4', 'thumbs/in-shared']);
     expect((await pool.query(`select count(*)::int as n from jobs where purged_at is not null`)).rows[0].n).toBe(1);
     expect(logged).toEqual([]);
   });
@@ -118,7 +120,7 @@ describe('purgeDeletedClips', () => {
       throw new Error('minio is down');
     };
     expect(await purgeDeletedClips(pool, failing, log)).toBe(1);
-    expect(logged.sort()).toEqual(['remove object assets/broken-poster', 'remove object assets/broken-video', 'remove object compressed/broken-poster.mp4', 'remove object compressed/broken-video.mp4', 'remove object thumbs/broken-poster', 'remove object thumbs/broken-poster-1600', 'remove object thumbs/broken-video', 'remove object thumbs/broken-video-1600']);
+    expect(logged.sort()).toEqual(['remove object assets/broken-poster', 'remove object assets/broken-video', 'remove object compressed/broken-poster.mp4', 'remove object compressed/broken-video.mp4', 'remove object thumbs/broken-poster', 'remove object thumbs/broken-poster-1600', 'remove object thumbs/broken-video', 'remove object thumbs/broken-video-1600', ...['broken-poster', 'broken-video'].flatMap((id) => reframedKeys(id).map((k) => `remove object ${k}`))].sort());
     expect((await pool.query(`select purged_at is not null as purged from jobs where id = 'broken'`)).rows[0].purged).toBe(true);
   });
 

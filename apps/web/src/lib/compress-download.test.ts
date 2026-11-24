@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { compressedName, downloadCompressed } from './compress-download';
+import { compressedName, downloadCompressed, downloadReframedVideo } from './compress-download';
 import { decodeOptimizerImage, optimizeImage } from './media-optimizer';
 
 vi.mock('./media-optimizer', () => ({ decodeOptimizerImage: vi.fn(), optimizeImage: vi.fn() }));
@@ -45,4 +45,31 @@ test('a copy that is not smaller leaves the original saved under its own name', 
   expect(saved).toEqual([{ download: 'out.png', href: 'blob:1' }]); // no name given: the asset's own filename
   expect(blobs[0]!.size).toBe(1000);
   expect(blobs[0]!.type).toBe('image/png');
+});
+
+test('a reframed video is asked for once, polled until ready, and saved named with its shape; a failed one throws', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout'] });
+  try {
+    const calls: string[] = [];
+    let state = 'working';
+    vi.stubGlobal('fetch', async (path: string, init?: RequestInit) => {
+      calls.push(`${init?.method ?? 'GET'} ${path}`);
+      return Response.json(state === 'ready' ? { status: state, downloadUrl: '/api/assets/a1/download?t=x&variant=reframed&ratio=4:5&fill=black' } : { status: state });
+    });
+    const saved: { download: string; href: string }[] = [];
+    vi.stubGlobal('document', { createElement: () => ({ click() { saved.push({ download: (this as unknown as HTMLAnchorElement).download, href: (this as unknown as HTMLAnchorElement).href }); }, remove() {} }), body: { append() {} } });
+    const done = downloadReframedVideo('a1', '4:5', 'black', '20261124-an-1a2b3c4d.mp4');
+    await vi.advanceTimersByTimeAsync(2_000);
+    state = 'ready';
+    await vi.advanceTimersByTimeAsync(2_000);
+    await done;
+    expect(calls).toEqual(['POST /api/assets/a1/reframe?ratio=4:5&fill=black', 'GET /api/assets/a1/reframe?ratio=4:5&fill=black', 'GET /api/assets/a1/reframe?ratio=4:5&fill=black']);
+    expect(saved).toEqual([{ download: '20261124-an-1a2b3c4d-4x5-black.mp4', href: '/api/assets/a1/download?t=x&variant=reframed&ratio=4:5&fill=black' }]);
+
+    state = 'failed';
+    await expect(downloadReframedVideo('a1', '9:16', 'blur')).rejects.toThrow('reframe failed');
+    expect(saved).toHaveLength(1);
+  } finally {
+    vi.useRealTimers();
+  }
 });
