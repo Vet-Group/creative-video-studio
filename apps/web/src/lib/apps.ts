@@ -288,7 +288,7 @@ export const APPS: AppConfig[] = [
     added: '2026-11-20',
     feature: 'pose_generator',
     name: 'Tạo tư thế người mẫu',
-    description: 'Từ một hoặc nhiều ảnh người mẫu (tối đa 6), tạo cùng người mẫu ấy trong tối đa 4 tư thế, mỗi ảnh và mỗi tư thế một ảnh riêng, giữ nguyên người và trang phục.',
+    description: 'Từ một hoặc nhiều ảnh người mẫu (tối đa 6), tạo mỗi người mẫu trong tối đa 4 tư thế, mỗi tư thế một ảnh riêng, giữ nguyên người và trang phục.',
     keywords: 'pose, pose generator, model poses',
     category: 'fashion',
     slots: [{ label: 'Người mẫu', inputLabel: 'Ảnh người mẫu', empty: 'Thêm 1 hoặc nhiều ảnh người mẫu (rõ mặt, thấy người)', aiModels: true }],
