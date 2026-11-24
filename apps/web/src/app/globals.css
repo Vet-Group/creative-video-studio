@@ -1368,6 +1368,10 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
 /* The marks and Reuse at the bottom of the side while the recipe above scrolls; the negative margins reach over the side's padding, which a sticky box stays inside. */
 .lightbox-foot { position: sticky; bottom: -16px; z-index: 1; display: grid; gap: 8px; margin: auto -16px -16px; padding: 12px 16px 16px; border-top: 1px solid var(--hairline); background: var(--surface); }
 .lightbox-foot:empty { display: none; }
+/* A control the keyboard reaches scrolls clear of the footer (--lightbox-foot-h, its height, set by ClipDetail) and of the side's top edge (WCAG 2.4.11):
+   the browser took a row the footer covered whole for in view and did not scroll. A margin, not the side's padding, so focus in the footer moves nothing. */
+.lightbox-side { scroll-padding-top: 16px; }
+.lightbox-side :not(.lightbox-foot, .lightbox-foot *) { scroll-margin-bottom: calc(var(--lightbox-foot-h, 0px) + 12px); }
 /* Side by side in equal halves when the words fit (the rerun's price wrapped in a half of the 320 px side), else the rerun takes what it needs, else a row each. */
 .lightbox-foot-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .lightbox-foot-actions > * { flex: 1 1 0; min-width: max-content; padding: 0 12px; white-space: nowrap; }

@@ -524,6 +524,55 @@ test('Dùng khung hình này in a video’s detail opens Create video with the f
   }
 });
 
+// WCAG 2.4.11: a control the keyboard reaches in the detail's side is never hidden under the side's pinned footer (the marks and Reuse). On a 390 px phone
+// the browser took the reframe row for in view and did not scroll, though the footer covered it whole (measured on prod 2026-11-24).
+test('every Tab stop in a video’s Library detail shows above the pinned marks and Reuse, on a touch phone and at 1440 px', async ({ page, browser }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'libfocus');
+  const up = (await (await page.request.post('/api/assets', { multipart: { file: { name: 'focus-in.png', mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] };
+  const res = await page.request.post('/api/jobs', { data: { assetIds: [up.assets[0]!.id], modelId: 'mock-e2e', prompt: 'a clip to tab through', enhance: false, ratio: '9:16', durationSec: 5 } });
+  expect(res.status()).toBe(201);
+  const id = ((await res.json()) as { id: string }).id;
+  // From the side's first control at the top, Tab to the footer: each stop's centre hits the control itself, and its box is clear of the footer.
+  const walk = async (p: Page, phone = false) => {
+    await p.goto('/library');
+    if (phone) await p.getByRole('button', { name: /^Bộ lọc/ }).click(); // a phone's filters are in a sheet
+    await p.getByLabel('Người tạo').selectOption({ label: 'E2E Library Focus' });
+    if (phone) await p.getByRole('button', { name: 'Xong' }).click();
+    await p.locator(`article[data-clip-id="${id}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
+    const side = p.getByRole('dialog').locator('.lightbox-side');
+    await expect(side.getByRole('group', { name: 'Tải theo tỉ lệ khác', exact: true })).toBeAttached();
+    await side.evaluate((s) => ((s.scrollTop = 0), s.querySelector<HTMLElement>('a[href], button:not(:disabled), select, summary')!.focus()));
+    const stops: { name: string; shown: boolean }[] = [];
+    for (let i = 0; i < 40; i++) {
+      const stop = await side.evaluate((s) => {
+        const el = document.activeElement as HTMLElement;
+        const foot = s.querySelector('.lightbox-foot')!;
+        if (!s.contains(el) || foot.contains(el)) return null;
+        const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return { name: el.getAttribute('aria-label') ?? el.textContent!.trim(), shown: !!hit && el.contains(hit) && r.bottom <= foot.getBoundingClientRect().top + 1 && r.top >= s.getBoundingClientRect().top - 1 };
+      });
+      if (!stop) break;
+      stops.push(stop);
+      await p.keyboard.press('Tab');
+    }
+    expect(stops.map((s) => s.name)).toEqual(expect.arrayContaining(['9:16', '4:5', '1:1', 'Nền mờ', 'Nền đen', 'Tải về']));
+    expect(stops.filter((s) => !s.shown).map((s) => s.name)).toEqual([]);
+    // Focus in the footer, which is always in sight, leaves the side where it was (3 focuses the fault picker there while the recipe is read).
+    expect(await side.evaluate((s) => ((s.scrollTop = 0), s.querySelector<HTMLElement>('.lightbox-foot button')!.focus(), s.scrollTop))).toBe(0);
+  };
+  try {
+    await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.find((j) => j.id === id)?.status, { timeout: 60_000 }).toBe('succeeded');
+    const phone = await (await browser.newContext({ storageState: await page.context().storageState(), viewport: { width: 390, height: 844 }, colorScheme: 'dark', hasTouch: true, isMobile: true })).newPage();
+    await walk(phone, true);
+    await phone.context().close();
+    await walk(page);
+  } finally {
+    expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
+  }
+});
+
 // As from a History card: a picture opens in the two photo tools from its Library detail, the copy (a new input of the viewer's) already in the tool's slot,
 // for its creator and for another member of the workspace (owner decision 2026-11-20). CVS_E2E_SHOTS=<folder> saves the screenshots there (1440 px light, 390 px dark).
 test('the photo tools in a picture’s Library detail open the tool with the picture in its slot, for its creator and for another member', async ({ page, browser }) => {
