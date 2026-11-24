@@ -10,6 +10,7 @@ import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
 import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
 import { typicalLabel, waitProgress } from '@/lib/explore';
+import { faceMatchLabel } from '@/lib/face-match';
 import { featureLabel } from '@/lib/features';
 import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
@@ -336,6 +337,7 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
           {providerQueueLabel(job) && ` · ${providerQueueLabel(job)}`}
           {typical && ` · ${typical}`}
         </p>
+        {faceMatchLabel(job.faceMatch) && <p className="muted">{faceMatchLabel(job.faceMatch)}</p>}
         {/* As on Fash, the words, each input and the result can go on the form beside the History. */}
         {job.text && <JobPrompt text={job.text} onUse={form?.prompt && (() => form.prompt!(job.text!))} />}
         {/* A Motion Control job's inputs are a character image and a reference video: they go back together through Dùng lại, not one by one. */}

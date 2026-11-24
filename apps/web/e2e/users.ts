@@ -175,6 +175,7 @@ export const USERS = {
   posed: { email: 'posed@e2e.test', name: 'E2E Poses D', role: 'member' }, // the catalogue: several model photos in one Run
   posee: { email: 'posee@e2e.test', name: 'E2E Poses E', role: 'member' }, // the catalogue's Run that stops part way
   posef: { email: 'posef@e2e.test', name: 'E2E Poses F', role: 'member' }, // the garment chips
+  poseg: { email: 'poseg@e2e.test', name: 'E2E Poses G', role: 'member' }, // the face score on the cards
   // recolor-listing.e2e: product recolor's and the listing set's Runs of one job per colour or shot.
   recolora: { email: 'recolora@e2e.test', name: 'E2E Recolor A', role: 'member' },
   listinga: { email: 'listinga@e2e.test', name: 'E2E Listing A', role: 'member' },

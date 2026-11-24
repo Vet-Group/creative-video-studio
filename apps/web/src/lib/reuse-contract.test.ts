@@ -73,6 +73,7 @@ const NOT_FORM_FIELDS: Record<string, string> = {
   enhancedPrompt: 'the Library detail shows the prompt the provider got',
   outputAssetId: 'the result, not an input',
   posterAssetId: 'the result, not an input',
+  faceMatch: 'the score of the result against its model photo, not an input',
 };
 
 test('every key the job route sends is read by a refill or named as not a form field, and none is listed twice or stale', () => {

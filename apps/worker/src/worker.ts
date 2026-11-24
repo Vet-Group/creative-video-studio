@@ -24,6 +24,7 @@ import { burnEndText, closestRatio, ensureH264, extractPoster, probeSeconds, pro
 import { compressVideoAsset } from './compress';
 import { purgeDeletedClips } from './purge';
 import { reframeVideoAsset } from './reframe';
+import { faceMatch } from './face';
 import { dropPreview, storePreview } from './preview';
 import { deleteObject, getObject, putObject } from './storage';
 import { closeStaleAnalyses, reaAnalyzeEnabled, runReaAnalyze } from './analyze';
@@ -97,6 +98,9 @@ const log = (what: string, e: unknown) => console.error(`worker: ${what}:`, e in
 
 /** The input whose frame the result keeps, by the order the pages send (lib/apps.ts slots): Try On's person, Background Changer's photo, the pose generator's model photo (its pose photo comes second) and product recolor's product photo (its only input, so a new colour keeps the framing) come first, a swap's target, Jewelry Try-On's wearer and the mockup pack's blank (else its design) last. */
 const KEPT_INPUT: Partial<Record<string, 0 | -1>> = { try_on: 0, background_changer: 0, pose_generator: 0, product_recolor: 0, character_swap: -1, model_swap: -1, face_swap: -1, jewelry_try_on: -1, lingerie_try_on: -1, mockup_pack: -1 };
+
+/** The longest a result waits for its face score before it is delivered without one (a score takes 0.3 to 1 s). */
+const FACE_SCORE_MS = 15_000;
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -442,7 +446,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   }
 
   /** An image is stored as it came (its type read from its bytes); its poster is a small JPEG preview for tiles, and a failed preview only leaves it without one. */
-  async function deliverImage(job: { id: string; user_id: string; workspace_id: string; provider: string }, outputUrl: string, costUsd: number): Promise<void> {
+  async function deliverImage(job: { id: string; user_id: string; workspace_id: string; provider: string; feature?: string }, outputUrl: string, costUsd: number): Promise<void> {
     const dir = await mkdtemp(join(tmpdir(), 'cvs-deliver-'));
     const outputId = randomUUID();
     const key = `assets/${outputId}`;
@@ -460,6 +464,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       await putObject(key, bytes, type.mime);
       await insertAssets(db, [{ id: outputId, ownerId: job.user_id, workspaceId: job.workspace_id, kind: 'output', s3Key: key, filename: `image-${job.id.slice(0, 8)}.${type.ext}`, mime: type.mime, bytes: bytes.length, width, height }]);
       previewId = await storePreview(db, job.user_id, job.workspace_id, job.id, bytes).catch((err) => (log(`preview ${job.id}`, err), null));
+      if (job.feature === 'pose_generator') await scoreFace(job.id, bytes);
       if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: previewId })) return;
       throw new Error('the job was settled by someone else');
     } catch (e) {
@@ -469,6 +474,25 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       throw e;
     } finally {
       await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * A pose generator result's face likeness to its model photo (the job's first input), written before settle so the card has it the moment the job reads succeeded. Best effort:
+   * an error, or a scorer that takes over FACE_SCORE_MS, is logged and leaves face_match null; the job is delivered either way.
+   */
+  async function scoreFace(jobId: string, result: Buffer): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const modelId = (await pool.query('select input_asset_ids[1] as id from jobs where id = $1', [jobId])).rows[0]?.id as string | undefined;
+      if (!modelId) return;
+      const score = faceMatch(Buffer.from(await readAsset(modelId)), result);
+      const late = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error(`no score within ${FACE_SCORE_MS} ms`)), FACE_SCORE_MS)));
+      await pool.query(`update jobs set face_match = $2 where id = $1 and status = 'running'`, [jobId, JSON.stringify(await Promise.race([score, late]))]);
+    } catch (e) {
+      log(`face match ${jobId}`, e);
+    } finally {
+      clearTimeout(timer);
     }
   }
 

@@ -1106,3 +1106,16 @@ describe('migration 0117 recolor and listing apps', () => {
     await expect(pool.query(`update jobs set feature = 'recolor' where id = $1`, [id])).rejects.toThrow(/jobs_feature_check/);
   });
 });
+
+describe('migration 0118 job face match', () => {
+  test('adds a nullable jobs.face_match with no default: a job starts with none and takes a score or a no-face verdict', async () => {
+    const { rows } = await pool.query(`select is_nullable, column_default, data_type from information_schema.columns where table_name = 'jobs' and column_name = 'face_match'`);
+    expect(rows).toEqual([{ is_nullable: 'YES', column_default: null, data_type: 'jsonb' }]);
+    const id = await insertJob(userId);
+    expect((await pool.query(`select face_match from jobs where id = $1`, [id])).rows[0].face_match).toBeNull();
+    for (const value of [{ score: 0.72 }, { noFace: 'result' }]) {
+      await pool.query(`update jobs set face_match = $2 where id = $1`, [id, JSON.stringify(value)]);
+      expect((await pool.query(`select face_match from jobs where id = $1`, [id])).rows[0].face_match).toEqual(value);
+    }
+  });
+});

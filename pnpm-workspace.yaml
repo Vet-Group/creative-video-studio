@@ -10,3 +10,5 @@ allowBuilds:
   # Its install script downloads the ffmpeg binary the worker needs.
   ffmpeg-static: true
   sharp: false
+  # onnxruntime-web (the worker's face score) pulls it in; its install script only sets up protobufjs's own CLI, which nothing here uses.
+  protobufjs: false

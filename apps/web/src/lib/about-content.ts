@@ -2672,7 +2672,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Giới hạn',
         blocks: [
-          'Tư thế càng khác ảnh gốc, AI càng phải đoán phần không thấy trong ảnh, như mặt sau của trang phục khi quay lưng. Hãy so từng ảnh với ảnh gốc trước khi dùng.',
+          'Tư thế càng khác ảnh gốc, AI càng phải đoán phần không thấy trong ảnh, như mặt sau của trang phục khi quay lưng. Hãy so từng ảnh với ảnh gốc trước khi dùng; dòng "Giống người mẫu" trên mỗi thẻ ở Lịch sử cho biết khuôn mặt giống ảnh gốc đến đâu (Cao, Vừa hoặc Thấp), còn ảnh quay lưng ghi "không thấy mặt".',
         ],
       },
       {

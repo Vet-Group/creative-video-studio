@@ -66,7 +66,7 @@ export async function GET(request: Request) {
   if (!new URL(request.url).searchParams.has('mine')) return bad('only ?mine is supported');
   const [jobs, worker, clips, queue] = await Promise.all([
     pool.query(
-      `select j.id, j.status, j.error, j.is_mock, j.feature, j.aspect, j.duration_s, j.params, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.started_at, j.finished_at, j.provider_queue_position,
+      `select j.id, j.status, j.error, j.is_mock, j.feature, j.aspect, j.duration_s, j.params, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.started_at, j.finished_at, j.provider_queue_position, j.face_match,
               j.prompt, j.preset_id, j.input_asset_ids, exists (select 1 from jobs r where r.retry_of = j.id and r.retry_of is not null) as retried,
               exists (select 1 from favorites f where f.user_id = $1 and f.job_id = j.id) as favorite,
               (select c.usd::text from cost_entries c where c.job_id = j.id and c.kind = 'estimate') as estimate_usd,
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
       text: r.params.brief ?? r.params.poseText ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
       traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, style: r.params.style ?? null, product: r.params.product ?? null, name: r.params.name ?? null,
       // The pose generator's pose (Try On keeps its own pose too, which its card does not name) or its own words.
-      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, poseRef: r.params.poseRef ?? null, color: r.params.color ?? null, shot: r.params.shot ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
+      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, poseRef: r.params.poseRef ?? null, faceMatch: r.face_match, color: r.params.color ?? null, shot: r.params.shot ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
     })),
   });
 }

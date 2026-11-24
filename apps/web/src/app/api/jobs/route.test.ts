@@ -1090,6 +1090,18 @@ describe('POST /api/jobs for an image feature', () => {
       expect(mine.jobs.map((j) => [j.feature, j.pose, j.poseText, j.text])).toEqual([['try_on', null, null, null], ['pose_generator', null, 'ngồi trên ghế', 'ngồi trên ghế'], ['pose_generator', 'front', null, null]]);
     });
 
+    test("History's list carries a pose generator job's face score, or why there is none, and null until the worker sets one", async () => {
+      const m = await newMember();
+      const pose = async (params: Record<string, string>, prompt: string) => ((await (await run(m.cookie, { assetIds: [m.asset], modelId: 'app-poses', feature: 'pose_generator', ratio: 'auto', prompt, params: { resolution: '1K', batch: BATCH, ...params } })).json()) as { id: string }).id;
+      const front = await pose({ pose: 'front' }, posePrompt('standing straight and facing the camera, arms relaxed at the sides, full body'));
+      const own = await pose({ poseText: 'ngồi trên ghế' }, posePrompt('ngồi trên ghế'));
+      await pool.query(`update jobs set face_match = $2 where id = $1`, [own, JSON.stringify({ noFace: 'result' })]);
+      const faces = async () => ((await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: m.cookie } }))).json()) as { jobs: { id: string; faceMatch: unknown }[] }).jobs.map((j) => [j.id, j.faceMatch]);
+      expect(await faces()).toEqual([[own, { noFace: 'result' }], [front, null]]);
+      await pool.query(`update jobs set face_match = $2 where id = $1`, [front, JSON.stringify({ score: 0.72 })]);
+      expect(await faces()).toEqual([[own, { noFace: 'result' }], [front, { score: 0.72 }]]);
+    });
+
     test('the multi-angle app keeps the batch id of its Run too, and an app that is not a batch app takes none', async () => {
       expect((await app('multi_angle', 1, { params: { resolution: '1K', view: 'back', batch: BATCH } })).job?.params).toEqual({ resolution: '1K', view: 'back', batch: BATCH });
       expect((await app('face_swap', 2, { params: { resolution: '1K', batch: BATCH } })).error).toMatch(/^params may hold only resolution, quality, thinking and brief, as text/);
