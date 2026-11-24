@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-24T20:30:00+07:00',
+  at: '2026-11-24T20:05:00+07:00',
   kind: 'new',
   title: 'Tạo tư thế người mẫu cho biết mỗi ảnh giống người mẫu đến đâu',
   details: [
