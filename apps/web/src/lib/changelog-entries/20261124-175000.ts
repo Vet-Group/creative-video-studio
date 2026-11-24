@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-24T14:00:00+07:00',
+  at: '2026-11-24T17:50:00+07:00',
   kind: 'improved',
   title: 'Tab Ví dụ cho Đổi màu sản phẩm và Bộ ảnh listing',
   details: [
