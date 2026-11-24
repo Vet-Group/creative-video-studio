@@ -14,6 +14,7 @@ const poses = (page: Page) => page.getByRole('group', { name: 'Tư thế cần t
 const count = (page: Page) => page.locator('.pick-count');
 const background = (page: Page, name: string) => page.getByRole('radiogroup', { name: 'Nền', exact: true }).getByRole('radio', { name, exact: true });
 const chip = (page: Page, name: string) => page.getByRole('group', { name: 'Chọn nhanh theo sàn' }).getByRole('button', { name, exact: true });
+const garment = (page: Page, name: string) => page.getByRole('group', { name: 'Chọn nhanh theo trang phục' }).getByRole('button', { name, exact: true });
 const slot = (page: Page) => page.getByRole('group', { name: 'Người mẫu', exact: true });
 const toast = (page: Page, text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
 type Job = { id: string; outputAssetId: string | null; feature: string; status: string; batch: string | null; pose: string | null; poseText: string | null; poseRef: string | null; inputAssetIds: string[] };
@@ -372,6 +373,50 @@ test('pose photos: each is one more pose beside the tiles and the own words, up 
   for (const name of ['Amazon', 'Etsy', 'Shopify']) await expect(chip(page, name)).toBeDisabled();
   await page.getByLabel(OWN_POSE).fill('ngồi trên bậc thềm');
   await expect(page.getByText('còn chỗ cho 0 ảnh')).toBeVisible();
+});
+
+test('garment chips: one click picks the poses of a garment and leaves the background, a second click clears them, the own words take a slot, and a Run sends the poses in list order', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'posef');
+  await page.goto('/apps/pose-generator');
+  await page.getByLabel('Ảnh người mẫu', { exact: true }).setInputFiles({ name: 'model.png', mimeType: 'image/png', buffer: png() });
+  await expect(slot(page).getByRole('img', { name: 'model.png' })).toBeVisible();
+  for (const name of ['Váy/Đầm', 'Áo', 'Quần', 'Áo khoác']) await expect(garment(page, name)).toHaveAttribute('aria-pressed', 'false');
+
+  // Dress: its four poses, pressed whatever the background; the background stays on the one picked first.
+  await background(page, 'Studio trắng').check();
+  await garment(page, 'Váy/Đầm').click();
+  await expect(count(page)).toContainText('4/4 đã chọn');
+  await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Xoay 3/4', 'Bước ngang', 'Sải bước']);
+  await expect(garment(page, 'Váy/Đầm')).toHaveAttribute('aria-pressed', 'true');
+  await expect(background(page, 'Studio trắng')).toBeChecked();
+  await background(page, 'Lifestyle').check();
+  await expect(garment(page, 'Váy/Đầm')).toHaveAttribute('aria-pressed', 'true');
+  // Pressed again it clears the picks and leaves the background alone.
+  await garment(page, 'Váy/Đầm').click();
+  await expect(garment(page, 'Váy/Đầm')).toHaveAttribute('aria-pressed', 'false');
+  await expect(poses(page).getByRole('button', { pressed: true })).toHaveCount(0);
+  await expect(background(page, 'Lifestyle')).toBeChecked();
+
+  // The own words take a slot, so only the first three poses of the top come.
+  await page.getByLabel(OWN_POSE).fill('ngồi trên bậc thềm');
+  await garment(page, 'Áo').click();
+  await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Tay chống hông', 'Nửa người']);
+  await expect(count(page)).toContainText('4/4 đã chọn');
+  await expect(garment(page, 'Áo')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByLabel(OWN_POSE).fill('');
+
+  // A Run with the trousers on the mock model: four jobs in the poses' list order.
+  await background(page, 'Giữ nền gốc').check();
+  await garment(page, 'Quần').click();
+  await expect(poses(page).getByRole('button', { pressed: true })).toHaveText(['Mặt trước', 'Bước ngang', 'Quay lưng', 'Tay đút túi']);
+  await pickModel(page, /Mock pets E2E/);
+  const sent: { params: Record<string, string> }[] = [];
+  page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/jobs' && sent.push(r.postDataJSON())));
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
+  const batch = sent[0]?.params.batch;
+  expect(sent.map((b) => b.params)).toEqual(['front', 'side-walk', 'back-view', 'hand-in-pocket'].map((pose) => ({ resolution: '1K', pose, background: 'keep', batch })));
 });
 
 test('catalogue: two model photos and two poses are four images, sent photo by photo under one batch id, shown as four cards; the slot stops at six photos', async ({ page }) => {

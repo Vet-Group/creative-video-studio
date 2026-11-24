@@ -80,6 +80,14 @@ export const POSE_PRESETS = [
   { id: 'shopify', label: 'Shopify', background: 'white', poses: ['front', 'back-view', 'three-quarter', 'power-stride'] },
 ] as const;
 
+/** The pose generator's garment presets: four poses of POSES that show each kind of garment well, picked in one click and leaving the background as it is. */
+export const GARMENT_PRESETS = [
+  { id: 'dress', label: 'Váy/Đầm', poses: ['front', 'power-stride', 'three-quarter', 'side-walk'] },
+  { id: 'top', label: 'Áo', poses: ['front', 'hand-on-hip', 'waist-up', 'collar-touch'] },
+  { id: 'bottom', label: 'Quần', poses: ['front', 'back-view', 'hand-in-pocket', 'side-walk'] },
+  { id: 'outerwear', label: 'Áo khoác', poses: ['front', 'three-quarter', 'hand-in-pocket', 'over-shoulder'] },
+] as const;
+
 /** Fash's model catalog (#tryon-model-catalog, read 2026-11-18): a portrait per model, the sample `try-on-portrait-<gender>-<name>.jpg`, with what its filters read. */
 export const PORTRAITS = [
   { name: 'adut', gender: 'woman', age: 'young', ethnicity: 'black', body: 'slim' },
