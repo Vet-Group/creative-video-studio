@@ -660,6 +660,8 @@ describe('POST /api/jobs for an image feature', () => {
     const job = (await pool.query('select feature, prompt from jobs where id = $1', [id])).rows[0];
     expect(job.feature).toBe('try_on');
     expect(job.prompt).toMatch(/^Dress the person in the first image/);
+    // A photo cropped tighter than the garment needs is widened, not squeezed into a big head on a short body (2026-11-24).
+    expect(job.prompt).toContain('Keep natural adult proportions: if the photo is cropped too tightly to show the whole garment, widen the shot');
     expect((await runImage(m, { ...tryOn, prompt: '  Put the red dress on her ', assetIds: [m.asset, `${m.id}-garment`] })).status).toBe(201);
   });
 

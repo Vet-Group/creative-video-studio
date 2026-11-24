@@ -833,7 +833,7 @@ test("Try On, as Fash's model catalog: the filter chips narrow the named portrai
     await expect(poseChip).toBeFocused();
     // With no pose the words may ask for one: the line goes, and the prompt no longer keeps the model's pose.
     await expect(poseWins).toHaveCount(0);
-    await expect(page.locator('.prompt-preview p')).toContainText("Keep the person's face and body exactly unchanged.");
+    await expect(page.locator('.prompt-preview p')).toContainText("Keep the person's face and body unchanged. Keep natural adult proportions:");
     await words.fill('');
     await poseChip.focus(); // the keyboard step below starts on the chip
     // From the keyboard, the chip opens the pose step's pictures for the photo already in the slot: a pick sets the pose and copies no photo again.
