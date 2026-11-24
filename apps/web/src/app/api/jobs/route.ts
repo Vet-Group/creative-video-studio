@@ -13,7 +13,7 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
-import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, isHexColor, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS } from '@/lib/apps';
+import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, isHexColor, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_MODELS, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS } from '@/lib/apps';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
@@ -131,11 +131,11 @@ export async function GET(request: Request) {
  * `params.name` (one name nameOk takes, already clean) and an optional `params.breed`; each takes exactly the prompt its item makes (itemPrompt), one job per item.
  * `pose_generator` takes one image (the person) and one of `params.pose` (a value of POSES) or `params.poseText` (the member's own words, clean as a name is, 1 to
  * MAX_POSE_TEXT characters), or two (the person, then a pose photo) and `params.poseRef` naming that second image; exactly one of the three, and an optional `params.background` (a value of
- * POSE_BACKGROUNDS), with exactly the prompt posePrompt (poseRefPrompt for a pose photo) makes of them: one job per pose.
+ * POSE_BACKGROUNDS), with exactly the prompt posePrompt (poseRefPrompt for a pose photo) makes of them: one job per pose and model photo (a catalogue Run is the same poses for up to MAX_MODELS photos).
  * `product_recolor` and `listing_set` take exactly one image (the product) and `params.color` (#RRGGBB in capitals, a swatch's or the member's own) or `params.shot` (an id of
  * LISTING_SHOTS), with exactly the prompt its item makes: one job per colour or shot.
  * The batch apps (BATCH_FEATURES) and Create image (a Run of 2 or 4 pictures) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again. As on the pages, a Run
- * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs (a pose generator Run MAX_POSES, a product recolor or listing set Run MAX_PICTURES), and a mockup pack Run with a blank product photo one job (400 for one more).
+ * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs (a pose generator Run MAX_POSES per model photo, the job's first input, and MAX_MODELS photos; a product recolor or listing set Run MAX_PICTURES), and a mockup pack Run with a blank product photo one job (400 for one more).
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * A store of another team than the caller's billing team is refused with 403 and `code` STORE_TEAM_CODE (lib/billing.ts); not naming a store stays allowed.
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
@@ -372,13 +372,15 @@ export async function POST(request: Request) {
     if (spec?.params.batch !== undefined) {
       const sent = (
         await tx.query(
-          `select count(*)::int as jobs, count(*) filter (where feature = 'mockup_pack' and cardinality(input_asset_ids) > 1)::int as blanks
+          `select count(*)::int as jobs, count(*) filter (where feature = 'mockup_pack' and cardinality(input_asset_ids) > 1)::int as blanks,
+                  count(*) filter (where input_asset_ids[1] = $4)::int as own, count(distinct input_asset_ids[1])::int as photos
              from jobs where user_id = $1 and workspace_id = $2 and params->>'batch' = $3`,
-          [userId, g.workspaceId, spec.params.batch],
+          [userId, g.workspaceId, spec.params.batch, spec.assetIds[0] ?? null],
         )
-      ).rows[0] as { jobs: number; blanks: number };
+      ).rows[0] as { jobs: number; blanks: number; own: number; photos: number };
       if (sent.jobs >= MAX_BATCH) return bad(`a Run (params.batch) takes at most ${MAX_BATCH} jobs`);
-      if (spec.feature === 'pose_generator' && sent.jobs >= MAX_POSES) return bad(`a pose generator Run (params.batch) takes at most ${MAX_POSES} poses`);
+      if (spec.feature === 'pose_generator' && sent.own >= MAX_POSES) return bad(`a pose generator Run (params.batch) takes at most ${MAX_POSES} poses per model photo`);
+      if (spec.feature === 'pose_generator' && sent.own === 0 && sent.photos >= MAX_MODELS) return bad(`a pose generator Run (params.batch) takes at most ${MAX_MODELS} model photos`);
       if ((spec.feature === 'product_recolor' || spec.feature === 'listing_set') && sent.jobs >= MAX_PICTURES) return bad(`a ${spec.feature === 'product_recolor' ? 'product recolor' : 'listing set'} Run (params.batch) takes at most ${MAX_PICTURES} pictures`);
       if (sent.jobs > 0 && (sent.blanks > 0 || (spec.feature === 'mockup_pack' && spec.assetIds.length > 1))) return bad('with a blank product photo the mockup pack makes one product per Run');
     }

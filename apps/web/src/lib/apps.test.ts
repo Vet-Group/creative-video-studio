@@ -3,7 +3,7 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
 import { POSE_PRESETS, POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -408,8 +408,17 @@ describe('Tạo tư thế người mẫu', () => {
   const d = (images: string[], poses: number): AppDraft => ({ images: [images.map(img)], prompt: '', models: [{ maxImages: 2 }], failed: false, poses });
   it('takes one photo of the model, which may be a saved AI model, among the fashion apps', () => {
     expect(app).toMatchObject({ feature: 'pose_generator', category: 'fashion', poses: true });
-    expect(app.slots.map((s) => [s.label, s.empty, !!s.optional, !!s.aiModels])).toEqual([['Người mẫu', 'Ảnh người mẫu (rõ mặt, thấy người)', false, true]]);
+    expect(app.slots.map((s) => [s.label, s.empty, !!s.optional, !!s.aiModels])).toEqual([['Người mẫu', 'Thêm 1 hoặc nhiều ảnh người mẫu (rõ mặt, thấy người)', false, true]]);
     expect(MAX_POSES).toBe(4);
+  });
+
+  it('takes up to six model photos, one photo per job, where the other bulk apps keep a Run of MAX_BATCH', () => {
+    expect(MAX_MODELS).toBe(6);
+    expect(MAX_MODELS * MAX_POSES).toBeLessThanOrEqual(MAX_BATCH);
+    expect([slotMax(app, 0, 2), slotMax(appBySlug('image-upscale')!, 0, 2), slotMax(appBySlug('background-remover')!, 0, 2), slotMax(appBySlug('background-changer')!, 0, 2)]).toEqual([6, 25, 25, 25]);
+    expect(jobImages(app, [[img('a'), img('b'), img('c')]])).toBe(1);
+    expect(appReason(app, d(['a', 'b', 'c', 'd', 'e', 'f'], 4))).toBeNull(); // a two-image model still takes the six photos: a job sends one, plus a pose photo at most
+    expect(appReason(app, { ...d(['a', 'b'], 1), poseRefs: 1, models: [{ maxImages: 1 }] })).toBe('Mô hình này nhận tối đa 1 ảnh.');
   });
 
   it('asks for the photo, then for a pose, and holds a Run to four poses, the own words counted', () => {
@@ -607,7 +616,7 @@ describe('the batch apps', () => {
 
   it('are the apps that pick items or take many photos, and their Run id is a UUID', () => {
     expect(APPS.filter((a) => a.views || a.breeds || a.styles || a.products || a.names || a.poses || a.colors || a.shots || a.bulk).map((a) => a.feature).sort()).toEqual([...BATCH_FEATURES].sort());
-    expect(APPS.filter((a) => a.bulk).map((a) => a.slug)).toEqual(['background-changer', 'image-upscale', 'background-remover']);
+    expect(APPS.filter((a) => a.bulk).map((a) => a.slug)).toEqual(['background-changer', 'image-upscale', 'background-remover', 'pose-generator']);
     expect(isBatchId('7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11')).toBe(true);
     for (const bad of ['', 'batch-1', '7D0E2F54-3C55-4A0E-9A59-2F3F0C8B1A11', '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11 ']) expect(isBatchId(bad)).toBe(false);
   });
