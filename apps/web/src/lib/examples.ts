@@ -168,7 +168,7 @@ export function cardSample(have: ReadonlySet<string>, base: string, fallback: st
 }
 
 /** Each Examples tab's fixed samples (components/image-tools.tsx Gallery, and Create's own clips), by the feature whose results an Admin may put beside them. */
-export const GALLERY_SAMPLES: Record<string, string> = { video: 'example-', image: 'image-example-', try_on: 'try-on-example-', marketing: 'marketing-example-', jewelry_try_on: 'jewelry-try-on-example-', lingerie_try_on: 'lingerie-try-on-example-', pose_generator: 'pose-generator-example-' };
+export const GALLERY_SAMPLES: Record<string, string> = { video: 'example-', image: 'image-example-', try_on: 'try-on-example-', marketing: 'marketing-example-', jewelry_try_on: 'jewelry-try-on-example-', lingerie_try_on: 'lingerie-try-on-example-', pose_generator: 'pose-generator-example-', product_recolor: 'product-recolor-example-', listing_set: 'listing-set-example-' };
 
 /** The uploaded samples named `<prefix><n>.<ext>` (n = 1, 2, ...), in number order: the fixed sample tiles of a gallery. */
 export function numberedSamples(have: ReadonlySet<string>, prefix: string, ext: 'jpg' | 'mp4'): string[] {

@@ -32,7 +32,7 @@ test('numbered samples keep their prefix and extension and sort by number', () =
 });
 
 test('the two Try-On apps have an Examples tab of their own prefix, and every prefix is one Recreate reads', () => {
-  expect(GALLERY_SAMPLES).toMatchObject({ jewelry_try_on: 'jewelry-try-on-example-', lingerie_try_on: 'lingerie-try-on-example-' });
+  expect(GALLERY_SAMPLES).toMatchObject({ jewelry_try_on: 'jewelry-try-on-example-', lingerie_try_on: 'lingerie-try-on-example-', product_recolor: 'product-recolor-example-', listing_set: 'listing-set-example-' });
   for (const prefix of Object.values(GALLERY_SAMPLES)) expect(exampleFrom({ example: `${prefix}3` })).toBe(`/api/samples/${prefix}3.json`);
   // Each tab lists only its own results: not the photos of an example, the template library, nor another page's samples.
   const have = new Set(['jewelry-try-on-example-2.jpg', 'jewelry-try-on-example-1.jpg', 'jewelry-try-on-example-1-template.jpg', 'jewelry-template-neck-01.jpg', 'lingerie-try-on-example-1.jpg', 'try-on-example-1.jpg']);
