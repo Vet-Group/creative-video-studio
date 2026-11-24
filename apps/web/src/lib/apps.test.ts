@@ -3,7 +3,7 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
 import { GARMENT_PRESETS, POSE_PRESETS, POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -226,6 +226,26 @@ describe('Ảnh nhiều góc', () => {
     expect(runTotal('0.0350', 6)).toBe('0.2100');
     expect(runTotal('0.0000', 2)).toBe('0.0000');
     expect(runTotal(undefined, 3)).toBeUndefined();
+  });
+
+  it('labels the two back three-quarter views and says in its words that it takes a model photo and makes the 360 video', () => {
+    expect([VIEW_LABELS['back-three-quarter-right'], VIEW_LABELS['back-three-quarter-left']]).toEqual(['Sau chéo phải', 'Sau chéo trái']);
+    expect(app.description).toMatch(/người mẫu/);
+    expect(app.description).toMatch(/360°/);
+    expect(app.slots[0]!.empty).toMatch(/người mẫu/);
+  });
+
+  it('turns the 360 chip on for exactly the 7 horizontal views, and pressing it again clears the picks', () => {
+    const seven = ['three-quarter-right', 'right', 'back-three-quarter-right', 'back', 'back-three-quarter-left', 'left', 'three-quarter-left'];
+    expect(turntableOn(DEFAULT_VIEWS)).toBe(false);
+    expect(toggleTurntable(DEFAULT_VIEWS)).toEqual(seven); // it replaces whatever was picked
+    expect(toggleTurntable(['top', 'back'])).toEqual(seven);
+    expect(turntableOn(seven)).toBe(true);
+    expect(turntableOn([...seven].reverse())).toBe(true); // the order picked does not matter
+    expect(turntableOn([...seven, 'top'])).toBe(false); // the top view is not part of the turntable
+    expect(turntableOn(seven.slice(1))).toBe(false);
+    expect(toggleTurntable(seven)).toEqual([]);
+    expect(runTotal('0.035', seven.length)).toBe('0.2450'); // the price line reads 7 images
   });
 });
 

@@ -400,6 +400,9 @@ test('garment chips: one click picks the poses of a garment and leaves the backg
   await page.getByLabel('Ảnh người mẫu', { exact: true }).setInputFiles({ name: 'model.png', mimeType: 'image/png', buffer: png() });
   await expect(slot(page).getByRole('img', { name: 'model.png' })).toBeVisible();
   for (const name of ['Váy/Đầm', 'Áo', 'Quần', 'Áo khoác']) await expect(garment(page, name)).toHaveAttribute('aria-pressed', 'false');
+  // The pointer to the 360 turntable in the multi-angle app.
+  await expect(page.getByText('Muốn xoay 360° người mẫu? Dùng app Ảnh nhiều góc với nút Vòng xoay 360°.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Ảnh nhiều góc' })).toHaveAttribute('href', '/apps/multi-angle');
 
   // Dress: its four poses, pressed whatever the background; the background stays on the one picked first.
   await background(page, 'Studio trắng').check();

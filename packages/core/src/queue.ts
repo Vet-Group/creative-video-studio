@@ -74,6 +74,24 @@ export function reframeOf(ratio: string | null, fill: string | null): { ratio: R
 export const reframedKey = (assetId: string, ratio: ReframeRatio, fill: ReframeFill) => `reframed/${assetId}-${ratio.replace(':', 'x')}-${fill}.mp4`;
 export const reframedKeys = (assetId: string) => REFRAME_RATIOS.flatMap((r) => REFRAME_FILLS.map((f) => reframedKey(assetId, r, f)));
 
+/**
+ * The 360 turntable of a multi-angle Run (apps/worker/src/turntable.ts): the photo and its 7 horizontal views stitched into one looping MP4, one ffmpeg encode on the worker, never
+ * retried, free. The `exclusive` policy and the stored key as singletonKey keep one queued or active job per Run and photo. No provider is called.
+ */
+export const TURNTABLE_QUEUE = 'turntable';
+export const TURNTABLE_QUEUE_OPTIONS = COMPRESS_QUEUE_OPTIONS;
+
+/** The Run (`params.batch`) and the photo (the jobs' first input) a turntable is made of, for this user and workspace. */
+export interface TurntableJobData {
+  batch: string;
+  inputAssetId: string;
+  userId: string;
+  workspaceId: string;
+}
+
+/** Where a Run's turntable is kept (also the job's singletonKey): the web streams it, the worker writes it and the purge removes it with the Run's horizontal view jobs. */
+export const turntableKey = (batch: string, inputAssetId: string) => `turntables/${batch}-${inputAssetId}.mp4`;
+
 export interface RemakeJobData {
   remakeId: string;
 }

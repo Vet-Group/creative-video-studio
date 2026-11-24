@@ -1,7 +1,8 @@
 // The daily purge (plan M.4): clips soft-deleted more than 30 days ago lose their objects and asset rows. The job row stays as a
 // tombstone (purged_at), because the cost ledger points at it; ledger rows are never touched.
 import { type LedgerPool, withTransaction } from '@cvs/core/ledger';
-import { compressedKey, reframedKeys } from '@cvs/core/queue';
+import { compressedKey, reframedKeys, turntableKey } from '@cvs/core/queue';
+import { TURNTABLE_VIEWS } from '@cvs/core/turntable';
 
 export const PURGE_AFTER = '30 days';
 
@@ -16,7 +17,7 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
   for (const { id } of due.rows) {
     try {
       const keys = await withTransaction(pool, async (tx) => {
-        const job = (await tx.query(`select ${inputsOf('j')} as inputs, j.output_asset_id, j.poster_asset_id from jobs j where j.id = $1 and j.purged_at is null for update`, [id])).rows[0];
+        const job = (await tx.query(`select ${inputsOf('j')} as inputs, j.output_asset_id, j.poster_asset_id, j.feature, j.params->>'batch' as batch, j.params->>'view' as view, j.input_asset_ids[1] as photo from jobs j where j.id = $1 and j.purged_at is null for update`, [id])).rows[0];
         if (!job) return [];
         const outputs = [job.output_asset_id, job.poster_asset_id].filter((a): a is string => !!a);
         // The job and the verdict reference the output assets, so both let go of them first; the verdict itself survives (it still counts in the pass rate).
@@ -37,7 +38,9 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
           [outputs, job.inputs, id],
         );
         // Each image may also have a tile thumbnail and a 1600 px preview (the web's thumbKey) and each video a compressed copy (compressedKey) and reframed copies (reframedKeys); removing a missing one is a no-op.
-        return rows.flatMap((r) => [r.s3_key as string, `thumbs/${r.id}`, `thumbs/${r.id}-1600`, compressedKey(r.id as string), ...reframedKeys(r.id as string)]);
+        // A horizontal view of a multi-angle Run was a frame of the Run's turntable, which is then no longer a video of 7 live views: it goes with the job.
+        const turntable = job.feature === 'multi_angle' && job.batch && job.photo && TURNTABLE_VIEWS.includes(job.view) ? [turntableKey(job.batch, job.photo)] : [];
+        return [...rows.flatMap((r) => [r.s3_key as string, `thumbs/${r.id}`, `thumbs/${r.id}-1600`, compressedKey(r.id as string), ...reframedKeys(r.id as string)]), ...turntable];
       });
       purged++;
       for (const key of keys) await removeObject(key).catch((e) => log(`remove object ${key}`, e));

@@ -307,7 +307,7 @@ describe('fal image submit', () => {
           angles[v.id] = [horizontal_angle, vertical_angle];
         }
         // The schema: 0 front, 90 right side, 180 back, 270 left side; vertical 0 eye level, 60 high angle.
-        expect(angles).toEqual({ back: [180, 0], left: [270, 0], right: [90, 0], 'three-quarter-left': [315, 0], 'three-quarter-right': [45, 0], top: [0, 60] });
+        expect(angles).toEqual({ back: [180, 0], left: [270, 0], right: [90, 0], 'three-quarter-left': [315, 0], 'three-quarter-right': [45, 0], 'back-three-quarter-right': [135, 0], 'back-three-quarter-left': [225, 0], top: [0, 60] });
       });
 
       test('keeps the output within one megapixel in the shape of the input, so a view costs its one 1K price', async () => {

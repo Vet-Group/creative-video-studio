@@ -159,8 +159,9 @@ export const USERS = {
   fmtf: { email: 'fmtf@e2e.test', name: 'E2E Formats F', role: 'member' },
   // fashion-model.e2e: the AI model generator, a saved model in the Try On person picker.
   fashiona: { email: 'fashiona@e2e.test', name: 'E2E Fashion A', role: 'member' },
-  // multi-angle.e2e: the multi-angle app, one job per view.
+  // multi-angle.e2e: the multi-angle app, one job per view; viewsb runs the 360 turntable.
   viewsa: { email: 'viewsa@e2e.test', name: 'E2E Views A', role: 'member' },
+  viewsb: { email: 'viewsb@e2e.test', name: 'E2E Views B', role: 'member' },
   // breed-swap.e2e: the breed swap app, one job per breed.
   breedsa: { email: 'breedsa@e2e.test', name: 'E2E Breeds A', role: 'member' },
   // pet-apps.e2e: the pet portrait, mockup pack and name swap apps, one member each.

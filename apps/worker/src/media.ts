@@ -123,6 +123,20 @@ export async function reframeClip(video: string, out: string, ratio: ReframeRati
   await run(requireFfmpeg(), reframeArgs(video, out, clip, ratio, fill), { timeout: timeoutMs, signal });
 }
 
+/**
+ * The ffmpeg arguments that stitch the frames `00.png` to `07.png` of `dir` (the photo, then the 7 horizontal views) into a turntable: 3 laps at 3 frames a second
+ * (8 s) with the picture cross-fading from one angle to the next at 24 fps (192 frames), H.264 yuv420p with the index up front; the frames are all one size already.
+ */
+export const turntableArgs = (dir: string, out: string): string[] => [
+  '-y', '-v', 'error', '-stream_loop', '2', '-framerate', '3', '-i', join(dir, '%02d.png'),
+  '-vf', 'framerate=fps=24:interp_start=0:interp_end=255:scene=100,format=yuv420p', '-c:v', 'libx264', '-crf', '20', '-movflags', '+faststart', out,
+];
+
+/** Stitches the frames of `dir` into `out` (turntableArgs), bounded like a compression: a hung ffmpeg must not hold a slot for good. */
+export async function turntableClip(dir: string, out: string, { signal, timeoutMs = COMPRESS_TIMEOUT_MS }: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
+  await run(requireFfmpeg(), turntableArgs(dir, out), { timeout: timeoutMs, signal });
+}
+
 /** Bounds each ffprobe and ffmpeg call of ensureH264. Delivery runs in the reconcile loop (no queue expiry covers it), so a hung process would stall every job polled after it. */
 export const H264_TIMEOUT_MS = 480_000;
 

@@ -470,6 +470,10 @@ dialog.modal.jobs-drawer[open] { animation: jobs-drawer-in .28s cubic-bezier(.2,
 .tray.history ul { gap: 24px; }
 /* The History size slider's small stop: two columns of cards from 1440 px, where the panel has room for both. */
 @media (min-width: 1440px) { .side.history-small .tray.history ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.job-turntable { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px; border-radius: 16px; background: var(--surface); box-shadow: 0 1px 3px rgb(var(--shade) / 8%), 0 6px 24px rgb(var(--shade) / 6%); }
+.job-turntable h3 { margin: 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 600; }
+.job-turntable .muted { margin: 0; font-size: 12px; }
+.job-turntable video { width: 100%; max-height: 70vh; border-radius: 8px; background: var(--surface-2); }
 .job-card { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 0; min-height: 500px; padding: 0; overflow: hidden; border: 0; border-radius: 16px; background: var(--surface); box-shadow: 0 1px 3px rgb(var(--shade) / 8%), 0 6px 24px rgb(var(--shade) / 6%); }
 .job-card.job-failed, .job-card.job-failed_unknown, .job-card.job-timed_out { box-shadow: 0 0 0 1px var(--danger-border); }
 .job-media { display: flex; align-items: center; justify-content: center; height: 500px; background: var(--fill); }
@@ -2830,7 +2834,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   .library-search input, .library-field :is(select, input) { height: 42px; }
   .library-tools .zip-toggle, .zip-tools .zip-toggle { line-height: 42px; }
   .library-tools .library-share { width: 44px; height: 44px; }
-  :is(.library-active .link-button, .library-empty-actions :is(.button, button), .acct-rows + .actions button, .zip-tools .link-button) { display: inline-flex; align-items: center; min-height: 44px; }
+  :is(.library-active .link-button, .library-empty-actions :is(.button, button), .acct-rows + .actions button, .zip-tools .link-button, .job-turntable .link-button) { display: inline-flex; align-items: center; min-height: 44px; }
   :is(.end-scene, .highlights) input[type='text'] { min-height: 44px; }
   .zip-bar .lookbook-title { min-height: 44px; font-size: 16px; } /* 16 px: iOS Safari zooms into a smaller field */
   .fb-new, .fb-uploads > button, .fb-filters .fb-mine, .fb-comment-actions button, .fb-copy { min-height: 44px; }

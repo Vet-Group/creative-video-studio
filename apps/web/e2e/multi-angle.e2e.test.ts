@@ -56,3 +56,49 @@ test('picks the views of a product photo, sees the price of one image per view, 
   await expect(views(page).getByRole('checkbox', { name: 'Bên trái' })).toBeChecked();
   await expect(views(page).getByRole('checkbox', { name: 'Bên phải' })).not.toBeChecked();
 });
+
+// The 360 turntable: one chip picks the 7 horizontal views, and the finished Run shows the video the worker stitched from the photo and its 7 views.
+test('the 360 chip picks exactly the 7 horizontal views and clears them on a second press, and a Run with it ends with a playable 360 video to download', async ({ page }) => {
+  await signIn(page, 'viewsb');
+  await page.goto('/apps/multi-angle');
+  const chip = page.getByRole('group', { name: 'Chọn nhanh' }).getByRole('button', { name: 'Vòng xoay 360°' });
+  await expect(page.getByText('Chọn 7 góc ngang; khi cả 7 ảnh xong, app tự ghép ảnh gốc và 7 góc thành video xoay 360° (MP4, miễn phí).')).toBeVisible();
+  await expect(chip).toHaveAttribute('aria-pressed', 'false'); // the back and both sides are picked, not the turntable
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'hoodie.png', mimeType: 'image/png', buffer: png() });
+  await expect(page.getByRole('group', { name: 'Sản phẩm' }).getByRole('img', { name: 'hoodie.png' })).toBeVisible();
+  await pickModel(page, /Mock angles priced/);
+
+  await chip.click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'true');
+  for (const name of ['Mặt sau', 'Bên trái', 'Bên phải', 'Góc 3/4 trái', 'Góc 3/4 phải', 'Sau chéo trái', 'Sau chéo phải']) await expect(views(page).getByRole('checkbox', { name })).toBeChecked();
+  await expect(views(page).getByRole('checkbox', { name: 'Nhìn từ trên' })).not.toBeChecked();
+  await expect(cost(page)).toHaveText('7 ảnh × $0.035 = $0.245');
+  await views(page).getByText('Nhìn từ trên', { exact: true }).click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'false'); // eight views are more than the turntable
+  await views(page).getByText('Nhìn từ trên', { exact: true }).click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'true');
+  await chip.click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.form-message').getByRole('status')).toHaveText('Chọn ít nhất một góc.');
+  await chip.click();
+
+  await pickModel(page, /Mock angles E2E/);
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
+  const mine = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; status: string }[] }).jobs.filter((j) => j.feature === 'multi_angle');
+  await expect.poll(async () => (await mine()).filter((j) => j.status === 'succeeded').length, { timeout: 120_000 }).toBe(7);
+
+  // Under the 7 results: the video, once the worker has stitched it, playing and with its download.
+  await expect(page.getByRole('heading', { name: 'Video xoay 360°', level: 3 })).toBeVisible();
+  const video = page.getByLabel('Video xoay 360° của ảnh gốc và 7 góc ngang');
+  await expect(video).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState >= 2 && v.videoWidth > 0 && v.duration > 7), { timeout: 30_000 }).toBe(true);
+  const download = page.getByRole('link', { name: 'Tải video xoay 360°' });
+  const href = (await download.getAttribute('href'))!;
+  expect(href).toMatch(/^\/api\/turntables\/[0-9a-f-]{36}\?asset=[^&]+&download=1$/);
+  const file = await page.request.get(href);
+  expect(file.status()).toBe(200);
+  expect(file.headers()['content-type']).toBe('video/mp4');
+  expect(file.headers()['content-disposition']).toMatch(/^attachment; filename="xoay-360-[0-9a-f]{8}\.mp4"/);
+  expect((await file.body()).length).toBeGreaterThan(1000);
+});

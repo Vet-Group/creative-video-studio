@@ -5,7 +5,7 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, colorLabel, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseHexColor, parseNames, PET_STYLES, POSE_BACKGROUNDS, POSE_PHOTOS, RECOLOR_COLORS, runTotal, slotMax, splitImages, stockGroups, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, colorLabel, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseHexColor, parseNames, PET_STYLES, POSE_BACKGROUNDS, POSE_PHOTOS, RECOLOR_COLORS, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { waitLabel } from '@/lib/explore';
 import { parseFashionTraits } from '@/lib/fashion-model';
 import { usable } from '@/lib/fashion-models';
@@ -190,6 +190,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
   const backgroundId = useId();
   const presetHelpId = useId();
   const garmentHelpId = useId();
+  const turntableHelpId = useId();
   const hexId = useId();
   const hexErrorId = useId();
   const { models, failed } = useImageModels(app.feature);
@@ -544,6 +545,14 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     </label>
                   ))}
                 </div>
+                <div className="segmented theme-choice preset-chips" role="group" aria-label="Chọn nhanh" aria-describedby={turntableHelpId}>
+                  <button type="button" aria-pressed={turntableOn(views)} disabled={busy} onClick={() => setViews(toggleTurntable(views))}>
+                    Vòng xoay 360°
+                  </button>
+                </div>
+                <p id={turntableHelpId} className="help">
+                  Chọn 7 góc ngang; khi cả 7 ảnh xong, app tự ghép ảnh gốc và 7 góc thành video xoay 360° (MP4, miễn phí).
+                </p>
                 <p className="help">Mỗi góc tạo một ảnh riêng và tính tiền riêng. Mặt sau và hai bên là AI đoán từ ảnh mặt trước; nếu có ảnh thật thì dùng ảnh thật.</p>
                 {runCost}
               </div>
@@ -621,6 +630,9 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                   </div>
                   <p id={garmentHelpId} className="help">
                     {`Chọn nhanh ${MAX_POSES} tư thế hợp loại trang phục (hoặc ít hơn khi đã có ô ${OWN_POSE} hoặc ảnh tư thế mẫu); nền giữ như đang chọn.`}
+                  </p>
+                  <p className="help">
+                    Muốn xoay 360° người mẫu? Dùng app <Link href="/apps/multi-angle">Ảnh nhiều góc</Link> với nút Vòng xoay 360°.
                   </p>
                   <span id={backgroundId} className="field-label">
                     Nền

@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import { type ComponentProps, createContext, Fragment, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { api, ApiError, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob, withWorkspace, WORKSPACE_CHANGED_EVENT } from '@/lib/api';
 import { appBySlug, itemLabel } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
@@ -18,6 +18,7 @@ import { userAvatarColor } from '@/lib/profile';
 import { loginFor } from '@/lib/return-to';
 import { APPS_OPEN_KEY, appShortcuts, COLLAPSED_COOKIE, isMac, isPaletteShortcut, isSettingsShortcut, navGroups } from '@/lib/sidebar';
 import { confirmRerun, confirmRun } from '@/lib/run-guard';
+import { type TurntableRun, turntableRuns } from '@/lib/turntable-runs';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { ChangelogPopup } from './ChangelogPopup';
@@ -39,6 +40,7 @@ import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import type { Account, Section } from './Settings';
 import { TemplateBlanksHost } from './TemplateBlanks';
+import { TurntableBlock } from './TurntableBlock';
 import { SaveTemplateDialog, type Scope } from './Templates';
 import { OpenToolGuide, ToolGuide, ToolGuideButton } from './ToolGuide';
 import { VetLogo } from './VetLogo';
@@ -585,6 +587,8 @@ export function Tray({ feature, format }: { feature?: string; format?: string })
       all.notify(errorText(e, 'Không tải được các ảnh của lô, hãy thử lại.'));
     }
   }
+  // A multi-angle Run of all 7 horizontal views gets its 360 turntable video under its last card.
+  const turntables = feature === 'multi_angle' ? turntableRuns(jobs) : new Map<string, TurntableRun>();
   // InvokeAI's queue count badge: the member's own jobs against the whole app's, so a wait reads as a busy queue rather than a stuck job.
   const mineQueued = all.jobs.filter((j) => j.status === 'queued').length;
   const mineRunning = all.jobs.filter((j) => j.status === 'submitting' || j.status === 'running').length;
@@ -601,7 +605,16 @@ export function Tray({ feature, format }: { feature?: string; format?: string })
       {failed && <LoadError text={!navigator.onLine ? 'Mất kết nối mạng. Sẽ cập nhật lại khi có mạng.' : loaded ? 'Không cập nhật được danh sách lượt tạo.' : 'Không tải được danh sách lượt tạo.'} onRetry={refresh} />}
       {loaded && jobs.length === 0 && (feature ? <HistoryEmpty feature={feature} /> : <p className="muted">Chưa có lượt tạo nào.</p>)}
       <ul>
-        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} selectBatch={inBatch(j) ? () => void selectBatch(j) : undefined} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
+        {jobs.map((j) =>
+          feature ? (
+            <Fragment key={j.id}>
+              <HistoryCard job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} selectBatch={inBatch(j) ? () => void selectBatch(j) : undefined} />
+              {turntables.get(j.id) && <TurntableBlock run={turntables.get(j.id)!} />}
+            </Fragment>
+          ) : (
+            <TrayItem key={j.id} job={j} isAdmin={isAdmin} />
+          ),
+        )}
       </ul>
       {/* Under the cards, so turning History into a tool row does not move them. */}
       {feature && jobs.some((j) => j.status === 'succeeded' && j.outputAssetId) && (
