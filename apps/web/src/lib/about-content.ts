@@ -2314,7 +2314,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             steps: [
               { title: 'Tải đồ lót', text: 'Thêm một hoặc nhiều ảnh đồ lót vào ô Đồ lót, ví dụ áo ngực và quần của cùng một bộ. Ảnh chụp rõ trên nền trơn giúp AI đọc đúng từng món.' },
-              { title: 'Chọn người mẫu', text: 'Chọn một người mẫu có sẵn ở ô Người mẫu, hoặc tải ảnh người mẫu của bạn lên. Có thể thêm mô tả ngắn và chọn tỉ lệ, độ phân giải.' },
+              { title: 'Chọn người mẫu', text: 'Chọn một người mẫu có sẵn ở ô Người mẫu, hoặc tải ảnh người mẫu của bạn lên, chụp từ đầu tới đùi hoặc toàn thân để người trong ảnh giữ đúng tỉ lệ. Có thể thêm mô tả ngắn và chọn tỉ lệ, độ phân giải.' },
               { title: 'Chạy', text: 'Bấm Chạy. AI mặc bộ đồ lót lên người mẫu, giữ chất liệu và màu sắc; ảnh mới nằm trong tab Lịch sử.' },
             ],
           },

@@ -773,6 +773,8 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await app('lingerie_try_on', 1)).error).toBe('lingerie_try_on needs 2 images');
       expect((await app('lingerie_try_on', 5)).error).toMatch(/number of images/);
       expect(await app('lingerie_try_on', 3)).toMatchObject({ status: 201, job: { feature: 'lingerie_try_on', prompt: expect.stringMatching(/^Dress the person in the last image in the lingerie pieces[^.]*.[^]*watermarks$/) } });
+      // A model photo cropped at the chest came back with a big head on a short body (2026-11-24): the instruction asks for a wider shot instead.
+      expect(FEATURE_PROMPTS.lingerie_try_on).toMatch(/natural adult proportions: if the photo is cropped above the hips, widen the shot/);
       const own = await app('lingerie_try_on', 2, { prompt: 'black lace set', params: { resolution: '2K' } });
       expect(own).toMatchObject({ status: 201, job: { prompt: expect.stringMatching(/watermarks. black lace set$/), params: { resolution: '2K' } } });
     });

@@ -89,7 +89,7 @@ export const FEATURE_PROMPTS: Record<string, string> = {
   face_swap: 'Swap the face from the first image onto the person in the second image.',
   background_remover: 'Remove the background.',
   jewelry_try_on: 'Put the jewelry from every image but the last on the person in the last image, each piece where it is worn and at a realistic scale. Keep its design, metal colour and stones exactly, and match its reflections and shadows to the light of the photo. Keep the person, face, pose, clothing and background exactly unchanged. Do not add any text, logos or watermarks.',
-  lingerie_try_on: 'Dress the person in the last image in the lingerie pieces from every image but the last, each piece worn as intended and fitted to the body. Keep the fabric details (lace, mesh, satin, straps, seams) and the colours exactly. Keep the face, body shape, pose, skin tone and background exactly unchanged. Do not add any text, logos or watermarks',
+  lingerie_try_on: 'Dress the person in the last image in the lingerie pieces from every image but the last, each piece worn as intended and fitted to the body. Keep the fabric details (lace, mesh, satin, straps, seams) and the colours exactly. Keep the face, body shape, pose, skin tone and background. Keep natural adult proportions: if the photo is cropped above the hips, widen the shot to show the body down to mid-thigh rather than enlarging the head or shortening the torso. Do not add any text, logos or watermarks',
   multi_angle: "Keep the product exactly as it is: its shape, print, colours and details. Infer the sides the photo does not show from the product's construction, with seams, closures and back details consistent with the front. Do not add any text, logos or watermarks.",
 };
 
