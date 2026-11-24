@@ -499,6 +499,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
   const [tile, setTile] = useState(1); // Xem lặp: the picture tiled tile × tile, to check that an all-over print's edges meet; kept while stepping, as the size slider is
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const side = useRef<HTMLDivElement>(null);
+  const foot = useRef<HTMLDivElement>(null);
   const inputs = useRef<HTMLUListElement>(null); // Về kết quả puts focus back on the photo it showed, not on the page
   // A swipe on a touch screen steps to the neighbour like the arrows: the media follows the finger, then opens it or snaps back.
   const box = useRef<HTMLDivElement>(null);
@@ -519,6 +520,14 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
     api<ClipInputs>(`/api/jobs/${clip.id}`).then(setJob, () => setJob(NO_INPUTS));
   }, [clip.id]);
   useEffect(() => void loadPresetNames().then(setPresets), []);
+  // The pinned footer's height (a note or the fault picker can grow it) is the scroll margin of the side's other controls (--lightbox-foot-h in globals.css), so one the keyboard reaches scrolls clear of it.
+  useEffect(() => {
+    const el = foot.current;
+    if (!el) return;
+    const watch = new ResizeObserver(() => side.current?.style.setProperty('--lightbox-foot-h', `${el.offsetHeight}px`));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
   // The grid holds small thumbnails only, so the image neighbours' large previews are fetched ahead and an arrow or a swipe shows them at once.
   useEffect(() => {
     for (const n of [clips[index - 1], clips[index + 1]]) if (n?.mediaType === 'image') new Image().src = thumbUrl(n.videoAssetId, PREVIEW_W);
@@ -836,7 +845,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
           </div>
         )}
         {/* Pinned under the recipe, which scrolls (a Marketing brief ran 1164 px in a 760 px dialog): the last action's note, the marks and Reuse. */}
-        <div className="lightbox-foot">
+        <div ref={foot} className="lightbox-foot">
           {note && (
             <p className="muted" role="status">
               {note}
