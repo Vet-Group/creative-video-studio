@@ -203,7 +203,7 @@ export const APPS: AppConfig[] = [
     category: 'fashion',
     slots: [
       { label: 'Đồ lót', inputLabel: 'Ảnh đồ lót', empty: 'Thêm 1 hoặc nhiều món đồ lót, chụp rõ trên nền trơn', many: true },
-      { label: 'Người mẫu', inputLabel: 'Ảnh người mẫu', empty: 'Thêm 1 ảnh người mẫu', stock: { title: 'Chọn người mẫu', groups: [{ prefix: 'lingerie-model-m' }] } },
+      { label: 'Người mẫu', inputLabel: 'Ảnh người mẫu', empty: 'Thêm 1 ảnh người mẫu, chụp từ đầu tới đùi hoặc toàn thân', stock: { title: 'Chọn người mẫu', groups: [{ prefix: 'lingerie-model-m' }] } },
     ],
     prompt: 'optional',
     ratio: true,
