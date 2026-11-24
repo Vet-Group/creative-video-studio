@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const job = (
     await pool.query(
-      `select j.id, j.user_id, j.status, j.error, j.is_mock, j.feature, j.params, j.preset_id, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.model, j.input_asset_ids, j.output_asset_id, j.poster_asset_id, j.store_id as job_store_id,
+      `select j.id, j.user_id, j.status, j.error, j.is_mock, j.feature, j.params, j.preset_id, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.model, j.input_asset_ids, j.output_asset_id, j.poster_asset_id, j.face_match, j.store_id as job_store_id,
               (select m.label from model_configs m where m.id = j.model) as model_label,
               (select s.id from stores s where s.id = j.store_id and s.workspace_id = j.workspace_id and not s.hidden and ${storeAllowed('s', '$3')}) as store_id
          from jobs j where j.id = $1 and j.workspace_id = $2 and j.deleted_at is null and j.purged_at is null`,
@@ -62,7 +62,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     id: job.id, userId: job.user_id, status: job.status, error: job.error, isMock: job.is_mock, feature: job.feature, resolution: job.params.resolution ?? null, presetId: job.preset_id, prompt: job.prompt, enhance: job.enhance, enhancedPrompt: job.enhanced_prompt, audio: job.params.audio ?? null, orientation: job.params.orientation ?? null, view: job.params.view ?? null, breed: job.params.breed ?? null, style: job.params.style ?? null, product: job.params.product ?? null, name: job.params.name ?? null, ratio: job.aspect,
     // The form inputs kept for reuse (Marketing Studio's, the image pages' own text, Try On's garment count). The brief and the script show to everyone who may see the job (owner, 2026-11-03):
     // the Library is where staff learn how a result was made, and the composed prompt carries them anyway.
-    garments: job.params.garments ? Number(job.params.garments) : null, pose: job.params.pose ?? null, poseText: job.params.poseText ?? null, poseRef: job.params.poseRef ?? null, background: job.params.background ?? null, color: job.params.color ?? null, shot: job.params.shot ?? null, format: job.params.format ?? null, hook: job.params.hook ?? null, location: job.params.location ?? null, brief: job.params.brief ?? null, script: job.params.script ?? null, roles: job.params.roles ?? null, highlights: job.params.highlights?.split('\n') ?? null, brand: job.params.brand === 'on',
+    garments: job.params.garments ? Number(job.params.garments) : null, pose: job.params.pose ?? null, poseText: job.params.poseText ?? null, poseRef: job.params.poseRef ?? null, faceMatch: job.face_match, background: job.params.background ?? null, color: job.params.color ?? null, shot: job.params.shot ?? null, format: job.params.format ?? null, hook: job.params.hook ?? null, location: job.params.location ?? null, brief: job.params.brief ?? null, script: job.params.script ?? null, roles: job.params.roles ?? null, highlights: job.params.highlights?.split('\n') ?? null, brand: job.params.brand === 'on',
     hookText: job.params.hookText ?? null, ending: job.params.ending ?? null, endText: job.params.endText ?? null, endTextPos: job.params.endTextPos ?? null,
     // The AI model generator's own traits (JSON), which its Reuse puts back on the form.
     traits: job.feature === 'fashion_model' ? (job.params.traits ?? null) : null,

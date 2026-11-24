@@ -510,6 +510,8 @@ export const jobs = pgTable(
     error: text('error'),
     /** The tokens the provider billed the job, when it reports them (BytePlus Seedance's usage.completion_tokens); the pack balance sums them. */
     providerTokens: integer('provider_tokens'),
+    /** A pose generator result's face likeness to its model photo, set by the worker once the image is stored: { score } (cosine, 2 decimals) or { noFace: 'model' | 'result' }; null for every other job and when scoring failed. */
+    faceMatch: jsonb('face_match').$type<{ score: number } | { noFace: 'model' | 'result' }>(),
     isMock: boolean('is_mock').notNull().default(false),
     outputAssetId: text('output_asset_id').references(() => assets.id, { onDelete: 'restrict' }),
     posterAssetId: text('poster_asset_id').references(() => assets.id, { onDelete: 'restrict' }),

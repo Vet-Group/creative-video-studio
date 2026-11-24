@@ -886,7 +886,7 @@ describe('GET /api/jobs/:id', () => {
     const res = await detail(bob.cookie, id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, breed: null, style: null, product: null, name: null, ratio: '1:1', garments: null, pose: null, poseText: null, poseRef: null, background: null, color: null, shot: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, traits: null, durationSec: 8, modelId: 'fal-test',
+      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, breed: null, style: null, product: null, name: null, ratio: '1:1', garments: null, pose: null, poseText: null, poseRef: null, faceMatch: null, background: null, color: null, shot: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, traits: null, durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', storeLost: false, modelLabel: 'Fal test', inputCount: 3, inputIds: ['d-in-2', 'd-in-gone', 'd-in-1'], outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }],
       endFrame: null, videoRef: null, clips: [], poseImages: [], batchItems: null,
@@ -964,6 +964,10 @@ describe('GET /api/jobs/:id', () => {
     };
     expect(await (await detail(alice.cookie, await pose({ background: 'white' }))).json()).toMatchObject({ pose: 'front', background: 'white' });
     expect(await (await detail(alice.cookie, await pose({}))).json()).toMatchObject({ pose: 'front', background: null });
+    // The face score the worker stored against the model photo comes with the job.
+    const scored = await pose({});
+    await pool.query(`update jobs set face_match = '{"score": 0.72}' where id = $1`, [scored]);
+    expect(await (await detail(alice.cookie, scored)).json()).toMatchObject({ faceMatch: { score: 0.72 } });
   });
 
   test("gives Reuse a pose generator job's pose photo, and the pose photos of its Run that still exist, to the creator only", async () => {

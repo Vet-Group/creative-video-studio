@@ -161,6 +161,8 @@ test('picks a model photo, two library poses and own words, sees the price of th
       [null, own, 'succeeded'], ['front', null, 'succeeded'], ['kneel', null, 'succeeded'],
     ]);
     for (const title of ['Mặt trước', 'Quỳ một gối', OWN_POSE]) await expect(page.getByRole('heading', { name: `Tạo tư thế · ${title}`, level: 3 })).toBeVisible();
+    // The mock model photo has no face, so each card says the score could not be made rather than showing a number.
+    await expect(page.locator('.job-card').getByText('Giống người mẫu: ảnh người mẫu không rõ mặt')).toHaveCount(3);
 
     // History lays the Run's pictures out as one lookbook, two per row, saved as a JPEG; a single picture is not a lookbook.
     const card = page.locator('.job-card').filter({ has: page.getByRole('heading', { name: 'Tạo tư thế · Mặt trước' }) });
@@ -231,6 +233,22 @@ test('picks a model photo, two library poses and own words, sees the price of th
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
+});
+
+test('a card says how much the result looks like the model photo: a model photo with a face and a mock result with none read "không thấy mặt"', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'poseg');
+  await page.goto('/apps/pose-generator');
+  await page.getByLabel('Ảnh người mẫu', { exact: true }).setInputFiles({ name: 'face.jpg', mimeType: 'image/jpeg', buffer: await readFile(new URL('../../worker/src/fixtures/face/person-a.jpg', import.meta.url)) });
+  await expect(slot(page).getByRole('img', { name: 'face.jpg' })).toBeVisible();
+  await pickModel(page, /Mock pets E2E/);
+  await poses(page).getByRole('button', { name: 'Mặt trước', exact: true }).click();
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
+  await openTab(page, 'Lịch sử');
+  const line = page.locator('.job-card').getByText('Giống người mẫu: không thấy mặt');
+  await expect(line).toBeVisible({ timeout: 90_000 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true); // no sideways scroll at 390 px
 });
 
 test('Đổi tư thế on an AI model result and on a Try On result opens the pose generator with that picture in its slot', async ({ page }) => {

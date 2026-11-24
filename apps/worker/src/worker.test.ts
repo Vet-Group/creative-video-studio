@@ -21,6 +21,7 @@ import { PgBoss } from 'pg-boss';
 import sharp from 'sharp';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { backfillDurations } from './durations';
+import { faceMatch } from './face';
 import { closestRatio, ensureH264, requireFfmpeg } from './media';
 import { createMockImageProvider, createMockProvider, MOCK_FAIL } from './mock-provider';
 import { backfillPreviews } from './preview';
@@ -32,6 +33,12 @@ vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
 vi.mock('./media', async (importOriginal) => {
   const media = await importOriginal<typeof import('./media')>();
   return { ...media, ensureH264: vi.fn(media.ensureH264) };
+});
+
+// The real faceMatch, wrapped so one test can make it fail.
+vi.mock('./face', async (importOriginal) => {
+  const face = await importOriginal<typeof import('./face')>();
+  return { ...face, faceMatch: vi.fn(face.faceMatch) };
 });
 
 const testDb = await createTestDatabase();
@@ -1143,6 +1150,44 @@ describe('image jobs', () => {
     await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
     expect(requests[0]!.imageUrls).toEqual(inputs.map((a) => `asset://${a}`));
     expect(requests[0]!.ratio, `input ${kept}`).toBe('3:4');
+  });
+
+  describe('the face score', () => {
+    const fixture = (name: string) => readFile(new URL(`./fixtures/face/${name}.jpg`, import.meta.url));
+
+    /** A job of this feature whose first input is the model photo (the same person as the output the provider returns, mirrored), run to the end; its face_match and status. */
+    async function runWithModelPhoto(feature: string): Promise<{ status: string; face_match: unknown }> {
+      const modelId = randomUUID();
+      await putObject(`assets/${modelId}`, await fixture('person-a'), 'image/jpeg');
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, 'u1', 'input', $2, 'm.jpg', 'image/jpeg', 1, 'ws_vet')`, [modelId, `assets/${modelId}`]);
+      const out = join(mockDir, `${randomUUID()}.jpg`);
+      await mkdir(mockDir, { recursive: true });
+      await writeFile(out, await fixture('person-a-flipped'));
+      const id = randomUUID();
+      await pool.query(
+        `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, workspace_id)
+         values ($1, 'u1', 'team-unassigned', $2, 'mock-image', 'mock', 'p', '3:4', 0, '{"resolution": "1K"}', $3, 'ws_vet')`,
+        [id, feature, [modelId]],
+      );
+      await withTransaction(pool, (tx) => reserve(tx, id, '0.1500'));
+      await startImages(recording([], async () => pathToFileURL(out).href));
+      await send(id, 'u1');
+      await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+      const j = await job(id);
+      return { status: j.status, face_match: j.face_match };
+    }
+
+    test("a pose generator result gets its face likeness to the model photo, and another feature's result gets none", async () => {
+      const pose = await runWithModelPhoto('pose_generator');
+      expect(pose.face_match).toMatchObject({ score: expect.any(Number) });
+      expect((pose.face_match as { score: number }).score).toBeGreaterThanOrEqual(0.5);
+      expect((await runWithModelPhoto('try_on')).face_match).toBeNull();
+    });
+
+    test('a scoring error leaves the job succeeded with no face_match', async () => {
+      vi.mocked(faceMatch).mockRejectedValueOnce(new Error('no wasm'));
+      expect(await runWithModelPhoto('pose_generator')).toEqual({ status: 'succeeded', face_match: null });
+    });
   });
 
   test('closestRatio picks the offered ratio nearest the upright photo, and auto when the model offers none', async () => {
