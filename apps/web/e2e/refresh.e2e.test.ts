@@ -76,8 +76,8 @@ test('Admin Costs, Report and Audit reload when the tab comes back', async ({ pa
   await tabReturn(page);
   await expect(entry).toBeVisible();
 
-  // Costs: an adjustment booked elsewhere changes the shared line.
-  await page.goto('/admin/costs');
+  // Costs: an adjustment booked elsewhere changes the shared line on the reconciliation tab.
+  await page.goto('/admin/costs/reconcile');
   const shared = page.getByRole('region', { name: 'Chi phí chung' });
   await expect(shared).toBeVisible();
   const before = (await shared.textContent())!;

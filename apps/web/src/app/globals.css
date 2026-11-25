@@ -913,12 +913,6 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
   .admin table.jobs td.model { position: relative; }
   .admin table.jobs td.model::before { content: '\b7'; position: absolute; left: -9px; }
 }
-/* Costs: one bar per day, thin, rounded at the data end, with a 2px gap; day numbers every five days. */
-.admin .day-bars { display: grid; grid-template-columns: repeat(var(--days, 31), minmax(0, 1fr)); gap: 2px; align-items: end; height: 140px; max-width: 720px; margin: 0 0 24px; padding: 0; list-style: none; border-bottom: 1px solid var(--hairline); }
-.admin .day-bars li { position: relative; display: flex; height: 100%; align-items: flex-end; }
-.admin .day-bars li span { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--ink-2); }
-.admin .day-bars li:hover span { background: var(--brand); }
-.admin .day-bars small { position: absolute; top: calc(100% + 4px); left: 50%; color: var(--text-muted); font-size: 12px; line-height: 16px; transform: translateX(-50%); }
 .admin details:not(.raw, .help) summary { width: fit-content; color: var(--link); font-size: 13px; font-weight: 600; cursor: pointer; }
 .admin h2 { margin: 32px 0 12px; font-size: 16px; line-height: 24px; }
 .admin p.muted { max-width: 80ch; }
@@ -3412,4 +3406,70 @@ dialog.modal.compare-two { width: min(1100px, calc(100vw - 32px)); max-width: no
 .period-picker > small { color: var(--muted); font-size: 12px; line-height: 18px; }
 @media (max-width: 640px) {
   .period-picker .segmented button, .period-picker .period-custom :is(input, button) { height: 44px; }
+}
+
+/* Admin > Costs (components/admin/AdminCosts.tsx): the period and filter row, a KPI row that is two columns on a phone, the daily chart (a $ axis,
+   gridlines, a dashed pace line, one button per day with its tooltip, thinned date labels), the detail card's sortable headers and share bars, and
+   the reconciliation tab's month steps. The Admin's tokens only; the bars' colour change is the only motion and stops under reduced motion. */
+.admin .cost-controls { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: flex-start; justify-content: space-between; margin: 0 0 16px; }
+.admin .cost-controls .period-picker { margin: 0; }
+.admin .cost-controls label.check { min-height: 30px; }
+.admin .cost-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.admin .cost-note { margin: -4px 0 16px; }
+.admin .cost-change > span { color: var(--ink); font-weight: 650; }
+.admin .day-chart h2 { margin: 0 0 16px; }
+.admin .day-plot { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 200px auto; column-gap: 8px; }
+.admin .day-axis { position: relative; min-width: 4ch; color: var(--text-muted); font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; }
+.admin .day-axis span { position: absolute; right: 0; white-space: nowrap; transform: translateY(50%); }
+.admin .day-area { position: relative; border-bottom: 1px solid var(--border-strong); }
+.admin .day-grid { position: absolute; right: 0; left: 0; border-top: 1px solid var(--hairline); }
+.admin .day-pace { position: absolute; right: 0; left: 0; z-index: 2; margin: 0; border-top: 2px dashed var(--warn-border); pointer-events: none; }
+.admin .day-pace span { position: absolute; right: 0; bottom: 3px; padding: 0 6px; border-radius: 4px; background: var(--surface); color: var(--text-sub); font-size: 12px; line-height: 18px; }
+.admin .day-cols { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--days), minmax(0, 1fr)); gap: 2px; }
+.admin .day-cols[data-dense] { gap: 0; }
+.admin .day-cols button { position: relative; display: flex; align-items: flex-end; justify-content: center; min-width: 0; height: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; }
+.admin .day-cols button:hover:not(:disabled) { background: none; }
+.admin .day-cols button::before { content: ''; width: 100%; max-width: 40px; height: var(--h); border-radius: 3px 3px 0 0; background: var(--ink-2); transition: background-color var(--dur-fast); }
+.admin .day-cols button:is(:hover, :focus-visible)::before { background: var(--brand); }
+.admin .day-tip { position: absolute; bottom: calc(var(--h) + 6px); left: 50%; z-index: 3; display: none; padding: 4px 8px; border-radius: 6px; background: var(--ink); color: var(--surface); font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; transform: translateX(-50%); pointer-events: none; }
+.admin .day-cols button[data-edge='start'] .day-tip { left: 0; transform: none; }
+.admin .day-cols button[data-edge='end'] .day-tip { right: 0; left: auto; transform: none; }
+.admin .day-cols button:is(:hover, :focus-visible) .day-tip { display: block; }
+.admin .day-x { display: grid; grid-column: 2; grid-template-columns: repeat(var(--days), minmax(0, 1fr)); margin: 6px 0 0; color: var(--text-muted); font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; }
+.admin .day-x span { justify-self: center; white-space: nowrap; }
+.admin .day-chart details { margin: 12px 0 0; }
+.admin .cost-detail .panel-head { flex-wrap: wrap; align-items: center; margin: 0 0 8px; }
+.admin .cost-detail .segmented { flex-wrap: wrap; }
+.admin .cost-detail .segmented button { height: 30px; border: 0; background: none; }
+.admin .cost-detail .segmented button:hover:not(:disabled) { background: none; color: var(--ink); }
+.admin .cost-detail .segmented button[aria-pressed='true'] { background: var(--surface-raised); color: var(--ink); box-shadow: 0 1px 2px rgb(var(--shade) / .08), 0 0 0 1px rgb(var(--tint) / .06); }
+.admin .cost-table th > .sort { gap: 4px; height: auto; min-height: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+.admin .cost-table th > .sort:hover:not(:disabled) { background: none; color: var(--ink); }
+.admin .cost-table :is(th, td).num { font-variant-numeric: tabular-nums; }
+.admin .cost-table td.share { white-space: nowrap; }
+.admin .share-bar { display: inline-block; width: 4rem; height: 6px; margin-right: 8px; overflow: hidden; border-radius: 999px; background: var(--fill); vertical-align: middle; }
+.admin .share-bar span { display: block; height: 100%; border-radius: inherit; background: var(--ink-2); }
+.admin .share-pct { display: inline-block; min-width: 4ch; }
+.admin .cost-method { margin: 0 0 16px; }
+.admin .cost-method .lines { margin: 8px 0 0; color: var(--text-sub); font-size: 13px; }
+.admin .month-step { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  .admin .day-cols button::before { transition: none; }
+}
+@container (max-width: 760px) {
+  .admin .cost-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 640px) {
+  .admin .day-x [data-minor] { visibility: hidden; }
+  /* The job list keeps to the visible box: the Admin area less the card's padding and border (38px) as well as the cell's (26px). */
+  .admin .cost-detail table.jobs { width: calc(100cqi - 64px); }
+}
+@media (max-width: 640px) {
+  .admin .cost-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .admin .cost-kpis .kpi { padding: 12px; }
+  .admin .cost-kpis .kpi-value { font-size: 20px; line-height: 28px; }
+  .admin .cost-kpis .kpi-value span { font-size: 13px; }
+  .admin .day-plot { grid-template-rows: 160px auto; }
+  .admin .cost-controls label.check, .admin .cost-detail .segmented button, .admin .cost-table th > .sort, .admin .cost-table td .link-button, .admin .month-step .button { min-height: 44px; }
+  .admin .cost-detail .segmented button { height: 44px; }
 }
