@@ -17,7 +17,7 @@ test('the sessions see-all toggle is a 44px touch target set apart from the list
 });
 
 const tokenBlocks = (css: string) => ({
-  root: css.match(/^:root \{([^}]*)\}/m),
+  root: css.match(/^:root, \.theme-light \{([^}]*)\}/m), // a .theme-light element keeps the light tokens (the Usage page's PNG)
   dark: css.match(/^:root\[data-theme='dark'\][^{]*\{([^}]*)\}/m),
   system: css.match(/^@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme='light'\]\)[^{]*\{([^}]*)\}\s*\}/m),
 });

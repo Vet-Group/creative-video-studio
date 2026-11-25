@@ -13,6 +13,7 @@ const PAGES: [string, ReactNode, IconName][] = [
   ['stores', 'Cửa hàng', 'store'],
   ['settings', 'Cài đặt', 'gear'],
   ['report', <>Báo cáo<span className="sr-only"> tuần</span></>, 'chart'],
+  ['usage', 'Mức độ sử dụng', 'gauge'],
   ['costs', 'Chi phí', 'coin'],
   ['audit', 'Nhật ký', 'log'],
 ];
