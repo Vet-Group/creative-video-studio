@@ -149,7 +149,7 @@ export function AdminUsage() {
     try {
       const { toBlob } = await import('html-to-image');
       await document.fonts.ready;
-      // shortcut: no auto-scale, so the width stays 2400 px; past the browser's canvas height (about 450 people) it fails and says so, then split by team.
+      // shortcut: no auto-scale, so the width stays 2400 px; past the browser's canvas height (about 350 people) it fails and says so, then split by team.
       const blob = await toBlob(shot.current!, { width: 1200, pixelRatio: 2, skipAutoScale: true });
       if (!blob) throw new Error('no image');
       const url = URL.createObjectURL(blob);
