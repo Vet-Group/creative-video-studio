@@ -297,7 +297,12 @@ function groups(s: Snapshot, rowKey: (r: Row) => string, jobKey: (r: Row) => str
 function sharedLine(s: Snapshot) {
   const shared = s.rows.filter((r) => !attributed(r));
   const sum = (rows: Row[]) => ({ usd: rows.reduce((t, r) => t + units(r.usd), 0n), vnd: rows.reduce((t, r) => t + BigInt(r.vnd ?? 0), 0n) });
-  const byKind = Object.fromEntries(['bakeoff', 'manual_adjustment', 'invoice_diff'].map((k) => [k, fixed(sum(shared.filter((r) => r.kind === k)).usd, 4)]));
+  const byKind = Object.fromEntries(
+    ['bakeoff', 'manual_adjustment', 'invoice_diff'].map((k) => {
+      const t = sum(shared.filter((r) => r.kind === k));
+      return [k, money(s, t.usd, t.vnd)];
+    }),
+  );
   return { ...money(s, sum(shared).usd, sum(shared).vnd), rows: shared.length, byKind };
 }
 
@@ -429,9 +434,9 @@ export function groupJobs(rows: Row[], by: GroupBy, id: string) {
   }
   const all = [...jobs.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   return {
-    jobs: all.slice(0, JOB_LIST_LIMIT).map((j) => ({ ...j, usd: fixed(j.usd, 4) })),
+    jobs: all.slice(0, JOB_LIST_LIMIT).map((j) => ({ ...j, usd: fixed(j.usd, 4), usdDisplay: display(j.usd) })),
     more: Math.max(all.length - JOB_LIST_LIMIT, 0),
-    llm: llm.calls ? { calls: llm.calls, usd: fixed(llm.usd, 4) } : null,
+    llm: llm.calls ? { calls: llm.calls, usd: fixed(llm.usd, 4), usdDisplay: display(llm.usd) } : null,
   };
 }
 

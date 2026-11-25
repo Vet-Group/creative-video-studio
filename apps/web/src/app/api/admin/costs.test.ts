@@ -57,7 +57,7 @@ interface Page {
   provisional: boolean;
   rateVndPerUsd: string | null;
   total: Money;
-  shared: Money & { rows: number; byKind: Record<string, string> };
+  shared: Money & { rows: number; byKind: Record<string, Money> };
   byUser: Figures[];
   byTeam: Figures[];
   byStore: Figures[];
@@ -259,7 +259,7 @@ describe('the Costs page for September 2026', () => {
     const p = await page();
     expect(p.month).toBe(M);
     expect(p.total).toEqual(TOTAL);
-    expect(p.shared).toEqual({ ...money('2.0000', '2.00', '50002'), rows: 4, byKind: { bakeoff: '3.0000', manual_adjustment: '-1.0000', invoice_diff: '0.0000' } });
+    expect(p.shared).toEqual({ ...money('2.0000', '2.00', '50002'), rows: 4, byKind: { bakeoff: money('3.0000', '3.00', '75002'), manual_adjustment: money('-1.0000', '-1.00', '-25000'), invoice_diff: money('0.0000', '0.00', '0') } });
     expect(p.capUsage).toEqual({ usd: '11.5000', monthlyCapUsd: '200.0000' });
 
     // Largest first. Alice: j1 + j2 + j6.
@@ -755,7 +755,7 @@ describe('the analysis on the Costs page: cost per accepted clip, by model, by d
       { id: 'openai:gpt-6-luna', provider: 'openai', model: 'gpt-6-luna', label: 'gpt-6-luna', jobs: 0, calls: 2, usd: '0.0016', usdDisplay: '0.00' },
     ]);
     expect(sumUsd(p.byModel.map((l) => l.usd))).toBe(p.attributed.usd);
-    expect(p.shared.byKind.bakeoff).toBe('1.0000');
+    expect(p.shared.byKind.bakeoff!.usd).toBe('1.0000');
     expect((await (await jobs(`month=${AM}&by=model&id=fal:fal-test`)).json()).jobs.map((j: { jobId: string }) => j.jobId)).toEqual(['cj2', 'cj1']);
   });
 
@@ -771,11 +771,11 @@ describe('the analysis on the Costs page: cost per accepted clip, by model, by d
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       jobs: [
-        { jobId: 'cj2', createdAt: '2032-02-05T03:00:00Z', feature: 'Thử đồ', model: 'Fal test', status: 'queued', verdict: 'pass', final: false, usd: '0.5000' },
-        { jobId: 'cj1', createdAt: '2032-02-03T03:00:00Z', feature: 'Tạo video', model: 'Fal test', status: 'succeeded', verdict: 'pass', final: true, usd: '2.0010' },
+        { jobId: 'cj2', createdAt: '2032-02-05T03:00:00Z', feature: 'Thử đồ', model: 'Fal test', status: 'queued', verdict: 'pass', final: false, usd: '0.5000', usdDisplay: '0.50' },
+        { jobId: 'cj1', createdAt: '2032-02-03T03:00:00Z', feature: 'Tạo video', model: 'Fal test', status: 'succeeded', verdict: 'pass', final: true, usd: '2.0010', usdDisplay: '2.00' },
       ],
       more: 0,
-      llm: { calls: 1, usd: '0.0006' },
+      llm: { calls: 1, usd: '0.0006', usdDisplay: '0.00' },
     });
     // The same keys as the page: the Try On line holds cj2 only, the LLM line the Enhance on cj1 and the call, the line with no store both jobs.
     expect((await (await jobs(`month=${AM}&by=feature&id=try_on`)).json()).jobs.map((j: { jobId: string }) => j.jobId)).toEqual(['cj2']);
@@ -817,7 +817,7 @@ describe('shared rows that name a model on the Costs page', () => {
     expect(p.total.usd).toBe('1.6500');
     expect(p.attributed.usd).toBe('2.0000');
     expect(p.shared.usd).toBe('-0.3500');
-    expect(p.shared.byKind.manual_adjustment).toBe('-0.3500');
+    expect(p.shared.byKind.manual_adjustment!.usd).toBe('-0.3500');
   });
 });
 

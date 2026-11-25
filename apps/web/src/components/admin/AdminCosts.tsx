@@ -30,8 +30,8 @@ interface Group extends Money {
   costPerAcceptedUsd: string | null;
 }
 interface ModelLine { id: string; provider: string | null; model: string | null; label: string; jobs: number; calls: number; usd: string; usdDisplay: string }
-interface JobLine { jobId: string; createdAt: string | null; feature: string; model: string; status: string | null; verdict: 'pass' | 'fail' | null; final: boolean; usd: string }
-interface GroupJobs { jobs: JobLine[]; more: number; llm: { calls: number; usd: string } | null }
+interface JobLine { jobId: string; createdAt: string | null; feature: string; model: string; status: string | null; verdict: 'pass' | 'fail' | null; final: boolean; usd: string; usdDisplay: string }
+interface GroupJobs { jobs: JobLine[]; more: number; llm: { calls: number; usd: string; usdDisplay: string } | null }
 interface Invoice {
   provider: string;
   totalUsd: string;
@@ -52,7 +52,7 @@ interface Costs {
   rateVndPerUsd: string | null;
   total: Money;
   hidden: { usd: string; usdDisplay: string; accountsUsd: string; sharedUsd: string };
-  shared: Money & { byKind: Record<string, string> };
+  shared: Money & { byKind: Record<string, Money> };
   attributed: Money;
   previous: { from: string; to: string; label: string; usd: string; usdDisplay: string };
   counts: { creations: number; users: number };
@@ -98,11 +98,11 @@ export function Usd({ m, dashZero = false }: { m: Money; dashZero?: boolean }) {
 /** The jobs behind one line, loaded when the line is opened; `query` holds the page's period, as_of and filter. */
 function JobList({ query, by, id }: { query: string; by: string; id: string }) {
   const { data, failed, reload } = useFetch<GroupJobs>(`/api/admin/costs/jobs?${query}&by=${by}&id=${encodeURIComponent(id)}`);
-  if (!data) return failed ? <LoadError text="Không tải được danh sách job." onRetry={reload} /> : <p role="status">Đang tải job...</p>;
-  if (data.jobs.length === 0 && !data.llm) return <p className="muted">Không có job nào.</p>;
+  if (!data) return failed ? <LoadError text="Không tải được danh sách lượt tạo." onRetry={reload} /> : <p role="status">Đang tải lượt tạo...</p>;
+  if (data.jobs.length === 0 && !data.llm) return <p className="muted">Không có lượt tạo nào.</p>;
   return (
     <>
-      <table className="jobs" role="table" aria-label="Job của dòng này">
+      <table className="jobs" role="table" aria-label="Lượt tạo của dòng này">
         <thead role="rowgroup">
           <tr role="row">
             <th role="columnheader" scope="col">Lúc gửi</th>
@@ -128,18 +128,22 @@ function JobList({ query, by, id }: { query: string; by: string; id: string }) {
                 {j.verdict && <span className="tag">{j.verdict === 'pass' ? 'Đạt' : 'Không đạt'}</span>}
                 {!j.final && <span className="tag">Tạm tính</span>}
               </td>
-              <td role="cell" className="num">{dollars(j.usd, 4)}</td>
+              <td role="cell" className="num">
+                <Usd m={{ usd: j.usd, usdDisplay: j.usdDisplay, vnd: null }} />
+              </td>
             </tr>
           ))}
           {data.llm && (
             <tr role="row">
-              <td role="cell" colSpan={4}>LLM không gắn job (Gợi ý, Dịch): {data.llm.calls} lượt gọi</td>
-              <td role="cell" className="num">{dollars(data.llm.usd, 4)}</td>
+              <td role="cell" colSpan={4}>LLM ngoài lượt tạo (Gợi ý, Dịch): {data.llm.calls} lượt gọi</td>
+              <td role="cell" className="num">
+                <Usd m={{ ...data.llm, vnd: null }} />
+              </td>
             </tr>
           )}
         </tbody>
       </table>
-      {data.more > 0 && <p className="muted">Còn {data.more} job cũ hơn; tải CSV chi tiết sổ cái để xem đủ.</p>}
+      {data.more > 0 && <p className="muted">Còn {data.more} lượt tạo cũ hơn; tải CSV chi tiết sổ cái để xem đủ.</p>}
     </>
   );
 }
@@ -432,7 +436,7 @@ function Overview({ data, view, onView, onDay, reconcile }: { data: Costs; view:
   const change = costChange(data.total.usd, data.previous);
   const query = `from=${p.from}&to=${p.to}&asOf=${data.asOf}${data.realOnly ? '' : '&real=0'}`;
   const figures: [string, string, string][] = [
-    ['Lượt tạo', data.counts.creations.toLocaleString('vi-VN'), 'Job có chi phí trong khoảng này'],
+    ['Lượt tạo', data.counts.creations.toLocaleString('vi-VN'), 'Lượt tạo có chi phí trong khoảng này'],
     ['Người dùng có chi phí', data.counts.users.toLocaleString('vi-VN'), data.realOnly ? 'Chỉ người dùng thật' : 'Mọi tài khoản'],
     ['Trung bình mỗi ngày', dollars(Number(data.total.usd) / elapsed), `Trên ${elapsed} ngày`],
   ];
@@ -491,22 +495,22 @@ function Overview({ data, view, onView, onDay, reconcile }: { data: Costs; view:
       )}
       <DailyChart key={`${p.from}-${p.to}`} days={data.byDay} pace={pace} onDay={onDay} />
       <Details data={data} view={view} onView={onView} query={query} />
-      <p className="muted">Bấm một dòng để xem các job của nó; rê chuột lên số tiền để xem số lẻ 4 chữ số.</p>
+      <p className="muted">Bấm một dòng để xem các lượt tạo của nó; rê chuột lên số tiền để xem số lẻ 4 chữ số.</p>
       <details className="cost-method">
         <summary>Cách tính</summary>
         <ul className="lines">
-          <li>Theo ngày chạy job, giờ Việt Nam; số liệu tính đến dòng sổ cái #{data.asOf}.</li>
+          <li>Theo ngày phát sinh chi phí, giờ Việt Nam; số liệu tính đến dòng sổ cái #{data.asOf}.</li>
           <li>
             Chỉ người dùng thật: bỏ tài khoản hệ thống, tài khoản thử và các team được đánh dấu không tính báo cáo, theo team hiện tại của mỗi người. Chi phí chung (thử nghiệm
             mô hình, điều chỉnh tay, chênh lệch hóa đơn) nằm ở tab Đối soát và chỉ được tính khi chọn trọn tháng.
           </li>
-          <li>Team hiện tại: team của người dùng bây giờ. Tab Theo team và các tệp CSV tính theo team lúc chạy job.</li>
+          <li>Team hiện tại: team của người dùng bây giờ. Tab Theo team và các tệp CSV tính theo team lúc tạo.</li>
           <li>So sánh với cùng số ngày ngay trước khoảng này; tháng đang chạy so với cùng số ngày đầu tháng trước. Hạn mức tính cho cả tháng và mọi tài khoản.</li>
           <li>
-            Không đạt: tiền của kết quả bị chấm Không đạt. Lỗi hoặc quá giờ: job lỗi mà vẫn bị tính tiền. Đạt: số kết quả được chấm Đạt. Mỗi clip đạt: tiền của Tạo video và
+            Không đạt: tiền của kết quả bị chấm Không đạt. Lỗi hoặc quá giờ: lượt tạo lỗi mà vẫn bị tính tiền. Đạt: số kết quả được chấm Đạt. Mỗi clip đạt: tiền của Tạo video và
             Marketing Studio chia cho số clip được chấm Đạt.
           </li>
-          <li>Mô hình: lượt tạo là số job, lượt gọi là số lần gọi LLM (Dịch, Gợi ý, Cải thiện, Smart Remake).</li>
+          <li>Mô hình: lượt tạo là số lần tạo dùng mô hình đó, lượt gọi là số lần gọi LLM (Dịch, Gợi ý, Cải thiện, Smart Remake).</li>
         </ul>
       </details>
     </>
@@ -541,7 +545,7 @@ function InvoiceForm({ provider, month, invoice, run, pending }: { provider: str
             {invoice.utcMonthUsd !== invoice.ledgerUsd && ` · Nếu tính theo tháng UTC: ${dollars(invoice.utcMonthUsd, 4)}`}
           </p>
           {Number(invoice.diffUsd) > 0 && (
-            <p className="muted">Phần chênh là tiền nhà cung cấp tính ngoài các job của app (chạy thử, canary trên cùng tài khoản) và đã được tính vào Chi phí chung.</p>
+            <p className="muted">Phần chênh là tiền nhà cung cấp tính ngoài các lượt tạo của app (chạy thử, canary trên cùng tài khoản) và đã được tính vào Chi phí chung.</p>
           )}
         </>
       )}
@@ -827,7 +831,7 @@ function ReconcileBody({ data, reload }: { data: Costs; reload: () => void }) {
   return (
     <>
       <p className="muted cost-note">
-        Sổ cái {formatMonth(month)}, mọi tài khoản: <Usd m={data.total} /> · Job và LLM {dollars(data.attributed.usdDisplay)} · Chi phí chung {dollars(data.shared.usdDisplay)}
+        Sổ cái {formatMonth(month)}, mọi tài khoản: <Usd m={data.total} /> · Lượt tạo và LLM {dollars(data.attributed.usdDisplay)} · Chi phí chung {dollars(data.shared.usdDisplay)}
         {data.provisional && <span className="tag">Tạm tính</span>}
       </p>
       {problem && (
@@ -854,9 +858,9 @@ function ReconcileBody({ data, reload }: { data: Costs; reload: () => void }) {
             {withVnd && <span className="muted"> · {vnd(data.shared.vnd)}</span>}
           </p>
           <ul className="lines">
-            {Object.entries(data.shared.byKind).map(([kind, usd]) => (
+            {Object.entries(data.shared.byKind).map(([kind, m]) => (
               <li key={kind}>
-                {KIND_LABEL[kind] ?? kind}: {dollars(usd, 4)}
+                {KIND_LABEL[kind] ?? kind}: <Usd m={m} />
               </li>
             ))}
           </ul>
@@ -906,6 +910,8 @@ export function AdminCostReconcile({ search }: { search: string }) {
     return { label: formatMonth(m.months[0]!), href: periodHref('/admin/costs/reconcile', search, m) };
   };
   const [prev, next] = [step(-1), step(1)];
+  // No month after the current one: it has no costs yet.
+  const hasNext = shiftMonth(month, 1) <= todayIct().slice(0, 7);
   return (
     <section aria-labelledby="reconcile-title">
       <CostViews search={search} />
@@ -914,9 +920,11 @@ export function AdminCostReconcile({ search }: { search: string }) {
           <Link className="button" href={prev.href} aria-label={`Tháng trước: ${prev.label}`}>
             <span aria-hidden="true">‹</span> {prev.label}
           </Link>
-          <Link className="button" href={next.href} aria-label={`Tháng sau: ${next.label}`}>
-            {next.label} <span aria-hidden="true">›</span>
-          </Link>
+          {hasNext && (
+            <Link className="button" href={next.href} aria-label={`Tháng sau: ${next.label}`}>
+              {next.label} <span aria-hidden="true">›</span>
+            </Link>
+          )}
         </nav>
         {data && (
           <a className="button" href={`/api/admin/costs/summary?month=${data.month}&asOf=${data.asOf}`} download>

@@ -126,6 +126,8 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await page.goto('/admin/costs/reconcile?from=2030-01-01&to=2030-01-31');
   await expect(page.getByRole('heading', { level: 1, name: 'Đối soát Tháng 1/2030' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Tháng trước: Tháng 12/2029' })).toHaveAttribute('href', '/admin/costs/reconcile?from=2029-12-01&to=2029-12-31');
+  // A month after the current one has no costs yet, so it is not offered.
+  await expect(page.getByRole('link', { name: /^Tháng sau/ })).toHaveCount(0);
   const rate = page.getByLabel('Tỉ giá VND/USD Tháng 1/2030');
   await rate.fill('25000');
   await Promise.all([page.waitForResponse((r) => r.url().includes(`/api/admin/rates/${month}`) && r.ok()), page.getByRole('button', { name: 'Lưu tỉ giá' }).click()]);
@@ -146,8 +148,12 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await page.getByLabel('Ghi chú (bắt buộc)').fill('Test adjustment');
   await page.getByRole('button', { name: 'Thêm điều chỉnh' }).click();
   const shared = page.getByRole('region', { name: 'Chi phí chung' });
-  await expect(shared).toContainText('Chênh lệch hóa đơn: $12.5000');
-  await expect(shared).toContainText('Điều chỉnh tay: -$1.5000');
+  // Each kind at 2 decimals, with the exact 4-decimal amount and the VND in its title.
+  const kind = (label: string) => shared.getByRole('listitem').filter({ hasText: label });
+  await expect(kind('Chênh lệch hóa đơn')).toContainText('Chênh lệch hóa đơn: $12.50');
+  await expect(kind('Chênh lệch hóa đơn').getByTitle('$12.5000 · 312.500 ₫')).toBeVisible();
+  await expect(kind('Điều chỉnh tay')).toContainText('Điều chỉnh tay: -$1.50');
+  await expect(kind('Điều chỉnh tay').getByTitle('-$1.5000 · -37.500 ₫')).toBeVisible();
   await expect(page.locator('p.cost-note', { hasText: 'Sổ cái Tháng 1/2030, mọi tài khoản' })).toContainText('Chi phí chung $11.00');
 
   // The summary CSV is the whole month with every row: file name, a byte order mark, the fixed header columns and the shared line.
@@ -416,10 +422,13 @@ test('on a phone each job of a Costs line is a two-line block with the time and 
   expect(await dot()).toEqual({ shown: true, wrapped: false, clips: true });
   await row.locator('td.model').evaluate((td) => { td.textContent = 'Nano Banana Pro (Character Swap) Nano Banana Pro'; });
   expect(await dot()).toEqual({ shown: false, wrapped: true, clips: true });
-  // The blocks still read as a table: five column headers, and five cells in the job's row.
-  const table = users.getByRole('table', { name: 'Job của dòng này' });
+  // The blocks still read as a table: five column headers, and five cells in the job's row, its amount at 2 decimals with the 4 in a title.
+  const table = users.getByRole('table', { name: 'Lượt tạo của dòng này' });
   await expect(table.getByRole('columnheader')).toHaveText(['Lúc gửi', 'Mục', 'Mô hình', 'Trạng thái', 'USD']);
-  await expect(table.getByRole('row').filter({ hasText: jobId.slice(0, 8) }).getByRole('cell')).toHaveCount(5);
+  const cells = table.getByRole('row').filter({ hasText: jobId.slice(0, 8) }).getByRole('cell');
+  await expect(cells).toHaveCount(5);
+  await expect(cells.last().locator('span[title]')).toHaveAttribute('title', /^\$\d+\.\d{4}$/);
+  await expect(cells.last()).toHaveText(/^\$\d+\.\d{2} \(/);
 });
 
 test('on a 320 px phone the Costs header buttons wrap their label instead of widening the page, and the view switch has 44 px targets', async ({ page }) => {
