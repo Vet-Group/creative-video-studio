@@ -1856,12 +1856,12 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about-video { position: relative; margin: 32px 0 24px; overflow: hidden; border-radius: 12px; background: var(--media-bg); }
 .about-video video { display: block; width: 100%; aspect-ratio: 16 / 9; }
 /* Its poster under one large play button until started; then the native controls. */
-.about-video-play { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: #fff; cursor: pointer; }
-.about-video-play > span { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: rgb(0 0 0 / .62); box-shadow: 0 6px 24px rgb(0 0 0 / .25); transition: background var(--dur-base), transform var(--dur-base); }
+.about-video-play { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--on-dark); cursor: pointer; }
+.about-video-play > span { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: rgb(var(--shade) / .62); box-shadow: 0 6px 24px rgb(var(--shade) / .25); transition: background var(--dur-base), transform var(--dur-base); }
 .about-video-play .icon { margin-left: 4px; } /* the triangle's optical centre */
-.about-video-play:hover > span { background: rgb(0 0 0 / .78); transform: scale(1.05); }
+.about-video-play:hover > span { background: rgb(var(--shade) / .78); transform: scale(1.05); }
 .about-video-play:focus-visible { outline: none; }
-.about-video-play:focus-visible > span { outline: 3px solid #fff; outline-offset: 3px; box-shadow: 0 0 0 6px rgb(0 0 0 / .62); }
+.about-video-play:focus-visible > span { outline: 3px solid var(--on-dark); outline-offset: 3px; box-shadow: 0 0 0 6px rgb(var(--shade) / .62); }
 @media (prefers-reduced-motion: reduce) { .about-video-play:hover > span { transform: none; } }
 /* The page's last change for members (About.tsx, lib/about-updated.ts), under the title and lead; it opens What's new. */
 .about-updated { margin: 16px 0 0; text-align: center; }
