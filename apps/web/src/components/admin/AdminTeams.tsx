@@ -11,6 +11,8 @@ interface Team {
   name: string;
   costCentreCode: string | null;
   hidden: boolean;
+  /** Left out of the real-user figures on Costs and Usage (lib/real-users.ts), such as the engineering team. */
+  excludedFromReports: boolean;
   defaultTool: string | null;
   /** A sales team (docs/BILLING.md): billed past its free monthly allowance, and its members run jobs only for its stores. */
   billable: boolean;
@@ -24,6 +26,7 @@ interface CompanyStore {
   teamId: string | null;
 }
 type Run = ReturnType<typeof useAction>['run'];
+const REPORTS_HELP = 'teams-reports-help';
 
 /** The company stores a team owns, one checkbox each; a change saves at once. A store of another team moves to this one. */
 function TeamStores({ team, stores, teams, run, pending }: { team: Team; stores: CompanyStore[]; teams: Team[]; run: Run; pending: boolean }) {
@@ -70,6 +73,7 @@ function TeamRow({ team, stores, teams, run, pending }: { team: Team; stores: Co
         <td data-label="Tên nhóm">
           <input aria-label={`Tên nhóm ${team.name}`} value={name} onChange={(e) => setName(e.target.value)} />
           {team.hidden && <span className="tag">Đã ẩn</span>}
+          {team.excludedFromReports && <span className="tag">Không tính báo cáo</span>}
         </td>
         <td data-label="Mã trung tâm chi phí">
           <input aria-label={`Mã trung tâm chi phí của ${team.name}`} value={code} onChange={(e) => setCode(e.target.value)} />
@@ -98,6 +102,19 @@ function TeamRow({ team, stores, teams, run, pending }: { team: Team; stores: Co
             )}
           </div>
         </td>
+        <td data-label="Báo cáo">
+          <label className="check team-reports">
+            <input
+              type="checkbox"
+              aria-label={`Không tính vào báo cáo: ${team.name}`}
+              aria-describedby={REPORTS_HELP}
+              checked={team.excludedFromReports}
+              disabled={pending}
+              onChange={(e) => void patch({ excludedFromReports: e.target.checked }, 'Không lưu được việc tính nhóm vào báo cáo.')}
+            />
+            Không tính vào báo cáo
+          </label>
+        </td>
         <td data-label="Cửa hàng">
           <button type="button" className="link-button" aria-expanded={open} aria-controls={open ? storesId : undefined} aria-label={`Cửa hàng của ${team.name}: ${team.storeIds.length}`} onClick={() => setOpen(!open)}>
             <span aria-hidden="true">{open ? '▾' : '▸'}</span> {team.storeIds.length} cửa hàng
@@ -120,7 +137,7 @@ function TeamRow({ team, stores, teams, run, pending }: { team: Team; stores: Co
       </tr>
       {open && (
         <tr id={storesId} className="drill">
-          <td colSpan={6}>
+          <td colSpan={7}>
             <TeamStores team={team} stores={stores} teams={teams} run={run} pending={pending} />
           </td>
         </tr>
@@ -177,6 +194,9 @@ export function AdminTeams() {
           {problem}
         </p>
       )}
+      <p id={REPORTS_HELP} className="muted">
+        Không tính vào báo cáo: tài khoản của team này không tính vào số liệu người dùng thật ở Chi phí và Mức độ sử dụng (ví dụ team Kỹ thuật).
+      </p>
       {data.teams.length === 0 ? (
         <Empty title="Chưa có nhóm nào">Tạo nhóm đầu tiên ở trên.</Empty>
       ) : (
@@ -188,6 +208,7 @@ export function AdminTeams() {
                 <th scope="col">Mã trung tâm chi phí</th>
                 <th scope="col">Trang mặc định</th>
                 <th scope="col">Tính phí</th>
+                <th scope="col">Báo cáo</th>
                 <th scope="col">Cửa hàng</th>
                 <th scope="col">Thao tác</th>
               </tr>

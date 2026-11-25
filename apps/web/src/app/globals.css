@@ -886,6 +886,8 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin .billing-team .link-button { justify-self: start; }
 @media (pointer: coarse) { .admin .cost-views a, .admin .billing-team .link-button { min-height: 44px; } }
 .admin .team-billing label:not(.check) { margin: 0; }
+/* Teams: the report toggle saves at once; on a touch screen its whole label is a 44 px row. */
+@media (pointer: coarse) { .admin .team-reports { min-height: 44px; } }
 .admin .mobile-records tr.drill > td { padding: 8px 12px 16px; background: var(--surface-1); }
 .admin table.jobs { width: 100%; font-size: 13px; }
 .admin table.jobs .tag { margin-left: 6px; }
@@ -3348,4 +3350,19 @@ dialog.modal.compare-two { width: min(1100px, calc(100vw - 32px)); max-width: no
 @media (min-width: 1024px) and (pointer: coarse) {
   .imagebar .field-head:not(dialog *) { min-height: 44px; }
   .imagebar .slot-count:not(dialog *) { line-height: 44px; }
+}
+
+/* The report period picker (components/admin/PeriodPicker.tsx): the period in words, the quick choices in the house segmented frame with the Admin's
+   button look undone for them, and the custom range as an Admin form row under it, its reason below when it cannot be applied. Phones get 44 px targets. */
+.period-picker { display: grid; gap: 8px; justify-items: start; margin: 0 0 16px; }
+.period-picker .period-label { margin: 0; color: var(--ink); font-size: 16px; line-height: 24px; font-weight: 600; }
+.period-picker .segmented { flex-wrap: wrap; }
+.period-picker .segmented button { height: 30px; border: 0; background: none; }
+.period-picker .segmented button:hover:not(:disabled) { background: none; color: var(--ink); }
+.period-picker .segmented button:is([aria-pressed='true'], [aria-expanded='true']):not(:disabled) { background: var(--surface-raised); color: var(--ink); box-shadow: 0 1px 2px rgb(var(--shade) / .08), 0 0 0 1px rgb(var(--tint) / .06); }
+.period-picker .period-custom { justify-self: stretch; }
+.period-picker .period-custom > label { flex: 0 1 11rem; }
+.period-picker > small { color: var(--muted); font-size: 12px; line-height: 18px; }
+@media (max-width: 640px) {
+  .period-picker .segmented button, .period-picker .period-custom :is(input, button) { height: 44px; }
 }

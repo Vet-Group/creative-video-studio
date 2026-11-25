@@ -1119,3 +1119,15 @@ describe('migration 0118 job face match', () => {
     }
   });
 });
+
+describe('migration 0119 team report exclusion', () => {
+  test('adds teams.excluded_from_reports, false for every team unless the Admin ticks it', async () => {
+    const { rows } = await pool.query(`select is_nullable, column_default, data_type from information_schema.columns where table_name = 'teams' and column_name = 'excluded_from_reports'`);
+    expect(rows).toEqual([{ is_nullable: 'NO', column_default: 'false', data_type: 'boolean' }]);
+    await pool.query(`insert into teams (id, name) values ('team-0119', 'Kỹ thuật')`);
+    expect((await pool.query(`select excluded_from_reports from teams where id = 'team-0119'`)).rows[0].excluded_from_reports).toBe(false);
+    await pool.query(`update teams set excluded_from_reports = true where id = 'team-0119'`);
+    expect((await pool.query(`select excluded_from_reports from teams where id = 'team-0119'`)).rows[0].excluded_from_reports).toBe(true);
+    await expect(pool.query(`update teams set excluded_from_reports = null where id = 'team-0119'`)).rejects.toThrow(/null value/);
+  });
+});
