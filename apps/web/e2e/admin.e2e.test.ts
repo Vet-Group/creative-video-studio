@@ -115,16 +115,21 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await editor.getByRole('button', { name: 'Đóng' }).click();
   await expect(count).toHaveText(staff!);
 
-  // Costs: the VND rate, an invoice and its difference, a manual adjustment.
+  // Costs: the VND rate, an invoice and its difference and a manual adjustment on the reconciliation tab, then what the overview shows of them.
   await nav(page, 'Chi phí').click();
-  // A month with no seeded rows (migration 0012 books the bake-off into 2026-10), so the totals do not depend on the run date.
+  const views = page.getByRole('navigation', { name: 'Các góc nhìn chi phí' });
+  await expect(views.getByRole('link', { name: 'Tổng quan' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('input[type="month"]')).toHaveCount(0);
+  // A month with no seeded rows (migration 0012 books the bake-off into 2026-10), so the totals do not depend on the run date. The reconciliation tab reads the month
+  // of the address's period.
   const month = '2030-01';
-  const rate = page.getByLabel(`Tỉ giá VND/USD của tháng ${month}`);
-  await page.getByLabel('Tháng', { exact: true }).fill(month);
+  await page.goto('/admin/costs/reconcile?from=2030-01-01&to=2030-01-31');
+  await expect(page.getByRole('heading', { level: 1, name: 'Đối soát Tháng 1/2030' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Tháng trước: Tháng 12/2029' })).toHaveAttribute('href', '/admin/costs/reconcile?from=2029-12-01&to=2029-12-31');
+  const rate = page.getByLabel('Tỉ giá VND/USD Tháng 1/2030');
   await rate.fill('25000');
   await Promise.all([page.waitForResponse((r) => r.url().includes(`/api/admin/rates/${month}`) && r.ok()), page.getByRole('button', { name: 'Lưu tỉ giá' }).click()]);
   await page.reload();
-  await page.getByLabel('Tháng', { exact: true }).fill(month);
   await expect(rate).toHaveValue('25000.0000');
 
   await page.getByLabel('Tổng hóa đơn fal (USD)').fill('12.5');
@@ -143,23 +148,9 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   const shared = page.getByRole('region', { name: 'Chi phí chung' });
   await expect(shared).toContainText('Chênh lệch hóa đơn: $12.5000');
   await expect(shared).toContainText('Điều chỉnh tay: -$1.5000');
-  // The provider and model table holds both shared rows under their kind.
-  const byModel = page.getByRole('region', { name: 'Theo nhà cung cấp và mô hình' });
-  await expect(byModel.getByRole('row', { name: /Chênh lệch hóa đơn/ })).toContainText('$12.50');
-  await expect(byModel.getByRole('row', { name: /Điều chỉnh tay/ })).toContainText('-$1.50');
-  // The total card shows the 2-decimal value with the exact 4-decimal USD and the VND under it, not in a tooltip.
-  const total = page.getByRole('group', { name: 'Tổng chi phí' });
-  await expect(total.locator('.kpi-value')).toHaveText('$11.00');
-  await expect(total).toContainText('$11.0000 · 275.000');
+  await expect(page.locator('p.cost-note', { hasText: 'Sổ cái Tháng 1/2030, mọi tài khoản' })).toContainText('Chi phí chung $11.00');
 
-  // Both CSVs: file name, a byte order mark and the fixed header columns.
-  const detail = await download(page, 'Tải CSV chi tiết sổ cái', `cvs-ledger-detail-${month}.csv`);
-  expect([...detail.subarray(0, 3)]).toEqual(BOM);
-  const detailLines = detail.toString('utf8').split('\r\n');
-  expect(detailLines[1]).toBe('month,date,job id,user,email,team,cost-centre code,store,store code,provider,model,entry kind,USD,VND,Tạm tính/Thật,Đạt/Không đạt');
-  expect(detailLines.some((l) => l.includes('invoice_diff') && l.includes('12.5000'))).toBe(true);
-  expect(detailLines.some((l) => l.includes('manual_adjustment') && l.includes('-1.5000'))).toBe(true);
-
+  // The summary CSV is the whole month with every row: file name, a byte order mark, the fixed header columns and the shared line.
   const summary = await download(page, 'Tải CSV tổng hợp theo nhóm và cửa hàng', `cvs-summary-${month}.csv`);
   expect([...summary.subarray(0, 3)]).toEqual(BOM);
   const summaryLines = summary.toString('utf8').split('\r\n');
@@ -167,6 +158,37 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
     'month,team,cost-centre code,store,store code,USD,VND,failed clips USD (Fail verdict),failed jobs USD (failed or timed out),accepted clips,cost per accepted clip USD',
   );
   expect(summaryLines.some((l) => l.includes('Chi phí chung') && l.includes('11.0000') && l.includes('275000'))).toBe(true);
+
+  // The overview keeps the period. By default it counts only real users' job and LLM rows, so the shared rows are named as hidden; the switch shows every
+  // row, and the total card has the 2-decimal value with the exact 4-decimal USD and the VND under it, not in a tooltip.
+  await views.getByRole('link', { name: 'Tổng quan' }).click();
+  await expect(page).toHaveURL(/\/admin\/costs\?from=2030-01-01&to=2030-01-31$/);
+  await expect(page.locator('.period-label')).toHaveText('Tháng 1/2030');
+  const total = page.getByRole('group', { name: 'Tổng chi phí' });
+  await expect(total.locator('.kpi-value')).toHaveText('$0.00');
+  const hidden = page.locator('p.cost-note');
+  await expect(hidden).toContainText('Đang ẩn $11.00: tài khoản hệ thống, tài khoản thử và team không tính báo cáo $0.00; chi phí chung $11.00');
+  await expect(hidden.getByRole('link', { name: 'Đối soát' })).toBeVisible();
+  const realOnly = page.getByLabel('Chỉ người dùng thật');
+  await expect(realOnly).toBeChecked();
+  await realOnly.uncheck();
+  await expect(page).toHaveURL(/real=0/);
+  await expect(total.locator('.kpi-value')).toHaveText('$11.00');
+  await expect(total).toContainText('$11.0000 · 275.000');
+  await expect(hidden).toHaveCount(0);
+
+  // The detail CSV follows the page: with every row shown it holds the shared rows.
+  const detail = await download(page, 'Tải CSV chi tiết sổ cái', `cvs-ledger-detail-${month}.csv`);
+  expect([...detail.subarray(0, 3)]).toEqual(BOM);
+  const detailLines = detail.toString('utf8').split('\r\n');
+  expect(detailLines[1]).toBe('month,date,job id,user,email,team,cost-centre code,store,store code,provider,model,entry kind,USD,VND,Tạm tính/Thật,Đạt/Không đạt');
+  expect(detailLines.some((l) => l.includes('invoice_diff') && l.includes('12.5000'))).toBe(true);
+  expect(detailLines.some((l) => l.includes('manual_adjustment') && l.includes('-1.5000'))).toBe(true);
+  // The model view lists job and LLM rows only: the shared rows stay on the reconciliation tab.
+  const card = page.getByRole('region', { name: 'Chi tiết chi phí' });
+  await card.getByRole('group', { name: 'Xem theo' }).getByRole('button', { name: 'Mô hình', exact: true }).click();
+  await expect(page).toHaveURL(/by=model/);
+  await expect(card).toContainText('Không có chi phí nào trong Tháng 1/2030.');
 
   // Report: the weekly CSV.
   await nav(page, 'Báo cáo tuần').click();
@@ -346,7 +368,7 @@ test("an Admin opens a member's line on Costs and sees the job behind it", async
 
   await signIn(page, 'admin');
   await page.goto('/admin/costs');
-  const users = page.getByRole('region', { name: 'Theo người dùng' });
+  const users = page.getByRole('region', { name: 'Chi tiết chi phí' });
   const line = users.getByRole('button', { name: 'E2E Costs A' });
   await expect(line).toHaveAttribute('aria-expanded', 'false');
   await line.click();
@@ -367,7 +389,7 @@ test('on a phone each job of a Costs line is a two-line block with the time and 
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, 'admin');
   await page.goto('/admin/costs');
-  const users = page.getByRole('region', { name: 'Theo người dùng' });
+  const users = page.getByRole('region', { name: 'Chi tiết chi phí' });
   await users.getByRole('button', { name: 'E2E Costs B' }).click();
   const row = users.locator('tr.drill table.jobs tbody tr').filter({ hasText: jobId.slice(0, 8) });
   await expect(row).toContainText('Mock E2E');
@@ -400,16 +422,59 @@ test('on a phone each job of a Costs line is a two-line block with the time and 
   await expect(table.getByRole('row').filter({ hasText: jobId.slice(0, 8) }).getByRole('cell')).toHaveCount(5);
 });
 
-test('on a 320 px phone the Costs header buttons wrap their label instead of widening the page', async ({ page }) => {
+test('on a 320 px phone the Costs header buttons wrap their label instead of widening the page, and the view switch has 44 px targets', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await signIn(page, 'admin');
+  for (const [path, name] of [['/admin/costs/reconcile', /Tải CSV tổng hợp/], ['/admin/costs', /Tải CSV chi tiết/]] as const) {
+    await page.goto(path);
+    const csv = page.getByRole('link', { name });
+    await expect(csv).toBeVisible();
+    const box = (await csv.boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual(320);
+    expect(box.height).toBeGreaterThanOrEqual(36);
+    expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
+  }
+  const views = page.getByRole('group', { name: 'Xem theo' }).getByRole('button');
+  await expect(views).toHaveCount(5);
+  for (const b of await views.all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+});
+
+test('an Admin narrows Costs to the last 7 days with a quick choice, then to one day from the chart, and the address keeps the view', async ({ browser, page }) => {
+  const member = await browser.newPage();
+  await signIn(member, 'costa');
+  await runViaApi(member);
+  await member.close();
+
+  await signIn(page, 'admin');
   await page.goto('/admin/costs');
-  const csv = page.getByRole('link', { name: /Tải CSV tổng hợp/ });
-  await expect(csv).toBeVisible();
-  const box = (await csv.boundingBox())!;
-  expect(box.x + box.width).toBeLessThanOrEqual(320);
-  expect(box.height).toBeGreaterThanOrEqual(36);
-  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
+  const picker = page.getByRole('group', { name: 'Khoảng thời gian' });
+  await picker.getByRole('button', { name: '7 ngày', exact: true }).click();
+  await expect(picker.getByRole('button', { name: '7 ngày', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page).toHaveURL(/\/admin\/costs\?from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}$/);
+  const today = new URL(page.url()).searchParams.get('to')!;
+  const date = `${today.slice(8)}/${today.slice(5, 7)}/${today.slice(0, 4)}`;
+  // One bar per day and one tab stop among them; the last bar is today, read out with its date and amount.
+  const chart = page.getByRole('group', { name: /^Các ngày/ });
+  const days = chart.getByRole('button');
+  await expect(days).toHaveCount(7);
+  await expect(chart.locator('button[tabindex="0"]')).toHaveCount(1);
+  await expect(days.last()).toHaveAttribute('aria-label', new RegExp(`^${date}: \\$\\d`));
+  await days.last().click();
+  await expect(page).toHaveURL(new RegExp(`from=${today}&to=${today}$`));
+  await expect(page.locator('.period-label')).toHaveText(date);
+  await expect(days).toHaveCount(1);
+  const card = page.getByRole('region', { name: 'Chi tiết chi phí' });
+  await expect(card.getByRole('button', { name: 'E2E Costs A' })).toBeVisible();
+  // The detail view is kept in the address too, and a column header sorts.
+  await card.getByRole('group', { name: 'Xem theo' }).getByRole('button', { name: 'Mô hình', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`from=${today}&to=${today}&by=model$`));
+  const usd = card.getByRole('columnheader', { name: 'USD', exact: true });
+  await expect(usd).toHaveAttribute('aria-sort', 'descending');
+  await usd.getByRole('button').click();
+  await expect(usd).toHaveAttribute('aria-sort', 'ascending');
+  await page.reload();
+  await expect(card.getByRole('group', { name: 'Xem theo' }).getByRole('button', { name: 'Mô hình', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.period-label')).toHaveText(date);
 });
 
 test('an Admin pauses, resumes, closes, reopens and deletes an unused store; the picker marks a paused one; a store with a clip cannot be deleted', async ({ page }) => {

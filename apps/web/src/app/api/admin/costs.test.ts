@@ -68,8 +68,9 @@ interface Page {
 let admin: Awaited<ReturnType<typeof newUser>>;
 let member: Awaited<ReturnType<typeof newUser>>;
 const ctxMonth = (month: string) => ({ params: Promise.resolve({ month }) });
-const page = async (month = M) => {
-  const res = await costsRoute.GET(call(admin.cookie, `/api/admin/costs?month=${month}`));
+// The fixtures below check the whole ledger, so the page is read with real=0; the real-user default has its own tests at the end.
+const page = async (month = M, real = '0') => {
+  const res = await costsRoute.GET(call(admin.cookie, `/api/admin/costs?month=${month}&real=${real}`));
   expect(res.status).toBe(200);
   return (await res.json()) as Page;
 };
@@ -109,7 +110,7 @@ async function csv(res: Response) {
   }
   return { disposition: res.headers.get('content-disposition'), label: rows[0]![0]!, header: rows[1]!, rows: rows.slice(2) };
 }
-const detail = async (month = M) => csv(await detailRoute.GET(call(admin.cookie, `/api/admin/costs/detail?month=${month}`)));
+const detail = async (month = M) => csv(await detailRoute.GET(call(admin.cookie, `/api/admin/costs/detail?month=${month}&real=0`)));
 const summary = async (month = M) => csv(await summaryRoute.GET(call(admin.cookie, `/api/admin/costs/summary?month=${month}`)));
 
 const units = (usd: string) => BigInt(usd.replace('.', ''));
@@ -549,7 +550,7 @@ describe('VND rates', () => {
 
 describe('one snapshot across the page and its CSVs', () => {
   const MS = '2026-06';
-  const detailAt = async (query: string) => csv(await detailRoute.GET(call(admin.cookie, `/api/admin/costs/detail?month=${MS}${query}`)));
+  const detailAt = async (query: string) => csv(await detailRoute.GET(call(admin.cookie, `/api/admin/costs/detail?month=${MS}&real=0${query}`)));
   const summaryAt = async (query: string) => csv(await summaryRoute.GET(call(admin.cookie, `/api/admin/costs/summary?month=${MS}${query}`)));
 
   test('with the page as_of both CSVs show the rows the page showed, a row written later is left out, and without it they show it', async () => {
@@ -706,9 +707,9 @@ describe('the analysis on the Costs page: cost per accepted clip, by model, by d
   const AM = '2032-02';
   type Analysis = Page & {
     attributed: Money;
-    previousMonth: Money;
+    previous: { from: string; to: string; label: string; usd: string; usdDisplay: string };
     byFeature: Figures[];
-    byModel: { provider: string | null; model: string | null; label: string; jobs: number; calls: number; usd: string; usdDisplay: string }[];
+    byModel: { id: string; provider: string | null; model: string | null; label: string; jobs: number; calls: number; usd: string; usdDisplay: string }[];
     byDay: { day: string; usd: string }[];
   };
   const jobs = async (query: string, cookie = admin.cookie) => jobsRoute.GET(call(cookie, `/api/admin/costs/jobs?${query}`));
@@ -735,7 +736,7 @@ describe('the analysis on the Costs page: cost per accepted clip, by model, by d
     const p = (await page(AM)) as Analysis;
     expect(p.total.usd).toBe('3.5016');
     expect(p.attributed.usd).toBe('2.5016');
-    expect(p.previousMonth).toEqual({ usd: '4.0000', usdDisplay: '4.00', vnd: null });
+    expect(p.previous).toEqual({ from: '2032-01-01', to: '2032-01-31', label: 'Tháng 1/2032', usd: '4.0000', usdDisplay: '4.00' });
     // 2.0 / 1, not (2.0 + 0.001 + 0.5 + 0.0006) / 1: neither the Enhance nor the image nor the suggestion is part of what the clip cost.
     expect(p.byUser[0]).toMatchObject({ id: 'alice', usd: '2.5016', acceptedResults: 2, acceptedClips: 1, costPerAcceptedUsd: '2.0000' });
     expect(p.byTeam[0]).toMatchObject({ id: 't3', acceptedClips: 1, costPerAcceptedUsd: '2.0000' });
@@ -746,14 +747,16 @@ describe('the analysis on the Costs page: cost per accepted clip, by model, by d
     expect(s.rows.find((r) => r[1] === 'Gamma')!.slice(9)).toEqual(['1', '2.0000']);
   });
 
-  test('lists every row by provider and model, shared rows by their kind, largest first', async () => {
+  test('lists the job and LLM rows by provider and model, largest first, counting jobs and LLM calls apart; the shared rows stay on the shared line', async () => {
     const p = (await page(AM)) as Analysis;
+    // The Enhance on cj1 is an LLM call, not a second job of the model.
     expect(p.byModel).toEqual([
-      { provider: 'fal', model: 'fal-test', label: 'Fal test', jobs: 2, calls: 0, usd: '2.5000', usdDisplay: '2.50' },
-      { provider: 'fal', model: null, label: 'Thử nghiệm mô hình', jobs: 0, calls: 0, usd: '1.0000', usdDisplay: '1.00' },
-      { provider: 'openai', model: 'gpt-6-luna', label: 'gpt-6-luna', jobs: 1, calls: 1, usd: '0.0016', usdDisplay: '0.00' },
+      { id: 'fal:fal-test', provider: 'fal', model: 'fal-test', label: 'Fal test', jobs: 2, calls: 0, usd: '2.5000', usdDisplay: '2.50' },
+      { id: 'openai:gpt-6-luna', provider: 'openai', model: 'gpt-6-luna', label: 'gpt-6-luna', jobs: 0, calls: 2, usd: '0.0016', usdDisplay: '0.00' },
     ]);
-    expect(sumUsd(p.byModel.map((l) => l.usd))).toBe(p.total.usd);
+    expect(sumUsd(p.byModel.map((l) => l.usd))).toBe(p.attributed.usd);
+    expect(p.shared.byKind.bakeoff).toBe('1.0000');
+    expect((await (await jobs(`month=${AM}&by=model&id=fal:fal-test`)).json()).jobs.map((j: { jobId: string }) => j.jobId)).toEqual(['cj2', 'cj1']);
   });
 
   test('has one entry per calendar day of the month, with the job and LLM rows on their ICT day and shared rows left out', async () => {
@@ -784,7 +787,7 @@ describe('the analysis on the Costs page: cost per accepted clip, by model, by d
   test.each([
     ['no month', 'by=user&id=alice'],
     ['a bad month', 'month=2032-13&by=user&id=alice'],
-    ['a bad by', `month=${AM}&by=model&id=alice`],
+    ['a bad by', `month=${AM}&by=provider&id=alice`],
     ['an inherited key as by', `month=${AM}&by=toString&id=alice`],
     ['no id', `month=${AM}&by=user`],
     ['a bad asOf', `month=${AM}&by=user&id=alice&asOf=0`],
@@ -808,16 +811,166 @@ describe('shared rows that name a model on the Costs page', () => {
     await bookShared(pool, { kind: 'manual_adjustment', usd: '0.1000', month: FM, provider: 'openai', model: 'gone-model', ref: 'adj-fold-4', note: 'unknown model' });
   });
 
-  test('folds them into the (provider, model) line without counting a job, keeps modelless shared lines, and leaves the month totals alone', async () => {
-    const p = (await page(FM)) as Page & { byModel: { provider: string | null; model: string | null; label: string; jobs: number; calls: number; usd: string; usdDisplay: string }[] };
-    expect(p.byModel).toEqual([
-      { provider: 'fal', model: 'fal-test', label: 'Fal test', jobs: 1, calls: 0, usd: '1.5000', usdDisplay: '1.50' },
-      { provider: 'vertex', model: 'vtx-test', label: 'Vertex test', jobs: 0, calls: 0, usd: '0.3000', usdDisplay: '0.30' },
-      { provider: 'openai', model: 'gone-model', label: 'gone-model', jobs: 0, calls: 0, usd: '0.1000', usdDisplay: '0.10' },
-      { provider: 'fal', model: null, label: 'Điều chỉnh tay', jobs: 0, calls: 0, usd: '-0.2500', usdDisplay: '-0.25' },
-    ]);
+  test('keeps them on the shared line (the reconciliation tab), out of the model lines, and leaves the month totals alone', async () => {
+    const p = (await page(FM)) as Page & { attributed: Money; byModel: { provider: string | null; model: string | null; label: string; jobs: number; calls: number; usd: string }[] };
+    expect(p.byModel).toMatchObject([{ provider: 'fal', model: 'fal-test', label: 'Fal test', jobs: 1, calls: 0, usd: '2.0000' }]);
     expect(p.total.usd).toBe('1.6500');
-    expect(sumUsd(p.byModel.map((l) => l.usd))).toBe(p.total.usd);
+    expect(p.attributed.usd).toBe('2.0000');
     expect(p.shared.usd).toBe('-0.3500');
+    expect(p.shared.byKind.manual_adjustment).toBe('-0.3500');
+  });
+});
+
+describe('a date range and the real-user filter', () => {
+  // April 2033 (30 days). Rina ran rj1 (1.0) on the 2nd in Old team, then moved to Real team and ran rj2 (2.0) on the 20th. The system account
+  // Sam ran sj1 (0.5) on the 3rd, and Xena of a team excluded from reports ran xj1 (0.25) on the 4th. A manual adjustment of 0.4 has no day.
+  // March 2033 holds Rina's rj0 (3.0), Sam's sj0 (0.7) and a bake-off row of 9.0.
+  const AP = '2033-04';
+  type RangePage = Page & {
+    period: { from: string; to: string; label: string; months: string[]; wholeMonths: boolean; days: number };
+    sharedIncluded: boolean;
+    realOnly: boolean;
+    hidden: { usd: string; usdDisplay: string; accountsUsd: string; sharedUsd: string };
+    previous: { from: string; to: string; label: string; usd: string; usdDisplay: string };
+    counts: { creations: number; users: number };
+    byTeamNow: Figures[];
+    byDay: { day: string; usd: string }[];
+  };
+  const range = async (query: string) => {
+    const res = await costsRoute.GET(call(admin.cookie, `/api/admin/costs?${query}`));
+    expect(res.status).toBe(200);
+    return (await res.json()) as RangePage;
+  };
+  const jobs = async (query: string) => (await (await jobsRoute.GET(call(admin.cookie, `/api/admin/costs/jobs?${query}`))).json()).jobs.map((j: { jobId: string }) => j.jobId);
+
+  beforeAll(async () => {
+    await pool.query(`insert into teams (id, name) values ('tr1', 'Real team'), ('told', 'Old team')`);
+    await pool.query(`insert into teams (id, name, excluded_from_reports) values ('tx1', 'Excluded team', true)`);
+    await pool.query(
+      `insert into users (id, email, name, team_id, system) values ('rina', 'rina@example.test', 'Rina', 'told', false), ('sam', 'sam@example.test', 'Sam', 'tr1', true),
+              ('xena', 'xena@example.test', 'Xena', 'tx1', false)`,
+    );
+    const job = async (id: string, user: string, team: string, at: string, usd: string) => {
+      await open(id, user, team, null, 'fal', at, usd);
+      await running(id);
+      await succeed(id, usd);
+    };
+    await job('rj0', 'rina', 'told', '2033-03-10T03:00:00Z', '3.0000');
+    await job('sj0', 'sam', 'tr1', '2033-03-11T03:00:00Z', '0.7000');
+    await bookShared(pool, { kind: 'bakeoff', usd: '9.0000', month: '2033-03', provider: 'fal', ref: 'bakeoff-fal-2033-03' });
+    await job('rj1', 'rina', 'told', '2033-04-02T03:00:00Z', '1.0000');
+    await pool.query(`update users set team_id = 'tr1' where id = 'rina'`);
+    await job('rj2', 'rina', 'tr1', '2033-04-20T03:00:00Z', '2.0000');
+    await job('sj1', 'sam', 'tr1', '2033-04-03T03:00:00Z', '0.5000');
+    await job('xj1', 'xena', 'tx1', '2033-04-04T03:00:00Z', '0.2500');
+    expect((await postAdjustment({ month: AP, usd: '0.4', note: 'Range test' })).status).toBe(201);
+  });
+
+  test('a whole month shows only the real users by default, says what it hides, and adds up to every row with real=0', async () => {
+    const real = await range(`month=${AP}`);
+    const every = await range(`month=${AP}&real=0`);
+    expect(real.period).toEqual({ from: '2033-04-01', to: '2033-04-30', label: 'Tháng 4/2033', months: [AP], wholeMonths: true, days: 30 });
+    expect([real.realOnly, real.sharedIncluded]).toEqual([true, true]);
+    expect(real.total.usd).toBe('3.0000');
+    expect(real.hidden).toEqual({ usd: '1.1500', usdDisplay: '1.15', accountsUsd: '0.7500', sharedUsd: '0.4000' });
+    expect(every.total.usd).toBe('4.1500');
+    expect(sumUsd([real.total.usd, real.hidden.usd])).toBe(every.total.usd);
+    expect(every.hidden).toEqual({ usd: '0.0000', usdDisplay: '0.00', accountsUsd: '0.0000', sharedUsd: '0.0000' });
+    expect(real.byUser.map((u) => u.id)).toEqual(['rina']);
+    expect(real.counts).toEqual({ creations: 2, users: 1 });
+    expect(every.counts).toEqual({ creations: 4, users: 3 });
+    // The month compared with: March, under the same filter.
+    expect(real.previous).toEqual({ from: '2033-03-01', to: '2033-03-31', label: 'Tháng 3/2033', usd: '3.0000', usdDisplay: '3.00' });
+    expect(every.previous.usd).toBe('12.7000');
+  });
+
+  test('the Team view groups by the team the user is in now; the job-time team stays in byTeam', async () => {
+    const p = await range(`month=${AP}`);
+    expect(p.byTeamNow.map((t) => [t.id, t.name, t.usd])).toEqual([['tr1', 'Real team', '3.0000']]);
+    expect(p.byTeam.map((t) => [t.id, t.name, t.usd])).toEqual([['tr1', 'Real team', '2.0000'], ['told', 'Old team', '1.0000']]);
+    expect(await jobs(`month=${AP}&by=teamNow&id=tr1`)).toEqual(['rj2', 'rj1']);
+  });
+
+  test('a range of days reads only the rows of those days, leaves the undated shared rows out and has one byDay entry per day', async () => {
+    const real = await range('from=2033-04-01&to=2033-04-10');
+    const every = await range('from=2033-04-01&to=2033-04-10&real=0');
+    expect(real.period).toMatchObject({ label: '01/04 – 10/04/2033', wholeMonths: false, days: 10 });
+    expect(real.sharedIncluded).toBe(false);
+    expect(real.total.usd).toBe('1.0000');
+    expect(real.hidden).toEqual({ usd: '0.7500', usdDisplay: '0.75', accountsUsd: '0.7500', sharedUsd: '0.0000' });
+    expect(every.total.usd).toBe('1.7500');
+    expect(every.shared.usd).toBe('0.0000');
+    expect(every.byDay).toHaveLength(10);
+    expect(every.byDay.filter((d) => d.usd !== '0.0000')).toEqual([
+      { day: '2033-04-02', usd: '1.0000' },
+      { day: '2033-04-03', usd: '0.5000' },
+      { day: '2033-04-04', usd: '0.2500' },
+    ]);
+    // The ten days before, under the same filter; the job list keeps to the range and the filter.
+    const later = await range('from=2033-04-11&to=2033-04-20&real=0');
+    expect([later.previous.from, later.previous.to, later.previous.usd]).toEqual(['2033-04-01', '2033-04-10', '1.7500']);
+    expect(await jobs('from=2033-04-01&to=2033-04-10&by=user&id=rina')).toEqual(['rj1']);
+    expect(await jobs('from=2033-04-01&to=2033-04-10&by=user&id=sam')).toEqual([]);
+    expect(await jobs('from=2033-04-01&to=2033-04-10&by=user&id=sam&real=0')).toEqual(['sj1']);
+  });
+
+  test('a range over two whole months counts both months with their shared rows, and has no single VND rate', async () => {
+    const p = await range('from=2033-03-01&to=2033-04-30&real=0');
+    expect(p.period).toMatchObject({ label: 'Tháng 3/2033 – Tháng 4/2033', months: ['2033-03', AP], wholeMonths: true, days: 61 });
+    expect(p.total.usd).toBe('16.8500');
+    expect(p.byDay).toHaveLength(61);
+    expect(p.rateVndPerUsd).toBeNull();
+    expect(p.month).toBe(AP);
+  });
+
+  test('the filter follows the team a user is in now: moving Xena out of the excluded team counts her April job', async () => {
+    await pool.query(`update users set team_id = 'tr1' where id = 'xena'`);
+    try {
+      expect((await range(`month=${AP}`)).total.usd).toBe('3.2500');
+    } finally {
+      await pool.query(`update users set team_id = 'tx1' where id = 'xena'`);
+    }
+    expect((await range(`month=${AP}`)).total.usd).toBe('3.0000');
+  });
+
+  test('the detail CSV keeps to the range and the filter, and its name and label say which', async () => {
+    const real = await csv(await detailRoute.GET(call(admin.cookie, '/api/admin/costs/detail?from=2033-04-01&to=2033-04-10')));
+    expect(real.disposition).toContain('cvs-ledger-detail-2033-04-01_2033-04-10.csv');
+    expect(real.label).toMatch(/^Creative Video Studio ledger-detail 2033-04-01_2033-04-10 real users only as_of \d+$/);
+    expect([...new Set(real.rows.map((r) => r[2]))]).toEqual(['rj1']);
+    expect(sumUsd(real.rows.map((r) => r[12]!))).toBe('1.0000');
+    const every = await csv(await detailRoute.GET(call(admin.cookie, '/api/admin/costs/detail?from=2033-04-01&to=2033-04-10&real=0')));
+    expect(sumUsd(every.rows.map((r) => r[12]!))).toBe('1.7500');
+  });
+
+  test('a model the model table has no label for shows a readable id, and the raw id stays', async () => {
+    // A Smart Remake's fal calls are LLM rows under the endpoint, which model_configs does not hold.
+    const { bookLlm } = await import('@cvs/core/ledger');
+    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at, workspace_id) values ('wr1', 'rina', '{}', 'succeeded', 0.3, '2033-06-02T03:00:00Z', 'ws_vet')`);
+    expect(await bookLlm(pool, { suggestion: 'wr1' }, { costUsd: 0.3, provider: 'fal', model: 'fal-ai/wan/v2.7/edit-video' })).toBe(true);
+    const p = (await range('month=2033-06')) as RangePage & { byModel: { label: string; model: string; jobs: number; calls: number }[] };
+    expect(p.byModel).toMatchObject([{ label: 'wan v2.7 edit-video', model: 'fal-ai/wan/v2.7/edit-video', jobs: 0, calls: 1 }]);
+  });
+
+  test('the period compared with a month in progress is the same days of the month before, cut at its end', async () => {
+    const { comparedPeriod } = await import('@/lib/costs');
+    const { parsePeriod } = await import('@/lib/period');
+    const month = (m: string) => parsePeriod(new URLSearchParams({ month: m })) as Parameters<typeof comparedPeriod>[0];
+    expect(comparedPeriod(month('2026-11'), '2026-11-25')).toMatchObject({ from: '2026-10-01', to: '2026-10-25', label: '01/10 – 25/10/2026' });
+    expect(comparedPeriod(month('2026-03'), '2026-03-30')).toMatchObject({ from: '2026-02-01', to: '2026-02-28', label: 'Tháng 2/2026' });
+    expect(comparedPeriod(month('2026-10'), '2026-11-25')).toMatchObject({ from: '2026-09-01', to: '2026-09-30' });
+  });
+
+  test.each([
+    ['from without to', 'from=2033-04-01'],
+    ['from after to', 'from=2033-04-10&to=2033-04-01'],
+    ['more than 366 days', 'from=2033-01-01&to=2034-01-02'],
+    ['a day that does not exist', 'from=2033-02-29&to=2033-03-01'],
+    ['a bad month', 'month=2033-13'],
+    ['a bad real', `month=${AP}&real=yes`],
+  ])('the page, the detail CSV and the job list refuse %s with 400', async (_name, query) => {
+    expect((await costsRoute.GET(call(admin.cookie, `/api/admin/costs?${query}`))).status).toBe(400);
+    expect((await detailRoute.GET(call(admin.cookie, `/api/admin/costs/detail?${query}`))).status).toBe(400);
+    expect((await jobsRoute.GET(call(admin.cookie, `/api/admin/costs/jobs?${query}&by=user&id=rina`))).status).toBe(400);
   });
 });

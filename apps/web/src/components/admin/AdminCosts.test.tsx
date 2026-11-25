@@ -1,7 +1,7 @@
-// The provider balances panel's top-up link and the Vertex read error: a neutral button, and one short sentence without Google's raw answer.
+// The Costs pages' parts: the provider balances panel's top-up link, the Vertex read error, amounts, the daily chart, the breakdown table and the budgets.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { ByModel, DailySpend, dollars, packText, sameDayChange, TopUp, Usd, VertexError } from './AdminCosts';
+import { axisTicks, Breakdown, costChange, DailyChart, dollars, modelUnits, packText, shareText, TopUp, Usd, VertexError } from './AdminCosts';
 import { Budget } from './AdminOverview';
 
 test('the top-up link is a neutral button that opens the provider billing page in a new tab', () => {
@@ -53,35 +53,75 @@ test('an amount shows 2 decimals with the exact 4 decimals and the VND on hover,
   expect(renderToStaticMarkup(<Usd m={{ usd: '0.0000', usdDisplay: '0.00', vnd: null }} />)).toBe(`<span title="$0.0000">$0.00${sr('$0.0000')}</span>`);
 });
 
-test('the daily chart draws one bar per day scaled to the largest day, lists only the days with spend in its table, and hides when nothing was spent', () => {
+test('the daily chart draws one focusable bar per day on a $ axis, with its tooltip, the pace line, a table of the days with spend, and flat bars when nothing was spent', () => {
   const days = [
     { day: '2026-11-01', usd: '0.0000' },
     { day: '2026-11-02', usd: '4.0000' },
     { day: '2026-11-03', usd: '1.0000' },
   ];
-  const html = renderToStaticMarkup(<DailySpend days={days} />);
-  expect(html.match(/<li /g)).toHaveLength(3);
-  expect(html).toContain('style="height:100%"');
-  expect(html).toContain('style="height:25%"');
-  expect(html).toContain('title="02/11: $4.0000"');
+  const html = renderToStaticMarkup(<DailyChart days={days} pace={2} />);
+  expect(html.match(/<button /g)).toHaveLength(3);
+  // The axis runs 0, 1, 2, 3, 4: the largest day is the full height, the pace line sits at half.
+  expect([...html.matchAll(/<span style="bottom:([\d.]+)%">\$([\d.]+)<\/span>/g)].map((m) => [m[1], m[2]])).toEqual([['0', '0'], ['25', '1'], ['50', '2'], ['75', '3'], ['100', '4']]);
+  expect(html).toContain('style="--h:100%"');
+  expect(html).toContain('style="--h:25%"');
+  expect(html).toContain('<p class="day-pace" style="bottom:50%"><span>Mức đều để vừa hạn mức video: $2.00/ngày</span></p>');
+  // One tab stop, on the last day with spend; each bar reads its full date and amount.
+  expect(html.match(/tabindex="0"/g)).toHaveLength(1);
+  expect(html).toContain('tabindex="0" aria-label="03/11/2026: $1.0000"');
+  expect(html).toContain('<span class="day-tip" aria-hidden="true">02/11: $4.00</span>');
   expect(html.match(/<tr><td>/g)).toHaveLength(2);
-  expect(renderToStaticMarkup(<DailySpend days={[{ day: '2026-11-01', usd: '0.0000' }]} />)).toBe('');
+  const none = renderToStaticMarkup(<DailyChart days={[{ day: '2026-11-01', usd: '0.0000' }]} pace={null} />);
+  expect(none).toContain('style="--h:0%"');
+  expect(none).toContain('$1</span>');
 });
 
-test('the model table names the provider, counts jobs or LLM calls, and is left out when the month is empty', () => {
+test('the date labels thin out to about eight, and every other one is marked to hide on a phone', () => {
+  const days = Array.from({ length: 30 }, (_, i) => ({ day: `2026-11-${String(i + 1).padStart(2, '0')}`, usd: '1.0000' }));
+  const html = renderToStaticMarkup(<DailyChart days={days} pace={null} />);
+  const labels = [...html.matchAll(/<span style="grid-column:(\d+)"( data-minor="true")?>(\d\d\/\d\d)<\/span>/g)].map((m) => [m[3], !!m[2]]);
+  expect(labels).toEqual([['01/11', false], ['05/11', true], ['09/11', false], ['13/11', true], ['17/11', false], ['21/11', true], ['25/11', false], ['29/11', true]]);
+  expect(html).not.toContain('day-pace');
+});
+
+test('the axis steps are 1, 2, 2.5 or 5 times a power of ten and reach the largest value', () => {
+  expect(axisTicks(4)).toEqual([0, 1, 2, 3, 4]);
+  expect(axisTicks(4.5)).toEqual([0, 2, 4, 6]);
+  expect(axisTicks(100)).toEqual([0, 25, 50, 75, 100]);
+  expect(axisTicks(0.0016).at(-1)).toBeCloseTo(0.002);
+  expect(axisTicks(0)).toEqual([0, 1]);
+});
+
+test('the change against the period before says up or down in words, with the arrow beside it', () => {
+  const prev = { usd: '100.0000', usdDisplay: '100.00', label: 'Tháng 10/2026' };
+  expect(costChange('112.4000', prev)).toEqual({ arrow: '↑', text: 'Tăng 12% so với Tháng 10/2026 ($100.00)' });
+  expect(costChange('75.0000', prev)).toEqual({ arrow: '↓', text: 'Giảm 25% so với Tháng 10/2026 ($100.00)' });
+  expect(costChange('100.2000', prev)).toEqual({ arrow: '→', text: 'Không đổi so với Tháng 10/2026 ($100.00)' });
+  expect(costChange('5.0000', { ...prev, usd: '0.0000', usdDisplay: '0.00' })).toEqual({ arrow: '', text: 'Tháng 10/2026 chưa có chi phí để so sánh' });
+});
+
+test('a breakdown sorts by USD first with aria-sort, draws each line share of the total, keeps the email in a title and names the line on its button', () => {
+  const line = (id: string, usd: string, email: string) => ({ id, name: id.toUpperCase(), email, usd, usdDisplay: usd.slice(0, -2), vnd: null });
   const html = renderToStaticMarkup(
-    <ByModel
-      lines={[
-        { provider: 'vertex', model: null, label: 'Chênh lệch hóa đơn', jobs: 0, calls: 0, usd: '4.9307', usdDisplay: '4.93' },
-        { provider: 'openai', model: 'gpt-6-luna', label: 'gpt-6-luna', jobs: 0, calls: 18, usd: '0.0106', usdDisplay: '0.01' },
-      ]}
-    />,
+    <Breakdown label="Người dùng" lines={[line('b', '1.0000', 'b@x.test'), line('a', '3.0000', 'a@x.test'), line('c', '0.0010', 'c@x.test')]} name={(l) => l.name} title={(l) => l.email} columns={[]} total="4.0010" jobs={() => null} />,
   );
-  expect(html).toContain('<td>Chênh lệch hóa đơn</td><td>Vertex</td><td class="num">—</td>');
-  expect(html).toContain('<td class="num">18 lượt</td><td class="num" title="$0.0106">$0.01</td>');
-  const both = renderToStaticMarkup(<ByModel lines={[{ provider: 'fal', model: 'm', label: 'M', jobs: 2, calls: 3, usd: '1.0000', usdDisplay: '1.00' }]} />);
-  expect(both).toContain('<td class="num">2 job · 3 lượt</td>');
-  expect(renderToStaticMarkup(<ByModel lines={[]} />)).toBe('');
+  expect(html).toContain('<th scope="col" class="num" aria-sort="descending"><button type="button" class="sort">USD<span aria-hidden="true">↓</span></button></th>');
+  expect(html.match(/aria-sort=/g)).toHaveLength(1);
+  expect([...html.matchAll(/<span aria-hidden="true">▸<\/span> (\w)/g)].map((m) => m[1])).toEqual(['A', 'B', 'C']);
+  expect(html).toContain('title="a@x.test"');
+  expect(html).not.toContain('who');
+  expect(html).toMatch(/<span style="width:74\.98\d*%"><\/span><\/span><span class="share-pct">75%<\/span>/);
+  expect(html).toContain('&lt;1%');
+});
+
+test('a model line counts its jobs as lượt tạo and its LLM calls as lượt gọi', () => {
+  expect([modelUnits({ jobs: 2, calls: 0 }), modelUnits({ jobs: 0, calls: 18 }), modelUnits({ jobs: 2, calls: 3 }), modelUnits({ jobs: 0, calls: 0 })]).toEqual([
+    '2 lượt tạo',
+    '18 lượt gọi',
+    '2 lượt tạo · 3 lượt gọi',
+    '—',
+  ]);
+  expect([shareText(0), shareText(0.4), shareText(12.5)]).toEqual(['0%', '<1%', '13%']);
 });
 
 test('a budget of $100,000 or more reads as no cap, without a bar; a real cap keeps its bar', () => {
@@ -100,13 +140,6 @@ test('the Seedance 2.0 pack line shows tokens left of the total, the percent, ab
   expect(packText({ ...pack, tokensLeft: 1_000_000, percentLeft: 14.29, usdLeft: 7, low: true })).toBe(`Còn ${n(1_000_000)} / ${n(7_000_000)} token (14.3%) · ≈ $7.00 theo giá lẻ · hết hạn 2027-02-01 (dưới 20%)`);
   expect(packText({ ...pack, daysLeft: 9.2, low: true })).toContain('(còn 10 ngày)');
   expect(packText({ ...pack, daysLeft: -1, expired: true, low: true })).toContain('(đã hết hạn)');
-});
-
-test('the same-day comparison sums only the days elapsed, gives the percent change, and has no percent when last month was empty', () => {
-  const d = (...v: number[]) => v.map((n) => ({ usd: n.toFixed(4) }));
-  expect(sameDayChange(d(1, 2, 9), d(2, 2, 100), 2)).toEqual({ cur: 3, prev: 4, pct: -25 });
-  expect(sameDayChange(d(3, 3), d(1, 1), 2).pct).toBe(200);
-  expect(sameDayChange(d(1, 2), d(0, 0), 2)).toEqual({ cur: 3, prev: 0, pct: null });
 });
 
 test('a budget bar turns amber from 80%, red at the cap, and a zero cap reads as locked; the no-limit sentinel starts at exactly $100,000', () => {

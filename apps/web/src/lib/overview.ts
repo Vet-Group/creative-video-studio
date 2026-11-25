@@ -2,12 +2,12 @@
 // when each sales-team member last used CVS.
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { pool } from '@/lib/auth';
-import { costsPage, snapshot } from '@/lib/costs';
+import { costsPage, snapshot, wholeMonth } from '@/lib/costs';
 
 const ICT_TODAY = `(date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh') at time zone 'Asia/Ho_Chi_Minh')`;
 
 export async function adminOverview() {
-  const costs = costsPage(await snapshot(null));
+  const costs = costsPage(await snapshot(wholeMonth(null)), false);
   const [today, running, users, models, audit, sellers] = await Promise.all([
     pool.query(
       `select count(*)::int as today, count(*) filter (where status = 'succeeded')::int as succeeded,
