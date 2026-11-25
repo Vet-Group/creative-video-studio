@@ -158,7 +158,8 @@ describe('GET /api/admin/usage', () => {
     expect(person(u, 'u-idle')).toMatchObject({ lastUsedAt: null, lastSeenAt: expect.any(String) });
     expect(person(u, 'u-mock')).toMatchObject({ jobs: 0, jobsAll: 0, usd: '0.0000', lastUsedAt: null, lastSeenAt: null });
     expect(person(u, admin.id)).toMatchObject({ role: 'admin', status: 'idle' });
-    expect(u.totals).toEqual({ people: 9, using: 3, usingPct: 33, lapsed: 1, idle: 3, never: 2, usd: '2.8754', usdDisplay: '2.88', usdAll: '4.8754', usdAllDisplay: '4.88' });
+    // The partner stays listed and in the spend but out of the head counts.
+    expect(u.totals).toEqual({ people: 8, teams: 2, partners: 1, using: 2, usingPct: 25, lapsed: 1, idle: 3, never: 2, usd: '2.8754', usdDisplay: '2.88', usdAll: '4.8754', usdAllDisplay: '4.88' });
   });
 
   test('real=0 lists everyone unlocked, tagging system accounts and the excluded teams', async () => {
@@ -173,7 +174,7 @@ describe('GET /api/admin/usage', () => {
     expect(u.teams[0]!.users[0]).toMatchObject({ name: 'System One', tags: ['Hệ thống'], status: 'using', usd: '9.0000' });
     expect(person(u, 'u-ex')).toMatchObject({ tags: ['Không tính báo cáo'], status: 'using', analyses: 1 });
     expect(person(u, 'u-banned')).toBeUndefined();
-    expect(u.totals).toMatchObject({ people: 11, using: 5, usingPct: 45, usd: '11.8754', usdAll: '13.8754' });
+    expect(u.totals).toMatchObject({ people: 10, partners: 1, using: 4, usingPct: 40, usd: '11.8754', usdAll: '13.8754' });
   });
 
   test('a period before any use leaves the users lapsed or idle, with their all-time figures', async () => {

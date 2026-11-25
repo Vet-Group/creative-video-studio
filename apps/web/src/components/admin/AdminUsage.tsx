@@ -24,7 +24,9 @@ function Kpis({ data }: { data: UsageReport }) {
       <div className="kpi">
         <p className="kpi-label">Nhân viên</p>
         <p className="kpi-value">{t.people}</p>
-        <p className="kpi-sub">trong {data.teams.length} team</p>
+        <p className="kpi-sub">
+          trong {t.teams} team{t.partners ? ` · không tính ${t.partners} đối tác` : ''}
+        </p>
       </div>
       <div className="kpi">
         <p className="kpi-label">Có dùng trong khoảng</p>

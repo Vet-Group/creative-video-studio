@@ -28,6 +28,7 @@ interface Group extends Money {
   acceptedResults: number;
   acceptedClips: number;
   costPerAcceptedUsd: string | null;
+  costPerAcceptedVnd: string | null;
 }
 interface ModelLine { id: string; provider: string | null; model: string | null; label: string; jobs: number; calls: number; usd: string; usdDisplay: string }
 interface JobLine { jobId: string; createdAt: string | null; feature: string; model: string; status: string | null; verdict: 'pass' | 'fail' | null; final: boolean; usd: string; usdDisplay: string }
@@ -391,7 +392,7 @@ const groupColumns = (withVnd: boolean): Column<Group>[] => [
     label: 'Mỗi clip đạt',
     className: 'num',
     sort: (g) => Number(g.costPerAcceptedUsd ?? -1),
-    cell: (g) => (g.costPerAcceptedUsd === null ? <span className="muted">—</span> : dollars(g.costPerAcceptedUsd, 4)),
+    cell: (g) => (g.costPerAcceptedUsd === null ? <span className="muted">—</span> : <Usd m={{ usd: g.costPerAcceptedUsd, usdDisplay: Number(g.costPerAcceptedUsd).toFixed(2), vnd: g.costPerAcceptedVnd }} />),
   },
 ];
 const MODEL_COLUMNS: Column<ModelLine>[] = [
