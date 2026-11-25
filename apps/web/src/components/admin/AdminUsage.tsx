@@ -102,16 +102,25 @@ function TeamCard({ team }: { team: UsageReport['teams'][number] }) {
                     {USAGE_STATUS[u.status]}
                   </span>
                 </td>
-                <td className="num" title={`$${u.usd}`}>
+                {/* The data- words label each figure where a phone shows the row as lines of text (globals.css), leaving out the empty ones. */}
+                <td className="num" title={`$${u.usd}`} data-suffix="trong khoảng">
                   {money(u.usdDisplay)}
                 </td>
-                <td className="num" title={`$${u.usdAll}`}>
+                <td className="num" title={`$${u.usdAll}`} data-suffix="từ trước tới nay">
                   {money(u.usdAllDisplay)}
                 </td>
-                <td className="num">{u.jobs}</td>
-                <td className="num">{u.analyses}</td>
-                <td className="nowrap">{day(u.lastUsedAt)}</td>
-                <td className="nowrap">{day(u.lastSeenAt)}</td>
+                <td className="num" data-suffix="lượt tạo" data-empty={u.jobs === 0 || undefined}>
+                  {u.jobs}
+                </td>
+                <td className="num" data-suffix="phân tích" data-empty={u.analyses === 0 || undefined}>
+                  {u.analyses}
+                </td>
+                <td className="nowrap" data-prefix="Dùng cuối" data-empty={!u.lastUsedAt || undefined}>
+                  {day(u.lastUsedAt)}
+                </td>
+                <td className="nowrap" data-prefix="Đăng nhập" data-empty={!u.lastSeenAt || undefined}>
+                  {day(u.lastSeenAt)}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -48,4 +48,13 @@ test('an Admin reads who used CVS per team, shows every account, picks 7 days an
   expect(png.subarray(1, 4).toString()).toBe('PNG');
   expect(png.readUInt32BE(16)).toBe(2400);
   await expect(page.getByRole('button', { name: 'Tải ảnh PNG', exact: true })).toBeEnabled();
+
+  // On a phone each person is a card row: the figures sit inside the screen, and neither the page nor a table scrolls sideways.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const spend = page.getByRole('row', { name: /^E2E Admin / }).getByRole('cell').nth(2);
+  await expect(spend).toBeVisible();
+  const box = (await spend.boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  const overflow = await page.evaluate(() => [document.documentElement, ...document.querySelectorAll('.usage > .usage-team .table-wrap')].map((el) => el.scrollWidth - el.clientWidth));
+  expect(overflow.filter((px) => px > 0)).toEqual([]);
 });
