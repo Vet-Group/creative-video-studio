@@ -9,6 +9,6 @@ export default {
     'Team được đánh dấu có nhãn "Không tính báo cáo" trong danh sách. Ô này lưu ngay khi bấm, được ghi vào Nhật ký và không đổi cách tính phí của team.',
   ],
   href: '/admin/teams',
-  prs: [0],
+  prs: [648],
   audience: 'admin',
 } satisfies ChangeEntry;
