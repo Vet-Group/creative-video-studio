@@ -1,5 +1,6 @@
 /* Every colour in the app lives here as a token; rules below only use var(). Login tokens first, then the app; the dark theme redefines them below. */
-:root {
+/* A .theme-light element keeps the light values for its subtree whatever the theme: the Usage page draws its PNG in one. */
+:root, .theme-light {
   --brand: #dc2626;
   --brand-hover: #b91c1c;
   --link: #b91c1c;
@@ -3473,3 +3474,32 @@ dialog.modal.compare-two { width: min(1100px, calc(100vw - 32px)); max-width: no
   .admin .cost-controls label.check, .admin .cost-detail .segmented button, .admin .cost-table th > .sort, .admin .cost-table td .link-button, .admin .month-step .button { min-height: 44px; }
   .admin .cost-detail .segmented button { height: 44px; }
 }
+/* Admin > Usage (components/admin/AdminUsage.tsx): the period and the real-user switch over the figures, one card per team, and a status badge per person
+   that has text as well as colour. The PNG copy is drawn off screen at 1200 px in a .theme-light element (top of this file), so it is light in either theme.
+   Phones get 44 px targets; the tables scroll inside their cards with the name column kept in view. */
+.usage-bar { display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: flex-start; justify-content: space-between; margin: 0 0 16px; }
+.usage-bar .period-picker { margin: 0; }
+.usage-real { display: grid; gap: 4px; max-width: 26rem; }
+.usage-real .switch-row label { display: flex; align-self: stretch; align-items: center; margin: 0; color: var(--ink); font-weight: 500; cursor: pointer; }
+.usage-real small { color: var(--muted); font-size: 12px; line-height: 18px; }
+.admin .usage-real .switch, .admin .usage-real .switch:hover:not(:disabled) { width: 44px; height: 24px; padding: 0; border: 0; border-radius: 12px; background: var(--fill-strong); }
+.admin .usage-real .switch[aria-checked='true'], .admin .usage-real .switch[aria-checked='true']:hover:not(:disabled) { background: var(--ink-strong); }
+.usage-team .panel-head { flex-wrap: wrap; }
+.usage-team .panel-head h2 { font-size: 16px; line-height: 24px; }
+.usage-team-figures { margin: 0; color: var(--text-sub); font-variant-numeric: tabular-nums; }
+.usage-team .table-wrap { margin: 8px 0 0; }
+.usage-team td { font-variant-numeric: tabular-nums; }
+.admin .status[data-status='lapsed'] { background: var(--warn-bg); color: var(--ink); box-shadow: inset 0 0 0 1px var(--warn-border); }
+.admin .status[data-status='idle'] { background: var(--fill); color: var(--text-sub); }
+.admin .status[data-status='never'] { background: var(--danger-soft); color: var(--danger); }
+.usage-shot-host { position: fixed; top: 0; left: -10000px; }
+.usage-shot { box-sizing: border-box; width: 1200px; padding: 32px; background: var(--surface); color: var(--ink); color-scheme: light; container-type: inline-size; }
+.usage-shot-head { margin: 0 0 20px; }
+.usage-shot > :last-child { margin-bottom: 0; }
+.usage-shot-head p { margin: 0; color: var(--text-sub); }
+.usage-shot-head .usage-shot-title { margin: 0 0 4px; color: var(--ink); font-size: 24px; line-height: 32px; font-weight: 650; }
+@media (max-width: 640px) {
+  .usage .admin-head-tools > :is(.button, button), .usage-real .switch-row { min-height: 44px; }
+  .usage-real .switch::before { content: ''; position: absolute; inset: -10px 0; }
+}
+@media (prefers-reduced-motion: reduce) { .usage-real .switch::after { transition: none; } }
