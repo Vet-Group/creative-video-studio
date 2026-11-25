@@ -1469,6 +1469,12 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .run-summary { padding: 0 2px 8px; } /* lined up with the Run button, which spans the card's content here */
   .runbar button.primary.run { height: 56px; }
 }
+/* Beside the form the About is only ~340 px wide here, so while it is shown it takes the full width, between the tabs and the form. */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  .create-grid:has(> .side[id$='-panel-about']) { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'tabs' 'side' 'form'; grid-template-rows: none; row-gap: 16px; }
+  .create-grid:has(> .side[id$='-panel-about']) .form-card { position: static; justify-self: center; }
+  [aria-labelledby='tryon-title'] .create-grid:has(> .side[id$='-panel-about']) .about { max-width: 46rem; } /* one column: Try On's fill-the-column rule would run to ~940 px */
+}
 /* A wide screen gives every tool's form 360 px: at 320 the hints and the prompt wrapped every few words beside a mostly empty gallery. */
 @media (min-width: 1280px) {
   .create-grid { grid-template-columns: 360px minmax(0, 1fr); }
