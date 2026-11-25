@@ -28,7 +28,7 @@ export async function PUT(request: Request, { params }: Ctx) {
   const refused = await refusal(g.session.user, name);
   if (refused) return refused;
   const mime = sampleType(name);
-  if (!mime) return bad('name must be lower-case words joined by dashes with .mp4, .jpg, .png or .webp');
+  if (!mime) return bad('name must be lower-case words joined by dashes with .mp4, .jpg, .png, .webp, .json or .vtt');
   if (Number(request.headers.get('content-length') ?? 0) > MAX_SAMPLE_BYTES) return bad(`a sample is at most ${MAX_SAMPLE_BYTES} bytes`, 413);
   const body = new Uint8Array(await request.arrayBuffer());
   if (body.byteLength === 0 || body.byteLength > MAX_SAMPLE_BYTES) return bad(`a sample has 1 to ${MAX_SAMPLE_BYTES} bytes`, 413);

@@ -40,7 +40,7 @@ describe('the About pages', () => {
 
   it.each(pages)('%s never speaks of credits, plans or the reference site', (_, page) => {
     const all = [page.title, page.lead ?? '', ...page.sections.flatMap((s) => [s.title, s.lead ?? '', ...(s.blocks ?? []).flatMap(text)])].join(' ');
-    expect(all).not.toMatch(/credit|tín dụng|gói cước|Fash Studio|fash\.studio/i);
+    expect(all).not.toMatch(/credit|tín dụng|gói cước|\bfash\b|fash\.studio/i);
   });
 
   /** Every media slot of a page: the sample each card, step, example and loop names. */
@@ -53,6 +53,11 @@ describe('the About pages', () => {
     const names = media(page);
     for (const name of names) expect([sampleType(`${name}.mp4`), sampleType(`${name}.jpg`)], name).not.toContain(null); // the bucket accepts it as a loop and a still
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it.each(pages)('%s lays its ratio tiles out in full rows (three a row, five on a wide screen) and names an uploadable tutorial', (_, page) => {
+    for (const b of page.sections.flatMap((s) => s.blocks ?? [])) if (typeof b !== 'string' && 'ratios' in b) expect([3, 5, 6]).toContain(b.ratios.length);
+    if (page.video) expect(sampleType(`${page.video}.mp4`)).toBe('video/mp4');
   });
 
   it("opens Advanced like the live page: the two format cards, the UGC one linking to UGC Try-On, and no comparison table", () => {

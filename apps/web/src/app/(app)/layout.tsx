@@ -3,9 +3,11 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { SignOutButton } from '@/app/account/password/ForcedChange';
+import { AboutUpdates } from '@/components/AboutUpdates';
 import { Shell } from '@/components/Shell';
 import { VetLogo } from '@/components/VetLogo';
 import { SmartRemakeGate } from '@/components/SmartRemakeGate';
+import { pageUpdates } from '@/lib/about-updated';
 import { reaAnalyzeEnabled } from '@/lib/analyze';
 import { CHANGELOG } from '@/lib/changelog';
 import { visibleEntries } from '@/lib/changelog-seen';
@@ -70,7 +72,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {/* The workspace this page rendered with: lib/api.ts sends it on every write (x-cvs-workspace). */}
       <meta name="cvs-workspace" content={workspaceId} />
       <Shell userId={user.id} userName={user.name} isAdmin={isAdmin} workspace={{ id: workspaceId, owner: user.workspaceRole === 'owner', company }} workspaces={workspaces} feedbackNew={feedbackNew} analyzeEnabled={reaAnalyzeEnabled()} account={account} larkPrompt={larkPrompt && !user.impersonatedBy} impersonating={user.impersonatedBy !== null} changelog={visibleEntries(CHANGELOG, isAdmin).slice(0, 10)} initialCollapsed={(await cookies()).get(COLLAPSED_COOKIE)?.value === '1'}>
-        {children}
+        <AboutUpdates updates={pageUpdates(CHANGELOG)}>{children}</AboutUpdates>
       </Shell>
     </SmartRemakeGate>
   );

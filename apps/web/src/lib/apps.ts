@@ -336,6 +336,17 @@ export const APPS: AppConfig[] = [
 /** The apps the member is offered: Smart Remake only when its flags are on (the server reads them), as every list of apps shows it. */
 export const visibleApps = (smartRemake: boolean): AppConfig[] => APPS.filter((a) => smartRemake || a.slug !== 'smart-remake');
 
+/** The apps an app's About suggests next: up to three of its own category, those after it in the list first so neighbours differ; a category with
+ * fewer than two others (utility, video) is topped up with the photo apps, the general image tools, in list order. */
+export function relatedApps(slug: string, smartRemake: boolean): AppConfig[] {
+  const all = visibleApps(smartRemake);
+  const i = all.findIndex((a) => a.slug === slug);
+  if (i < 0) return [];
+  const others = [...all.slice(i + 1), ...all.slice(0, i)];
+  const same = others.filter((a) => a.category === all[i]!.category);
+  return (same.length >= 2 ? same : [...same, ...all.filter((a) => a.category === 'photo' && a.slug !== slug)]).slice(0, 3);
+}
+
 /** The apps whose results are jobs of their own feature, so the Library can filter by one (Smart Remake borrows `video`, and has none). */
 export const JOB_APPS: AppConfig[] = APPS.filter((a) => a.feature !== 'video');
 

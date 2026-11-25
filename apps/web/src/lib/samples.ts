@@ -7,20 +7,28 @@ export const SAMPLE_PREFIX = 'samples/';
 export const MAX_SAMPLE_BYTES = 50 * 1024 * 1024;
 /** The least size of a picker thumbnail (GET /api/samples/<name>?thumb=1): twice the largest photo dialog tile, 158 x 210 px at 1440 px wide (150 x 200 at 390), measured 2026-11-19. */
 export const SAMPLE_THUMB = { width: 316, height: 421 };
-const TYPES = { mp4: 'video/mp4', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', json: 'application/json' } as const;
+const TYPES = { mp4: 'video/mp4', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', json: 'application/json', vtt: 'text/vtt' } as const;
 
-/** The content type of a valid sample name (lower-case words joined by dashes, one known extension), or null. */
+/** The content type of a valid sample name (lower-case words joined by dashes, one known extension), or null. A `.vtt` is a tutorial's captions. */
 export function sampleType(name: string): string | null {
-  const m = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(mp4|jpg|png|webp|json)$/.exec(name);
+  const m = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(mp4|jpg|png|webp|json|vtt)$/.exec(name);
   return m ? TYPES[m[1] as keyof typeof TYPES] : null;
 }
 
-/** Whether the bytes look like the type their name claims: the magic numbers of JPEG, PNG, WebP and the MP4 `ftyp` box, or one JSON object (an example's details). */
+/** Whether the bytes look like the type their name claims: the magic numbers of JPEG, PNG, WebP and the MP4 `ftyp` box, one JSON object (an example's details),
+ * or UTF-8 text opening with the WebVTT signature (a byte-order mark allowed). */
 export function sampleBytesMatch(type: string, b: Uint8Array): boolean {
   const at = (i: number, s: string) => [...s].every((c, k) => b[i + k] === c.charCodeAt(0));
   if (type === 'image/jpeg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
   if (type === 'image/png') return b[0] === 0x89 && at(1, 'PNG');
   if (type === 'image/webp') return at(0, 'RIFF') && at(8, 'WEBP');
+  if (type === 'text/vtt') {
+    try {
+      return /^\uFEFF?WEBVTT(?:[ \t\r\n]|$)/.test(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(b));
+    } catch {
+      return false;
+    }
+  }
   if (type === 'application/json') {
     try {
       const v: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(b));

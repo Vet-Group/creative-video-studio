@@ -1,9 +1,10 @@
 // The About tabs as data: one typed page per tool, rendered by components/About.tsx. The section order follows the reference site's About pages;
 // every fact (models, limits, prices in USD, the Library) is this app's own. Media fields name samples in the bucket (`<name>.mp4` and/or `<name>.jpg`);
 // a missing sample keeps its slot as the empty stripes, so the layout does not move when it is uploaded.
-import { MAX_PICTURES } from './apps';
+import { MAX_MODELS, MAX_PICTURES } from './apps';
 import { HOOKS, LOCATIONS } from './marketing';
 import type { AboutCard, AboutPage } from './about-specs';
+import type { AboutKey } from './about-updated';
 export * from './about-specs';
 
 const PRIVACY: [string, string] = [
@@ -184,7 +185,7 @@ const create: AboutPage = {
       kicker: 'Âm thanh',
       title: 'Video có tiếng không?',
       blocks: [
-        'Có. Công tắc Tạo âm thanh bật sẵn, như trên Fash: với mô hình tạo được âm thanh, clip có tiếng gốc, gồm âm thanh không khí, tiếng động và lời nói khi mô tả yêu cầu. Giá ghi trên nút Tạo video đã tính âm thanh; tắt công tắc để có clip im lặng.',
+        'Có. Công tắc Tạo âm thanh bật sẵn: với mô hình tạo được âm thanh, clip có tiếng gốc, gồm âm thanh không khí, tiếng động và lời nói khi mô tả yêu cầu. Giá ghi trên nút Tạo video đã tính âm thanh; tắt công tắc để có clip im lặng.',
         'Các mô hình có âm thanh: Kling O3 Pro, Kling 3.0 Pro, Kling 2.6 Pro, Veo 3.1, Seedance 1.5 Pro, Seedance 2.0, Seedance 2.5 và FLUX 3. Với Kling, Veo và Seedance 1.5, âm thanh làm giá mỗi giây cao hơn (Kling O3 Pro khoảng một phần tư, Veo 3.1 gấp đôi); Seedance 2.0, 2.5 và FLUX 3 giữ nguyên giá. Mô hình không tạo được âm thanh thì công tắc ở Tắt và không bấm được.',
         'Cần giọng thương hiệu hay nhạc riêng? Tắt âm thanh, tải clip xuống và lồng tiếng trong phần mềm dựng.',
       ],
@@ -253,7 +254,7 @@ const create: AboutPage = {
       title: 'Đưa video AI lên cửa hàng online thế nào?',
       blocks: [
         'Giống như đưa ảnh sản phẩm lên: tạo clip, tải xuống từ Thư viện, rồi tải lên bằng trình quản lý media của nền tảng. Ứng dụng không kết nối trực tiếp với Shopify hay sàn nào, nên không có gì để cài, cấp quyền hay đồng bộ.',
-        'Quy trình gồm bốn bước: tạo bản 1:1 cho bộ ảnh sản phẩm, tải file từ Thư viện, đặt vào ô media của sản phẩm cạnh các ảnh, rồi dùng lại bản 9:16 cho quảng cáo mạng xã hội. Ô Cửa hàng/Thương hiệu trên form gắn clip với cửa hàng hoặc thương hiệu bạn chọn.',
+        'Quy trình gồm bốn bước: tạo bản 1:1 cho bộ ảnh sản phẩm, tải file từ Thư viện, đặt vào ô media của sản phẩm cạnh các ảnh, rồi lấy bản 9:16 hay 4:5 cho mạng xã hội ở mục "Tải theo tỉ lệ khác" trong chi tiết video ở Thư viện: miễn phí, không tạo lại video, khung mới thêm nền mờ hoặc nền đen chứ không cắt mất phần nào. Ô Cửa hàng/Thương hiệu trên form gắn clip với cửa hàng hoặc thương hiệu bạn chọn.',
         'Cách này dùng được trên Shopify, WooCommerce, Shopee, TikTok Shop, Etsy, Amazon và mọi nơi nhận file video, vì không bước nào phụ thuộc nền tảng. Chỉ dung lượng và tỉ lệ được nhận là khác nhau, và mỗi nền tảng tự ghi rõ điều đó.',
       ],
     },
@@ -462,7 +463,7 @@ const tryOn: AboutPage = {
         {
           steps: [
             { title: 'Tải ảnh trang phục', text: 'Thêm 1 đến 5 ảnh trang phục (đến 13 ảnh với Nano Banana 2.1): ảnh trải phẳng, ảnh ma-nơ-canh ẩn hay ảnh người mặc đều được. Có thể chồng áo, quần và giày để phối cả bộ trong một lần. Tổng số ảnh của một lần chạy (người mẫu, trang phục và bối cảnh) không vượt giới hạn của mô hình: 14 với Nano Banana Pro, 2 và 2.1, 4 với Nano Banana, 2 với FASHN v1.6.', media: 'try-on-garment-1' },
-            { title: 'Chọn người mẫu', text: 'Tải ảnh một người, hoặc chọn một ảnh mẫu có sẵn nếu công ty đã đưa lên. Dùng ảnh toàn thân của một người nhìn thẳng vào máy; ảnh càng rõ, kết quả càng tốt.', media: 'try-on-model-1' },
+            { title: 'Chọn người mẫu', text: 'Tải ảnh một người, hoặc chọn một người mẫu có sẵn hay một người mẫu AI đã lưu. Chọn người mẫu có sẵn thì bước Chọn tư thế hiện ra ngay sau đó: chọn một tư thế, hoặc Không chọn tư thế rồi tả tư thế trong ô Mô tả nếu muốn. Khi ô Người mẫu đã có ảnh, nút tư thế cạnh ảnh cho biết tư thế đang chọn: bấm để chọn hay đổi tư thế, bấm × để bỏ. Có tư thế thì người mẫu đứng theo tư thế và khung hình của nó; không chọn thì tư thế trong ảnh giữ nguyên, và nếu ảnh chụp sát hơn món đồ cần thấy, AI lùi khung để thấy thêm người thay vì phóng to đầu hay rút ngắn thân.', media: 'try-on-model-1' },
             { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, độ phân giải và tỉ lệ, thêm ảnh bối cảnh hoặc mô tả nếu muốn chỉ đạo cảnh, rồi bấm Thử đồ. Nút ghi chi phí ước tính bằng USD trước khi bạn bấm, và kết quả về tab Lịch sử.', media: 'try-on-example-1' },
           ],
         },
@@ -688,7 +689,7 @@ const tryOn: AboutPage = {
             ['Thử nhiều món cùng lúc được không?', 'Được. Thêm tối đa 5 ảnh trang phục (13 ảnh với Nano Banana 2.1) trong một lần chạy, trong giới hạn ảnh của mô hình (4 ảnh tổng cộng với Nano Banana, tính cả người mẫu và bối cảnh), và AI phối áo, quần, giày và phụ kiện thành một bộ trên một người mẫu. Tải mỗi món thành một ảnh riêng thay vì một ảnh ghép.'],
             ['Tạo ảnh thử đồ không cần buổi chụp được không?', 'Được, đó chính là mục đích của trang này. Một ảnh trang phục có sẵn, kể cả chụp bằng điện thoại, cùng một ảnh người mẫu là đủ cho một lần chạy. Không đặt studio, không tuyển người mẫu, không chỉnh ảnh.'],
             ['Có phải cài ứng dụng không?', 'Không. Ứng dụng chạy trên trình duyệt, trên máy tính lẫn điện thoại, nên không có gì để tải về hay cài đặt. Mọi kết quả nằm trong Thư viện của công ty, xem được trên bất kỳ thiết bị nào bạn đăng nhập.'],
-            ['Thử đồ có đổi khuôn mặt, tóc hay tư thế của người mẫu không?', 'Không. Chỉ quần áo thay đổi. Khuôn mặt, tóc, màu da, dáng người và tư thế giữ nguyên, và AI dựng lại chất vải, nếp nhăn và bóng đổ cho khớp với tư thế và ánh sáng sẵn có. Bối cảnh cũng giữ nguyên trừ khi bạn chủ động đổi bằng ảnh bối cảnh hoặc prompt. Muốn thay cả người, hãy dùng ứng dụng Đổi người mẫu.'],
+            ['Thử đồ có đổi khuôn mặt, tóc hay tư thế của người mẫu không?', 'Khuôn mặt, tóc, màu da và dáng người giữ nguyên; tư thế tuỳ bạn. Chọn một tư thế thì người mẫu đổi sang tư thế đó, khung hình theo tư thế. Không chọn thì tư thế trong ảnh giữ nguyên; nếu ảnh chụp sát hơn món đồ cần thấy, AI lùi khung để thấy thêm người thay vì phóng to đầu hay rút ngắn thân. AI dựng lại chất vải, nếp nhăn và bóng đổ cho khớp với tư thế và ánh sáng. Bối cảnh cũng giữ nguyên trừ khi bạn chủ động đổi bằng ảnh bối cảnh hoặc prompt. Muốn thay cả người, hãy dùng ứng dụng Đổi người mẫu.'],
             ['Tạo ảnh cho nhiều sản phẩm cùng lúc được không?', 'Mỗi lần chạy cho một ảnh người mẫu từ tối đa 5 ảnh trang phục (13 ảnh với Nano Banana 2.1), được phối thành một bộ. Không có nhập từ bảng tính hay tải hàng loạt, nên phủ một danh mục là xếp hàng các lần chạy; kết quả hiện trong tab Lịch sử khi xong.'],
             ['Thử đồ dùng những mô hình nào?', 'Danh mục có bốn mô hình: Nano Banana Pro (1K, 2K, 4K, chi tiết trang phục tốt nhất), Nano Banana 2.1 (1K, 2K), Nano Banana (rẻ và nhanh, một cỡ cố định) và FASHN v1.6 (một người mẫu và một trang phục). Bạn chọn trong menu Mô hình trước mỗi lần chạy, trong số mô hình Admin đã bật.'],
             ['Dùng ảnh thử đồ cho quảng cáo và trang sản phẩm được không?', `Được, ảnh là tài sản của công ty. ${RIGHTS} Nếu ảnh người mẫu là ảnh người thật, cần có sự đồng ý của người đó.`],
@@ -827,7 +828,7 @@ const image: AboutPage = {
     {
       kicker: 'Mô hình tạo',
       title: 'Có những mô hình nào?',
-      lead: 'Nút Mô hình quyết định công cụ nào tạo ảnh. Danh mục có tám mô hình, khác nhau về độ chi tiết, tốc độ, định dạng hỗ trợ và giá mỗi lần chạy; menu chỉ hiện mô hình Admin đã bật. Nano Banana Pro, 2 và 2.1 nhận tối đa 14 ảnh tham chiếu, các mô hình còn lại tối đa 4.',
+      lead: 'Nút Mô hình quyết định công cụ nào tạo ảnh. Các mô hình khác nhau về độ chi tiết, tốc độ, định dạng hỗ trợ và giá mỗi lần chạy; menu chỉ hiện mô hình Admin đang bật, nên có thể ít hơn danh sách dưới đây. Nano Banana Pro, 2 và 2.1 nhận tối đa 14 ảnh tham chiếu, các mô hình còn lại tối đa 4.',
       blocks: [
         {
           cards: [
@@ -836,8 +837,16 @@ const image: AboutPage = {
             { tag: 'Nhanh', title: 'Nano Banana 2', media: 'model-nano-banana-2', text: 'Mô hình Flash của Google, nhanh và nhiều tỉ lệ, hợp với thử nhanh ở 1K.', specs: ['Tỉ lệ: như Nano Banana Pro', 'Độ phân giải: 1K'] },
             { tag: 'Bám chỉ dẫn tốt nhất', title: 'GPT Image 2', media: 'model-gpt-image-2', text: 'Mô hình của OpenAI, đọc kỹ nhất một chỉ dẫn dài. Nếu mô tả có năm yêu cầu riêng, đây là mô hình dễ đáp ứng đủ cả năm nhất.', specs: ['Tỉ lệ: auto, 1:1, 9:16, 16:9, 3:4, 4:3', 'Độ phân giải: 1K, 2K, 4K'] },
             { tag: 'Mới nhất của OpenAI', title: 'GPT Image 2.5', media: 'model-gpt-image-2-5-flare', text: 'Bản kế nhiệm GPT Image 2, có hai biến thể. Flare là lựa chọn hằng ngày, nét hơn GPT Image 2 và nhanh hơn. Sunburst dành nhiều thời gian hơn cho mỗi ảnh để giữ chi tiết phức tạp, cho lần chỉnh khó cần kiểm soát chặt.', specs: ['Biến thể: Flare (nhanh), Sunburst (chính xác)', 'Tỉ lệ: auto, 1:1, 9:16, 16:9, 3:4, 4:3', 'Độ phân giải: 1K'] },
-            { tag: 'Nhanh và rẻ', title: 'Nano Banana', media: 'model-nano-banana', text: 'Mô hình tiêu chuẩn của Google và rẻ nhất mỗi lần chạy. Dùng để thử ý tưởng và chỉnh mô tả trước khi chạy bản cuối.', specs: ['Tỉ lệ: như Nano Banana Pro', 'Độ phân giải: cỡ cố định'] },
+            { tag: 'Nhanh và rẻ', title: 'Nano Banana', media: 'model-nano-banana', text: 'Mô hình tiêu chuẩn của Google, nhanh và rẻ. Dùng để thử ý tưởng và chỉnh mô tả trước khi chạy bản cuối.', specs: ['Tỉ lệ: như Nano Banana Pro', 'Độ phân giải: cỡ cố định'] },
             { tag: 'Người và cảnh chân thực', title: 'Seedream 5.0 Pro', media: 'model-seedream-5-pro', text: 'Mô hình của ByteDance, mạnh về người và khung cảnh chân thực. Đưa ảnh tham chiếu để chỉnh hoặc phối lại một cảnh, ở 1K hoặc 2K.', specs: ['Tỉ lệ: như Nano Banana Pro', 'Độ phân giải: 1K, 2K'] },
+          ],
+        },
+        {
+          cols: 3,
+          cards: [
+            { tag: 'Nhanh', title: 'Seedream 5.0 Flash', text: 'Bản nhanh của Seedream 5.0, cùng một giá ở 1K và 2K. Hợp với bản nháp và loạt ảnh nhiều biến thể trước khi chạy bản cuối.', specs: ['Tỉ lệ: như Nano Banana Pro', 'Độ phân giải: 1K, 2K'] },
+            { tag: 'Chỉ 2K', title: 'Seedream 4.5', text: 'Bản Seedream trước 5.0, chỉ xuất ở 2K với một giá mỗi ảnh. Nhận ảnh tham chiếu để chỉnh hoặc phối lại cảnh như các bản Seedream khác.', specs: ['Tỉ lệ: như Nano Banana Pro', 'Độ phân giải: 2K'] },
+            { tag: 'Giá cố định', title: 'Seedream 4.0', text: 'Bản Seedream đời đầu, một giá cho cả 1K và 2K. Hợp khi cần nhiều ảnh thử với chi phí biết trước.', specs: ['Tỉ lệ: như Nano Banana Pro', 'Độ phân giải: 1K, 2K'] },
           ],
         },
         {
@@ -851,9 +860,12 @@ const image: AboutPage = {
             ['GPT Image 2.5 Sunburst', 'Chi tiết phức tạp khi lần chỉnh khó cần kiểm soát chặt', '1K'],
             ['Nano Banana', 'Bản nháp rẻ và thử mô tả', 'Cố định'],
             ['Seedream 5.0 Pro', 'Người và cảnh chân thực từ ảnh tham chiếu', '1K, 2K'],
+            ['Seedream 5.0 Flash', 'Bản nháp và loạt biến thể, cùng giá ở 1K và 2K', '1K, 2K'],
+            ['Seedream 4.5', 'Ảnh 2K với một giá mỗi ảnh', '2K'],
+            ['Seedream 4.0', 'Ảnh thử ở 1K hoặc 2K với một giá mỗi ảnh', '1K, 2K'],
           ],
         },
-        'Cách làm nhiều người chọn: thử trên Nano Banana cho tới khi bố cục đã ổn, rồi chạy lại câu mô tả đó trên Nano Banana Pro ở độ phân giải cao hơn. Nếu không muốn thử cả tám, Nano Banana Pro ở 2K là lựa chọn an toàn, và GPT Image 2.5 Flare khi sản phẩm có chữ.',
+        'Cách làm nhiều người chọn: thử trên Nano Banana cho tới khi bố cục đã ổn, rồi chạy lại câu mô tả đó trên Nano Banana Pro ở độ phân giải cao hơn. Nếu không muốn thử từng mô hình, Nano Banana Pro ở 2K là lựa chọn an toàn, và GPT Image 2.5 Flare khi sản phẩm có chữ.',
       ],
     },
     {
@@ -861,7 +873,7 @@ const image: AboutPage = {
       title: 'AI có tạo được ảnh sản phẩm với chữ đọc rõ không?',
       blocks: [
         'Có, và mô hình bạn chọn quyết định chữ rõ đến đâu. Chữ trên nhãn mác, logo trên ngực áo, chữ trên bao bì, giá trên thẻ treo: chữ là chi tiết các mô hình ảnh xưa nay hay làm hỏng, biến chữ thật thành thứ trông giống chữ khi nhìn xa và vỡ ra khi nhìn gần.',
-        'Các mô hình GPT Image viết chữ chính xác nhất trong tám mô hình ở đây, nên hãy dùng chúng khi sản phẩm có chữ mà khách sẽ đọc. Bắt đầu với GPT Image 2.5 Flare, và chuyển sang Sunburst khi nhãn hay logo cần thêm một lượt chính xác.',
+        'Các mô hình GPT Image viết chữ chính xác nhất trong các mô hình ở đây, nên hãy dùng chúng khi sản phẩm có chữ mà khách sẽ đọc. Bắt đầu với GPT Image 2.5 Flare, và chuyển sang Sunburst khi nhãn hay logo cần thêm một lượt chính xác.',
         'Viết đúng dòng chữ trong mô tả, đặt trong ngoặc kép, ví dụ: nhãn ghi “VET STUDIO”. Chữ càng ngắn, kết quả càng chắc.',
       ],
     },
@@ -988,8 +1000,8 @@ const image: AboutPage = {
             ['Một lần tạo ảnh tốn bao nhiêu?', 'Chi phí tuỳ mô hình và độ phân giải bạn chọn. Nút Tạo ảnh ghi chi phí ước tính bằng USD trước khi bạn bấm và cập nhật khi bạn đổi lựa chọn. Ảnh và ứng dụng có ngân sách riêng, tách khỏi video: mỗi người có hạn mức theo ngày và theo tháng, công ty có hạn mức theo tháng.'],
             ['Đổi được độ tuổi, màu da và phong cách của người mẫu không?', 'Được, qua mô tả. Trang này không có menu chọn độ tuổi hay dáng người, nên bạn tả người bạn muốn: độ tuổi, màu da, tóc, dáng người, biểu cảm, tư thế và cách phối đồ. Muốn giữ cùng một người qua cả loạt ảnh, đưa một ảnh đã tạo làm ảnh tham chiếu ở lần sau và dặn giữ nguyên khuôn mặt.'],
             ['Ảnh điện thoại làm ảnh tham chiếu có đủ không?', 'Đủ. Một ảnh điện thoại nét, đủ sáng là dùng được, không cần máy ảnh hay studio. AI đọc chủ thể, màu sắc và chi tiết từ đó. Tránh ảnh mờ hoặc nén nặng, vì thứ gì ảnh che đi AI sẽ phải tự bịa ra.'],
-            ['Trang này dùng những mô hình nào?', 'Danh mục có tám mô hình: Nano Banana Pro, Nano Banana 2.1, Nano Banana 2 và Nano Banana của Google; GPT Image 2, GPT Image 2.5 Flare và GPT Image 2.5 Sunburst của OpenAI; và Seedream 5.0 Pro của ByteDance. Bạn chọn trong nút Mô hình trước mỗi lần chạy, trong số mô hình Admin đã bật, và đổi mô hình cũng đổi chi phí ghi trên nút chạy.'],
-            ['Nên chọn mô hình nào?', 'Nano Banana Pro cho độ chi tiết cao nhất và tới 4K cho ảnh dùng thật. Nano Banana 2.1 cho ảnh chân thực, chữ sắc ở 1K hoặc 2K. GPT Image 2 và GPT Image 2.5 bám chỉ dẫn dài sát nhất và viết chữ chính xác nhất. Seedream 5.0 Pro mạnh về người và cảnh chân thực. Nano Banana rẻ và nhanh nhất cho bản nháp.'],
+            ['Trang này dùng những mô hình nào?', 'Các mô hình của Google (Nano Banana Pro, Nano Banana 2.1, Nano Banana 2 và Nano Banana), của OpenAI (GPT Image 2, GPT Image 2.5 Flare và GPT Image 2.5 Sunburst) và của ByteDance (Seedream 5.0 Pro, Seedream 5.0 Flash, Seedream 4.5 và Seedream 4.0). Bạn chọn trong nút Mô hình trước mỗi lần chạy, trong số mô hình Admin đang bật, và đổi mô hình cũng đổi chi phí ghi trên nút chạy.'],
+            ['Nên chọn mô hình nào?', 'Nano Banana Pro cho độ chi tiết cao nhất và tới 4K cho ảnh dùng thật. Nano Banana 2.1 cho ảnh chân thực, chữ sắc ở 1K hoặc 2K. GPT Image 2 và GPT Image 2.5 bám chỉ dẫn dài sát nhất và viết chữ chính xác nhất. Seedream 5.0 Pro mạnh về người và cảnh chân thực. Nano Banana và Seedream 5.0 Flash nhanh và rẻ cho bản nháp.'],
             ['Viết mô tả thế nào cho tốt?', 'Tả chủ thể, bối cảnh, ánh sáng và phong cách chụp bằng câu đơn giản. Khi chỉnh ảnh tham chiếu, nói điều cần đổi và điều phải giữ, ví dụ “đổi phông nền thành phố đêm, giữ nguyên khuôn mặt và chiếc áo”. Viết tiếng Việt cũng được khi Cải thiện đang bật, vì mô tả được dịch sang tiếng Anh trước khi chạy.'],
             ['Nút Cải thiện làm gì?', 'Khi Cải thiện bật (mặc định), AI viết lại mô tả ngắn của bạn thành một bản tả chi tiết bằng tiếng Anh trước khi chạy, và dịch nếu bạn viết tiếng Việt. Nó không nhìn thấy ảnh, nên chỉ thêm chi tiết về bố cục, ánh sáng và phong cách, không bịa màu sắc, chữ hay logo. Tắt Cải thiện khi bạn muốn gửi đúng câu của mình.'],
             ['Chỉnh một ảnh có sẵn thay vì tạo mới được không?', 'Được, đó là cách trang này làm việc. Tải ảnh lên làm ảnh tham chiếu và tả chỉnh sửa: đổi phông nền, đổi tư thế, bỏ một món đồ, hay biến ảnh người mẫu thành ảnh sản phẩm sạch. AI giữ mọi thứ bạn không yêu cầu đổi, nên nói rõ điều phải giữ là đáng làm.'],
@@ -1012,6 +1024,7 @@ const hookNames = HOOKS.map((h) => h.name).join(', ');
 /** Marketing Studio, the UGC Try On format. */
 const marketing: AboutPage = {
   title: 'UGC Thử đồ: video kiểu người sáng tạo nội dung cho quảng cáo thời trang',
+  video: 'tutorial-marketing',
   lead: 'Hai ảnh vào, một video quảng cáo kiểu người sáng tạo nội dung ra. Một người mẫu, một sản phẩm, và AI dựng cảnh quay điện thoại người đó mặc sản phẩm của bạn. Không phải tìm người sáng tạo nội dung, không đặt lịch quay, không phải dựng lại sau.',
   sections: [
     {
@@ -1097,7 +1110,7 @@ const marketing: AboutPage = {
       kicker: 'Âm thanh',
       title: 'Video có tiếng không?',
       blocks: [
-        'Có. Như trên Fash, Tạo âm thanh bật sẵn: clip có tiếng như quay bằng điện thoại, gồm âm thanh căn phòng và vài câu phản ứng ngắn, tự nhiên của người mẫu về sản phẩm, không có nhạc nền. Với Kling O3 Pro và hai bản Seedance, tắt công tắc để có clip im lặng; Gemini Omni Flash, Grok Imagine, Wan 2.7 và MiniMax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Muốn viết đúng từng chữ người mẫu nói, hãy dùng định dạng Editorial.',
+        'Có. Tạo âm thanh bật sẵn: clip có tiếng như quay bằng điện thoại, gồm âm thanh căn phòng và vài câu phản ứng ngắn, tự nhiên của người mẫu về sản phẩm, không có nhạc nền. Với Kling O3 Pro và hai bản Seedance, tắt công tắc để có clip im lặng; Gemini Omni Flash, Grok Imagine, Wan 2.7 và MiniMax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Muốn viết đúng từng chữ người mẫu nói, hãy dùng định dạng Editorial.',
         {
           cols: 3,
           cards: [
@@ -1283,7 +1296,7 @@ const advanced: AboutPage = {
     {
       kicker: 'Lời thoại',
       title: 'Quy tắc của lời thoại',
-      lead: 'Tạo âm thanh bật sẵn, như trên Fash. Ô Lời thoại (tuỳ chọn) quyết định nhân vật nói gì.',
+      lead: 'Tạo âm thanh bật sẵn. Ô Lời thoại (tuỳ chọn) quyết định nhân vật nói gì.',
       blocks: [
         {
           list: [
@@ -1550,7 +1563,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Tối ưu media là gì?',
         blocks: [
-          'Tối ưu media là công cụ nén ảnh, đổi kích thước và chuyển định dạng trong một lần chạy. Bạn đưa vào một ảnh, gõ chiều rộng và chiều cao mới nếu cần, chọn PNG, JPG hoặc WEBP, rồi bấm Chạy để nhận một tệp mới, nhẹ hơn.',
+          'Tối ưu media là công cụ nén ảnh, đổi kích thước và chuyển định dạng trong một lần chạy. Bạn đưa vào một ảnh, gõ chiều rộng và chiều cao mới nếu cần, chọn PNG, JPG hoặc WEBP, rồi bấm Chạy để nhận một tệp mới, nhẹ hơn. Nút Ảnh listing Etsy/Shopify làm cùng lúc tới 50 ảnh vuông cho trang bán hàng.',
           'Công cụ miễn phí và chạy hoàn toàn trong trình duyệt của bạn: ảnh không được tải lên máy chủ, không dùng mô hình AI và không tính vào ngân sách nào. Hiện chỉ hỗ trợ ảnh; chưa hỗ trợ video MP4 hoặc WEBM.',
         ],
       },
@@ -1569,6 +1582,14 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         ],
       },
       {
+        title: 'Ảnh listing cho Etsy và Shopify',
+        lead: 'Một lần chạy đổi tới 50 ảnh thành ảnh vuông 2048 × 2048 px cho trang bán hàng.',
+        blocks: [
+          'Bấm nút Ảnh listing Etsy/Shopify trên form. Mỗi ảnh thành một ảnh JPG vuông 2048 × 2048 px: giữ trọn ảnh, thêm nền trắng xung quanh và tô trắng vùng trong suốt, vì Etsy hiện ảnh PNG trong suốt trên nền đen. Kích thước và định dạng đã cố định, nên hai ô Kích thước và mục Định dạng tắt trong lúc nút này bật.',
+          'Thêm tối đa 50 ảnh PNG, JPG hoặc WEBP, mỗi ảnh tối đa 20 MB, rồi bấm Chạy. Các ảnh được làm lần lượt ngay trong trình duyệt và gom vào một tệp .zip trong tab Lịch sử; một ảnh thì tải về một tệp JPG như thường. Tắt nút để quay lại một ảnh mỗi lần chạy.',
+        ],
+      },
+      {
         title: 'Định dạng và giới hạn',
         lead: 'Công cụ nhận ảnh PNG, JPG và WEBP, tối đa 20 MB, 8000 px mỗi chiều và 16 triệu điểm ảnh.',
         blocks: [
@@ -1584,10 +1605,11 @@ export const APP_ABOUT: Record<string, AboutPage> = {
               ['Giữ tỷ lệ', 'Bật mặc định; tắt để đặt riêng chiều rộng và chiều cao'],
               ['Chi phí', 'Miễn phí'],
               ['Nơi xử lý', 'Trong trình duyệt của bạn, không tải ảnh lên máy chủ'],
+              ['Ảnh listing Etsy/Shopify', 'JPG vuông 2048 × 2048 px, tối đa 50 ảnh một lần, tải về một tệp .zip'],
               ['Lưu kết quả', 'Chỉ trong phiên này (tab Lịch sử), không lưu vào Thư viện'],
             ],
           },
-          'Ảnh vào và ảnh ra đều là ảnh, nên mỗi lần chạy cho đúng một tệp ảnh mới. Tệp gốc của bạn không bị thay đổi.',
+          'Ảnh vào và ảnh ra đều là ảnh: mỗi lần chạy cho một tệp ảnh mới, hoặc một tệp .zip khi chạy nhiều ảnh listing. Tệp gốc của bạn không bị thay đổi.',
         ],
       },
       {
@@ -2653,7 +2675,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Tạo tư thế người mẫu là gì?',
         blocks: [
-          'Từ một ảnh người mẫu, ứng dụng tạo lại đúng người đó trong các tư thế bạn chọn: đứng thẳng, chống hông, quay lưng, ngồi, cận mặt và nhiều tư thế khác, hoặc một tư thế bạn tự tả. Mỗi tư thế là một ảnh riêng.',
+          `Từ một đến ${MAX_MODELS} ảnh người mẫu, ứng dụng tạo lại đúng từng người trong các tư thế bạn chọn: đứng thẳng, chống hông, quay lưng, ngồi, cận mặt và nhiều tư thế khác, hoặc một tư thế bạn tự tả. Mỗi người mẫu ở mỗi tư thế là một ảnh riêng.`,
           `AI giữ nguyên khuôn mặt, tóc, dáng người, trang phục, ánh sáng và nền của ảnh gốc (nếu bạn không đổi nền), chỉ đổi tư thế và khung hình. ${APP_COST}`,
         ],
       },
@@ -3028,6 +3050,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
   },
   'motion-control': {
     title: 'Kling Motion Control: chép chuyển động lên nhân vật của bạn',
+    video: 'tutorial-motion-control',
     sections: [
       {
         title: 'Kling Motion Control là gì?',
@@ -3128,6 +3151,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
 
 const analyze: AboutPage = {
   title: 'Phân tích video tham chiếu',
+  video: 'tutorial-analyze',
   lead: 'Đưa vào một video tham chiếu, trang này rã nó thành danh sách cảnh: định dạng, câu mở đầu, tóm tắt và một prompt tiếng Anh cho từng cảnh. Dùng để học cách một clip đang chạy tốt được dựng, rồi tạo lại ý tưởng đó cho sản phẩm của bạn chỉ bằng một cú bấm.',
   sections: [
     {
@@ -3178,7 +3202,7 @@ const analyze: AboutPage = {
 };
 
 /** The long About tabs of the tools; `advanced` is for the Advanced marketing page. */
-export const ABOUT = { create, tryOn, image, marketing, advanced, unboxing, review, analyze };
+export const ABOUT = { create, tryOn, image, marketing, advanced, unboxing, review, analyze } satisfies Record<AboutKey, AboutPage>;
 
 /** The short description of a model on the Explore "Featured models" cards, by model id. */
 export const MODEL_CARD_TEXT: Record<string, string> = {

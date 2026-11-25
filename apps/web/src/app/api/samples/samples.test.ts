@@ -82,6 +82,12 @@ describe('sample names and bytes', () => {
     expect(['{"brief":"x"}', '[1]', 'null', '{"a":', ''].map((s) => sampleBytesMatch('application/json', text(s)))).toEqual([true, false, false, false, false]);
     expect(sampleBytesMatch('application/json', jpeg)).toBe(false);
   });
+  test('takes WebVTT captions (.vtt, text/vtt): UTF-8 text opening with WEBVTT, a byte-order mark allowed', () => {
+    expect(['tutorial-try-on.vtt', 'Tutorial.vtt', 'a.srt'].map(sampleType)).toEqual(['text/vtt', null, null]);
+    const text = (s: string) => new TextEncoder().encode(s);
+    expect(['WEBVTT\n\n00:00.000 --> 00:02.000\nXin chào', '\uFEFFWEBVTT', 'WEBVTT - phụ đề', 'WEBVTTX', 'webvtt', ''].map((s) => sampleBytesMatch('text/vtt', text(s)))).toEqual([true, true, true, false, false, false]);
+    expect([sampleBytesMatch('text/vtt', jpeg), sampleBytesMatch('text/vtt', new Uint8Array([0x57, 0x45, 0x42, 0x56, 0x54, 0x54, 0x0a, 0xff]))]).toEqual([false, false]); // not UTF-8
+  });
 });
 
 describe('/api/samples', () => {
@@ -261,5 +267,17 @@ describe('POST /api/assets/samples', () => {
     expect(res.status).toBe(429);
     expect((await res.json()).error).toMatch(/hour/);
     expect((await copy(member, { names: ['copy-a.jpg'] })).status).toBe(201); // another member is not held back
+  });
+});
+
+describe('tutorial captions', () => {
+  test('an Admin uploads a .vtt next to a tutorial and a member reads it as text/vtt; bytes that are not WebVTT are refused', async () => {
+    const vtt = new TextEncoder().encode('WEBVTT\n\n00:00.000 --> 00:02.000\nThử đồ trên người mẫu\n');
+    expect((await PUT(req(admin, { method: 'PUT', body: jpeg }), ctx('tutorial-test.vtt'))).status).toBe(400);
+    expect((await PUT(req(admin, { method: 'PUT', body: vtt }), ctx('tutorial-test.vtt'))).status).toBe(201);
+    expect(((await (await LIST(req(member))).json()) as { samples: { name: string }[] }).samples.map((s) => s.name)).toContain('tutorial-test.vtt');
+    const res = await ONE(req(member), ctx('tutorial-test.vtt'));
+    expect([res.status, res.headers.get('content-type'), res.headers.get('x-content-type-options')]).toEqual([200, 'text/vtt', 'nosniff']);
+    expect(new TextDecoder().decode(await res.arrayBuffer())).toContain('Thử đồ trên người mẫu');
   });
 });
