@@ -34,6 +34,18 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await page.getByRole('button', { name: 'Tạo nhóm', exact: true }).click();
   await expect(page.getByLabel('Tên nhóm Team E2E')).toHaveValue('Team E2E');
   await expect(page.getByLabel('Mã trung tâm chi phí của Team E2E')).toHaveValue('CC-E2E');
+  // The report toggle saves at once, tags the team in the list and reads back after a reload; it is cleared again for the costs below.
+  const reports = page.getByLabel('Không tính vào báo cáo: Team E2E');
+  const teamRow = page.getByRole('row').filter({ has: page.getByLabel('Tên nhóm Team E2E') });
+  await expect(reports).not.toBeChecked();
+  await reports.click();
+  await expect(reports).toBeChecked();
+  await expect(teamRow.getByText('Không tính báo cáo', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(reports).toBeChecked();
+  await reports.click();
+  await expect(reports).not.toBeChecked();
+  await expect(teamRow.getByText('Không tính báo cáo', { exact: true })).toHaveCount(0);
 
   // Stores: create one; its code stays editable.
   await nav(page, 'Cửa hàng').click();

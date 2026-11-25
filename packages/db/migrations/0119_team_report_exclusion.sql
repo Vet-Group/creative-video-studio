@@ -1,0 +1,3 @@
+-- A team left out of the real-user figures of the Admin reports, Costs and Usage (owner decision, 2026-11-25): its members are counted like system accounts there, as
+-- the engineering team that tests the app should be. No team is excluded here; the Admin ticks it on the Teams page. Its history and billing are unchanged.
+ALTER TABLE "teams" ADD COLUMN "excluded_from_reports" boolean DEFAULT false NOT NULL;

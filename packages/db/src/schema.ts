@@ -69,6 +69,8 @@ export const teams = pgTable(
     /** A sales team (docs/BILLING.md): its month's costs past `freeMonthlyUsd` are billed to it, and its members run jobs only for its stores. */
     billable: boolean('billable').notNull().default(false),
     freeMonthlyUsd: numeric('free_monthly_usd', { precision: 12, scale: 4 }).notNull().default('20'),
+    /** Left out of the real-user figures of the Admin reports, Costs and Usage (apps/web lib/real-users.ts), such as the engineering team; billing is unchanged. */
+    excludedFromReports: boolean('excluded_from_reports').notNull().default(false),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
   (t) => [

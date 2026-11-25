@@ -81,7 +81,7 @@ describe('every /api/admin route', () => {
 
 describe('teams', () => {
   const list = async (query = '') =>
-    ((await (await teamsRoute.GET(call(admin.cookie, `/api/admin/teams${query}`))).json()) as { teams: { id: string; name: string; costCentreCode: string | null; hidden: boolean; defaultTool: string | null }[] }).teams;
+    ((await (await teamsRoute.GET(call(admin.cookie, `/api/admin/teams${query}`))).json()) as { teams: { id: string; name: string; costCentreCode: string | null; hidden: boolean; excludedFromReports: boolean; defaultTool: string | null }[] }).teams;
   const patch = (id: string, body: unknown) => teamRoute.PATCH(call(admin.cookie, `/api/admin/teams/${id}`, 'PATCH', body), ctx(id));
 
   test('creates a team with a name and an optional cost-centre code, audited once', async () => {
@@ -137,9 +137,28 @@ describe('teams', () => {
     expect((await POST(call(admin.cookie, '/api/admin/users', 'POST', body))).status).toBe(400);
   });
 
+  test('leaves a team out of the reports and counts it again, each change audited once; the list reads the flag', async () => {
+    const { id } = (await (await teamsRoute.POST(call(admin.cookie, '/api/admin/teams', 'POST', { name: 'Kỹ thuật' }))).json()) as { id: string };
+    expect((await list()).find((t) => t.id === id)).toMatchObject({ excludedFromReports: false });
+    const res = await patch(id, { excludedFromReports: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ excludedFromReports: true, hidden: false, name: 'Kỹ thuật' });
+    expect((await list()).find((t) => t.id === id)).toMatchObject({ excludedFromReports: true });
+    expect((await patch(id, { excludedFromReports: true })).status).toBe(200); // unchanged: no entry
+    expect((await patch(id, { name: 'Kỹ thuật' })).status).toBe(200); // another field leaves the flag as it is
+    expect((await list()).find((t) => t.id === id)).toMatchObject({ excludedFromReports: true });
+    expect((await patch(id, { excludedFromReports: false })).status).toBe(200);
+    expect((await audits(`team:${id}`)).slice(1)).toEqual([
+      { actor_id: admin.id, action: 'team.reports', old_value: { excludedFromReports: false }, new_value: { excludedFromReports: true } },
+      { actor_id: admin.id, action: 'team.reports', old_value: { excludedFromReports: true }, new_value: { excludedFromReports: false } },
+    ]);
+  });
+
   test('refuses an empty change, a bad value and an unknown team', async () => {
     expect((await patch('team-unassigned', {})).status).toBe(400);
     expect((await patch('team-unassigned', { hidden: 'yes' })).status).toBe(400);
+    for (const excludedFromReports of ['yes', 1, null]) expect((await patch('team-unassigned', { excludedFromReports })).status).toBe(400);
+    expect((await pool.query(`select excluded_from_reports from teams where id = 'team-unassigned'`)).rows[0].excluded_from_reports).toBe(false);
     expect((await patch('team-unassigned', { name: '' })).status).toBe(400);
     expect((await patch('no-such-team', { name: 'X' })).status).toBe(404);
   });
