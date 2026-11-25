@@ -85,15 +85,20 @@ export async function usageReport(period: Period, real: boolean) {
     if (user.status === 'using') t.using++;
     t.users.push(user);
   }
-  const count = (s: UsageStatus) => people.filter((u) => u.status === s).length;
+  // Partners (outside_lark) stay listed and in the spend, but the head counts are staff only, as the owner's adoption report counts them.
+  const partners = new Set(shown.filter((r) => r.outside_lark).map((r) => r.id as string));
+  const staff = people.filter((u) => !partners.has(u.id));
+  const count = (s: UsageStatus) => staff.filter((u) => u.status === s).length;
   const using = count('using');
   return {
     period,
     real,
     totals: {
-      people: people.length,
+      people: staff.length,
+      teams: new Set(staff.map((u) => u.team.id)).size,
+      partners: partners.size,
       using,
-      usingPct: people.length ? Math.round((using * 100) / people.length) : 0,
+      usingPct: staff.length ? Math.round((using * 100) / staff.length) : 0,
       lapsed: count('lapsed'),
       idle: count('idle'),
       never: count('never'),
