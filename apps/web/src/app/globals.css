@@ -57,6 +57,8 @@
   --danger-soft-border: rgb(254, 202, 202);
   --danger-border: #fca5a5;
   --ok-border: #86efac;
+  --ok-soft: rgb(240, 253, 244);
+  --ok-text: #15803d;
   --warn-bg: #fef3c7;
   --warn-border: #f59e0b;
   --badge-bg: #7c3aed;
@@ -144,6 +146,8 @@
   --danger-soft-border: #5b2227;
   --danger-border: #7f2a2f;
   --ok-border: #1f6b3a;
+  --ok-soft: #12261a;
+  --ok-text: #4ade80;
   --warn-bg: #3b2a0b;
   --tag-bg: #5a4510;
   --favorite: #e0a526;
@@ -201,6 +205,8 @@
     --danger-soft-border: #5b2227;
     --danger-border: #7f2a2f;
     --ok-border: #1f6b3a;
+    --ok-soft: #12261a;
+    --ok-text: #4ade80;
     --warn-bg: #3b2a0b;
     --tag-bg: #5a4510;
     --favorite: #e0a526;
@@ -1831,6 +1837,12 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about-cards .about-media { margin-bottom: 16px; }
 .about-cards:not([data-cols='3']) .about-media :is(video, img, .banner-empty) { aspect-ratio: 4 / 3; }
 .about-tag { display: inline-block; margin-bottom: 10px; padding: 2px 10px; border-radius: 999px; background: rgb(var(--tint) / .06); color: var(--ink); font-size: 12px; line-height: 18px; }
+/* Do and don't cards: a colour, a mark and the word, so neither colour nor mark carries the meaning alone (the mark is not read out). */
+.about-tag[data-tone] { font-weight: 600; }
+.about-tag[data-tone='do'] { background: var(--ok-soft); color: var(--ok-text); }
+.about-tag[data-tone='dont'] { background: var(--danger-soft); color: var(--danger); }
+.about-tag[data-tone='do']::before { content: '\2713\00a0' / ''; }
+.about-tag[data-tone='dont']::before { content: '\2717\00a0' / ''; }
 .about-specs { margin: 12px 0 0; padding-left: 18px; font-size: 13px; line-height: 19px; }
 /* Steps: the sample beside the text, alternating sides, as on the live About tabs. */
 .about-steps { display: grid; gap: 40px; margin: 8px 0 16px; padding: 0; list-style: none; }
@@ -1841,8 +1853,30 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about-loop :is(video, img) { display: block; max-width: 100%; max-height: 800px; }
 .about-loop .banner-empty { display: block; width: 448px; max-width: 100%; aspect-ratio: 9 / 16; }
 /* A page's tutorial (About.tsx Tutorial): full column width, 16:9 like the reference site's How to Use clips. */
-.about-video { margin: 0 0 24px; overflow: hidden; border-radius: 12px; background: var(--media-bg); }
+.about-video { position: relative; margin: 32px 0 24px; overflow: hidden; border-radius: 12px; background: var(--media-bg); }
 .about-video video { display: block; width: 100%; aspect-ratio: 16 / 9; }
+/* Its poster under one large play button until started; then the native controls. */
+.about-video-play { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--on-dark); cursor: pointer; }
+.about-video-play > span { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: rgb(var(--shade) / .62); box-shadow: 0 6px 24px rgb(var(--shade) / .25); transition: background var(--dur-base), transform var(--dur-base); }
+.about-video-play .icon { margin-left: 4px; } /* the triangle's optical centre */
+.about-video-play:hover > span { background: rgb(var(--shade) / .78); transform: scale(1.05); }
+.about-video-play:focus-visible { outline: none; }
+.about-video-play:focus-visible > span { outline: 3px solid var(--on-dark); outline-offset: 3px; box-shadow: 0 0 0 6px rgb(var(--shade) / .62); }
+@media (prefers-reduced-motion: reduce) { .about-video-play:hover > span { transform: none; } }
+/* The page's last change for members (About.tsx, lib/about-updated.ts), under the title and lead; it opens What's new. */
+.about-updated { margin: 16px 0 0; text-align: center; }
+.about-updated a { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--fill); color: var(--text-muted); font-size: 12px; line-height: 18px; font-weight: 500; text-decoration: none; }
+.about-updated a:hover { color: var(--ink); }
+@media (pointer: coarse) { .about-updated a::after { content: ''; position: absolute; inset: -8px 0; } } /* a 44 px tap around the 28 px pill */
+/* The end of every About: back to the form, and an app's neighbours. */
+.about-start { padding: 32px 24px; border-radius: 16px; background: rgb(var(--tint) / .05); text-align: center; }
+.about .about-start h3 { margin: 0 0 8px; }
+.about .about-start p { margin: 0 0 16px; color: var(--text-body); font-size: 16px; line-height: 24px; }
+.about-start button.primary { min-height: 44px; margin: 0; padding: 0 24px; border-radius: 10px; font-weight: 600; }
+.about .about-start .about-start-more { margin: 28px 0 8px; color: var(--text-muted); font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.about-start ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.about-start ul a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; color: var(--ink); font-size: 14px; text-decoration: none; }
+.about-start ul a:hover { background: rgb(var(--tint) / .05); }
 /* The tutorials page (Tutorials.tsx): the About type scale, with the page's h1 as its title and h2 section titles. */
 .tutorials > h1 { margin: 8px 0 12px; color: var(--ink); font-size: 32px; line-height: 40px; font-weight: 600; text-align: center; }
 .tutorials > h1 + p { max-width: 560px; margin: 0 auto 32px; color: var(--text-body); font-size: 17px; line-height: 25px; text-align: center; }
@@ -1857,10 +1891,23 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about-table table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 21px; }
 .about-table th { padding: 12px 16px; border: 0; background: rgb(var(--tint) / .04); color: var(--muted); font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: .06em; text-align: left; text-transform: uppercase; }
 .about-table td { padding: 12px 16px; border: 0; border-top: 1px solid rgb(var(--tint) / .08); vertical-align: top; }
+/* A phone reads each row as a card: the first cell as its title, the others under their column names. */
+@media (max-width: 600px) {
+  .about-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .about-table :is(table, tbody, tr, td) { display: block; }
+  .about-table tr { padding: 14px 16px; }
+  .about-table tr + tr { border-top: 1px solid rgb(var(--tint) / .08); }
+  .about-table td { padding: 0; border: 0; }
+  .about-table td:first-child { color: var(--ink); font-weight: 600; }
+  .about-table td + td { margin-top: 8px; }
+  .about-table td + td::before { content: attr(data-label); display: block; color: var(--muted); font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+}
 .about-list { display: grid; gap: 8px; margin: 0 0 16px; padding-left: 20px; }
 .about-list a { color: var(--ink); font-weight: 600; text-decoration: underline; }
 /* Ratio tiles: the frame's shape, its name and where it is used. */
-.about-ratios { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 12px; margin: 0 0 16px; padding: 0; list-style: none; }
+/* Whole rows only: three a row (3, 5 or 6 tiles leave none alone; about-content.test.ts keeps the counts to those), five across when five fit. */
+.about-ratios { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; padding: 0; list-style: none; }
+@container (min-width: 600px) { .about-ratios[data-count='5'] { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .about-ratios > li { display: grid; justify-items: center; align-content: start; gap: 6px; padding: 20px 12px; border: 1px solid rgb(var(--tint) / .1); border-radius: 12px; color: var(--muted); font-size: 13px; line-height: 18px; text-align: center; }
 .about-ratio-shape { height: 44px; max-width: 100%; margin-bottom: 4px; border: 2px solid var(--ink); border-radius: 4px; background: rgb(var(--tint) / .05); }
 .about-ratio-shape[data-auto] { width: 44px; border-style: dashed; }
@@ -1966,9 +2013,9 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 /* An app's About reads as an article (live app pages): left-aligned sections, a plain numbered list, points without boxes. */
 .about-long p { margin: 0 0 24px; color: var(--ink-2); font-size: 16px; line-height: 24px; }
 .about-long .about-steps { display: block; padding-left: 20px; list-style: decimal; }
-.about-long .about-steps > li { display: list-item; margin: 0 0 8px; }
+.about-long .about-steps > li { display: list-item; margin: 0 0 8px; color: var(--ink-2); font-size: 16px; line-height: 24px; } /* the article's body text */
 .about-long .about-step-no { display: none; }
-.about-long .about-steps strong { display: inline; margin: 0; font-size: 14px; line-height: 21px; }
+.about-long .about-steps strong { display: inline; margin: 0; font-size: 16px; line-height: 24px; }
 .about-long .about-steps strong::after { content: '.'; }
 .about-long .about-cards { display: block; }
 .about-long .about-cards > li { margin: 0 0 20px; padding: 0; border: 0; font-size: 16px; line-height: 24px; }

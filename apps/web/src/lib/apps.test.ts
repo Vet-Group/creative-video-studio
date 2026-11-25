@@ -3,7 +3,7 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
 import { GARMENT_PRESETS, POSE_PRESETS, POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, relatedApps, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -107,6 +107,23 @@ describe('the app About tabs', () => {
   it('has an About page for every built app and none for an app that is not built', () => {
     for (const a of APPS) expect(Object.hasOwn(APP_ABOUT, a.slug)).toBe(!a.soon);
     expect(Object.keys(APP_ABOUT)).toHaveLength(APPS.filter((a) => !a.soon).length);
+  });
+});
+
+describe('relatedApps', () => {
+  const slugs = (slug: string, smartRemake = false) => relatedApps(slug, smartRemake).map((a) => a.slug);
+
+  it('offers the next apps of the same group, wrapping round the list', () => {
+    expect(slugs('character-swap')).toEqual(['model-swap', 'face-swap', 'jewelry-try-on']);
+    expect(slugs('listing-set')).toEqual(['background-changer', 'reframe', 'image-upscale']);
+  });
+
+  it('tops a group of one up with photo apps, offers Smart Remake only when it is on, and nothing for an unknown page', () => {
+    expect(slugs('media-optimizer')).toEqual(['background-changer', 'reframe', 'image-upscale']);
+    expect(slugs('motion-control')).not.toContain('smart-remake');
+    expect(slugs('motion-control', true)[0]).toBe('smart-remake');
+    expect(slugs('smart-remake')).toEqual([]);
+    expect(slugs('')).toEqual([]);
   });
 });
 

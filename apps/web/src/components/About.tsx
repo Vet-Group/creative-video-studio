@@ -3,21 +3,83 @@
 // then sections of eyebrow, heading and lead with cards, steps, before-and-after pairs, tables, ratio tiles, example prompts and a FAQ).
 // `long` is the app pages' article style: plain headings, numbered steps and points without boxes.
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import type { ABOUT } from '@/lib/about-content';
+import { useEffect, useId, useRef, useState } from 'react';
 import { type AboutBlock, type AboutCard, type SpecModel, withLiveSpecs } from '@/lib/about-specs';
+import { type AboutKey, aboutPath, updatedLabel } from '@/lib/about-updated';
+import { relatedApps } from '@/lib/apps';
 import { cardSample } from '@/lib/examples';
 import { useSamples, versionedSample } from '@/lib/use-samples';
+import { usePageUpdate } from './AboutUpdates';
 import { CardMedia } from './CardMedia';
+import { Icon } from './Icon';
+import { useSmartRemakeEnabled } from './SmartRemakeGate';
 
-/** A page's tutorial video with sound and controls, as the reference site's How to Use clips; nothing until its `<name>.mp4` sample is uploaded. */
+/** A page's tutorial video with sound, as the reference site's How to Use clips: its poster under a large play button, then the native controls once
+ * started; captions from `<name>.vtt` when uploaded (off by default, the clips burn them in). Nothing until its `<name>.mp4` sample is uploaded. */
 export function Tutorial({ name, title }: { name: string; title: string }) {
-  const { video, poster } = cardSample(useSamples(), name);
+  const have = useSamples();
+  const { video, poster } = cardSample(have, name);
+  const ref = useRef<HTMLVideoElement>(null);
+  const [started, setStarted] = useState(false);
   if (!video) return null;
+  const start = () => {
+    setStarted(true);
+    ref.current?.play().catch(() => {}); // a refused play leaves the controls to start it
+    requestAnimationFrame(() => ref.current?.focus()); // the button goes: the keyboard carries on in the player
+  };
   return (
     <figure className="about-video">
-      <video src={versionedSample(video)} poster={poster ? versionedSample(poster) : undefined} controls playsInline preload="none" aria-label={`Video hướng dẫn: ${title}`} />
+      <video ref={ref} src={versionedSample(video)} poster={poster ? versionedSample(poster) : undefined} controls={started} playsInline preload="none" aria-label={`Video hướng dẫn: ${title}`}>
+        {have.has(`${name}.vtt`) && <track kind="captions" src={versionedSample(`/api/samples/${name}.vtt`)} srcLang="vi" label="Tiếng Việt" />}
+      </video>
+      {!started && (
+        <button type="button" className="about-video-play" aria-label={`Phát video hướng dẫn: ${title}`} onClick={start}>
+          <span>
+            <Icon name="play" filled size={28} />
+          </span>
+        </button>
+      )}
     </figure>
+  );
+}
+
+/** Back to the form from the end of an About: every tool page names its form `<prefix>-panel-create` and, on a phone, that panel's tab `<prefix>-tab-create` (WorkTabs). */
+function toForm() {
+  const tab = document.querySelector<HTMLElement>('[role="tab"][id$="-tab-create"]');
+  if (tab && tab.getClientRects().length > 0) tab.click(); // a phone: the form is a tab of its own
+  requestAnimationFrame(() => {
+    const panel = document.querySelector<HTMLElement>('[id$="-panel-create"]');
+    if (!panel) return;
+    panel.scrollIntoView({ block: 'start' });
+    const shown = (el: HTMLElement) => el.getClientRects().length > 0 && !el.matches(':disabled') && !el.closest('.tool-hint, .tool-hint-chip');
+    [...panel.querySelectorAll<HTMLElement>('button, input:not([type="hidden"]):not([type="file"]), textarea, select')].find(shown)?.focus({ preventScroll: true });
+  });
+}
+
+/** The end of every About: back to the form, and on an app's page a few apps to try next (lib/apps.ts relatedApps). */
+function Start({ app }: { app?: string }) {
+  const related = relatedApps(app ?? '', useSmartRemakeEnabled());
+  const id = useId();
+  return (
+    <section className="about-start" aria-labelledby={id}>
+      <h3 id={id}>Bắt đầu</h3>
+      <p>Quay lại form để bắt đầu.</p>
+      <button type="button" className="primary" onClick={toForm}>
+        Mở form
+      </button>
+      {related.length > 0 && (
+        <>
+          <p className="about-start-more">Ứng dụng cùng nhóm</p>
+          <ul>
+            {related.map((a) => (
+              <li key={a.slug}>
+                <Link href={`/apps/${a.slug}`}>{a.name}</Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -35,7 +97,11 @@ function Card({ card }: { card: AboutCard }) {
   return (
     <li>
       {card.media && <Media name={card.media} />}
-      {card.tag && <span className="about-tag">{card.tag}</span>}
+      {card.tag && (
+        <span className="about-tag" data-tone={card.tag === 'Nên' ? 'do' : card.tag === 'Không nên' ? 'dont' : undefined}>
+          {card.tag}
+        </span>
+      )}
       <h4>{card.title}</h4>
       <p>
         {card.text}
@@ -120,7 +186,9 @@ function Block({ block, models }: { block: AboutBlock; models?: SpecModel[] }) {
             {rows.map((r) => (
               <tr key={r.join()}>
                 {r.map((c, i) => (
-                  <td key={i}>{c}</td>
+                  <td key={i} data-label={head![i]}>
+                    {c}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -149,7 +217,7 @@ function Block({ block, models }: { block: AboutBlock; models?: SpecModel[] }) {
     );
   if ('ratios' in block)
     return (
-      <ul className="about-ratios">
+      <ul className="about-ratios" data-count={block.ratios.length}>
         {block.ratios.map(([ratio, text]) => (
           <li key={ratio}>
             <span className="about-ratio-shape" data-auto={ratio === 'auto' || undefined} style={ratio === 'auto' ? undefined : { aspectRatio: ratio.replace(':', ' / ') }} aria-hidden="true" />
@@ -183,17 +251,26 @@ function Block({ block, models }: { block: AboutBlock; models?: SpecModel[] }) {
 
 /** `page` names a tool's page (ABOUT) and `app` an app's slug (APP_ABOUT); the page data (a large module) loads when the tab first opens.
  * `models`: the Create form's loaded model list, which family cards build their spec lines from. */
-export function About({ page: key, app, long = false, models }: { page?: keyof typeof ABOUT; app?: string; long?: boolean; models?: SpecModel[] }) {
+export function About({ page: key, app, long = false, models }: { page?: AboutKey; app?: string; long?: boolean; models?: SpecModel[] }) {
   const [content, setContent] = useState<typeof import('@/lib/about-content')>();
   useEffect(() => {
     void import('@/lib/about-content').then(setContent);
   }, []);
+  const updated = usePageUpdate(aboutPath(key, app));
   const page = key ? content?.ABOUT[key] : app ? content?.APP_ABOUT[app] : undefined;
   if (!page) return null;
   return (
     <article className={long ? 'about about-long' : 'about'}>
       <h2>{page.title}</h2>
       {page.lead && <p className="about-intro">{page.lead}</p>}
+      {updated && (
+        <p className="about-updated">
+          <Link href="/changelog">
+            <Icon name="calendar" />
+            {updatedLabel(updated)}
+          </Link>
+        </p>
+      )}
       {page.video && <Tutorial name={page.video} title={page.title} />}
       {page.sections.map((s) => (
         <section key={s.title}>
@@ -203,6 +280,7 @@ export function About({ page: key, app, long = false, models }: { page?: keyof t
           {s.blocks?.map((b, i) => <Block key={i} block={b} models={models} />)}
         </section>
       ))}
+      <Start app={app} />
     </article>
   );
 }
