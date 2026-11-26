@@ -281,6 +281,7 @@ describe('mailing a closed month to accounting', () => {
       [
         'Creative Video Studio: đã chốt chi phí tháng 2026-08.',
         `Tổng sổ cái: $${Number(closed.totals.ledgerUsd).toFixed(2)}`,
+        'Team đã dùng: $0.00 (miễn phí $0.00)',
         'Team phải trả: $0.00',
         'Đối tác phải trả: $0.00',
         `Phần của công ty: $${Number(closed.totals.companyUsd).toFixed(2)}`,
@@ -384,6 +385,19 @@ describe('the automatic close', () => {
     expect(done).toEqual({ month: '2026-11', did: 'closed', lark: { sent: 1, failed: [] } });
     expect((await billingMonth('2026-11')).closed).toMatchObject({ by: null });
     expect(sent.filter((c) => (c as { url: string }).url.includes('/im/v1/files'))).toHaveLength(1);
+    // A billed month: the teams' use (A 24.75 of which 20 free, B 6 of which 5 free), partners and the company add up to the ledger.
+    const text = sent.map((c) => (c as { body: unknown }).body).filter((b): b is string => typeof b === 'string' && b.includes('"msg_type":"text"'));
+    expect(JSON.parse(JSON.parse(text[0]!).content).text).toBe(
+      [
+        'Creative Video Studio: đã chốt chi phí tháng 2026-11.',
+        'Tổng sổ cái: $49.75',
+        'Team đã dùng: $30.75 (miễn phí $25.00)',
+        'Team phải trả: $5.75',
+        'Đối tác phải trả: $2.50',
+        'Phần của công ty: $16.50',
+        'Chi tiết trong tệp CSV gửi kèm.',
+      ].join('\n'),
+    );
     expect((await pool.query(`select actor_id, action from audit_entries where target = 'billing:2026-11' order by id`)).rows).toEqual([
       { actor_id: null, action: 'billing.close' },
       { actor_id: null, action: 'billing.send' },

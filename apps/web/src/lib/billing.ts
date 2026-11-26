@@ -336,12 +336,14 @@ export type CloseMail = { sent: number; failed: string[] } | 'off';
 
 const dollars = (usd: string) => `$${Number(usd).toFixed(2)}`;
 
-/** The short text of the close mail, for accounting to read before the CSV. */
+/** The short text of the close mail, for accounting to read before the CSV. Teams' use, partners and the company add up to the ledger. */
 function closeSummary(m: BillingMonth): string {
   const teamsPayable = fmt(sum(m.teams.map((t) => units(t.payableUsd))));
+  const teamsFree = fmt(sum(m.teams.map((t) => units(t.usedUsd))));
   return [
     `Creative Video Studio: đã chốt chi phí tháng ${m.month}.`,
     `Tổng sổ cái: ${dollars(m.totals.ledgerUsd)}`,
+    `Team đã dùng: ${dollars(m.totals.teamsUsd)} (miễn phí ${dollars(teamsFree)})`,
     `Team phải trả: ${dollars(teamsPayable)}`,
     `Đối tác phải trả: ${dollars(m.totals.partnersUsd)}`,
     `Phần của công ty: ${dollars(m.totals.companyUsd)}`,
