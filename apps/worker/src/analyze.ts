@@ -46,22 +46,25 @@ export const reaAnalyzeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean
 //   detector's cuts); --lang en: English report/summary/prompts (the UI
 // localizes only the format label, and the provider prompts must be English). Not relying on host rea-video
 // prefs keeps the invocation self-contained.
-// --workers 5: run the per-shot VLM calls 5 at a time (rea-video's default is 3). Measured on a 57s/720p clip:
-//   3 workers = 847 MB / 6:16, 8 workers = 2.0 GB / 3:50; 5 is the balance that halves nothing but shaves the
-//   wall time to ~4.5 min while staying ~1.3 GB, under the worker's 2G MemoryMax (deploy/linux/cvs-worker.service).
+// --workers 3: run the per-shot VLM calls 3 at a time (rea-video's default). On ac47077, 5 workers kept a 57s/720p clip at ~1.3 GB;
+//   c11f1bd needs more per worker: on prod (57.7s clip, 2026-11-26) 5 workers peaked at 1.8 GB / 6:55, 5 + --no-packaging at
+//   1.6 GB / 6:25, and 3 + --no-packaging at 1.3 GB / 8:03, the only one leaving room for Node under the worker's 2G MemoryMax
+//   (deploy/linux/cvs-worker.service).
 // --max-vlm-shots 40: bound the VLM spend and time on a pathologically long video (default 60); the busiest real
 //   clip measured was 27 shots, and rea-video spends the budget on the least-certain shots first.
 // --no-stems --no-speakers: ac47077 separates vocals/music and diarizes speakers by default, which nothing here reads; the
 //   stems pass alone was OOM-killed at 2G on prod (50s/720p clip, 2026-11-19). Without both: 898 MB peak / 4.5 min, survey on.
 //   The flags are unknown to earlier rea-video, so the host's install must be ac47077 or later.
 // --no-moments: from c11f1bd, --vlm also hunts "special moments" (magic reveals, twists, goofs) by default, 3-5 more VLM calls that
-//   nothing here reads. Unknown to ac47077, so the host's install must be c11f1bd or later.
+//   nothing here reads. --no-packaging: skips c11f1bd's editing layer (subtitle timeline, styled text, stickers, sound-effect
+//   cue points), which nothing here reads either.
+//   Both are unknown to ac47077, so the host's install must be c11f1bd or later.
 // Killed a minute before the queue's expiry (at once when the job's signal aborts), so a hung rea-video cannot hold the one analysis slot.
 const DECOMPOSE_TIMEOUT_MS = ANALYZE_QUEUE_OPTIONS.expireInSeconds * 1000 - 60_000;
 const realDecompose = async (video: string, outDir: string, env: Record<string, string>, signal?: AbortSignal): Promise<void> => {
   await run(
     process.env.REA_VIDEO_BIN || 'rea-video',
-    ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en', '--workers', '5', '--max-vlm-shots', '40', '--no-stems', '--no-speakers', '--no-moments'],
+    ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en', '--workers', '3', '--max-vlm-shots', '40', '--no-stems', '--no-speakers', '--no-moments', '--no-packaging'],
     { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024, timeout: DECOMPOSE_TIMEOUT_MS, killSignal: 'SIGKILL', signal },
   );
 };
