@@ -12,7 +12,7 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 
 const { auth, pool } = await import('@/lib/auth');
-const { billedRows, billingMonth } = await import('@/lib/billing');
+const { autoCloseLastMonth, billedRows, billingMonth, reopenMonth } = await import('@/lib/billing');
 const { parseCsv } = await import('@/lib/csv');
 const { GET: BILLING } = await import('./route');
 const { GET: CSV } = await import('./csv/route');
@@ -337,6 +337,74 @@ describe('mailing a closed month to accounting', () => {
     await close('2026-03');
     expect(seen.filter((c) => c.url.startsWith('/im/v1/files'))).toHaveLength(2);
     await reopen('2026-03');
+  });
+});
+
+describe('the automatic close', () => {
+  // `now` is passed in, so these run in 2026-11 itself: the month closed is 2026-11, the first one billed, which is "past" only for an `at` of December.
+  const at = (iso: string) => new Date(iso);
+  /** The previous month as if never closed: no snapshot and no `billing.close` audit row. */
+  const forget = async () => {
+    await pool.query(`delete from billing_month_closes where month = '2026-11'`);
+    await pool.query(`delete from audit_entries where target = 'billing:2026-11'`);
+  };
+  let sent: unknown[];
+  const larkOn = () => {
+    sent = [];
+    process.env.LARK_APP_ID = 'cli_x';
+    process.env.LARK_APP_SECRET = 's';
+    process.env.FAL_ALERT_LARK_TO = 'a@vet.test';
+    vi.stubGlobal('fetch', async (url: string | URL | Request, init?: RequestInit) => {
+      sent.push({ url: String(url), body: init?.body });
+      return new Response(JSON.stringify({ code: 0, msg: 'ok', tenant_access_token: 't-1', data: { file_key: 'file_v2_x' } }));
+    });
+  };
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    for (const k of ['LARK_APP_ID', 'LARK_APP_SECRET', 'FAL_ALERT_LARK_TO']) delete process.env[k];
+    await forget();
+  });
+
+  test('waits for 08:00 ICT on day 1 and for nothing else', async () => {
+    larkOn();
+    expect(await autoCloseLastMonth(at('2026-12-01T07:59:59+07:00'))).toEqual({ month: '2026-11', did: 'early' });
+    expect(await autoCloseLastMonth(at('2026-11-30T23:00:00Z'))).toEqual({ month: '2026-11', did: 'early' }); // 06:00 ICT on 1 December
+    expect((await billingMonth('2026-11')).closed).toBeNull();
+    expect(sent).toEqual([]);
+  });
+
+  test('does nothing for a month before the billing start', async () => {
+    expect(await autoCloseLastMonth(at('2026-11-01T09:00:00+07:00'))).toEqual({ month: '2026-10', did: 'before-start' });
+    expect((await billingMonth('2026-10')).closed).toBeNull();
+  });
+
+  test('closes the previous month from 08:00 on day 1, as the system, and mails it once', async () => {
+    larkOn();
+    const done = await autoCloseLastMonth(at('2026-12-01T08:00:00+07:00'));
+    expect(done).toEqual({ month: '2026-11', did: 'closed', lark: { sent: 1, failed: [] } });
+    expect((await billingMonth('2026-11')).closed).toMatchObject({ by: null });
+    expect(sent.filter((c) => (c as { url: string }).url.includes('/im/v1/files'))).toHaveLength(1);
+    expect((await pool.query(`select actor_id, action from audit_entries where target = 'billing:2026-11' order by id`)).rows).toEqual([
+      { actor_id: null, action: 'billing.close' },
+      { actor_id: null, action: 'billing.send' },
+    ]);
+    // Every later hour finds it closed: no second close, no second mail.
+    expect(await autoCloseLastMonth(at('2026-12-01T09:00:00+07:00'))).toEqual({ month: '2026-11', did: 'already' });
+    expect(sent.filter((c) => (c as { url: string }).url.includes('/im/v1/files'))).toHaveLength(1);
+  });
+
+  test('a month an Admin reopened stays open', async () => {
+    larkOn();
+    await autoCloseLastMonth(at('2026-12-01T08:00:00+07:00'));
+    expect(await reopenMonth('2026-11', admin.id)).toBe(true);
+    expect(await autoCloseLastMonth(at('2026-12-01T10:00:00+07:00'))).toEqual({ month: '2026-11', did: 'already' });
+    expect(await autoCloseLastMonth(at('2026-12-02T10:00:00+07:00'))).toEqual({ month: '2026-11', did: 'already' });
+    expect((await billingMonth('2026-11')).closed).toBeNull();
+  });
+
+  test('closes later in the month when the server missed 08:00, and closes without Lark', async () => {
+    expect(await autoCloseLastMonth(at('2026-12-20T03:00:00+07:00'))).toEqual({ month: '2026-11', did: 'closed', lark: 'off' });
+    expect((await billingMonth('2026-11')).closed).toMatchObject({ by: null });
   });
 });
 

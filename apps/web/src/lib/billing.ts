@@ -245,11 +245,11 @@ export async function billingMonth(requested: string | null): Promise<BillingMon
   });
 }
 
-/** Freezes a past month's figures (audited `billing.close`). `open` for this month or a later one, `closed` when it already is. */
-export async function closeMonth(month: string, actorId: string): Promise<'ok' | 'open' | 'closed'> {
+/** Freezes a past month's figures (audited `billing.close`; a null actor is the system). `open` for the month of `now` or a later one, `closed` when it already is. */
+export async function closeMonth(month: string, actorId: string | null, now = new Date()): Promise<'ok' | 'open' | 'closed'> {
   return withTransaction(pool, async (tx) => {
     await tx.query('set transaction isolation level repeatable read');
-    if (!((await tx.query(`select $1 < ${THIS_MONTH} as past`, [month])).rows[0].past as boolean)) return 'open';
+    if (!((await tx.query(`select $1 < to_char($2::timestamptz at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as past`, [month, now])).rows[0].past as boolean)) return 'open';
     const m = await liveMonth(tx, month);
     const buckets = [...m.teams, ...m.partners, ...m.company.reasons];
     const { rowCount } = await tx.query(
@@ -353,7 +353,7 @@ function closeSummary(m: BillingMonth): string {
  * After a close has committed: sends the people in FAL_ALERT_LARK_TO, from the CVS Lark bot, the summary and the month's CSV (the same content as
  * `billingCsv`), and audits the outcome (`billing.send`). Best effort: nothing here throws, so the close stays whatever Lark does.
  */
-export async function mailClose(month: string, actorId: string, env: NodeJS.ProcessEnv = process.env, f: Fetch = fetch): Promise<CloseMail> {
+export async function mailClose(month: string, actorId: string | null, env: NodeJS.ProcessEnv = process.env, f: Fetch = fetch): Promise<CloseMail> {
   const app = larkApp(env);
   const to = larkRecipients(env);
   let outcome: CloseMail = 'off';
@@ -372,4 +372,22 @@ export async function mailClose(month: string, actorId: string, env: NodeJS.Proc
   }
   await audit(pool, { actorId, action: 'billing.send', target: `billing:${month}`, newValue: outcome }).catch((e) => console.error('billing: close mail audit:', e instanceof Error ? e.message : e));
   return outcome;
+}
+
+/** What `autoCloseLastMonth` did for the previous ICT month: waited for 08:00, skipped it (before the billing start or closed before), or closed it. */
+export type AutoClose = { month: string; did: 'early' | 'before-start' | 'already' | 'open' | 'closed'; lark?: CloseMail };
+
+/**
+ * The automatic close (owner decision 2026-11-26): from 08:00 ICT on day 1 the previous ICT month is closed by the system and mailed like a manual close.
+ * It runs again later in the month if the server was down at 08:00. A month that has ever been closed is left alone, so one an Admin reopened stays open.
+ */
+export async function autoCloseLastMonth(now = new Date()): Promise<AutoClose> {
+  const ict = new Date(now.getTime() + 7 * 3_600_000); // ICT has no daylight saving: UTC+7 all year
+  const month = new Date(Date.UTC(ict.getUTCFullYear(), ict.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+  if (ict.getUTCDate() === 1 && ict.getUTCHours() < 8) return { month, did: 'early' };
+  if (month < BILLING_START_MONTH) return { month, did: 'before-start' };
+  if ((await pool.query(`select 1 from audit_entries where action = 'billing.close' and target = $1 limit 1`, [`billing:${month}`])).rowCount) return { month, did: 'already' };
+  const done = await closeMonth(month, null, now);
+  if (done !== 'ok') return { month, did: done === 'open' ? 'open' : 'already' };
+  return { month, did: 'closed', lark: await mailClose(month, null) };
 }
