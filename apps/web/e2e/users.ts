@@ -212,6 +212,8 @@ export const USERS = {
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
   // a11y.e2e: one finished clip, so a Library card shows its marks on a phone.
   phonea: { email: 'phonea@e2e.test', name: 'E2E Phone A', role: 'member' },
+  // a11y.e2e: one image result, so History shows its prompt tools and the Library its select boxes.
+  tapa: { email: 'tapa@e2e.test', name: 'E2E Tap A', role: 'member' },
   // drag-photo.e2e: History photos dragged onto a form slot, one member per page.
   draga: { email: 'draga@e2e.test', name: 'E2E Drag A', role: 'member' },
   dragb: { email: 'dragb@e2e.test', name: 'E2E Drag B', role: 'member' },

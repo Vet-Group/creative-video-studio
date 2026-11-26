@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
-import { runViaApi, signIn } from './support.test';
+import { expect, type Locator, test } from '@playwright/test';
+import { openTab, runViaApi, signIn } from './support.test';
 import { USERS } from './users';
 
 // The main pages, in both themes, carry no serious or critical axe violation (the 2026-11-04 accessibility pass).
@@ -77,6 +77,47 @@ test('the small text buttons on a form take a click across 24 px, and 44 px on a
       }, band / 2 - 1);
       expect(others, `${await control.textContent()} at ${width} px`).toEqual([]);
     }
+  }
+});
+
+// WCAG 2.5.8 for the standalone controls drawn under 24 px (a prod audit, 2026-11-26): from its middle, each answers a click across 24 px both ways,
+// itself or through the label around a checkbox (1 px off for rounding, as in the touch sweep below). The size slider shows from 1024 px only.
+test('the tool hint link, the prompt tools, the select boxes, "Chỉ của tôi" and the size slider take a click across 24 x 24 px', async ({ page }) => {
+  await signIn(page, 'tapa');
+  const prompt = 'a linen shirt folded on a wooden table in soft morning window light, a calm mood, close on the collar stitching';
+  const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt, enhance: false, params: { resolution: '1K' } } });
+  expect(res.status()).toBe(201);
+  await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs[0]?.status, { timeout: 60_000 }).toBe('succeeded');
+  const takes = (control: Locator) =>
+    control.evaluate(async (el) => {
+      const target = (el.matches('[type=checkbox]') && el.closest('label')) || el;
+      target.scrollIntoView({ block: 'center', behavior: 'instant' });
+      await new Promise(requestAnimationFrame);
+      const r = target.getBoundingClientRect();
+      const [x, y] = [r.left + r.width / 2, r.top + r.height / 2];
+      const reach = (sx: number, sy: number) => { let n = 0; while (n < 30 && target.contains(document.elementFromPoint(x + sx * (n + 1), y + sy * (n + 1)))) n++; return n; };
+      return [reach(-1, 0) + reach(1, 0) + 1, reach(0, -1) + reach(0, 1) + 1];
+    });
+  for (const [width, height] of [[390, 844], [1440, 900]] as const) {
+    await page.setViewportSize({ width, height });
+    const check = async (control: Locator, name: string) => {
+      const [w, h] = await takes(control);
+      expect.soft(Math.min(w!, h!), `${name} at ${width} px takes ${w}x${h}`).toBeGreaterThanOrEqual(23); // soft: one run lists every miss
+    };
+    await page.goto('/try-on');
+    await check(page.locator('.tool-hint').getByRole('button', { name: 'So sánh các công cụ' }), 'the tool hint link');
+    await page.goto('/image-generation');
+    await openTab(page, 'Lịch sử');
+    const tools = page.locator('.job-prompt-tools button');
+    await expect(tools.getByText('Dịch', { exact: true })).toBeVisible(); // an English prompt: copy and translate at least
+    for (const tool of await tools.all()) await check(tool, `${await tool.textContent()}`);
+    await page.goto('/library');
+    await page.getByRole('button', { name: 'Chọn', exact: true }).click(); // the select mode shows every box
+    await check(page.getByRole('checkbox', { name: /^Chọn tất cả 1 mục ngày / }), 'the day box');
+    await check(page.getByRole('checkbox', { name: /^Chọn Tạo ảnh/ }), 'the card box');
+    if (width >= 1024) await check(page.getByLabel('Cỡ ô'), 'the size slider');
+    await page.goto('/feedback');
+    await check(page.getByLabel('Chỉ của tôi'), '"Chỉ của tôi"');
   }
 });
 
