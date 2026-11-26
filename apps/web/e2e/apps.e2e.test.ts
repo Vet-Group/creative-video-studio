@@ -479,8 +479,8 @@ test("an app's card art tops its About and fills its empty History; an app witho
   await expect(empty.getByRole('button', { name: 'Bắt đầu ngay' })).toBeVisible();
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
-    // The colours a theme switch fades (the current nav item's background, for one) settle before axe reads them.
-    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => {}))));
+    // The colours a theme switch fades (the current nav item's background, for one) and the History panel's fade-in settle before axe reads them.
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a instanceof CSSTransition || (a instanceof CSSAnimation && a.animationName === 'panel-in')).map((a) => a.finished.catch(() => {}))));
     expect((await new AxeBuilder({ page }).exclude('nextjs-portal').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]); // as e2e/a11y
   }
 
@@ -665,7 +665,6 @@ for (const [width, height, columns] of [[390, 844, 2], [1024, 768, 2], [1440, 10
       heads.add(Math.round((await page.locator('.app-head').boundingBox())!.height));
       for (const tab of await page.getByRole('tab').all()) {
         await tab.click();
-        await expect(tab).toHaveAttribute('aria-selected', 'true'); // a switch lands after its cross-fade's first snapshot, a frame later
         expect(await fits(page), `${slug} ${await tab.textContent()}`).toBe(true);
       }
     }

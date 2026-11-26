@@ -43,7 +43,7 @@ test('an About ends on a way back to the form, the Tạo tab on a phone and the 
   await expect(page.locator('.about-tag[data-tone="dont"]').first()).toHaveText('Không nên');
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
-    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => {}))));
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a instanceof CSSTransition || (a instanceof CSSAnimation && a.animationName === 'panel-in')).map((a) => a.finished.catch(() => {}))));
     expect((await new AxeBuilder({ page }).include('article.about').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
   }
 });

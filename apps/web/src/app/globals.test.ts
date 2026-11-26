@@ -115,13 +115,13 @@ test('dialog and toast entrances and the press scale play only under no-preferen
   expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.runbar button\.primary\.run \{ transition: none; \} \}/);
 });
 
-// A view transition holds every click until it ends, so a tab switch's cross-fade (WorkTabs) is as short as the fast token, and only under no-preference.
-test('the view transition pseudo-elements run at the fast duration, inside the no-preference block only', () => {
+// A tool page's tab panel fades in as it shows: opacity only, so it never holds the switch, a click or the layout, and only under no-preference.
+test('a shown tab panel fades in at the fast duration, opacity only, inside the no-preference block only', () => {
   const css = stripComments(readFileSync(new URL('./globals.css', import.meta.url), 'utf8'));
   const motion = blockOf(css, '@media (prefers-reduced-motion: no-preference) {\n  button, .button');
-  expect(motion).toContain('::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: var(--dur-fast); }');
-  expect(css.replace(motion, '')).not.toContain('::view-transition');
-  expect(css).toMatch(/--dur-fast: 150ms;/);
+  expect(motion).toContain(":where([role='tabpanel'] > :not(dialog)) { animation: panel-in var(--dur-fast) ease-out; }");
+  expect(css.replace(motion, '')).not.toContain('panel-in var(');
+  expect(css).toMatch(/^@keyframes panel-in \{ from \{ opacity: 0; \} \}$/m);
 });
 
 const toHex = (v: string) => {

@@ -65,6 +65,8 @@ for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     const { card } = await holdRunning(page);
     await expect(card.getByText('Thường mất khoảng 2 phút')).toBeVisible();
+    // The History panel fades in after its tab, and axe would read the half-faded text as low contrast.
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a instanceof CSSAnimation && a.animationName === 'panel-in').map((a) => a.finished.catch(() => {}))));
     const serious = (await new AxeBuilder({ page }).exclude('nextjs-portal').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     expect(serious.map((v) => v.id)).toEqual([]);
   });
