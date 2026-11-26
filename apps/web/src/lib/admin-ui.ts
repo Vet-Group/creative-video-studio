@@ -57,8 +57,9 @@ const REFUSALS: Record<string, string> = {
 export const auditNewValue = (action: string, v: unknown): unknown =>
   action === 'workspace.member_refused' && v && typeof v === 'object' ? { ...v, reason: REFUSALS[(v as { reason: string }).reason] ?? (v as { reason: string }).reason } : v;
 
-/** An entry's target as an Admin reads it in the Overview: a sample's file name without the `sample:` prefix and the extension. */
-export const auditTarget = (target: string): string => (target.startsWith('sample:') ? target.slice('sample:'.length).replace(/\.[a-z0-9]+$/i, '') : target);
+/** An entry's target as an Admin reads it in the Overview: a sample's file name without the `sample:` prefix and the extension, a UUID cut to its first 8 characters. */
+export const auditTarget = (target: string): string =>
+  target.startsWith('sample:') ? target.slice('sample:'.length).replace(/\.[a-z0-9]+$/i, '') : target.replace(/^([a-z_]+:[0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, '$1');
 
 /**
  * Collapses a run of consecutive entries (newest first) with the same action by the same actor, each within `gapMs` of the one before it, into the

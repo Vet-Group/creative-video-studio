@@ -19,8 +19,16 @@ export async function adminOverview() {
     pool.query('select count(*) filter (where not banned)::int as active, count(*) filter (where banned)::int as locked from users'),
     pool.query('select count(*) filter (where enabled)::int as enabled, count(*)::int as total from model_configs where twin_of is null'),
     pool.query(
-      `select a.id::int as id, coalesce(u.name, 'Hệ thống') as "actorName", a.action, a.target, a.created_at as "createdAt"
-         from audit_entries a left join users u on u.id = a.actor_id order by a.id desc limit 40`,
+      // The target's name where it is a user, team, store or workspace, so the list does not show their raw ids.
+      `select a.id::int as id, coalesce(u.name, 'Hệ thống') as "actorName", a.action, a.target, a.created_at as "createdAt",
+              coalesce(tu.name, tt.name, ts.name, tw.name) as "targetName"
+         from (select * from audit_entries order by id desc limit 40) a
+         left join users u on u.id = a.actor_id
+         left join users tu on a.target = 'user:' || tu.id
+         left join teams tt on a.target = 'team:' || tt.id
+         left join stores ts on a.target = 'store:' || ts.id
+         left join workspaces tw on a.target = 'workspace:' || tw.id
+        order by a.id desc`,
     ),
     // Who in each sales team uses CVS: their last job or video analysis, and the last trace of their own sign-in (lastUseSql).
     pool.query(
@@ -39,7 +47,7 @@ export async function adminOverview() {
     jobs: { ...today.rows[0], ...running.rows[0] } as { today: number; succeeded: number; failed: number; running: number },
     users: users.rows[0] as { active: number; locked: number },
     models: models.rows[0] as { enabled: number; total: number },
-    audit: audit.rows as { id: number; actorName: string; action: string; target: string; createdAt: string }[],
+    audit: audit.rows as { id: number; actorName: string; action: string; target: string; createdAt: string; targetName: string | null }[],
     sellers: sellers.rows as { id: string; name: string; team: string; lastUsedAt: string | null; lastSeenAt: string | null }[],
   };
 }

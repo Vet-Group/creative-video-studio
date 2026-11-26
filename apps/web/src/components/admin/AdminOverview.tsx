@@ -142,8 +142,8 @@ export function AdminOverview() {
                         {e.count > 1 && ` ×${e.count}`}
                       </code>
                       {e.count === 1 && (
-                        <span className="recent-target" title={e.target}>
-                          {auditTarget(e.target)}
+                        <span className={e.targetName ? 'recent-target recent-name' : 'recent-target'} title={e.target}>
+                          {e.targetName ?? auditTarget(e.target)}
                         </span>
                       )}
                     </li>
