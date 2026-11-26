@@ -8,7 +8,7 @@ import { type AboutBlock, type AboutCard, type SpecModel, withLiveSpecs } from '
 import { type AboutKey, aboutPath, updatedLabel } from '@/lib/about-updated';
 import { relatedApps } from '@/lib/apps';
 import { cardSample } from '@/lib/examples';
-import { useSamples, versionedSample } from '@/lib/use-samples';
+import { samplesPending, useSamples, versionedSample } from '@/lib/use-samples';
 import { usePageUpdate } from './AboutUpdates';
 import { CardMedia } from './CardMedia';
 import { Icon } from './Icon';
@@ -21,7 +21,8 @@ export function Tutorial({ name, title }: { name: string; title: string }) {
   const { video, poster } = cardSample(have, name);
   const ref = useRef<HTMLVideoElement>(null);
   const [started, setStarted] = useState(false);
-  if (!video) return null;
+  // While the sample list loads, the empty 16:9 box keeps the video's place, so the text below does not jump down when the video arrives.
+  if (!video) return samplesPending() ? <figure className="about-video" aria-hidden="true" /> : null;
   const start = () => {
     setStarted(true);
     ref.current?.play().catch(() => {}); // a refused play leaves the controls to start it
