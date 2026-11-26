@@ -3259,6 +3259,13 @@ dialog.modal.compare-two { width: min(1100px, calc(100vw - 32px)); max-width: no
 .rating-actions button { min-height: 40px; margin-top: 0; }
 .rating-block { display: grid; gap: 8px; max-width: 480px; margin: 0 0 16px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); }
 .rating-block h2 { margin: 0; font-size: 1rem; }
+/* The row under a result that just finished spans the whole History card: the question and the later button, then one line of ten scores, on a phone too. */
+.rating-inline { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 480px); gap: 8px; margin: 0; padding: 12px 16px; border-top: 1px solid var(--border); }
+.rating-inline p { margin: 0; }
+.rating-inline-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; line-height: 20px; }
+.rating-inline-head p { font-weight: 600; }
+.rating-inline-head .link-button { flex: none; min-height: 32px; }
+.rating-inline .rating-scores { grid-template-columns: repeat(10, minmax(0, 1fr)); }
 @media (max-width: 639.98px) {
   .rating-card { right: 0; bottom: 0; left: 0; width: auto; padding-bottom: calc(14px + env(safe-area-inset-bottom)); border-bottom: 0; border-radius: 14px 14px 0 0; }
   /* Room under the page while the sheet is up, so its last control (Create's Run button) scrolls clear of the sheet. */

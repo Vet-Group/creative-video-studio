@@ -4,10 +4,11 @@ import { pool } from '@/lib/auth';
 import { isRatingDue, parseRating, RATING_STATE_SQL } from '@/lib/rating';
 import { guard, impersonationRefusal, isImpersonated } from '@/lib/session';
 
-/** Whether the prompt should ask this member for a score now (lib/rating.ts). */
+/** Whether the prompt should ask this member for a score now (lib/rating.ts). Never for an Admin signed in as the member, who could not send it. */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
+  if (isImpersonated(g.session)) return Response.json({ due: false });
   const state = (await pool.query(RATING_STATE_SQL, [g.session.user.id])).rows[0];
   return Response.json({ due: isRatingDue(state) });
 }

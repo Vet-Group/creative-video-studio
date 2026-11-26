@@ -32,7 +32,7 @@ import { EmptyArt } from './EmptyArt';
 import { Icon, type IconName } from './Icon';
 import { ImageToolButtons } from './ImageToolButtons';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
-import { RatingPrompt } from './Rating';
+import { InlineRating, RatingPrompt } from './Rating';
 import { Select } from './Select';
 import { useSmartRemakeEnabled } from './SmartRemakeGate';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
@@ -469,6 +469,7 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
           </div>
         )}
       </div>
+      <InlineRating job={job} />
       {savable && <SaveTemplateDialog open={saving !== null} onClose={() => setSaving(null)} onSave={saveTemplate} canShare={saving?.canShare ?? false} name={cardTitle(job)} />}
     </li>
   );

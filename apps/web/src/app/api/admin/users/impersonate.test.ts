@@ -230,6 +230,19 @@ describe('while signed in as a user', () => {
     expect(row).toEqual({ n: 0, rating_snoozed_until: null });
   });
 
+  test('the satisfaction rating is never due for the Admin, though it is due for the member in their own session', async () => {
+    for (let i = 0; i < 3; i++) {
+      await pool.query(
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, is_mock, workspace_id)
+         values ($1, $2, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', 'video', 'succeeded', false, $3)`,
+        [`rating-due-${i}`, member, COMPANY_WORKSPACE_ID],
+      );
+    }
+    const due = async (c: string) => ((await (await rating.GET(new Request(`${ORIGIN}/api/rating`, { headers: { cookie: c } }))).json()) as { due: boolean }).due;
+    expect(await due(memberCookie)).toBe(true);
+    expect(await due(cookie)).toBe(false);
+  });
+
   test('an impersonated Admin cannot change their own email, password or 2FA, nor unlink their own sign-in methods', async () => {
     expect((await patch(adminCookie, other, { email: 'moved@example.test' })).status).toBe(403);
     expect((await patch(adminCookie, other, { temporaryPassword: 'a-new-temporary-pass' })).status).toBe(403);
