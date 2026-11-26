@@ -8,7 +8,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { KindChip } from '@/components/KindChip';
 import { ToolGuideButton } from '@/components/ToolGuide';
 import { Welcome } from '@/components/Welcome';
-import { MODEL_CARD_TEXT } from '@/lib/about-content';
+import { MODEL_CARD_TEXT } from '@/lib/about-model-cards';
 import { thumbUrl } from '@/lib/api';
 import { pool } from '@/lib/auth';
 import { CHANGELOG } from '@/lib/changelog';

@@ -20,9 +20,9 @@ const TOOLS = [
 
 /** `analyzeEnabled`: the Analyze page is on (the sidebar shows it on the same flag), else its section is left out. */
 export function Tutorials({ analyzeEnabled = false }: { analyzeEnabled?: boolean }) {
-  const [content, setContent] = useState<typeof import('@/lib/about-content')>();
+  const [content, setContent] = useState<{ ABOUT: typeof import('@/lib/about-content').ABOUT; APP_ABOUT: typeof import('@/lib/about-apps').APP_ABOUT }>();
   useEffect(() => {
-    void import('@/lib/about-content').then(setContent);
+    void Promise.all([import('@/lib/about-content'), import('@/lib/about-apps')]).then(([t, a]) => setContent({ ABOUT: t.ABOUT, APP_ABOUT: a.APP_ABOUT }));
   }, []);
   return (
     <article className="about tutorials">

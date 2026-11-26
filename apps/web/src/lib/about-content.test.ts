@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ABOUT, type AboutBlock, type AboutPage, APP_ABOUT, MODEL_CARD_TEXT, withLiveSpecs } from './about-content';
+import { APP_ABOUT } from './about-apps';
+import { ABOUT, type AboutBlock, type AboutPage, withLiveSpecs } from './about-content';
+import { MODEL_CARD_TEXT } from './about-model-cards';
 import { APPS } from './apps';
 import { sampleType } from './samples';
 

@@ -1,10 +1,10 @@
 'use client';
-// The one renderer of every About tab: a page from lib/about-content.ts, laid out like the reference site's About pages (a centred title and lead,
+// The one renderer of every About tab: a page from lib/about-content.ts (tools) or lib/about-apps.ts (apps), laid out like the reference site's About pages (a centred title and lead,
 // then sections of eyebrow, heading and lead with cards, steps, before-and-after pairs, tables, ratio tiles, example prompts and a FAQ).
 // `long` is the app pages' article style: plain headings, numbered steps and points without boxes.
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
-import { type AboutBlock, type AboutCard, type SpecModel, withLiveSpecs } from '@/lib/about-specs';
+import { type AboutBlock, type AboutCard, type AboutPage, type SpecModel, withLiveSpecs } from '@/lib/about-specs';
 import { type AboutKey, aboutPath, updatedLabel } from '@/lib/about-updated';
 import { relatedApps } from '@/lib/apps';
 import { cardSample } from '@/lib/examples';
@@ -253,12 +253,13 @@ function Block({ block, models }: { block: AboutBlock; models?: SpecModel[] }) {
 /** `page` names a tool's page (ABOUT) and `app` an app's slug (APP_ABOUT); the page data (a large module) loads when the tab first opens.
  * `models`: the Create form's loaded model list, which family cards build their spec lines from. */
 export function About({ page: key, app, long = false, models }: { page?: AboutKey; app?: string; long?: boolean; models?: SpecModel[] }) {
-  const [content, setContent] = useState<typeof import('@/lib/about-content')>();
+  // A tool page loads the tools' copy and an app page the apps' copy: each module is about half of the About text.
+  const [page, setPage] = useState<AboutPage>();
   useEffect(() => {
-    void import('@/lib/about-content').then(setContent);
-  }, []);
+    if (key) void import('@/lib/about-content').then((m) => setPage(m.ABOUT[key]));
+    else if (app) void import('@/lib/about-apps').then((m) => setPage(m.APP_ABOUT[app]));
+  }, [key, app]);
   const updated = usePageUpdate(aboutPath(key, app));
-  const page = key ? content?.ABOUT[key] : app ? content?.APP_ABOUT[app] : undefined;
   if (!page) return null;
   return (
     <article className={long ? 'about about-long' : 'about'}>
