@@ -14,8 +14,35 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Push to main only: when the merged PR's head has this exact tree and passed all six shards, the shards below are skipped.
+  # Any doubt (API error, no PR, several commits) leaves skip unset and the shards run. A PR or manual run skips this job.
+  same-tree:
+    name: Same tree already tested
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    outputs:
+      skip: ${{ steps.decide.outputs.skip }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: scripts/ci/same-tree.sh
+
   e2e:
     name: E2E ${{ matrix.shard }}/6
+    needs: same-tree
+    # !cancelled() instead of success(): the shards also run when same-tree failed or was skipped (PR runs), and only skip=true stops them.
+    if: ${{ !cancelled() && needs.same-tree.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
