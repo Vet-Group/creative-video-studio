@@ -108,6 +108,9 @@ export const USERS = {
   libv: { email: 'libv@e2e.test', name: 'E2E Library View', role: 'member' }, // library.e2e: grid or list, the selection bar, search and the empty states
   libd: { email: 'libd@e2e.test', name: 'E2E Library Days', role: 'member' }, // library.e2e: the day headings and their select-all checkbox
   librange: { email: 'librange@e2e.test', name: 'E2E Library Range', role: 'member' }, // library.e2e: Shift-click picks a range
+  // library-boards.e2e: libboard makes, fills, renames and deletes a board; libboardb opens libboard's copied board link and must see the board-not-found state.
+  libboard: { email: 'libboard@e2e.test', name: 'E2E Library Board', role: 'member' },
+  libboardb: { email: 'libboardb@e2e.test', name: 'E2E Library Board B', role: 'member' },
   // library.e2e: libra marks from the detail view and in bulk, librb owns the item libra may read but not mark.
   libra: { email: 'libra@e2e.test', name: 'E2E Library Recipe A', role: 'member' },
   librb: { email: 'librb@e2e.test', name: 'E2E Library Recipe B', role: 'member' },
