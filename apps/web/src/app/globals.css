@@ -518,9 +518,12 @@ dialog.modal.jobs-drawer[open] { animation: jobs-drawer-in .28s cubic-bezier(.2,
 .job-prompt { display: grid; gap: 6px; padding: 10px; border-radius: 10px; background: var(--fill); }
 .job-prompt .job-text { display: -webkit-box; max-height: none; overflow: hidden; color: var(--text-2); font-size: 13px; line-height: 19px; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
 .job-prompt[data-open] .job-text { display: block; max-height: 260px; overflow-y: auto; }
-.job-prompt-tools { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.job-prompt-tools { display: flex; flex-wrap: wrap; gap: 6px 12px; } /* 6 px between wrapped rows, so their 24 px hit areas meet without overlapping */
 .job-prompt-tools button { display: inline-flex; white-space: nowrap; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; cursor: pointer; }
 .job-prompt-tools button:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* WCAG 2.5.8: the 18 px tools take clicks across 24 px; no 44 px band on touch, as the prompt text just above takes taps too. */
+.job-prompt-tools button { position: relative; }
+.job-prompt-tools button::after { content: ''; position: absolute; inset: min(0px, calc((24px - 100%) / -2)); }
 .job-translation { margin-top: 8px; padding: 8px 10px; border-left: 2px solid var(--border-strong); color: var(--text-2); font-size: 13px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; } /* the Translate button's Vietnamese reading, under the tools */
 /* A wait shown as alive (Suggestions.tsx BusyNote): what is happening with a sliding bar under it and the seconds so far; text-like shimmer lines
    hold the room of the words to come. Reduced motion keeps a still bar and still lines. */
@@ -2078,6 +2081,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .zip-check input { width: 18px; height: 18px; margin: 0; }
 .library-size { padding: 0 4px; color: var(--text-subtle); }
 .library-size input { width: 96px; padding: 0; }
+.library-size input[type='range'] { height: 24px; margin: -4px 0; } /* WCAG 2.5.8: a 24 px tall slider (the track stays centred); the margin keeps its 16 px place in the row */
 .library-empty { display: grid; justify-items: center; gap: 4px; padding: 48px 16px; text-align: center; }
 .library-art { margin: 0 0 12px; }
 .library-art .art-back { fill: var(--surface-2); stroke: var(--border); }
@@ -2839,6 +2843,9 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .tool-hint-else a, .tool-hint .link-button { color: var(--ink-strong); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 .tool-hint .link-button { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
 .tool-hint .link-button .icon { display: none; }
+/* WCAG 2.5.8: a 24 px hit area that grows down into the hint's padding only, as the link always ends its last line, under any wrapped links. */
+.tool-hint .link-button { position: relative; }
+.tool-hint .link-button::after { content: ''; position: absolute; inset: 0 0 min(0px, calc(100% - 24px)); }
 .tool-hint-close { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); }
 .tool-hint-close:hover { background: var(--surface); color: var(--ink); }
 .tool-hint-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin: 0 0 12px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font-size: 12px; line-height: 18px; font-weight: 500; }
