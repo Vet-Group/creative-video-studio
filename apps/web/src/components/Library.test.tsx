@@ -175,6 +175,24 @@ test('the filters of the address are what the server renders and the first clien
   for (const chip of ['Tìm: áo dài', 'Người tạo: u1', 'Cửa hàng: Không gắn cửa hàng', 'Tỉ lệ: 1:1']) expect(html, chip).toContain(chip);
 });
 
+test('with no board the Library renders no Bảng control, and a ?board= link renders the field and its chip', async () => {
+  const html = renderToStaticMarkup(<Library />);
+  expect(html).not.toContain('<span>Bảng</span>');
+  expect(html).not.toContain('Bảng:');
+  const opened = renderToStaticMarkup(<Library initialFilters={filtersFromSearch({ board: 'b1' })} />);
+  expect(opened).toContain('<span>Bảng</span>'); // the field shows while the boards load, so the link's own filter is visible
+  expect(opened).toMatch(/<span>Bảng<\/span><span aria-hidden="true">×<\/span>/); // the chip, which reads just the word until the boards are known
+  expect(renderToStaticMarkup(await LibraryPage({ searchParams: Promise.resolve({ board: 'b1' }) }))).toBe(opened);
+});
+
+test('the detail offers the Bảng button only to a page that passes the boards (the History and curated mounts do not)', () => {
+  const boards = { boards: [{ id: 'b1', name: 'Tết 2027', count: 2 }], failed: false, reload: async () => undefined, create: async () => ({ id: 'b2', name: 'x', count: 0 }), rename: async () => undefined, remove: async () => undefined, setItems: async () => undefined };
+  const withBoards = (c: Clip) => renderToStaticMarkup(<ClipDetail clips={[c]} index={0} admin={false} boards={boards} onIndex={() => undefined} onChange={() => undefined} />);
+  expect(detail(sample)).not.toMatch(/>Bảng/);
+  expect(withBoards(sample)).toMatch(/aria-haspopup="dialog">.*?Bảng<\/button>/);
+  expect(withBoards({ ...sample, boardIds: ['b1'] })).toMatch(/aria-haspopup="dialog">.*?Bảng \(1\)<\/button>/);
+});
+
 test('without a query the Library renders no filter and a repeated key counts once', async () => {
   expect(renderToStaticMarkup(await LibraryPage({ searchParams: Promise.resolve({}) }))).toBe(renderToStaticMarkup(<Library />));
   expect(filtersFromSearch({ kind: ['video', 'images'], days: undefined })).toMatchObject({ kind: 'video', days: '' });

@@ -44,11 +44,12 @@ Root rows carry it; children are reached through their parent.
 | `user_templates`, `user_choices` | NOT NULL, FK | "Company" templates and hooks (`is_company`) become the workspace's. |
 | `fashion_models` | NOT NULL, FK | `shared` means shared inside the workspace. |
 | `products` | NOT NULL, FK | A member's saved product (a name and 2 to 4 of their own photos): private to its owner, no sharing and no Admin bypass. |
+| `library_boards` | NOT NULL, FK | A member's named set of Library results: private to its owner, no sharing and no Admin bypass. |
 | `stores` | NOT NULL, FK | A store belongs to one workspace; `user_stores`, brand kits and store-scoped templates follow it. An Admin creates a partner's stores in its workspace. |
 | `feedback` | NOT NULL, FK | Each workspace has its own board (see the exception above). |
 | `preset_proposals` | NOT NULL, FK | Proposing to the shared preset catalog is company-only: refused outside `ws_vet`. |
 | `cost_entries` | NOT NULL, FK | The ledger is append-only (an update trigger refuses changes), so the column arrives with its constant default and is never updated: shared and invoice rows stay `ws_vet` (the company pays them), new rows copy their parent's workspace. |
-| `examples`, `favorites`, `verdicts`, `ratings`, `feedback_*`, `audit_entries` | via parent / none | Reached through their job, user or feedback item; the audit log stays Admin-only and instance-wide. |
+| `examples`, `favorites`, `library_board_items`, `verdicts`, `ratings`, `feedback_*`, `audit_entries` | via parent / none | Reached through their job, user or feedback item; the audit log stays Admin-only and instance-wide. |
 | `presets`, `model_configs`, `feature_caps`, `settings`, `monthly_rates`, `provider_invoices`, `vertex_accounts`, `worker_heartbeat`, `teams` | none | Instance-wide catalog and operations. `teams` stays the company's cost-centre label; a partner's users keep the unassigned team. |
 | `users`, `accounts`, `sessions`, `passkeys`, `two_factors`, `verifications` | none | Identity is instance-wide; membership grants data. |
 
@@ -121,7 +122,7 @@ Cross-user reads:
 The caller's own rows (each must also match the active workspace):
 - Uploads picker `/api/assets` GET, `keptInputs` (`packages/db/src/assets.ts`), `/api/assets/copy`, `/api/assets/finalize-video`, `/api/assets/samples`.
 - `/api/jobs` POST end-frame, audio and video checks, retry and rerun; `/api/jobs` GET (History).
-- `/api/recall`, `/api/recent-prompts`, `/api/templates` (own), `/api/choices` (own), `/api/fashion-models` (own), `/api/products` and `/api/products/[id]` (own only: the shelf's list, add, change and delete), `/api/analyses` (own), `/api/remakes` (own), `/api/suggestions/[id]`, `/api/feedback` POST (photos), `/api/rating`.
+- `/api/recall`, `/api/recent-prompts`, `/api/templates` (own), `/api/choices` (own), `/api/fashion-models` (own), `/api/products` and `/api/products/[id]` (own only: the shelf's list, add, change and delete), `/api/library/boards`, `/api/library/boards/[id]` and `/api/library/boards/[id]/items` (own only: the boards' list, add, rename, delete and the items on one), `/api/analyses` (own), `/api/remakes` (own), `/api/suggestions/[id]`, `/api/feedback` POST (photos), `/api/rating`.
 
 Worker and core (`apps/worker/src`, `packages/core/src`):
 - Output and poster assets (`worker.ts`), previews (`preview.ts`), remake outputs (`remake.ts`) take the parent's workspace.

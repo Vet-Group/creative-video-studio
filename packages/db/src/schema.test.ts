@@ -1214,3 +1214,41 @@ describe('migration 0121 products', () => {
     expect((await pool.query(`select 1 from products where id = 'p-s'`)).rowCount).toBe(0);
   });
 });
+
+describe('migration 0122 library boards', () => {
+  let owner = '';
+  let other = '';
+  const make = (id: string, name: string, user = owner, workspace = 'ws_vet') =>
+    pool.query(`insert into library_boards (id, user_id, workspace_id, name) values ($1, $2, $3, $4)`, [id, user, workspace, name]);
+
+  beforeAll(async () => {
+    owner = await insertUser();
+    other = await insertUser();
+    await pool.query(`insert into workspaces (id, name) values ('ws_0122', 'Partner 0122')`);
+  });
+
+  test('keeps the name to 1 to 60 characters: an empty and a 61-character name are refused', async () => {
+    await expect(make('b-empty', '')).rejects.toThrow(/library_boards_name_check/);
+    await expect(make('b-61', 'x'.repeat(61))).rejects.toThrow(/library_boards_name_check/);
+    await make('b-60', 'x'.repeat(60));
+  });
+
+  test('a second name that differs only in case is refused for the same member and workspace, and accepted for another member or in another workspace', async () => {
+    await make('b-u1', 'TẾT 2027');
+    await expect(make('b-u2', 'tết 2027')).rejects.toThrow(/library_boards_user_name_key/);
+    await make('b-u3', 'TẾT 2027', other);
+    await make('b-u4', 'TẾT 2027', owner, 'ws_0122');
+  });
+
+  test('a deleted board takes its items and leaves the jobs, and a deleted job takes its item', async () => {
+    const user = await insertUser();
+    const [j1, j2] = [await insertJob(user), await insertJob(user)];
+    await make('b-c1', 'Cascade', user);
+    await pool.query(`insert into library_board_items (board_id, job_id) values ('b-c1', $1), ('b-c1', $2)`, [j1, j2]);
+    await pool.query(`delete from jobs where id = $1`, [j1]);
+    expect((await pool.query(`select job_id from library_board_items where board_id = 'b-c1'`)).rows).toEqual([{ job_id: j2 }]);
+    await pool.query(`delete from library_boards where id = 'b-c1'`);
+    expect((await pool.query(`select 1 from library_board_items where board_id = 'b-c1'`)).rowCount).toBe(0);
+    expect((await pool.query(`select 1 from jobs where id = $1`, [j2])).rowCount).toBe(1);
+  });
+});

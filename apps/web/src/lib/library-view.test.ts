@@ -7,8 +7,8 @@ describe('libraryQuery', () => {
   });
 
   it('sends every filter, the trimmed words, the sort and the offset', () => {
-    const q = new URLSearchParams(libraryQuery({ q: '  áo  khoác ', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favoritesOnly: true, examplesOnly: true, suggestedOnly: true, showSystem: true, sort: 'oldest' }, 24));
-    expect(Object.fromEntries(q)).toEqual({ q: 'áo  khoác', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favorites: '1', example: '1', suggested: '1', system: '1', sort: 'oldest', offset: '24' });
+    const q = new URLSearchParams(libraryQuery({ q: '  áo  khoác ', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favoritesOnly: true, board: 'b1', examplesOnly: true, suggestedOnly: true, showSystem: true, sort: 'oldest' }, 24));
+    expect(Object.fromEntries(q)).toEqual({ q: 'áo  khoác', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favorites: '1', board: 'b1', example: '1', suggested: '1', system: '1', sort: 'oldest', offset: '24' });
   });
 
   it('drops blank words', () => {
@@ -22,7 +22,7 @@ describe('filtersFromParams', () => {
   });
 
   it('round-trips every filter through libraryQuery', () => {
-    const f = { q: 'áo khoác', creator: 'u1', store: 'none', date: '2026-10-23', days: '7' as const, ratio: '1:1', kind: 'images', verdict: 'none' as const, favoritesOnly: true, examplesOnly: true, suggestedOnly: true, showSystem: true, sort: 'oldest' as const };
+    const f = { q: 'áo khoác', creator: 'u1', store: 'none', date: '2026-10-23', days: '7' as const, ratio: '1:1', kind: 'images', verdict: 'none' as const, favoritesOnly: true, board: 'b1', examplesOnly: true, suggestedOnly: true, showSystem: true, sort: 'oldest' as const };
     expect(filtersFromParams(new URLSearchParams(libraryQuery(f, 0)))).toEqual(f);
   });
 
@@ -37,6 +37,11 @@ describe('filtersFromParams', () => {
     const p = new URLSearchParams('q=hoa&offset=48&item=abc&days=weird&verdict=bogus&sort=weird');
     expect(filtersFromParams(p)).toEqual({ ...NO_FILTERS, q: 'hoa' });
   });
+
+  it('reads a board only when it looks like an id, so a mangled link opens the whole Library', () => {
+    expect(filtersFromParams(new URLSearchParams('board=3f2a-9c')).board).toBe('3f2a-9c');
+    for (const bad of ['a%20b', 'a/b', 'x'.repeat(65)]) expect(filtersFromParams(new URLSearchParams(`board=${bad}`)).board, bad).toBe('');
+  });
 });
 
 describe('activeFilters', () => {
@@ -45,8 +50,9 @@ describe('activeFilters', () => {
     expect(activeFilters({ ...NO_FILTERS, sort: 'oldest', q: ' ' })).toBe(0);
     expect(activeFilters({ ...NO_FILTERS, kind: 'videos' })).toBe(1);
     expect(activeFilters({ ...NO_FILTERS, verdict: 'fail' })).toBe(1);
-    expect(activeFilters({ q: 'x', creator: 'u1', store: 's1', date: '2026-10-23', days: '30', ratio: '9:16', kind: 'apps', verdict: 'pass', favoritesOnly: true, examplesOnly: true, suggestedOnly: true, showSystem: true, sort: 'newest' })).toBe(11);
+    expect(activeFilters({ q: 'x', creator: 'u1', store: 's1', date: '2026-10-23', days: '30', ratio: '9:16', kind: 'apps', verdict: 'pass', favoritesOnly: true, board: 'b1', examplesOnly: true, suggestedOnly: true, showSystem: true, sort: 'newest' })).toBe(12);
     expect(activeFilters({ ...NO_FILTERS, store: 'none' })).toBe(1);
+    expect(activeFilters({ ...NO_FILTERS, board: 'b1' })).toBe(1);
   });
 });
 
@@ -126,6 +132,14 @@ describe('activeFilterChips', () => {
   });
   it('the store filter for items with no store reads as its option, whatever name is passed', () => {
     expect(activeFilterChips({ ...NO_FILTERS, store: 'none' }, { store: 'x' })).toEqual([{ key: 'store', label: 'Cửa hàng: Không gắn cửa hàng' }]);
+  });
+  it('names the board, or says it is loading or not found, and sits before the creator like its field', () => {
+    expect(activeFilterChips({ ...NO_FILTERS, board: 'b1', creator: 'u1' }, { board: 'Tết 2027', creator: 'An' })).toEqual([
+      { key: 'board', label: 'Bảng: Tết 2027' },
+      { key: 'creator', label: 'Người tạo: An' },
+    ]);
+    expect(activeFilterChips({ ...NO_FILTERS, board: 'b1' }, { board: '' })).toEqual([{ key: 'board', label: 'Bảng' }]);
+    expect(activeFilterChips({ ...NO_FILTERS, board: 'b1' }, { board: undefined })).toEqual([{ key: 'board', label: 'Bảng: không tìm thấy' }]);
   });
   it('a picked date wins over days and reads day/month/year', () => {
     expect(activeFilterChips({ ...NO_FILTERS, date: '2026-11-09', days: '30' })).toEqual([{ key: 'date', label: 'Ngày: 09/11/2026' }]);

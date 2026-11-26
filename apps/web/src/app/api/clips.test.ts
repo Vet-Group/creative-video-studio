@@ -204,7 +204,7 @@ describe('GET /api/library', () => {
     expect(body.clips.find((c) => c.id === a)).toEqual({
       id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt', system: false }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8, lengthSec: null,
       feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, storeName: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', featured: false, markedBy: alice.id },
-      favorite: false, example: false, productType: null, prompt: null, canEdit: false, mine: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
+      favorite: false, boardIds: [], example: false, productType: null, prompt: null, canEdit: false, mine: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
     expect(body.clips.find((c) => c.id === b)).toMatchObject({ isMock: true, costFinal: false, verdict: null, canEdit: true }); // bob is the creator
     expect(body.creators).toEqual(expect.arrayContaining([{ id: alice.id, name: 'Nguyễn Văn Đạt' }, { id: bob.id, name: 'Bob' }]));

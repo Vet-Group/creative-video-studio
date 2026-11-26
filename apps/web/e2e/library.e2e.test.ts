@@ -502,7 +502,7 @@ test('Dùng khung hình này in a video’s detail opens Create video with the f
     const detail = page.getByRole('dialog');
     await expect.poll(() => detail.locator('video').evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2); // a frame is decoded
     // Download and the frame carry their words; the rerun, a new paid job, is the quieter button beside Reuse and names the price the clip cost.
-    await expect(detail.locator('.job-actions .labelled')).toHaveText(['Tải xuống', 'Dùng khung hình']);
+    await expect(detail.locator('.job-actions .labelled')).toHaveText(['Tải xuống', 'Bảng', 'Dùng khung hình']);
     const rerun = detail.getByRole('button', { name: /^Chạy lại · \$\d+\.\d+$/ });
     await expect(rerun).toHaveCSS('background-color', await detail.locator('.lightbox-side').evaluate((e) => getComputedStyle(e).backgroundColor));
     await expect(detail.locator('.lightbox-foot-actions').getByRole('link', { name: 'Dùng lại' })).toBeInViewport({ ratio: 1 });
@@ -542,6 +542,7 @@ test('every Tab stop in a video’s Library detail shows above the pinned marks 
     await p.locator(`article[data-clip-id="${id}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
     const side = p.getByRole('dialog').locator('.lightbox-side');
     await expect(side.getByRole('group', { name: 'Tải theo tỉ lệ khác', exact: true })).toBeAttached();
+    await expect(side.getByText('a clip to tab through', { exact: true })).toBeVisible(); // the recipe has loaded: before it the side is too short to scroll a control clear of the footer
     await side.evaluate((s) => ((s.scrollTop = 0), s.querySelector<HTMLElement>('a[href], button:not(:disabled), select, summary')!.focus()));
     const stops: { name: string; shown: boolean }[] = [];
     for (let i = 0; i < 40; i++) {
