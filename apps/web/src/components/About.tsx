@@ -89,7 +89,7 @@ function Start({ app }: { app?: string }) {
 function Media({ name }: { name: string }) {
   return (
     <span className="about-media">
-      <CardMedia {...cardSample(useSamples(), name)} />
+      <CardMedia {...cardSample(useSamples(), name)} lazy />
     </span>
   );
 }
@@ -151,7 +151,7 @@ function Block({ block, models }: { block: AboutBlock; models?: SpecModel[] }) {
   if ('loop' in block)
     return (
       <span className="about-loop">
-        <CardMedia {...cardSample(useSamples(), block.loop)} />
+        <CardMedia {...cardSample(useSamples(), block.loop)} lazy />
       </span>
     );
   if ('pairs' in block)

@@ -71,14 +71,14 @@ function ItemChecks({ label, items, picked, onChange, single, children }: { labe
 }
 
 /** The picture of an app on a card and in the page header: its sample loop or still, else a tinted tile with the icon of its category. The loop plays under reduced motion too, as on the reference site's Apps pages. */
-export function AppArt({ app, page }: { app: AppConfig; page?: boolean }) {
+export function AppArt({ app, page, lazy }: { app: AppConfig; page?: boolean; lazy?: boolean }) {
   const media = cardSample(useSamples(), `app-${app.slug}`);
   const has = Boolean(media.video || media.poster);
   // On its own page an app with no art shows nothing rather than a bare tile; while the sample list loads, the empty box keeps the art's place, so the About text below does not jump down when the art arrives.
   if (page && !has && !samplesPending()) return null;
   return (
     <span className="app-art" data-category={app.category} data-page={page || undefined} aria-hidden="true">
-      {has ? <CardMedia {...media} /> : !page && <Icon name={CATEGORY_ICON[app.category]} size={36} />}
+      {has ? <CardMedia {...media} lazy={lazy} /> : !page && <Icon name={CATEGORY_ICON[app.category]} size={36} />}
     </span>
   );
 }
