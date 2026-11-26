@@ -45,6 +45,7 @@ Root rows carry it; children are reached through their parent.
 | `fashion_models` | NOT NULL, FK | `shared` means shared inside the workspace. |
 | `products` | NOT NULL, FK | A member's saved product (a name and 2 to 4 of their own photos): private to its owner, no sharing and no Admin bypass. |
 | `library_boards` | NOT NULL, FK | A member's named set of Library results: private to its owner, no sharing and no Admin bypass. |
+| `custom_apps` | NOT NULL, FK | An Admin's one-tap app from a live clip; its fixed inputs and art stay the source job's. Only a global Admin writes, inside the active workspace; another workspace's id answers 404. |
 | `stores` | NOT NULL, FK | A store belongs to one workspace; `user_stores`, brand kits and store-scoped templates follow it. An Admin creates a partner's stores in its workspace. |
 | `feedback` | NOT NULL, FK | Each workspace has its own board (see the exception above). |
 | `preset_proposals` | NOT NULL, FK | Proposing to the shared preset catalog is company-only: refused outside `ws_vet`. |
@@ -117,6 +118,7 @@ Cross-user reads:
 - Stores: `/api/stores`, `/api/stores/[id]` (brand kit), `/api/stores/[id]/pin`; the store check on `/api/jobs` POST (brand kit into the prompt), `/api/assets` POST and `/api/admin/jobs/[id]/store`.
 - Presets: `/api/preset-proposals` (editor queue).
 - Costs: `/api/models` and `/api/image-models` (`creditUsd`), Library clip cost.
+- Custom apps: `/api/admin/apps` and `/api/admin/apps/[id]` (Admin writes, the workspace's rows only), `/api/custom-apps/[id]/run` (a member runs a published app of the active workspace; it composes the body from the row and calls the `/api/jobs` handler), and the `/api/jobs/[id]` DELETE guard (a clip that is an app's source answers 409 `app_source`).
 - Admin: `lib/overview.ts`, `lib/report.ts`, `lib/costs.ts`, `/api/admin/*` (group or label by workspace; no partner content).
 
 The caller's own rows (each must also match the active workspace):
