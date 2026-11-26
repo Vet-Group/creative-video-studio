@@ -50,10 +50,16 @@ test('the Phân tích item appears right after Tạo video only when the analysi
   expect(on.indexOf('Phân tích')).toBe(on.indexOf('Tạo video') + 1);
 });
 
-test('the newest tool Phân tích carries the "Mới" badge, and Marketing Studio no longer does', () => {
-  const items = navGroups(false, 0, true).flatMap((g) => g.items);
-  expect(items.find((i) => i.href === '/analyze')?.badge).toBe('Mới');
-  expect(items.find((i) => i.href === '/marketing-studio')?.badge).toBeUndefined();
+test('Phân tích carries the "Mới" badge for 14 days from its launch (2026-11-12 ICT), then loses it with no release', () => {
+  const badge = (at: string | undefined, href = '/analyze') =>
+    navGroups(false, 0, true, false, at === undefined ? undefined : Date.parse(at))
+      .flatMap((g) => g.items)
+      .find((i) => i.href === href)?.badge;
+  expect(badge('2026-11-12T00:00:00+07:00')).toBe('Mới');
+  expect(badge('2026-11-25T23:59:59+07:00')).toBe('Mới');
+  expect(badge('2026-11-26T00:00:00+07:00')).toBeUndefined();
+  expect(badge(undefined)).toBeUndefined(); // the server's render, without the viewer's clock
+  expect(badge('2026-11-20T00:00:00+07:00', '/marketing-studio')).toBeUndefined(); // no launch day, no badge
 });
 
 test('the feedback item shows its count as a badge (new items for an Admin, updated ones for a member) and none at zero', () => {

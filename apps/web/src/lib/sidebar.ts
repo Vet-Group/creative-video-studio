@@ -1,5 +1,5 @@
 import type { IconName } from '@/components/Icon';
-import { type AppConfig, appBySlug, visibleApps } from './apps';
+import { type AppConfig, appBySlug, isNewApp, visibleApps } from './apps';
 import { toolGuide } from './tool-guide';
 
 /** A cookie, so the server renders the rail already collapsed and the page does not jump on load. Shared by the layout and the Shell. */
@@ -10,6 +10,8 @@ interface NavItem {
   text: string;
   icon: IconName;
   badge?: string;
+  /** The day the page went live (ICT): it carries the "Mới" badge for NEW_DAYS days from then, as a new app's card does (lib/apps.ts isNewApp). */
+  added?: string;
   /** What the tool is for, beside the item on hover or focus and under it in the phone drawer. */
   hint?: string;
 }
@@ -48,23 +50,25 @@ const MEMBERS_ITEM: NavItem = { href: '/members', text: 'Thành viên', icon: 'u
 
 for (const item of GROUPS[1]!.items) item.hint = toolGuide(item.href)!.oneLine;
 
-// The reference-video analysis page (rea-video), shown in the creative group only when REA_ANALYZE_ENABLED is on, as the
-// newest tool so it carries the "new" badge. Its line comes from the guide's ANALYZE_TOOL (kept out of the static
-// TOOL_GUIDE above so the sidebar-mirror test stays exact for the flag-off default).
-const ANALYZE_ITEM: NavItem = { href: '/analyze', text: 'Phân tích', icon: 'chart', badge: 'Mới', hint: toolGuide('/analyze')!.oneLine };
+// The reference-video analysis page (rea-video), shown in the creative group only when REA_ANALYZE_ENABLED is on. Its line
+// comes from the guide's ANALYZE_TOOL (kept out of the static TOOL_GUIDE above so the sidebar-mirror test stays exact for the
+// flag-off default).
+const ANALYZE_ITEM: NavItem = { href: '/analyze', text: 'Phân tích', icon: 'chart', added: '2026-11-12', hint: toolGuide('/analyze')!.oneLine };
 
 /**
  * `feedbackNew`, shown as a badge on the feedback item: for an Admin the count of items still at status `new` to triage, for a member the count of their items the Admin has changed since they last opened them.
  * `members`: the user owns the partner workspace they are in, so the management group lists its Members page.
+ * `now`, the viewer's clock: an item with an `added` day carries the "Mới" badge until NEW_DAYS days after it, so no release has to take it off. Left out
+ * (the server's render) no item does, as on the Apps index.
  */
-export const navGroups = (isAdmin: boolean, feedbackNew = 0, analyzeEnabled = false, members = false): NavGroup[] => {
+export const navGroups = (isAdmin: boolean, feedbackNew = 0, analyzeEnabled = false, members = false, now?: number): NavGroup[] => {
   const groups = GROUPS.map((g) =>
     analyzeEnabled && g.label === 'Sáng tạo' ? { ...g, items: g.items.flatMap((it) => (it.href === '/create' ? [it, ANALYZE_ITEM] : [it])) } : g,
   );
   const manage = [...(members ? [MEMBERS_ITEM] : []), ...(isAdmin ? [ADMIN_ITEM] : [])];
   const base = manage.length ? [...groups, { label: 'Quản lý', items: manage }] : groups;
-  if (feedbackNew <= 0) return base;
-  return base.map((g) => ({ ...g, items: g.items.map((it) => (it.href === '/feedback' ? { ...it, badge: String(feedbackNew) } : it)) }));
+  const badge = (it: NavItem) => (it.href === '/feedback' && feedbackNew > 0 ? String(feedbackNew) : now !== undefined && isNewApp(it, now) ? 'Mới' : undefined);
+  return base.map((g) => ({ ...g, items: g.items.map((it) => ({ ...it, badge: badge(it) })) }));
 };
 
 /** The sidebar's open/closed choice for the Apps sub-list, kept in this browser only. */

@@ -66,8 +66,9 @@ function CopyScript({ text }: { text: string }) {
 
 /** The analysis result, Vietnamese display with each shot's English prompt. Pure, so it render-tests without the page.
  * With `seek` (a source video is beside it) each scene's time is a button that plays the video from there; `activeShot` marks the scene being played.
- * `frames` (one per scene, undefined while still being cut) adds a thumbnail that seeks the same way. */
-export function AnalysisResult({ analysis, seek, activeShot, frames }: { analysis: Analysis; seek?: (sec: number) => void; activeShot?: number | null; frames?: (string | undefined)[] | null }) {
+ * `frames` (one per scene, undefined while still being cut) adds a thumbnail that seeks the same way. `collapsed` keeps the scenes behind a "Xem N cảnh" disclosure
+ * (the Examples tab, where every sample open at once ran several screens long). */
+export function AnalysisResult({ analysis, seek, activeShot, frames, collapsed = false }: { analysis: Analysis; seek?: (sec: number) => void; activeShot?: number | null; frames?: (string | undefined)[] | null; collapsed?: boolean }) {
   // Vietnamese for reading when the worker translated it; the English prompt is still what the "use this prompt" button sends to Create.
   const vi = analysis.vi;
   const scenes = mergeShots(analysis);
@@ -75,32 +76,8 @@ export function AnalysisResult({ analysis, seek, activeShot, frames }: { analysi
   // Detailed prompts run long, so Create's 2000-character box may take only the first scenes: then the button says how many.
   const scripted = script ? script.split('\n').length : 0;
   const withPrompt = scenes.shots.filter((s) => s.prompt).length;
-  return (
-    <div className="analysis-result">
-      <p className="muted">
-        {analysisFormat(analysis)}
-        {analysis.durationS ? ` · ${analysis.durationS.toFixed(1)} giây` : ''} · {scenes.shots.length} cảnh
-      </p>
-      {(vi?.hook || analysis.hook) && (
-        <p>
-          <strong>Mở đầu:</strong> {vi?.hook || analysis.hook}
-        </p>
-      )}
-      {(vi?.summary || analysis.summary) && <p className="muted">{vi?.summary || analysis.summary}</p>}
-      {scenes.shots.length > 0 && (
-        <p className="analysis-script-actions">
-          {script && (
-            <Link
-              className="button"
-              href={`/create?prompt=${encodeURIComponent(script)}`}
-              title={scripted < withPrompt ? `Ô mô tả của Tạo video nhận tối đa 2000 ký tự, đủ cho ${scripted} cảnh đầu` : undefined}
-            >
-              {scripted < withPrompt ? `Dùng ${scripted}/${withPrompt} cảnh đầu` : 'Dùng cả kịch bản'}
-            </Link>
-          )}
-          <CopyScript text={scriptText(analysis)} />
-        </p>
-      )}
+  const list = (
+    <>
       {seek && <p className="help">Bấm giờ của một cảnh để tua video tới đó.</p>}
       <ol className="analysis-shots">
         {scenes.shots.map((s, i) => (
@@ -149,6 +126,42 @@ export function AnalysisResult({ analysis, seek, activeShot, frames }: { analysi
           </li>
         ))}
       </ol>
+    </>
+  );
+  return (
+    <div className="analysis-result">
+      <p className="muted">
+        {analysisFormat(analysis)}
+        {analysis.durationS ? ` · ${analysis.durationS.toFixed(1)} giây` : ''} · {scenes.shots.length} cảnh
+      </p>
+      {(vi?.hook || analysis.hook) && (
+        <p>
+          <strong>Mở đầu:</strong> {vi?.hook || analysis.hook}
+        </p>
+      )}
+      {(vi?.summary || analysis.summary) && <p className="muted">{vi?.summary || analysis.summary}</p>}
+      {scenes.shots.length > 0 && (
+        <p className="analysis-script-actions">
+          {script && (
+            <Link
+              className="button"
+              href={`/create?prompt=${encodeURIComponent(script)}`}
+              title={scripted < withPrompt ? `Ô mô tả của Tạo video nhận tối đa 2000 ký tự, đủ cho ${scripted} cảnh đầu` : undefined}
+            >
+              {scripted < withPrompt ? `Dùng ${scripted}/${withPrompt} cảnh đầu` : 'Dùng cả kịch bản'}
+            </Link>
+          )}
+          <CopyScript text={scriptText(analysis)} />
+        </p>
+      )}
+      {collapsed && scenes.shots.length > 0 ? (
+        <details className="analysis-more">
+          <summary>Xem {scenes.shots.length} cảnh</summary>
+          {list}
+        </details>
+      ) : (
+        list
+      )}
     </div>
   );
 }
@@ -156,7 +169,7 @@ export function AnalysisResult({ analysis, seek, activeShot, frames }: { analysi
 /** A finished analysis with its video beside the result. The layout follows the width of the box it sits in, not the viewport (the result
  * shows in the 320 px form column and in the wide side panel). preload="metadata" shows the first frame as a poster with no transcode,
  * and only the one open result mounts a player, so the History list stays light. */
-export function AnalysisWithSource({ analysis, src, poster, preload = 'metadata' }: { analysis: Analysis; src?: string; poster?: string; preload?: 'none' | 'metadata' }) {
+export function AnalysisWithSource({ analysis, src, poster, preload = 'metadata', collapsed = false }: { analysis: Analysis; src?: string; poster?: string; preload?: 'none' | 'metadata'; collapsed?: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<number | null>(null);
@@ -178,7 +191,7 @@ export function AnalysisWithSource({ analysis, src, poster, preload = 'metadata'
             <video ref={video} className="analysis-source" src={src} poster={poster} controls muted playsInline preload={preload} onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)} aria-label="Video gốc đã phân tích" />
           </div>
         )}
-        <AnalysisResult analysis={analysis} seek={src ? seek : undefined} activeShot={active} frames={frames} />
+        <AnalysisResult analysis={analysis} seek={src ? seek : undefined} activeShot={active} frames={frames} collapsed={collapsed} />
       </div>
     </div>
   );
@@ -274,7 +287,7 @@ function Examples({ busy, onUse }: { busy: boolean; onUse: (video: string) => vo
               Dùng video này
             </button>
           </div>
-          <AnalysisWithSource analysis={ex.analysis} src={`/api/samples/${ex.video}`} poster={`/api/samples/${ex.video.replace(/\.mp4$/, '.jpg')}`} preload="none" />
+          <AnalysisWithSource analysis={ex.analysis} src={`/api/samples/${ex.video}`} poster={`/api/samples/${ex.video.replace(/\.mp4$/, '.jpg')}`} preload="none" collapsed />
         </section>
       ))}
     </div>
@@ -465,7 +478,7 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false,
               }}
             />
 
-            <button type="button" className="primary" disabled={!video || busy || running} aria-describedby={video ? undefined : 'analyze-reason'} onClick={() => void analyse()}>
+            <button type="button" className="primary analyze-run" disabled={!video || busy || running} aria-describedby={video ? undefined : 'analyze-reason'} onClick={() => void analyse()}>
               <Icon name="chart" /> Phân tích<span className="run-cost"> · ${ANALYZE_COST_USD.toFixed(2)}</span>
             </button>
             {!video && (
