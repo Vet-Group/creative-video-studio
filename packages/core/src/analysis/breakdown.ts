@@ -90,3 +90,6 @@ export function mergeShots(a: Analysis): { shots: Analysis['shots']; vi: string[
 // afterward. The worker books this per analysis (plus the prompt and translation calls, a fraction of a cent), and the
 // analyze buttons show it as the price. shortcut: flat estimate, upgrade when rea-video surfaces usage.
 export const ANALYZE_COST_USD = 0.02;
+
+/** The start of a failed analysis' error when no VLM call answered (the worker's vlmFailure); the web shows its own Vietnamese line for it. */
+export const VLM_NO_ANSWER = 'the video model answered no call';
