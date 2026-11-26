@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-27T03:45:00+07:00',
+  at: '2026-11-27T07:00:00+07:00',
   kind: 'new',
   title: 'Gom kết quả vào bảng theo chiến dịch hoặc sản phẩm',
   details: [
