@@ -69,10 +69,12 @@ test('Mở hộp: only the product photo is required; the model and packaging ar
     const pill = tile.locator('.slot-optional');
     await expect(pill).toHaveText('Tuỳ chọn');
     await expect(tile.locator('.optional-head .choice-optional')).toBeHidden();
-    const [label, chip, link] = await Promise.all([tile.locator('.slot-name').boundingBox(), pill.boundingBox(), tile.locator('.uploads-link').boundingBox()]);
+    const [label, chip] = await Promise.all([tile.locator('.slot-name').boundingBox(), pill.boundingBox()]);
     expect(chip!.height).toBeLessThan(22);
     expect(chip!.y).toBeGreaterThanOrEqual(label!.y + label!.height);
-    expect(chip!.y + chip!.height).toBeLessThanOrEqual(link!.y);
+    // Bao bì also has the product shelf link beside the uploaded-photos one; the pill clears both.
+    await expect(tile.locator('.uploads-link')).toHaveCount(name === 'Bao bì' ? 2 : 1);
+    for (const link of await tile.locator('.uploads-link').all()) expect(chip!.y + chip!.height).toBeLessThanOrEqual((await link.boundingBox())!.y);
     // Every tile in the row starts its icon at the same height.
     expect((await tile.locator('.slot-icon').boundingBox())!.y - (await tile.locator('.slot').boundingBox())!.y).toBe(29);
   }

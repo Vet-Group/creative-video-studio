@@ -36,6 +36,7 @@ import { PromptComposer } from './PromptComposer';
 import { PromptPreview, PromptSections, usePromptMode } from './PromptSections';
 import { Preview } from './Preview';
 import { Select } from './Select';
+import { ShelfPicker } from './ShelfPicker';
 import { StorePicker, type StoreOption } from './StorePicker';
 import { Tray } from './Shell';
 import { fillBlanks } from './TemplateBlanks';
@@ -882,6 +883,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
             </div>
             <div className="dropzone-foot">
               <UploadedPhotos taken={images} disabled={!hydrated || busy || images.length >= maxImages} storeId={storeId} onPick={(img) => (setError(''), setImages((cur) => (cur.length < maxImages ? [...cur, img] : cur)))} />
+              <ShelfPicker name="Từ kệ sản phẩm" taken={images} disabled={!hydrated || busy || images.length >= maxImages} storeId={storeId} onPick={(img) => (setError(''), setImages((cur) => (cur.length < maxImages ? [...cur, img] : cur)))} />
             </div>
             <ExampleNote images={images} />
             {(!sec || presetId !== '') && endSlot}

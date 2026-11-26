@@ -63,6 +63,19 @@ test('an empty slot shows a picture by default and the icon it is given, as the 
   expect(slot('plus')).toContain('Tối đa 7 ảnh tham chiếu');
 });
 
+test('a slot that takes a pick offers the shelf link beside the uploaded photos, except a model or background slot, a slot with no pick and a full multi-photo slot', () => {
+  const html = (label: string, over: { onPick?: () => void; images?: { id: string; filename: string }[]; max?: number } = {}) =>
+    renderToStaticMarkup(<Slot label={label} empty="Thêm ảnh" inputLabel={label} images={over.images ?? []} max={over.max ?? 4} busy={false} onAdd={() => undefined} onRemove={() => undefined} onPick={'onPick' in over ? over.onPick : () => undefined} />);
+  expect(html('Trang phục')).toContain(`aria-label="Từ kệ sản phẩm cho Trang phục"`);
+  expect(html('Ảnh tham chiếu (tuỳ chọn)')).toContain(`aria-label="Từ kệ sản phẩm cho Ảnh tham chiếu (tuỳ chọn)"`);
+  expect(html('Người mẫu')).not.toContain('Từ kệ sản phẩm');
+  expect(html('Bối cảnh (tuỳ chọn)')).not.toContain('Từ kệ sản phẩm');
+  expect(html('Trang phục', { onPick: undefined })).not.toContain('Từ kệ sản phẩm');
+  const full = [{ id: 'a', filename: 'a.png' }, { id: 'b', filename: 'b.png' }];
+  expect(html('Trang phục', { images: full, max: 2 })).not.toContain('Từ kệ sản phẩm');
+  expect(html('Nhân vật', { images: [full[0]!], max: 1 })).toContain('Từ kệ sản phẩm cho Nhân vật'); // a one-photo slot swaps its photo
+});
+
 test('the audio switch reads on when available and on, is off and disabled with a reason when the model cannot make audio, and on and disabled when it always does', () => {
   const on = renderToStaticMarkup(<AudioSwitch on available onChange={() => undefined} />);
   expect(on).toContain('aria-checked="true"');

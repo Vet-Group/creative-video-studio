@@ -2369,6 +2369,26 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .app-slots:not([data-two='true']) .slot[data-one] { height: 220px; } /* a full-width slot has no tile height of its own once its photo is laid over it */
 .app-slots:not([data-two='true']) .slot[data-one] .slot-chip { display: none; } /* its name is the label right above it */
 .app-page .app-slots[data-two='true'] > .field:has(.slot[data-one]) > .field-head { top: 8px; right: auto; bottom: auto; left: 8px; } /* filled, the uploads link leaves the bottom edge to the name chip */
+/* The product shelf link (ShelfPicker) sits beside the uploaded-photos link: an icon and its words, and the words are hidden where the head is narrow (the name stays in aria-label and title). */
+.uploads-link:has(.shelf-text) { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 18px; min-height: 18px; }
+.field-head:has(.uploads-link ~ .uploads-link) { flex-wrap: wrap; row-gap: 2px; justify-content: flex-start; }
+.field-head:has(.uploads-link ~ .uploads-link) > .uploads-link:not(.uploads-link ~ .uploads-link) { margin-left: auto; }
+.app-slots:not([data-two='true']) > .field:has(.slot[data-one]) > .field-head:has(.uploads-link ~ .uploads-link) { padding-right: 28px; } /* a filled full-width slot: both links' tap areas end before the photo's remove button */
+.dropzone-foot:has(.uploads-link ~ .uploads-link) { display: flex; justify-content: flex-end; align-items: flex-end; gap: 12px; padding-right: 12px; }
+.dropzone-foot:has(.uploads-link ~ .uploads-link) .uploads-link { position: relative; right: auto; bottom: auto; margin-bottom: 10px; }
+.dropzone[data-filled='true']:has(+ .dropzone-foot .uploads-link ~ .uploads-link) .dropzone-pick { padding-right: 200px; }
+@media (max-width: 480px) { /* a phone: the shelf link is an icon, so its 44 px hit area and the uploaded-photos link's stay right of the drop zone's middle */
+  .dropzone-foot .shelf-text { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .dropzone-foot:has(.uploads-link ~ .uploads-link) { gap: 14px; }
+  .dropzone[data-filled='true']:has(+ .dropzone-foot .uploads-link ~ .uploads-link) .dropzone-pick { padding-right: 120px; }
+}
+.form-scroll:has(> .marketing-head) .field-head:has(.uploads-link ~ .uploads-link) { height: auto; min-height: 21px; }
+:is(.imagebar, .app-slots[data-two='true'] > :not(.slot-wide)) .shelf-text { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.app-slots[data-two='true'] > .field > .field-head:has(.uploads-link ~ .uploads-link) { column-gap: 10px; }
+.app-slots[data-two='true'] > .field > .field-head:has(.uploads-link ~ .uploads-link) .uploads-link { padding: 2px 6px; } /* both links and their hit areas end before a filled photo's remove button */
+.app-slots[data-two='true'] > .field > .field-head:has(.uploads-link ~ .uploads-link) > .optional-head { position: absolute; } /* an optional tile's name is read, not drawn: it takes no room in the head */
+.imagebar .field-head:has(.uploads-link ~ .uploads-link) { column-gap: 14px; } /* the icon's 44 px hit area on a phone ends where the uploaded-photos link begins */
+.marketing-slots[data-two='true'] > .field:has(.slot[data-one]) > .field-head:has(.uploads-link ~ .uploads-link) { top: 8px; right: auto; bottom: auto; left: 8px; }
 .app-slots .slot[data-one] .slot-thumbs { position: absolute; inset: 0; }
 .app-slots .slot[data-one] .slot-thumbs li { width: 100%; height: 100%; }
 .app-slots .slot[data-one] .slot-thumbs :is(img, video) { border-radius: 17px; object-fit: contain; } /* the whole photo, as on Fash */
