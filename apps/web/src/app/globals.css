@@ -323,7 +323,7 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 /* The sidebar's red pill: New on a page or app launched in the last two weeks (lib/sidebar.ts), the count on Feedback. One light sweep across it as it
    appears, so the eye finds it once; never again while the page stays open, and none under reduced motion. */
 .nav-badge { position: relative; overflow: hidden; flex: none; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--badge-new); color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .01em; }
-.nav-badge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / .5) 50%, transparent 70%); transform: translateX(-110%); animation: badge-sweep .9s ease-out .4s both; pointer-events: none; }
+.nav-badge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--on-dark) 50%, transparent) 50%, transparent 70%); transform: translateX(-110%); animation: badge-sweep .9s ease-out .4s both; pointer-events: none; }
 @keyframes badge-sweep { to { transform: translateX(110%); } }
 @media (prefers-reduced-motion: reduce) { .nav-badge::after { display: none; } }
 /* The Apps row's chevron and its sub-list of app shortcuts (Shell.tsx AppsNav): small text indented to the labels above, no icons. */
