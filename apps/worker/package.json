@@ -14,7 +14,7 @@
     "ffmpeg-static": "5.2.0",
     "ffprobe-static": "3.1.0",
     "onnxruntime-web": "1.31.1",
-    "pg-boss": "12.39.0",
+    "pg-boss": "12.40.0",
     "sharp": "0.35.5"
   },
   "devDependencies": {
