@@ -199,7 +199,7 @@ function BillingBody({ data, reload, mailed, onMailed }: { data: Billing; reload
     <>
       <div className="billing-status" role="group" aria-label="Trạng thái tháng">
         {data.closed ? (
-          <span className="tag" title={data.closed.by ? `Chốt bởi ${data.closed.by}` : undefined}>
+          <span className="tag" title={`Chốt bởi ${data.closed.by ?? 'Hệ thống (tự động)'}`}>
             Đã chốt {day(data.closed.at)}
           </span>
         ) : (
