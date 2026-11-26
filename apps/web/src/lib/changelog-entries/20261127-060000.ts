@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-27T01:00:00+07:00',
+  at: '2026-11-27T06:00:00+07:00',
   kind: 'new',
   title: 'Chọn ảnh từ kệ sản phẩm ở mọi trang',
   details: [
@@ -9,6 +9,6 @@ export default {
     'Ảnh người mẫu và ảnh nền không có nút này, vì ảnh sản phẩm không dùng ở đó.',
   ],
   href: '/library?kind=products',
-  prs: [],
+  prs: [678],
   audience: 'all',
 } satisfies ChangeEntry;
