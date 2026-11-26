@@ -542,6 +542,54 @@ export const jobs = pgTable(
   ],
 );
 
+export const CUSTOM_APP_FEATURES = ['video', 'image'] as const;
+export const CUSTOM_APP_CATEGORIES = ['fashion', 'photo', 'video', 'utility'] as const;
+/** One input of the source clip, in the order it was sent: a photo the member uploads (with its label and hint), or the source job's own photo, kept fixed. */
+export type CustomAppInput = { slot: { label: string; hint: string } } | { fixed: string };
+
+// An Admin's one-tap app made from a live clip (docs/WORKSPACES.md §2): everything but the member's slot photos comes from this row when the app runs (POST /api/custom-apps/[id]/run).
+// A fixed input is an asset id copied server-side from the source job's `input_asset_ids`; `model` is the cheaper row of a pair of duplicate models (migration 0075).
+export const customApps = pgTable(
+  'custom_apps',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: workspaceId(),
+    /** Jobs are never hard-deleted, and DELETE /api/jobs/[id] refuses a clip that is an app's source. */
+    sourceJobId: text('source_job_id')
+      .notNull()
+      .references(() => jobs.id, { onDelete: 'restrict' }),
+    feature: text('feature', { enum: CUSTOM_APP_FEATURES }).notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    category: text('category', { enum: CUSTOM_APP_CATEGORIES }).notNull(),
+    model: text('model')
+      .notNull()
+      .references(() => modelConfigs.id, { onDelete: 'restrict' }),
+    /** Stored trimmed. The model's own limit is checked by the API. */
+    prompt: text('prompt').notNull(),
+    aspect: text('aspect', { enum: IMAGE_RATIOS }).notNull(),
+    /** Seconds of a video; 0 for an image. */
+    durationS: integer('duration_s').notNull(),
+    /** A video's `audio`; an image's `resolution`, `quality` and `thinking`. */
+    params: jsonb('params').$type<Record<string, string>>().notNull().default(sql`'{}'`),
+    inputs: jsonb('inputs').$type<CustomAppInput[]>().notNull(),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    /** Null while it is a draft only an Admin sees. */
+    publishedAt: tstz('published_at'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    updatedAt: tstz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('custom_apps_workspace_id_published_at_idx').on(t.workspaceId, t.publishedAt),
+    check('custom_apps_feature_check', sql`${t.feature} in ('video', 'image')`),
+    check('custom_apps_category_check', sql`${t.category} in ('fashion', 'photo', 'video', 'utility')`),
+    check('custom_apps_name_check', sql`char_length(${t.name}) between 1 and 60`),
+    check('custom_apps_description_check', sql`char_length(${t.description}) <= 200`),
+    check('custom_apps_prompt_check', sql`char_length(${t.prompt}) between 1 and 5000`),
+    check('custom_apps_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9', '4:1', '1:4', '8:1', '1:8')`),
+  ],
+);
+
 // Soft monthly caps per feature: crossing 80% or 100% only warns the Admin; Runs are never refused by these.
 export const featureCaps = pgTable('feature_caps', {
   feature: text('feature', { enum: FEATURES }).primaryKey(),
