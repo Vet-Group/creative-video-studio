@@ -42,22 +42,22 @@ test('AC 11: Image Generation asks before a Run of 1 USD or more; No sends nothi
   await page.goto('/image-generation');
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await formPrompt(page).fill('a guarded picture');
-  await expect(formRun(page)).toContainText('$1.2000');
+  await expect(formRun(page)).toContainText('$1.20');
 
   await formRun(page).click();
-  await answer(page, 'Tạo lượt này với giá $1.2000?', false);
+  await answer(page, 'Tạo lượt này với giá $1.20?', false);
   await expect(formRun(page)).toBeEnabled();
   expect(posts()).toBe(0);
 
   await formRun(page).click();
-  await answer(page, 'Tạo lượt này với giá $1.2000?', true);
+  await answer(page, 'Tạo lượt này với giá $1.20?', true);
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(1);
 
   await priceImages(page, '0.5000');
   await page.reload();
   await formPrompt(page).fill('a cheap picture');
-  await expect(formRun(page)).toContainText('$0.5000');
+  await expect(formRun(page)).toContainText('$0.50');
   await formRun(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(2);
@@ -128,13 +128,13 @@ test('AC 11: Create asks with the price its Run button shows', async ({ page }) 
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
   await page.getByLabel('Mô tả chuyển động').fill('a slow turn');
   const run = page.getByRole('button', { name: /^Tạo video/ });
-  await expect(run).toContainText('$1.5000');
+  await expect(run).toContainText('$1.50');
 
   await run.click();
-  await answer(page, 'Tạo lượt này với giá $1.5000?', false);
+  await answer(page, 'Tạo lượt này với giá $1.50?', false);
   expect(posts()).toBe(0);
   await run.click();
-  await answer(page, 'Tạo lượt này với giá $1.5000?', true);
+  await answer(page, 'Tạo lượt này với giá $1.50?', true);
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
@@ -159,11 +159,11 @@ test('AC 12: Ctrl+Enter in the prompt runs once, Enter alone does not, and at 1.
   await priceImages(page, '1.2000');
   await page.reload();
   await formPrompt(page).fill('keyboard costly picture');
-  await expect(formRun(page)).toContainText('$1.2000');
+  await expect(formRun(page)).toContainText('$1.20');
   // The same wait as above: after the reload Run is locked again until the remembered settings load, and Ctrl+Enter on a locked Run does nothing.
   await expect(formRun(page)).toBeEnabled();
   await formPrompt(page).press('Control+Enter');
-  await answer(page, 'Tạo lượt này với giá $1.2000?', false);
+  await answer(page, 'Tạo lượt này với giá $1.20?', false);
   expect(posts()).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });

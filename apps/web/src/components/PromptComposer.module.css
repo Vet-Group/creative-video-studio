@@ -17,7 +17,8 @@
 /* Starter chips: dashed until hovered, so they read as suggestions, not as chosen tags. */
 /* Folded to the first row (PromptComposer sets its height), the rest behind the "+N" chip; the clip margin keeps the phones' 44 px taps. */
 .starters { display: flex; align-items: flex-start; gap: 6px; padding: 0 10px 10px; contain: inline-size; } /* no say in the bar's widths: the chips fold to whatever room is left */
-.starterList { display: flex; flex: 1; flex-wrap: wrap; gap: 6px; min-width: 0; overflow: clip; overflow-clip-margin: 8px; }
+.starterList { display: flex; flex: 1; flex-wrap: wrap; gap: 6px; min-width: 0; max-height: 28px; overflow: clip; overflow-clip-margin: 8px; } /* one chip row from the first paint, so the fold script's own max-height does not shrink the list after hydration */
+.starterList[data-open] { max-height: none; }
 .starterList > [data-past] { visibility: hidden; }
 .more { min-width: 44px; border-style: solid; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; } /* a steady width, so a count gaining a digit does not refold the row */
 .starter { flex: none; height: 28px; padding: 0 10px; border: 1px dashed var(--border-button); border-radius: 999px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; }

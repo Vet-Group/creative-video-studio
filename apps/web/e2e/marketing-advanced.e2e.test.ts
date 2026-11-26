@@ -57,7 +57,7 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await expect(page.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
   await expect(audio(page)).toHaveAttribute('aria-checked', 'true');
   await expect(modelButton(page)).toContainText('Mock E2E');
-  await expect(runButton(page)).toContainText('$0.0000');
+  await expect(runButton(page)).toContainText('$0.00');
 
   // Run waits for an image, then for the brief.
   await expect(runButton(page)).toBeDisabled();

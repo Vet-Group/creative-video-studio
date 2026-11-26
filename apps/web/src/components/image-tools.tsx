@@ -620,13 +620,13 @@ export function FormNotice({ text, onHistory }: { text: string; onHistory?: () =
 }
 
 /** The model, resolution and ratio fields, shown locked while no model is enabled, so the form keeps its shape; the run button's notice says why. */
-export function LockedFields() {
+export function LockedFields({ loading = false, labels = ['Mô hình', 'Độ phân giải', 'Tỉ lệ'] }: { loading?: boolean; labels?: string[] }) {
   return (
-    <div className="locked-fields" aria-hidden="true">
-      {['Mô hình', 'Độ phân giải', 'Tỉ lệ'].map((label, i) => (
+    <div className="locked-fields" data-loading={loading || undefined} aria-hidden="true">
+      {labels.map((label, i) => (
         <div key={label} className="field">
           <span className="field-label">{label}</span>
-          <span className="select-trigger locked">{i === 0 ? 'Chưa bật mô hình' : '—'}</span>
+          <span className="select-trigger locked">{loading ? '…' : i === 0 && labels.length === 3 ? 'Chưa bật mô hình' : '—'}</span>
         </div>
       ))}
     </div>

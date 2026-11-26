@@ -16,9 +16,9 @@ export function usd(value: string | number): string {
 }
 
 /** True when the Run may go: the price is unknown or under RUN_CONFIRM_USD, or the member said yes. */
-export async function confirmRun(usd: string | number | null | undefined, text?: string): Promise<boolean> {
-  if (usd === null || usd === undefined || !(Number(usd) >= RUN_CONFIRM_USD)) return true;
-  return confirmDialog({ title: text ?? `Tạo lượt này với giá $${usd}?`, confirmLabel: 'Tiếp tục' });
+export async function confirmRun(price: string | number | null | undefined, text?: string): Promise<boolean> {
+  if (price === null || price === undefined || !(Number(price) >= RUN_CONFIRM_USD)) return true;
+  return confirmDialog({ title: text ?? `Tạo lượt này với giá ${usd(price)}?`, confirmLabel: 'Tiếp tục' });
 }
 
 /** Each feature's last Run sent in this page load, as its JSON body. */

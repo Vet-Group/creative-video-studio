@@ -307,7 +307,7 @@ test('a Run of 4 pictures is priced four times on Run and sends four image jobs 
   const bar = barOf(page);
   await expect(modelButton(page)).toContainText('Mock image E2E');
   const cost = bar.getByRole('button', { name: /^Tạo ảnh/ }).locator('.run-cost');
-  await expect(cost).toHaveText(/^· \$\d+\.\d{4}$/);
+  await expect(cost).toHaveText(/^· \$\d+\.\d{2,4}$/);
   const one = Number((await cost.textContent())!.replace('· $', ''));
   await expect(select(page, 'Số ảnh')).toBeHidden(); // under the more-options pill, as the chip row has no room for it
   await openMore(page);
@@ -315,7 +315,7 @@ test('a Run of 4 pictures is priced four times on Run and sends four image jobs 
   await expect(bar.getByText(/^\d ảnh × /)).toHaveCount(0); // one picture is priced as before
   await selectText(page, 'Số ảnh', '4 ảnh');
   await expect(bar.locator('.imagebar-more-on')).toContainText('1'); // the pill counts it as an option in use
-  await expect(cost).toHaveText(`· $${(one * 4).toFixed(4)}`);
+  await expect(cost).toHaveText(`· $${(one * 4).toFixed(2)}`);
   await expect(bar.getByText(/^4 ảnh × \$[\d.]+ = \$[\d.]+$/)).toBeVisible();
 
   await bar.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen dress on a hanger');

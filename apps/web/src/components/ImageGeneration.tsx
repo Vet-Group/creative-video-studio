@@ -228,7 +228,7 @@ ${style.prompt}` : prompt.trim();
   const runButton = (
     <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? 'imagegen-reason' : undefined} onClick={() => void run()}>
       Tạo ảnh
-      {busy ? <span className="run-cost">· Đang gửi…</span> : starting ? <span className="run-cost">· Đang tải…</span> : total !== undefined && <span className="run-cost">· ${total}</span>}
+      {busy ? <span className="run-cost">· Đang gửi…</span> : starting ? <span className="run-cost">· Đang tải…</span> : total !== undefined && <span className="run-cost">· {usd(total)}</span>}
     </button>
   );
 
@@ -301,7 +301,7 @@ ${style.prompt}` : prompt.trim();
         <div className="imagebar-chips">
           <StylePicker value={styleId} onChange={setStyleId} onStyle={setStyle} />
           {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={(v) => (recall.touch(), pick.setModelId(v))} />}
-          {models !== null && !failed && !chosen && <LockedFields />}
+          {models === null ? <LockedFields loading /> : !failed && !chosen && <LockedFields />}
           {chosen && (
             <>
               <Select chip label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={(v) => (recall.touch(), pick.setRatio(v))} />
@@ -325,6 +325,7 @@ ${style.prompt}` : prompt.trim();
         </div>
 
         <div className="imagebar-foot" id="imagegen-more" hidden={!narrow && !more}>
+          {models === null && <LockedFields loading labels={['Số ảnh']} />}
           {chosen && <Select chip label="Số ảnh" icon="copy" heading="Số ảnh mỗi lượt" value={String(count)} options={[...new Set([1, 2, 4, count])].sort((a, b) => a - b).map((n) => ({ value: String(n), label: `${n} ảnh` }))} onChange={(v) => setCount(Number(v))} />}
           <BrandPicker storeId={storeId} onStore={(v) => (recall.touch(), setStoreId(v))} on={useBrand} onToggle={(v) => (recall.touch(), setUseBrand(v))} onKit={setKit} onFailed={() => setMore(true)} />
           <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />

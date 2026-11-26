@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { createContext, type DragEvent, type ReactNode,useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { api, ApiError, sendJson, type TrayJob } from '@/lib/api';
+import { badgeFor, DONE_BADGE_MS, setFaviconBadge } from '@/lib/favicon-badge';
 import { featureLabel } from '@/lib/features';
 import { announce } from '@/lib/preferences';
 import { pageOf } from '@/lib/reuse';
@@ -507,6 +508,15 @@ export function JobsProvider({ userId, page, children }: { userId: string; page?
     watch.observe(document.head, { childList: true, subtree: true, characterData: true });
     return () => watch.disconnect();
   }, [news, active, pathname, page]);
+
+  // A pinned tab shows only its icon: a dot on it says jobs run (amber) or just finished (green).
+  useEffect(() => {
+    const badge = badgeFor(active, news, data.lastFinished, Date.now());
+    void setFaviconBadge(badge);
+    if (badge !== 'done') return;
+    const t = setTimeout(() => void setFaviconBadge(null), DONE_BADGE_MS - (Date.now() - data.lastFinished));
+    return () => clearTimeout(t);
+  }, [active, news, data.lastFinished]);
 
   const dismiss = useCallback((id: number) => {
     setToasts((cur) => cur.filter((t) => t.id !== id));

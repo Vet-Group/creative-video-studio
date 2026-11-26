@@ -394,7 +394,7 @@ test('hook variants: up to 3 hooks make one clip each, with the total, the daily
 
   // Before Run: the clip count and total on the button, the daily clip use, and one prompt per variant in the preview.
   await expect(runButton(page)).toContainText('3 clip');
-  await expect(runButton(page)).toContainText('$0.0000'); // the mock model books 0 USD, so 3 x 0
+  await expect(runButton(page)).toContainText('$0.00'); // the mock model books 0 USD, so 3 x 0
   await expect(page.locator('.variants-usage')).toContainText(/3 biến thể, tổng \$0\.0000: dùng 3 trong \d+ clip mỗi ngày của bạn \(hôm nay đã dùng 0\)/);
   await expect(page.locator('.prompt-preview p')).toHaveCount(3);
   for (const [i, h] of picks.slice(0, 3).entries()) await expect(page.locator('.prompt-preview p').nth(i)).toContainText(h.phrase);
