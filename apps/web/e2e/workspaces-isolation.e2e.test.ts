@@ -14,7 +14,7 @@ const userId = async (key: keyof typeof USERS) => (await one('select id from use
 
 const C = {
   job: 'wsiso-job', input: 'wsiso-in', output: 'wsiso-out', photo: 'wsiso-photo', modelPic: 'wsiso-model-pic', source: 'wsiso-src',
-  template: 'wsiso-tpl', hook: 'wsiso-hook', model: 'wsiso-model', analysis: 'wsiso-analysis', store: 'wsiso-store', feedback: 'wsiso-fb',
+  template: 'wsiso-tpl', hook: 'wsiso-hook', model: 'wsiso-model', analysis: 'wsiso-analysis', store: 'wsiso-store', feedback: 'wsiso-fb', product: 'wsiso-product',
 };
 const COMPANY_IDS = Object.values(C);
 
@@ -51,6 +51,8 @@ test.beforeAll(async () => {
     [C.analysis, comp],
   );
   await db.query(`insert into feedback (id, user_id, team_id, kind, title, body, image_asset_ids, workspace_id) values ($1, $2, 'team-unassigned', 'bug', 'WSISO feedback', 'b', '{}', 'ws_vet')`, [C.feedback, comp]);
+  // A product of the dual user's, filed under the company workspace: private to its owner, and only while ws_vet is active.
+  await db.query(`insert into products (id, user_id, workspace_id, name, asset_ids) values ($1, $2, 'ws_vet', 'WSISO product', $3)`, [C.product, dual, [C.input, C.photo]]);
 });
 
 test.afterAll(async () => {
@@ -63,6 +65,7 @@ test.afterAll(async () => {
     await db.query('delete from fashion_models where id = $1', [C.model]);
     await db.query('delete from analyses where id = $1', [C.analysis]);
     await db.query('delete from feedback where id = $1', [C.feedback]);
+    await db.query('delete from products where id = $1', [C.product]);
     await db.query(`delete from assets where id like 'wsiso-%'`);
     await db.query('delete from stores where id = $1', [C.store]);
   } finally {
@@ -98,6 +101,7 @@ test('a partner seller sees none of the company: lists, items by id and every co
   expect(await ids(await get('/api/templates?feature=video'), 'templates')).not.toContain(C.template);
   expect(await ids(await get('/api/choices'), 'hooks')).not.toContain(C.hook);
   expect(await ids(await get('/api/fashion-models'), 'models')).not.toContain(C.model);
+  expect(await ids(await get('/api/products'), 'products')).not.toContain(C.product);
   expect(await shelf(page)).not.toContain(C.analysis);
   expect(await ids(await get('/api/stores'), 'stores')).not.toContain(C.store);
   expect(await ids(await get('/api/feedback'), 'items')).not.toContain(C.feedback);
@@ -131,6 +135,10 @@ test('a partner seller sees none of the company: lists, items by id and every co
   expect(await status(page.request.post(`/api/feedback/${C.feedback}/comments`, { data: { body: 'hi' } }))).toBe(404);
   expect(await status(page.request.post('/api/templates', { data: { feature: 'video', name: 'Mine', data: { images: [C.input] } } }))).toBe(400);
   expect(await status(page.request.post('/api/choices', { data: { kind: 'hook', name: 'Mine', phrase: 'mine', imageAssetId: C.photo } }))).toBe(400);
+  // A product is its owner's: another member's change and delete are 404, and a product of company photos is refused.
+  expect(await status(page.request.patch(`/api/products/${C.product}`, { data: { name: 'Taken' } }))).toBe(404);
+  expect(await status(page.request.delete(`/api/products/${C.product}`))).toBe(404);
+  expect(await status(page.request.post('/api/products', { data: { name: 'Mine', assetIds: [C.input, C.photo] } }))).toBe(400);
   expect(await status(page.request.post('/api/feedback', { data: { kind: 'bug', title: 't', body: 'b', assetIds: [C.input] } }))).toBe(400);
   // Proposing to the company's preset catalog is the company's.
   expect(await status(page.request.post('/api/preset-proposals', { data: { label: 'Mine', prompt: 'mine' } }))).toBe(403);
@@ -209,6 +217,7 @@ test('a user in both workspaces switches by the cookie, carries nothing across, 
   const get = (path: string) => page.request.get(path);
   // ws_vet first: the company's clip opens, and an upload made here is the company's.
   expect(await status(get(`/api/jobs/${C.job}`))).toBe(200);
+  expect(await ids(await get('/api/products'), 'products')).toContain(C.product); // theirs, with ws_vet active
   await page.goto('/create');
   await expect(page.locator('meta[name="cvs-workspace"]')).toHaveAttribute('content', 'ws_vet');
   const bytes = png();
@@ -220,6 +229,9 @@ test('a user in both workspaces switches by the cookie, carries nothing across, 
   expect(await status(get(`/api/jobs/${C.job}`))).toBe(404);
   expect(await ids(await get('/api/library'), 'clips')).not.toContain(C.job);
   expect(await ids(await get('/api/templates?feature=video'), 'templates')).not.toContain(C.template);
+  expect(await ids(await get('/api/products'), 'products')).not.toContain(C.product); // theirs, but filed under ws_vet
+  expect(await status(page.request.patch(`/api/products/${C.product}`, { data: { name: 'Carried' } }))).toBe(404);
+  expect(await status(page.request.delete(`/api/products/${C.product}`))).toBe(404);
   // The company upload is not theirs to use here: not in the picker, not as a job input, a template photo or a hook photo.
   expect(await ids(await get('/api/assets?recent=uploads'), 'assets')).not.toContain(inCompany);
   expect(await status(get(`/api/assets/${inCompany}/content`))).toBe(404);
@@ -253,4 +265,5 @@ test('a user in both workspaces switches by the cookie, carries nothing across, 
   await context.addCookies([{ name: 'cvs_ws', value: 'ws_vet', url: page.url() }]);
   expect(await ids(await get('/api/choices'), 'hooks')).not.toContain(freshId);
   expect(await status(get(`/api/jobs/${C.job}`))).toBe(200);
+  expect(await ids(await get('/api/products'), 'products')).toContain(C.product); // and the product is back
 });

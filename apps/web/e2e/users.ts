@@ -113,6 +113,7 @@ export const USERS = {
   librb: { email: 'librb@e2e.test', name: 'E2E Library Recipe B', role: 'member' },
   librp: { email: 'librp@e2e.test', name: 'E2E Library Prefetch', role: 'member' }, // library.e2e: the detail fetches its image neighbours' previews ahead
   librf: { email: 'librf@e2e.test', name: 'E2E Library Frame', role: 'member' }, // library.e2e: Use this frame takes a video's frame to Create
+  shelf: { email: 'shelf@e2e.test', name: 'E2E Product Shelf', role: 'member' }, // product-shelf.e2e: the Library's Products view, its form and the create-more-angles link
   welc: { email: 'welc@e2e.test', name: 'E2E Welcome', role: 'member' }, // library-extras.e2e: the first-visit card on Explore
   libx: { email: 'libx@e2e.test', name: 'E2E Library Extras', role: 'member' }, // library-extras.e2e: the date presets
   toolg: { email: 'toolg@e2e.test', name: 'E2E Tool Guide', role: 'member' }, // tool-guide.e2e: the sidebar lines, the guide, the page hints and Explore's start list

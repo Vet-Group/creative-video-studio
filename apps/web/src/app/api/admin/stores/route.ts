@@ -18,7 +18,8 @@ export async function GET(request: Request) {
     `select s.id, s.name, s.code, s.hidden, s.paused, s.brand_voice as "brandVoice", s.brand_colors as "brandColors", s.brand_tagline as "brandTagline", s.team_id as "teamId",
             exists (select 1 from cost_entries c where c.store_id = s.id) as "hasCost",
             exists (select 1 from jobs where store_id = s.id union all select 1 from cost_entries where store_id = s.id union all select 1 from assets where store_id = s.id
-                    union all select 1 from user_templates where store_id = s.id union all select 1 from user_choices where store_id = s.id) as "inUse"
+                    union all select 1 from user_templates where store_id = s.id union all select 1 from user_choices where store_id = s.id
+                    union all select 1 from products where store_id = s.id) as "inUse"
        from stores s where s.workspace_id = $2 and ($1 or not s.hidden) order by s.hidden, s.paused, s.name, s.id`,
     [all, g.workspaceId],
   );

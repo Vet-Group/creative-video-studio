@@ -164,6 +164,18 @@ describe('purgeDeletedClips', () => {
     expect(await keys()).not.toContain('assets/keep-solo');
   });
 
+  test("keeps a product's photos when the clip that used them is purged, deletes the clip's outputs, and removes an input no product names", async () => {
+    for (const id of ['pr-a', 'pr-b', 'pr-solo']) await asset(id, 'input');
+    await pool.query(`insert into products (id, user_id, workspace_id, name, asset_ids) values ('prod-1', 'u1', 'ws_vet', 'Shirt', '{pr-a,pr-b}')`);
+    await clip('pr-clip', ['pr-a', 'pr-b', 'pr-solo'], 31);
+    expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(1);
+    expect((await pool.query(`select id from assets where id like 'pr-%' and id not like 'pr-clip-%' order by id`)).rows.map((r) => r.id)).toEqual(['pr-a', 'pr-b']);
+    expect((await pool.query(`select id from assets where id like 'pr-clip-%'`)).rowCount).toBe(0); // the outputs go
+    expect(await keys()).toEqual(expect.arrayContaining(['assets/pr-a', 'assets/pr-b']));
+    expect(await keys()).not.toContain('assets/pr-solo');
+    expect((await pool.query(`select asset_ids from products where id = 'prod-1'`)).rows[0].asset_ids).toEqual(['pr-a', 'pr-b']);
+  });
+
   test('keeps an input that is still the source video of an analysis', async () => {
     await asset('an-source', 'input');
     await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ('an', 'u1', 'team-unassigned', 'assets/an-source', 'succeeded', 'ws_vet')`);

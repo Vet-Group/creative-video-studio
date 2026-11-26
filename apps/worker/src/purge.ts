@@ -23,7 +23,7 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
         // The job and the verdict reference the output assets, so both let go of them first; the verdict itself survives (it still counts in the pass rate).
         await tx.query('update jobs set purged_at = now(), output_asset_id = null, poster_asset_id = null where id = $1', [id]);
         await tx.query('update verdicts set output_asset_id = null where job_id = $1', [id]);
-        // An input stays while any other undeleted job (a Reuse, a retry, a failed Run) still names it, or a live saved AI model, a saved template, a choice's photo, a feedback item or an analysis (its source video) does.
+        // An input stays while any other undeleted job (a Reuse, a retry, a failed Run) still names it, or a live saved AI model, a saved template, a choice's photo, a product on the shelf, a feedback item or an analysis (its source video) does.
         // A deleted AI model no longer holds its picture (the row's foreign key would otherwise block the delete below).
         await tx.query('delete from fashion_models where asset_id = any($1::text[]) and deleted_at is not null', [job.inputs]);
         const { rows } = await tx.query(
@@ -32,6 +32,7 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
                   and not exists (select 1 from fashion_models f where f.asset_id = a.id and f.deleted_at is null)
                   and not exists (select 1 from user_templates t where strpos(t.data::text, a.id) > 0)
                   and not exists (select 1 from user_choices u where u.image_asset_id = a.id)
+                  and not exists (select 1 from products p where a.id = any(p.asset_ids))
                   and not exists (select 1 from feedback b where a.id = any(b.image_asset_ids))
                   and not exists (select 1 from analyses x where x.source_key = a.s3_key))
             returning a.id, a.s3_key`,

@@ -63,6 +63,19 @@ test("keeps an analysis' reference video and a remake's product image even when 
   await pool.query(`delete from assets where id like 'v-%' or id like 'p-%'`);
 });
 
+test("keeps a product's photo: both copies stay when the product names the older one, and the older unused copy goes when it names the newer", async () => {
+  await input('pd-old-named', 'shirt-front', 10, 'u2');
+  await input('pd-new-1', 'shirt-front', 1, 'u2');
+  await input('pd-old-free', 'shirt-back', 10, 'u2');
+  await input('pd-new-named', 'shirt-back', 1, 'u2');
+  await pool.query(`insert into products (id, user_id, workspace_id, name, asset_ids) values ('prod-d1', 'u2', 'ws_vet', 'Front', '{pd-old-named,pd-new-named}')`);
+  await dedupeTick(pool, read);
+  expect(await live()).toEqual(expect.arrayContaining(['pd-old-named', 'pd-new-1', 'pd-new-named']));
+  expect(await live()).not.toContain('pd-old-free');
+  await pool.query(`delete from products`);
+  await pool.query(`delete from assets where id like 'pd-%'`);
+});
+
 test('ranks only the files that have another live copy, so a sweep reads jobs per copy and not per input', async () => {
   // Audit 2026-11-20: ranking every live input made each tick read jobs once per input, though nearly every input has no copy.
   onTestFinished(() => pool.query(`delete from assets where id like 's-%'`).then(() => {}));
