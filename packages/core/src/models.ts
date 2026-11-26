@@ -197,9 +197,10 @@ export const AUDIO_USD_PER_SECOND: Record<string, number> = {
 /**
  * The endpoints that always make sound: their fal schemas have no audio switch, and the owner's paid test of 2026-11-04 (migration 0060) heard real
  * speech from each at the row's own price, so audio on costs the stored price and the switch cannot turn it off. Gemini Omni 1.2 Flash on Vertex
- * (vertex-omni.ts) is listed too: Google states it generates native audio and the video pages show no switch to turn it off.
+ * (vertex-omni.ts) is listed too: Google states it generates native audio and the video pages show no switch to turn it off. MiniMax H3 Max Turbo
+ * image-to-video is listed after the canary of 2026-11-26 (job 7bfdcccb, 480p, 5 s): its clip carried an audible track (mean -23.8 dB).
  */
-export const ALWAYS_AUDIO: ReadonlySet<string> = new Set(['google/gemini-omni-flash/v1.2/reference-to-video', 'gemini-omni-1.2-flash', 'minimax/h3-max/reference-to-video', 'xai/grok-imagine-video/reference-to-video', 'fal-ai/wan/v2.7/reference-to-video']);
+export const ALWAYS_AUDIO: ReadonlySet<string> = new Set(['google/gemini-omni-flash/v1.2/reference-to-video', 'gemini-omni-1.2-flash', 'minimax/h3-max/reference-to-video', 'xai/grok-imagine-video/reference-to-video', 'fal-ai/wan/v2.7/reference-to-video', 'minimax/h3-max-turbo/image-to-video']);
 
 /**
  * The model's price per second for a job, with audio on when `audio` is 'on' (a job's params.audio); undefined when the endpoint cannot make audio.

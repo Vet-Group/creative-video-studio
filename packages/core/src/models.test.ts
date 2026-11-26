@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { BAKEOFF_MODELS, estimateUsd, extraInputUsd, imagePricesFor, PROMPT_CEILING, promptLimit, usdPerSecondFor, usdPerSecondWithVideo, validateRequest } from './models';
+import { ALWAYS_AUDIO, BAKEOFF_MODELS, estimateUsd, extraInputUsd, imagePricesFor, PROMPT_CEILING, promptLimit, usdPerSecondFor, usdPerSecondWithVideo, validateRequest } from './models';
 
 describe.each(BAKEOFF_MODELS)('$id', (model) => {
   const ok = { ratio: '9:16', durationSec: 5, imageCount: 1 };
@@ -69,9 +69,10 @@ describe('Veo 3.1 Lite and Fast, H3 Max Turbo and Seedream 5.5 Edit (fal model p
     expect(estimateUsd(usdPerSecondFor(lite, 'on')!, 8)).toBe('0.4000');
   });
 
-  test('H3 Max Turbo has no audio price, and 5 s costs $0.125 at 480p, $0.20 at 768p and $0.40 at 1080p', () => {
+  test('H3 Max Turbo always makes sound at its stored price, and 5 s costs $0.125 at 480p, $0.20 at 768p and $0.40 at 1080p', () => {
     const turbo = 'minimax/h3-max-turbo/image-to-video';
-    expect(usdPerSecondFor({ endpoint: turbo, usdPerSecond: '0.0250' }, 'on')).toBeUndefined();
+    expect(ALWAYS_AUDIO.has(turbo)).toBe(true);
+    expect(usdPerSecondFor({ endpoint: turbo, usdPerSecond: '0.0250' }, 'on')).toBe('0.0250');
     expect(['0.0250', '0.0400', '0.0800'].map((usd) => estimateUsd(usdPerSecondFor({ endpoint: turbo, usdPerSecond: usd }, 'off')!, 5))).toEqual(['0.1250', '0.2000', '0.4000']);
   });
 
