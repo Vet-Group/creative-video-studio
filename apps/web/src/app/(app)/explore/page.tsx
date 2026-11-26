@@ -270,7 +270,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
           {shown.map((m) => (
             <li key={m.id}>
               <Link href={`${m.kind === 'video' ? '/create' : '/image-generation'}?model=${encodeURIComponent(m.id)}`} className="explore-card">
-                <CardMedia {...media(m.id)} />
+                <CardMedia {...media(m.id)} lazy />
                 <strong>
                   {m.label}
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}

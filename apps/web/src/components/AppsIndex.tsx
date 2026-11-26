@@ -42,10 +42,11 @@ export function AppsIndex() {
         </p>
       ) : (
         <ul className="apps-grid" aria-label="Danh sách ứng dụng">
-          {apps.map((a) => (
+          {apps.map((a, i) => (
             <li key={a.slug}>
               <Link href={`/apps/${a.slug}`} className="app-card">
-                <AppArt app={a} />
+                {/* The first two rows at 1440 px keep their posters eager: the page's largest paint is one of them. */}
+                <AppArt app={a} lazy={i >= 6} />
                 <span className="app-card-head">
                   <strong>{a.name}</strong>
                   {a.soon ? <span className="badge-soon">Sắp có</span> : hydrated && isNewApp(a) && <span className="badge-soon badge-new">Mới</span>}
