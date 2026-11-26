@@ -9,6 +9,6 @@ export default {
     'Bấm Dùng ví dụ này trên một video để điền sẵn ảnh nhân vật, video chuyển động, mô tả, mô hình và hướng nhân vật vào biểu mẫu, rồi thay bằng ảnh của bạn nếu cần.',
   ],
   href: '/apps/motion-control',
-  prs: [],
+  prs: [662],
   audience: 'all',
 } satisfies ChangeEntry;

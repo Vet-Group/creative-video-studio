@@ -567,6 +567,7 @@ test('Motion Control: the image and the reference video, a length check, and a R
   });
   await openApp(page, 'Điều khiển chuyển động', 'motion-control');
   await expect(page.getByText('Sắp có')).toHaveCount(0);
+  await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']); // an Admin may put results on its Examples tab
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Nhân vật.');
   await page.getByLabel('Ảnh nhân vật').setInputFiles(file('dancer.png'));
   await expect(page.getByRole('img', { name: 'dancer.png' })).toBeVisible();
