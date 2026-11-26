@@ -14,7 +14,7 @@ import { Select } from './Select';
 import { type StoreOption, StorePicker } from './StorePicker';
 import s from './ProductShelf.module.css';
 
-const NO_PRODUCTS = 'Chưa có sản phẩm nào. Bấm Thêm sản phẩm để lưu 2–4 ảnh của một sản phẩm cùng tên và cửa hàng.';
+const NO_PRODUCTS = 'Chưa có sản phẩm nào. Bấm Thêm sản phẩm để lưu 2–4 ảnh của một sản phẩm cùng tên và cửa hàng, rồi chọn lại ở Tạo video, Thử đồ, Ứng dụng và Marketing Studio.';
 const NO_STORE_PRODUCTS = 'Chưa có sản phẩm nào của cửa hàng này. Chọn "Tất cả cửa hàng" để xem mọi sản phẩm.';
 
 /** The form's words for a refused save: the two codes of POST and PATCH, then the shared reasons (another team's store, too many requests). */
@@ -173,7 +173,7 @@ export function ProductShelf() {
   return (
     <div className="product-shelf">
       <div className={s.top}>
-        <p className="muted">Sản phẩm bạn đã lưu: tên, cửa hàng và 2–4 ảnh. Chỉ bạn thấy.</p>
+        <p className="muted">Sản phẩm bạn đã lưu: tên, cửa hàng và 2–4 ảnh, dùng lại ở mọi trang. Chỉ bạn thấy.</p>
         <button type="button" className="primary" onClick={() => setEditing('new')}>
           Thêm sản phẩm
         </button>

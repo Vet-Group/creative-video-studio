@@ -8,7 +8,7 @@ const item = (over: Partial<ProductItem>): ProductItem => ({ id: 'p1', name: 'Á
 const render = (products: ProductItem[], filtered = false) => renderToStaticMarkup(<ProductCards products={products} filtered={filtered} onEdit={() => undefined} onDelete={() => undefined} />).replaceAll('<!-- -->', '');
 
 test('an empty shelf says how to fill it; an empty store filter points back at all stores', () => {
-  expect(render([])).toContain('Chưa có sản phẩm nào. Bấm Thêm sản phẩm để lưu 2–4 ảnh của một sản phẩm cùng tên và cửa hàng.');
+  expect(render([])).toContain('Chưa có sản phẩm nào. Bấm Thêm sản phẩm để lưu 2–4 ảnh của một sản phẩm cùng tên và cửa hàng, rồi chọn lại ở Tạo video, Thử đồ, Ứng dụng và Marketing Studio.');
   expect(render([], true)).toContain('Chưa có sản phẩm nào của cửa hàng này. Chọn &quot;Tất cả cửa hàng&quot; để xem mọi sản phẩm.');
 });
 
