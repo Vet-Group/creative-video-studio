@@ -9,6 +9,6 @@ export default {
     'Ảnh không đúng khung dọc được thêm viền thay vì bị cắt. Chữ nhỏ trên sản phẩm có thể bị méo trong lúc hiệu ứng chạy, và clip có sẵn âm thanh do mô hình tự tạo.',
   ],
   href: '/apps/hook-effects',
-  prs: [],
+  prs: [680],
   audience: 'all',
 } satisfies ChangeEntry;
