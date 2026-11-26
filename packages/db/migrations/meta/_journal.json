@@ -834,6 +834,13 @@
 			"when": 1797100000000,
 			"tag": "0119_team_report_exclusion",
 			"breakpoints": true
+		},
+		{
+			"idx": 119,
+			"version": "7",
+			"when": 1797200000000,
+			"tag": "0120_cheap_fal_models",
+			"breakpoints": true
 		}
 	]
 }

@@ -196,6 +196,9 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'google/gemini-omni-flash/v1.2/reference-to-video': { text: 'google/gemini-omni-flash/v1.2/text-to-video', video: { field: 'reference_video_urls', minSec: 0, maxSec: 15, name: () => 'the reference video' }, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...ref(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'google/gemini-omni-flash/v1.2/image-to-video': { end: 'end_image_url', endMaxSec: 10, text: 'google/gemini-omni-flash/v1.2/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'fal-ai/veo3.1/image-to-video': { text: 'fal-ai/veo3.1', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: `${req.durationSec}s`, resolution: '720p', generate_audio: req.audio === true }) },
+  // Veo 3.1 Lite and Fast take Veo 3.1's body and have their own text twins (schemas read 2026-11-26); neither image endpoint has an end frame.
+  'fal-ai/veo3.1/lite/image-to-video': { text: 'fal-ai/veo3.1/lite', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: `${req.durationSec}s`, resolution: '720p', generate_audio: req.audio === true }) },
+  'fal-ai/veo3.1/fast/image-to-video': { text: 'fal-ai/veo3.1/fast', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: `${req.durationSec}s`, resolution: '720p', generate_audio: req.audio === true }) },
   'xai/grok-imagine-video/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'xai/grok-imagine-video/v1.5/image-to-video': { crop: true, text: 'xai/grok-imagine-video/v1.5/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '720p' }) },
   'fal-ai/wan/v2.7/reference-to-video': { text: 'fal-ai/wan/v2.7/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
@@ -204,6 +207,8 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   // in a capital P, and each row's output resolution picks one, at that row's price.
   'minimax/h3-max/reference-to-video': { end: 'end_image_url', text: 'minimax/h3-max/text-to-video', audio: { field: 'reference_audio_urls', max: 3, seconds: 15 }, build: (req, images) => ({ prompt: imageTokens(req.prompt, (n) => `Image ${n}`), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
   'minimax/h3-max/image-to-video': { crop: true, end: 'end_image_url', text: 'minimax/h3-max/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
+  // H3 Max Turbo: the same schema as H3 Max image-to-video (no ratio field, so the crop; no audio switch), read 2026-11-26; each row's output resolution picks 480P, 768P or 1080P.
+  'minimax/h3-max-turbo/image-to-video': { crop: true, end: 'end_image_url', text: 'minimax/h3-max-turbo/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
   // A fixed-length clip: the schema has no duration, and the row offers 6 s only, as Fash does.
   'fal-ai/minimax/hailuo-2.3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images) }) },
   'fal-ai/kling-video/v3/pro/motion-control': { upload: true, build: (req, inputs) => motion(req, inputs) },
@@ -220,9 +225,12 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'blackforestlabs/flux-3/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: '1080p', generate_audio: req.audio === true }) },
   'google/gemini-omni-flash/v1.2/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: '720p' }) },
   'fal-ai/veo3.1': { build: (req) => words(req, `${req.durationSec}s`, { resolution: '720p', generate_audio: req.audio === true }) },
+  'fal-ai/veo3.1/lite': { build: (req) => words(req, `${req.durationSec}s`, { resolution: '720p', generate_audio: req.audio === true }) },
+  'fal-ai/veo3.1/fast': { build: (req) => words(req, `${req.durationSec}s`, { resolution: '720p', generate_audio: req.audio === true }) },
   'xai/grok-imagine-video/v1.5/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: '720p' }) },
   'fal-ai/wan/v2.7/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: '720p' }) },
   'minimax/h3-max/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
+  'minimax/h3-max-turbo/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
 };
 
 /**
@@ -450,6 +458,8 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
   'openai/gpt-image-2.5/flare/edit': gptImage,
   'openai/gpt-image-2.5/sunburst/edit': gptImage,
   'bytedance/seedream/v5/pro/edit': (req, image_urls) => ({ prompt: req.prompt, image_urls, image_size: seedreamSize(req.ratio, req.resolution), num_images: 1, output_format: 'png' }),
+  // Seedream 5.5 Edit takes Pro's body; its sizes (921,600 to 4,624,220 px, auto_1K/auto_2K) hold seedreamSize's targets (schema read 2026-11-26).
+  'bytedance/seedream/v5.5/edit': (req, image_urls) => ({ prompt: req.prompt, image_urls, image_size: seedreamSize(req.ratio, req.resolution), num_images: 1, output_format: 'png' }),
   // The person image first, then the garment; the output follows the person image, so the schema has no ratio, and the prompt is not read.
   'fal-ai/fashn/tryon/v1.6': (_req, urls) => {
     if (urls.length !== 2) throw new ImageReadError('fashn needs the model image and the garment image');

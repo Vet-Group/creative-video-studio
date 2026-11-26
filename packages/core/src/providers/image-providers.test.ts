@@ -99,6 +99,7 @@ describe('fal image submit', () => {
     ['fal-ai/nano-banana/edit', 'fal-ai/nano-banana'],
     ['openai/gpt-image-2/edit', 'openai/gpt-image-2'],
     ['bytedance/seedream/v5/pro/edit', 'bytedance/seedream/v5/pro/text-to-image'],
+    ['bytedance/seedream/v5.5/edit', 'bytedance/seedream/v5.5/text-to-image'],
   ])('with no input image, %s goes to its text-to-image twin %s, with no images and no auto ratio', async (edit, text) => {
     const { url, body } = await bodyFor(req(model(edit, { '1K': '0.04' }), { imageUrls: [], ratio: 'auto' }));
     expect(url).toBe(`https://queue.fal.run/${text}`);
@@ -174,6 +175,21 @@ describe('fal image submit', () => {
         expect(size.width * size.height).toBeLessThanOrEqual(2048 * 2048);
         const [w, h] = ratio.split(':').map(Number) as [number, number];
         expect(Math.abs(size.width / size.height - w / h)).toBeLessThan(0.03);
+      }
+    }
+  });
+
+  test('Seedream 5.5 Edit takes the Pro body at its own endpoint, with sizes inside its 921,600 to 4,624,220 pixels and the 2K price tier above 2,610,000', async () => {
+    const seed = model('bytedance/seedream/v5.5/edit', { '1K': '0.042', '2K': '0.0525' });
+    expect(await bodyFor(req(seed, { ratio: 'auto', resolution: '1K' }))).toMatchObject({
+      url: 'https://queue.fal.run/bytedance/seedream/v5.5/edit',
+      body: { prompt: 'a bottle on a table', image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], image_size: 'auto_1K', num_images: 1, output_format: 'png' },
+    });
+    for (const [resolution, min, max] of [['1K', 921_600, 2_610_000], ['2K', 2_610_001, 4_624_220]] as const) {
+      for (const ratio of ['1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9']) {
+        const size = ((await bodyFor(req(seed, { ratio, resolution }))).body as { image_size: { width: number; height: number } }).image_size;
+        expect(size.width * size.height, `${resolution} ${ratio}`).toBeGreaterThanOrEqual(min);
+        expect(size.width * size.height, `${resolution} ${ratio}`).toBeLessThanOrEqual(max);
       }
     }
   });
