@@ -657,6 +657,17 @@ describe('/api/jobs/:id/example', () => {
     expect(await libraryIds(bob.cookie, '?kind=video&example=1')).toContain(video);
   });
 
+  test('a Motion Control clip goes on its own Examples tab: listed there for a member, in the Admin order list, and not under another page', async () => {
+    const id = await clip(alice.id, { model: 'example-test' });
+    await pool.query(`update jobs set feature = 'motion_control' where id = $1`, [id]);
+    expect(await libraryIds(bob.cookie, '?kind=motion_control&example=1')).not.toContain(id);
+    expect((await call(PUT_EXAMPLE, 'PUT', admin.cookie, id)).status).toBe(200);
+    expect(await libraryIds(bob.cookie, '?kind=motion_control&example=1')).toContain(id);
+    expect(await libraryIds(bob.cookie, '?kind=video&example=1')).not.toContain(id);
+    const listed = (await (await GET_EXAMPLES(req('/api/examples?feature=motion_control', admin.cookie))).json()) as { examples: { id: string }[] };
+    expect(listed.examples.map((e) => e.id)).toContain(id);
+  });
+
   test('an Admin tags an example with a product type, changes and clears it with a later PUT, each change audited; an unknown type is refused', async () => {
     const id = await tryOn(alice.id);
     const put = (body: unknown) => PUT_EXAMPLE(req(`/api/jobs/${id}/example`, admin.cookie, { method: 'PUT', body: JSON.stringify(body) }), ctx(id));

@@ -1040,8 +1040,8 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     }
   }
 
-  const tabs: Tab[] = narrow ? ['create', 'history', 'about'] : ['history', 'about'];
-  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'history' ? 'history' : 'about';
+  const tabs: Tab[] = [...(narrow ? (['create'] as const) : []), 'history', 'examples', 'about'];
+  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'history' || tab === 'examples' ? tab : 'about';
   const panel = shown === 'create' ? 'about' : shown;
 
   return (
@@ -1135,7 +1135,13 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
 
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
           <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')) }}>
-            {shown === 'history' ? <Tray feature={app.feature} /> : <AppAbout app={app} />}
+            {shown === 'history' ? (
+              <Tray feature={app.feature} />
+            ) : shown === 'examples' ? (
+              <Gallery kind={app.feature} video samples={GALLERY_SAMPLES.motion_control} cols={[2, 2, 3]} label={`Video ${app.name.toLowerCase()} của công ty`} emptyText={`Chưa có video ${app.name.toLowerCase()} nào trong công ty.`} />
+            ) : (
+              <AppAbout app={app} />
+            )}
           </FormContext.Provider>
         </div>
       </div>
