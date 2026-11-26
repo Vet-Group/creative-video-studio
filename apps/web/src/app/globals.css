@@ -320,8 +320,12 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 .nav-progress { position: fixed; top: 0; left: 0; z-index: 1000; width: 100%; height: 2px; background: var(--brand); transform-origin: left; transform: scaleX(0); opacity: 0; pointer-events: none; }
 .nav-progress[data-on='true'] { opacity: 1; transition: opacity 0s .15s; animation: nav-progress 8s linear .15s forwards; }
 @keyframes nav-progress { 0% { transform: scaleX(.3); } 12.5% { transform: scaleX(.55); } 25% { transform: scaleX(.7); } 100% { transform: scaleX(.9); } } /* 30% at once, 70% by 2 s, then slower; linear so the stops set the curve */
-/* The live sidebar's red "New" pill beside Marketing Studio. */
-.nav-badge { flex: none; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--badge-new); color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .01em; }
+/* The sidebar's red pill: New on a page or app launched in the last two weeks (lib/sidebar.ts), the count on Feedback. One light sweep across it as it
+   appears, so the eye finds it once; never again while the page stays open, and none under reduced motion. */
+.nav-badge { position: relative; overflow: hidden; flex: none; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--badge-new); color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .01em; }
+.nav-badge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--on-dark) 50%, transparent) 50%, transparent 70%); transform: translateX(-110%); animation: badge-sweep .9s ease-out .4s both; pointer-events: none; }
+@keyframes badge-sweep { to { transform: translateX(110%); } }
+@media (prefers-reduced-motion: reduce) { .nav-badge::after { display: none; } }
 /* The Apps row's chevron and its sub-list of app shortcuts (Shell.tsx AppsNav): small text indented to the labels above, no icons. */
 .nav-parent { display: flex; align-items: center; gap: 2px; }
 .nav-parent > :first-child { flex: 1; min-width: 0; }
@@ -3079,6 +3083,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .analysis-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .analysis-panel-head h2 { margin: 0; font-size: 16px; line-height: 24px; }
 .analyze-form-title { margin: 0 0 4px; font-size: 16px; line-height: 24px; }
+.analyze-run { display: inline-flex; align-items: center; gap: 6px; } /* the global .icon is a block, which put the chart icon on a line of its own */
 .analysis-wait .job-wait-bar { margin-top: 4px; }
 .analysis-wait { display: grid; gap: 4px; padding: 16px; border-radius: 12px; background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite; }
 .analysis-box { container-type: inline-size; min-width: 0; }
@@ -3109,6 +3114,11 @@ button.analysis-frame { cursor: pointer; }
 .analysis-example-head h3 { margin: 0; }
 .analysis-example-head button { flex-shrink: 0; white-space: nowrap; }
 .analysis-examples { display: grid; gap: 16px; }
+/* An example's scenes behind a "see N scenes" disclosure (AnalysisResult collapsed). */
+.analysis-more > summary { width: fit-content; padding: 6px 0; color: var(--link); font-size: 14px; font-weight: 600; cursor: pointer; }
+@media (pointer: coarse) { .analysis-more > summary { padding: 12px 0; } }
+/* The shared reference videos: as many columns as fit (1 in a form column or on a phone, 2 at 1440, 3 at 1920) instead of rows across the whole panel. */
+.shared-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
 .analysis-history { margin-top: 24px; }
 .analysis-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .analysis-item { position: relative; }

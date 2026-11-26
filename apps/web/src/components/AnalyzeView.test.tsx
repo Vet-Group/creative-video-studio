@@ -31,6 +31,15 @@ test('shows the mapped format, the hook, each shot English prompt and a link tha
   expect(html).toContain('Dùng cả kịch bản'); // every scene fits Create's prompt box
 });
 
+test('collapsed (the Examples tab) keeps the scenes behind a "Xem N cảnh" disclosure, while the hook and the script button stay in view', () => {
+  const html = renderToStaticMarkup(<AnalysisResult analysis={analysis} collapsed />);
+  const more = html.indexOf('<details class="analysis-more"><summary>Xem 2 cảnh</summary>');
+  expect(more).toBeGreaterThan(html.indexOf('Clean apparel presentation.'));
+  expect(more).toBeGreaterThan(html.indexOf('Dùng cả kịch bản'));
+  expect(html.indexOf('Model poses to showcase a plain white t-shirt.')).toBeGreaterThan(more); // the scenes sit inside it
+  expect(renderToStaticMarkup(<AnalysisResult analysis={analysis} />)).not.toContain('analysis-more'); // a real result shows every scene
+});
+
 test('with long detailed prompts the script button says how many first scenes fit, and each scene still reads in full', () => {
   const shots = [1, 2, 3, 4].map((i) => ({ index: i, start: i - 1, end: i, role: 'mood', point: `Beat ${i}.`, prompt: `${'word '.repeat(140)}${i}` }));
   const vi = { format: '', hook: '', summary: '', shots: shots.map((s) => `Cận cảnh ngang tầm mắt, người mẫu đưa sản phẩm lại gần máy quay. ${'Rồi xoay nhẹ. '.repeat(30)}${s.index}`) };

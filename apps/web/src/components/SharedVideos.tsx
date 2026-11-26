@@ -52,7 +52,7 @@ export function SharedVideos({ busy, currentId, onPick, initial = [] }: { busy: 
         Video mẫu
       </h2>
       <p className="help">Chọn một video mẫu, thêm ảnh sản phẩm của bạn, AI sẽ thay sản phẩm vào các cảnh đã chọn.</p>
-      <ul className="analysis-list">
+      <ul className="analysis-list shared-list">
         {items.map((v) => (
           <li key={v.id} className="analysis-item">
             <button type="button" className="analysis-card" aria-current={v.id === currentId ? 'true' : undefined} disabled={busy || opening} onClick={() => void open(v.id)}>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ComponentProps, createContext, Fragment, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { api, ApiError, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob, withWorkspace, WORKSPACE_CHANGED_EVENT } from '@/lib/api';
-import { appBySlug, itemLabel } from '@/lib/apps';
+import { appBySlug, isNewApp, itemLabel } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
 import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
@@ -19,6 +19,7 @@ import { loginFor } from '@/lib/return-to';
 import { APPS_OPEN_KEY, appShortcuts, COLLAPSED_COOKIE, isMac, isPaletteShortcut, isSettingsShortcut, navGroups } from '@/lib/sidebar';
 import { confirmRerun, confirmRun } from '@/lib/run-guard';
 import { type TurntableRun, turntableRuns } from '@/lib/turntable-runs';
+import { useHydrated } from '@/lib/use-hydrated';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { ChangelogPopup } from './ChangelogPopup';
@@ -760,11 +761,12 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
 
 /**
  * The "Ứng dụng" row with a chevron that opens a sub-list of the apps behind it (Jewelry Try-On to Background Changer, as on the reference site), under the
- * "Tất cả ứng dụng" link. The choice is kept in localStorage (closed until chosen, and always when storage is unavailable); the icon rail hides both.
+ * "Tất cả ứng dụng" link; an app launched in the last NEW_DAYS days carries the New badge. The choice is kept in localStorage (closed until chosen, and always when storage is unavailable); the icon rail hides both.
  */
 function AppsNav({ row, pathname }: { row: ReactNode; pathname: string }) {
   const listId = useId();
   const apps = appShortcuts(useSmartRemakeEnabled());
+  const hydrated = useHydrated(); // the New badge reads the viewer's clock
   const [open, setOpen] = useState(false);
   useEffect(() => {
     try {
@@ -777,10 +779,15 @@ function AppsNav({ row, pathname }: { row: ReactNode; pathname: string }) {
     } catch {}
     setOpen(!open);
   }
-  const item = (href: string, text: string, current: boolean) => (
+  const item = (href: string, text: string, current: boolean, isNew = false) => (
     <li key={href}>
       <Link href={href} aria-current={current ? 'page' : undefined}>
         {text}
+        {isNew && (
+          <span className="nav-badge" aria-hidden="true">
+            Mới
+          </span>
+        )}
       </Link>
     </li>
   );
@@ -794,7 +801,7 @@ function AppsNav({ row, pathname }: { row: ReactNode; pathname: string }) {
       </div>
       <ul id={listId} className="nav-sub" aria-label="Ứng dụng nhanh" hidden={!open}>
         {item('/apps', 'Tất cả ứng dụng', pathname === '/apps')}
-        {apps.map((a) => item(`/apps/${a.slug}`, a.name, pathname === `/apps/${a.slug}`))}
+        {apps.map((a) => item(`/apps/${a.slug}`, a.name, pathname === `/apps/${a.slug}`, hydrated && isNewApp(a)))}
       </ul>
     </>
   );
@@ -943,7 +950,8 @@ export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], f
   const accountMenu = (variant: 'chip' | 'avatar') => (
     <AccountMenu name={userName} email={account.email} color={userAvatarColor(userName, account.avatarColor)} variant={variant} onSettings={setSettings} />
   );
-  const groups = navGroups(isAdmin, feedbackNew, analyzeEnabled, workspace.owner && !workspace.company);
+  const hydrated = useHydrated(); // the New badge reads the viewer's clock, so the server leaves it out
+  const groups = navGroups(isAdmin, feedbackNew, analyzeEnabled, workspace.owner && !workspace.company, hydrated ? Date.now() : undefined);
   // An app page is named by its app (Smart Remake), the other pages by PAGE_TITLES; the tab title carries the same name.
   const page = (pathname.startsWith('/apps/') ? appBySlug(pathname.split('/')[2]!)?.name : undefined) ?? PAGE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1];
   const title = page ?? 'Creative Video Studio';
