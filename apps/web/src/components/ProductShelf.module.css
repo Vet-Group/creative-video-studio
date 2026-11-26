@@ -1,0 +1,20 @@
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 0 0 16px; }
+.top p { margin: 0; }
+.filter { flex: 1 1 220px; max-width: 280px; }
+.filter > :global(.field) { margin-top: 0; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+.card { display: grid; gap: 8px; align-content: start; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.photos img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px; background: var(--fill); }
+.photos img:first-child { grid-column: 1 / -1; aspect-ratio: 4 / 3; border-radius: 10px; }
+.card h3 { margin: 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 600; overflow-wrap: anywhere; }
+.card p { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.actions :is(button, a) { min-height: 32px; padding: 0 10px; font-size: 13px; }
+.form { display: grid; gap: 12px; }
+.form > h2 { margin: 0; }
+.form :global(.field) { margin: 0; }
+/* Phones: 44 px taps; the card actions wrap, so each row's hit area ends where the next begins. */
+@media (max-width: 480px) {
+  .actions :is(button, a) { display: inline-flex; align-items: center; min-height: 44px; }
+}

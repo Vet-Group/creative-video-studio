@@ -26,6 +26,7 @@ import { ImageToolButtons } from './ImageToolButtons';
 import { useFreshResults, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
+import { ProductShelf } from './ProductShelf';
 import { UndoNotice, type UndoNote } from './UndoNotice';
 import { VerdictGuide } from './VerdictGuide';
 import { useZipDownload } from './ZipDownload';
@@ -44,7 +45,7 @@ function readPlace(): { query: string; count: number; y: number } | null {
 const today = (daysBack = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(Date.now() - daysBack * 86_400_000));
 const fmtShort = (iso: string) => new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
-/** The Library filters in the reference order; the id is the `kind` the API takes. */
+/** The Library filters in the reference order; the id is the `kind` the API takes, except `products`, the shelf, which is not a kind of clip. */
 const KINDS = [
   { id: 'all', label: 'Tất cả' },
   { id: 'images', label: 'Tất cả ảnh' },
@@ -58,6 +59,7 @@ const KINDS = [
   { id: 'marketing_unboxing', label: 'Mở hộp' },
   { id: 'marketing_review', label: 'Đánh giá sản phẩm' },
   { id: 'apps', label: 'Ứng dụng' },
+  { id: 'products', label: 'Sản phẩm' },
 ];
 /** The kind of each app, for the second row of pills under the Apps pill: the id is the app's feature, the `kind` the API takes. */
 const APP_KINDS = JOB_APPS.map((a) => ({ id: a.feature, label: a.name }));
@@ -1168,6 +1170,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
     }
   }, [pickDay]);
   const active = activeFilters(filters);
+  const shelf = filters.kind === 'products';
   const inApps = filters.kind === 'apps' || APP_KINDS.some((k) => k.id === filters.kind);
   const chips = activeFilterChips(filters, { creator: creators.find((c) => c.id === filters.creator)?.name, store: storeNames.find((s) => s.id === filters.store)?.name, kind: [...KINDS, ...APP_KINDS].find((k) => k.id === filters.kind)?.label });
   const inSheet = chips.filter((c) => c.key !== 'q' && c.key !== 'kind').length; // the search box and the type pills stay on the page
@@ -1203,6 +1206,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
     // How many came while more wait, null at the end or on an error, undefined when a newer load took over. `refresh` puts the new items of page 1 on top of the list shown instead of replacing it.
     async (offset: number, refresh = false): Promise<number | null | undefined> => {
       const ticket = ++latest.current;
+      if (filters.kind === 'products') return null; // the shelf shows no clips; the ticket bump above drops an answer still in flight from the pill before
       try {
         const r = await api<{ hasMore: boolean; isAdmin: boolean; unmarked: number; creators: { id: string; name: string }[]; stores: { id: string; name: string }[]; ratios: string[]; clips: Clip[] }>(`/api/library?${libraryQuery(filters, offset)}`);
         if (ticket !== latest.current) return undefined;
@@ -1358,6 +1362,12 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
     setPickDay(false);
     setFilters((cur) => ({ ...NO_FILTERS, sort: cur.sort, showSystem: cur.showSystem }));
   }
+  /** The shelf pill: like Xoá lọc, it clears the search and every filter, so the address is /library?kind=products. */
+  function showShelf() {
+    setSearch('');
+    setPickDay(false);
+    set({ ...NO_FILTERS, kind: 'products' });
+  }
   function clearOne(key: ChipKey) {
     if (key === 'q') setSearch('');
     else if (key === 'days' || key === 'date') (setPickDay(false), set({ days: '', date: '' }));
@@ -1503,7 +1513,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
         </button>
       </p>
       <VerdictGuide open={guide} onClose={() => setGuide(false)} />
-      <div className="library-tools">
+      {!shelf && <div className="library-tools">
         <label className="library-search">
           <Icon name="search" />
           <span className="sr-only">Tìm kiếm</span>
@@ -1537,10 +1547,10 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           <Icon name={copied ? 'check' : 'link'} />
           {copied && <span className="sr-only">Đã sao chép liên kết.</span>}
         </button>
-      </div>
+      </div>}
       <div className="kinds kinds-wrap" role="group" aria-label="Loại">
         {KINDS.map((k) => (
-          <button key={k.id} type="button" aria-pressed={filters.kind === k.id || (k.id === 'apps' && inApps)} onClick={() => set({ kind: k.id })}>
+          <button key={k.id} type="button" aria-pressed={filters.kind === k.id || (k.id === 'apps' && inApps)} onClick={() => (k.id === 'products' ? showShelf() : set({ kind: k.id }))}>
             {k.label}
           </button>
         ))}
@@ -1554,7 +1564,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           ))}
         </div>
       )}
-      <div className="library-filters" role="search" aria-label="Bộ lọc">
+      {!shelf && <div className="library-filters" role="search" aria-label="Bộ lọc">
         {phone ? (
           <button type="button" className="library-toggle" aria-haspopup="dialog" onClick={() => setFiltering(true)}>
             <Icon name="sliders" />
@@ -1564,8 +1574,8 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           fields
         )}
         {activeChips}
-      </div>
-      {phone && (
+      </div>}
+      {phone && !shelf && (
         <Modal open={filtering} onClose={() => setFiltering(false)} label="Bộ lọc" className="template-sheet library-sheet">
           <h2>Bộ lọc</h2>
           <div className="library-sheet-fields">{fields}</div>
@@ -1575,6 +1585,10 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
         </Modal>
       )}
 
+      {shelf ? (
+        <ProductShelf />
+      ) : (
+        <>
       {state === 'loading' && clips.length === 0 && (
         <div className={view === 'list' ? 'library-list library-skeleton' : 'grid library-skeleton'} style={{ '--card-min': SIZES[size] } as CSSProperties} role="status">
           <span className="sr-only">Đang tải...</span>
@@ -1666,7 +1680,9 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           Tải thêm
         </button>
       )}
-      {zip.bar}
+        </>
+      )}
+      {!shelf && zip.bar}
       <UndoNotice note={undo} onClose={() => setUndo(null)} />
     </section>
   );
