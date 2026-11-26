@@ -1,7 +1,7 @@
 // Integration test of migration 0002 on a disposable database (needs the compose Postgres: `pnpm services:up`).
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { ALWAYS_AUDIO, AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../../core/src/models';
+import { ALWAYS_AUDIO, AUDIO_USD_PER_SECOND, BAKEOFF_MODELS, EXTRA_INPUT_IMAGE_USD, FAL_TEXT_ENDPOINTS } from '../../core/src/models';
 import { tokenCost } from '../../core/src/providers/byteplus';
 import { VIDEO_BODIES, videoInputs } from '../../core/src/providers/fal';
 import { VERTEX_OMNI_MODEL } from '../../core/src/providers/vertex-omni';
@@ -190,7 +190,7 @@ describe('migration 0028 prompt limits', () => {
 describe('migration 0015 Fash video models', () => {
   test('adds 22 fal video models, disabled and complete, each with a request builder and its sources', async () => {
     const { rows } = await pool.query(
-      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and (not enabled or id = 'veo-3.1') and id !~ '^minimax-h3-max.*-(480|1080)p$' and id <> 'seedance-2.5-image-1080p' order by id`, // 0036's and 0094's resolution rows have their own tests; 0075 switches Veo 3.1 on
+      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and (not enabled or id = 'veo-3.1') and id !~ '^minimax-h3-max.*-(480|1080)p$' and id <> 'seedance-2.5-image-1080p' and id !~ '^(veo-3.1-(lite|fast)|minimax-h3-max-turbo.*)$' order by id`, // 0036's and 0094's resolution rows have their own tests; 0075 switches Veo 3.1 on
     );
     expect(rows).toHaveLength(22);
     for (const r of rows) {
@@ -358,7 +358,7 @@ describe('migration 0035 user choices', () => {
 
 describe('migration 0007 image models', () => {
   test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
-    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'multi_angle']::text[] and id not like 'gpt-image-2.5%' and provider = 'fal' order by id`);
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'multi_angle']::text[] and id not like 'gpt-image-2.5%' and id <> 'seedream-5.5' and provider = 'fal' order by id`);
     expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices])).toEqual([
       ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.281', '2K': '0.301', '4K': '0.530' }],
@@ -506,7 +506,7 @@ describe('migrations 0032 and 0034 Try On bake-off prior', () => {
 describe('migration 0036 Minimax H3 Max resolutions', () => {
   test('adds disabled 480P and 1080P rows beside each 768P Minimax H3 Max row, at the fal price, otherwise the same as their twin', async () => {
     const { rows } = await pool.query(
-      `select id, endpoint, label, output_resolution as res, usd_per_second::text as usd, enabled, features, ratios, durations_sec, max_images from model_configs where id like 'minimax-h3-max%' order by id`,
+      `select id, endpoint, label, output_resolution as res, usd_per_second::text as usd, enabled, features, ratios, durations_sec, max_images from model_configs where id like 'minimax-h3-max%' and id not like 'minimax-h3-max-turbo%' order by id`,
     );
     expect(rows.map((r) => [r.id, r.endpoint, r.label, r.res, r.usd])).toEqual([
       ['minimax-h3-max', 'minimax/h3-max/image-to-video', 'MiniMax H3 Max', '768p', '0.0800'],
@@ -1129,5 +1129,42 @@ describe('migration 0119 team report exclusion', () => {
     await pool.query(`update teams set excluded_from_reports = true where id = 'team-0119'`);
     expect((await pool.query(`select excluded_from_reports from teams where id = 'team-0119'`)).rows[0].excluded_from_reports).toBe(true);
     await expect(pool.query(`update teams set excluded_from_reports = null where id = 'team-0119'`)).rejects.toThrow(/null value/);
+  });
+});
+
+describe('migration 0120 cheaper fal models', () => {
+  const ids = ['minimax-h3-max-turbo', 'minimax-h3-max-turbo-1080p', 'minimax-h3-max-turbo-480p', 'seedream-5.5', 'veo-3.1-fast', 'veo-3.1-lite'];
+
+  test('adds six rows, disabled and no twin of anything, each with a request builder, a label and the facts of its fal page', async () => {
+    const { rows } = await pool.query(`select id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, max_prompt_chars, output_resolution, usd_per_second::text as usd, image_prices, enabled, twin_of, sources from model_configs where id = any($1) order by id`, [ids]);
+    expect(rows.map((r) => [r.id, r.endpoint, r.label, r.output_resolution, r.usd, r.image_prices, r.max_prompt_chars])).toEqual([
+      ['minimax-h3-max-turbo', 'minimax/h3-max-turbo/image-to-video', 'MiniMax H3 Max Turbo', '768p', '0.0400', null, 50000],
+      ['minimax-h3-max-turbo-1080p', 'minimax/h3-max-turbo/image-to-video', 'MiniMax H3 Max Turbo 1080p', '1080p', '0.0800', null, 50000],
+      ['minimax-h3-max-turbo-480p', 'minimax/h3-max-turbo/image-to-video', 'MiniMax H3 Max Turbo 480p', '480p', '0.0250', null, 50000],
+      ['seedream-5.5', 'bytedance/seedream/v5.5/edit', 'Seedream 5.5', null, null, { '1K': '0.042', '2K': '0.0525' }, 2000],
+      ['veo-3.1-fast', 'fal-ai/veo3.1/fast/image-to-video', 'Veo 3.1 Fast', '720p', '0.1000', null, 20000],
+      ['veo-3.1-lite', 'fal-ai/veo3.1/lite/image-to-video', 'Veo 3.1 Lite', '720p', '0.0300', null, 20000],
+    ]);
+    for (const r of rows) {
+      expect([r.provider, r.enabled, r.twin_of], r.id).toEqual(['fal', false, null]);
+      if (r.kind === 'video') {
+        expect(VIDEO_BODIES[r.endpoint], r.id).toBeDefined();
+        expect(r.durations_sec, r.id).toEqual(r.id.startsWith('veo') ? [4, 6, 8] : [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+        expect(r.ratios, r.id).toEqual(r.id.startsWith('veo') ? ['9:16', '16:9'] : ['9:16', '1:1']);
+        expect(Object.keys(r.sources).sort(), r.id).toEqual(['durationsSec', 'maxImages', 'maxPromptChars', 'outputResolution', 'ratios', 'usdPerSecond']);
+      } else {
+        expect(Object.hasOwn(FAL_TEXT_ENDPOINTS, r.endpoint)).toBe(true);
+        expect([r.features, r.max_images, r.durations_sec]).toEqual([['image'], 10, []]);
+        expect(Object.keys(r.sources).sort()).toEqual(['imagePrices', 'maxImages', 'ratios']);
+      }
+    }
+  });
+
+  test('an Admin can switch each row on, and the prices the app reserves are the page rates: the audio price beside Lite and Fast, the input-image fee beside Seedream', async () => {
+    await pool.query(`update model_configs set enabled = true where id = any($1)`, [ids]);
+    await pool.query(`update model_configs set enabled = false where id = any($1)`, [ids]);
+    expect([AUDIO_USD_PER_SECOND['fal-ai/veo3.1/lite/image-to-video'], AUDIO_USD_PER_SECOND['fal-ai/veo3.1/fast/image-to-video']]).toEqual([0.05, 0.15]);
+    expect(AUDIO_USD_PER_SECOND).not.toHaveProperty('minimax/h3-max-turbo/image-to-video');
+    expect(EXTRA_INPUT_IMAGE_USD['bytedance/seedream/v5.5/edit']).toBe(0.012);
   });
 });

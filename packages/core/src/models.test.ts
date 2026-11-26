@@ -57,6 +57,32 @@ test('the Seedance 2.5 1080p row keeps its own price with sound on (free on that
   expect(estimateUsd(usdPerSecondFor({ endpoint, usdPerSecond: '1.1640' }, 'on')!, 5)).toBe('5.8200');
 });
 
+describe('Veo 3.1 Lite and Fast, H3 Max Turbo and Seedream 5.5 Edit (fal model pages, read 2026-11-26)', () => {
+  const lite = { endpoint: 'fal-ai/veo3.1/lite/image-to-video', usdPerSecond: '0.0300' };
+  const fast = { endpoint: 'fal-ai/veo3.1/fast/image-to-video', usdPerSecond: '0.1000' };
+
+  test('a 4 s clip at 720p reserves $0.12 silent and $0.20 with sound on Lite, $0.40 and $0.60 on Fast', () => {
+    expect(estimateUsd(usdPerSecondFor(lite, 'off')!, 4)).toBe('0.1200');
+    expect(estimateUsd(usdPerSecondFor(lite, 'on')!, 4)).toBe('0.2000');
+    expect(estimateUsd(usdPerSecondFor(fast, 'off')!, 4)).toBe('0.4000');
+    expect(estimateUsd(usdPerSecondFor(fast, 'on')!, 4)).toBe('0.6000');
+    expect(estimateUsd(usdPerSecondFor(lite, 'on')!, 8)).toBe('0.4000');
+  });
+
+  test('H3 Max Turbo has no audio price, and 5 s costs $0.125 at 480p, $0.20 at 768p and $0.40 at 1080p', () => {
+    const turbo = 'minimax/h3-max-turbo/image-to-video';
+    expect(usdPerSecondFor({ endpoint: turbo, usdPerSecond: '0.0250' }, 'on')).toBeUndefined();
+    expect(['0.0250', '0.0400', '0.0800'].map((usd) => estimateUsd(usdPerSecondFor({ endpoint: turbo, usdPerSecond: usd }, 'off')!, 5))).toEqual(['0.1250', '0.2000', '0.4000']);
+  });
+
+  test('Seedream 5.5 Edit: the row stores one input image ($0.042 at 1K, $0.0525 at 2K) and each further image adds $0.012', () => {
+    const edit = 'bytedance/seedream/v5.5/edit';
+    const row = { image_prices: { '1K': '0.042', '2K': '0.0525' }, thinking_levels: [], thinking_prices: null };
+    const price = (res: '1K' | '2K', images: number) => (Number(imagePricesFor(row)[res]) + extraInputUsd(edit, images)).toFixed(4);
+    expect([price('1K', 1), price('1K', 2), price('1K', 10), price('2K', 1), price('2K', 2)]).toEqual(['0.0420', '0.0540', '0.1500', '0.0525', '0.0645']);
+  });
+});
+
 test('a model’s prompt limit is its own, never past the ceiling', () => {
   expect([promptLimit(2000), promptLimit(4096), promptLimit(50000)]).toEqual([2000, 4096, PROMPT_CEILING]);
   expect(PROMPT_CEILING).toBe(5000);

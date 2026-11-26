@@ -49,6 +49,7 @@ export const FAL_TEXT_ENDPOINTS: Record<string, string> = {
   'fal-ai/nano-banana/edit': 'fal-ai/nano-banana',
   'openai/gpt-image-2/edit': 'openai/gpt-image-2',
   'bytedance/seedream/v5/pro/edit': 'bytedance/seedream/v5/pro/text-to-image',
+  'bytedance/seedream/v5.5/edit': 'bytedance/seedream/v5.5/text-to-image',
 };
 
 /** Whether an image model makes a picture from words alone, as Fash's text-to-image examples do: a fal edit endpoint with a text twin, a Gemini model on Vertex (generateContent takes text only), or a mock. */
@@ -57,10 +58,10 @@ export const textToImage = (m: { provider: string; endpoint: string }): boolean 
 
 /**
  * USD per input image after the first, by endpoint: Seedream 5.0 Pro on BytePlus (https://docs.byteplus.com/en/docs/modelark/model-pricing, read 2026-11-03);
- * Flash input images are free. Nano Banana 2.1 bills 1,120 input tokens an image, at $1.764 per million on fal (https://fal.ai/models/google/nano-banana-2.1/edit)
+ * Flash input images are free. Seedream 5.5 Edit bills $0.012 for every input image, the first included (https://fal.ai/models/bytedance/seedream/v5.5/edit, read 2026-11-26), so its row stores the price with one input image ($0.03 + $0.012 at 1K) and the rest are charged here. Nano Banana 2.1 bills 1,120 input tokens an image, at $1.764 per million on fal (https://fal.ai/models/google/nano-banana-2.1/edit)
  * and $1.50 on Vertex (https://cloud.google.com/vertex-ai/generative-ai/pricing), both read 2026-11-20: small for one garment, a quarter more for Try On's 14.
  */
-export const EXTRA_INPUT_IMAGE_USD: Record<string, number> = { 'dola-seedream-5-0-pro-260628': 0.003, 'google/nano-banana-2.1/edit': 0.00198, 'gemini-nano-banana-2.1': 0.00168 };
+export const EXTRA_INPUT_IMAGE_USD: Record<string, number> = { 'dola-seedream-5-0-pro-260628': 0.003, 'bytedance/seedream/v5.5/edit': 0.012, 'google/nano-banana-2.1/edit': 0.00198, 'gemini-nano-banana-2.1': 0.00168 };
 
 /** What `images` input images add to an image job's price on this endpoint. */
 export const extraInputUsd = (endpoint: string, images: number): number => (Object.hasOwn(EXTRA_INPUT_IMAGE_USD, endpoint) ? Number((EXTRA_INPUT_IMAGE_USD[endpoint]! * Math.max(0, images - 1)).toFixed(4)) : 0);
@@ -164,7 +165,7 @@ export const validateRequest = (model: ModelConfig, req: { ratio: string; durati
 /**
  * USD per second with native audio on, by endpoint: the endpoints whose request builder sends the audio switch (fal.ts), at the price their fal model
  * page states (read 2026-10-26, https://fal.ai/models/<endpoint>), for the resolution the builder asks for. Kling O3 Pro $0.112 -> $0.14, Kling 3.0 Pro
- * $0.112 -> $0.168, Kling 2.6 Pro $0.07 -> $0.14, Veo 3.1 $0.20 -> $0.40 (720p/1080p), Seedance 1.5 Pro $1.20 -> $2.40 per million tokens (so twice the
+ * $0.112 -> $0.168, Kling 2.6 Pro $0.07 -> $0.14, Veo 3.1 $0.20 -> $0.40 (720p/1080p), Veo 3.1 Lite $0.03 -> $0.05 and Fast $0.10 -> $0.15 (720p; model pages read 2026-11-26), Seedance 1.5 Pro $1.20 -> $2.40 per million tokens (so twice the
  * stored $0.0259). Seedance 2.0 and 2.5 and FLUX 3 price by resolution and tokens only, so audio costs nothing more. Veo 3.1 on Vertex (vertex-video.ts) lists $0.20 -> $0.40 per 1 count at
  * 720p, an estimate that takes one count as one second (migration 0042). Seedance 2.x on BytePlus (byteplus.ts sends generate_audio) bills the clip's
  * tokens with or without sound: the paid canary of 2026-11-08 (scripts/byteplus-canary.ts) billed 21,780 tokens a second for 5 s of Seedance 2.0 with sound
@@ -176,6 +177,8 @@ export const AUDIO_USD_PER_SECOND: Record<string, number> = {
   'fal-ai/kling-video/v3/pro/image-to-video': 0.168,
   'fal-ai/kling-video/v2.6/pro/image-to-video': 0.14,
   'fal-ai/veo3.1/image-to-video': 0.4,
+  'fal-ai/veo3.1/lite/image-to-video': 0.05,
+  'fal-ai/veo3.1/fast/image-to-video': 0.15,
   'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': 0.0518,
   'bytedance/seedance-2.0/us/image-to-video': 0.3034,
   'bytedance/seedance-2.0/us/reference-to-video': 0.37,

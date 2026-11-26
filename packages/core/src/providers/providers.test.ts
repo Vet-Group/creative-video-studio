@@ -50,6 +50,10 @@ describe('fal', () => {
     expect(await body('fal-ai/kling-video/v3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', start_image_url: 'https://img/1.jpg', duration: '5', generate_audio: false });
     expect(await body('google/gemini-omni-flash/v1.2/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', aspect_ratio: '9:16', duration: 5, resolution: '720p' });
     expect(await body('fal-ai/veo3.1/image-to-video')).toMatchObject({ duration: '5s', generate_audio: false });
+    // Veo 3.1 Lite and Fast take the Veo 3.1 body at their own endpoints, 720p whatever their schema allows (the price rows are for 720p).
+    for (const endpoint of ['fal-ai/veo3.1/lite/image-to-video', 'fal-ai/veo3.1/fast/image-to-video']) {
+      expect(await body(endpoint)).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', aspect_ratio: '9:16', duration: '5s', resolution: '720p', generate_audio: false });
+    }
     expect(await body('blackforestlabs/flux-3/keyframes-to-video')).toMatchObject({ keyframes: [{ image_url: 'https://img/1.jpg', frame_index: 0 }], duration: 5, resolution: '1080p' });
     expect(await body('blackforestlabs/flux-3/image-to-video')).toMatchObject({ resolution: '1080p' }); // 720p comes back 704 px wide
     for (const endpoint of ['bytedance/seedance-2.5/us/image-to-video', 'blackforestlabs/flux-3/keyframes-to-video']) {
@@ -61,6 +65,8 @@ describe('fal', () => {
     // Each Minimax row asks for its own resolution: the 480P and 1080P rows share the endpoint at their own price.
     expect(await body('minimax/h3-max/reference-to-video', undefined, '1080p')).toMatchObject({ resolution: '1080P' });
     expect(await body('minimax/h3-max/image-to-video', undefined, '480p')).toMatchObject({ resolution: '480P' });
+    expect(await body('minimax/h3-max-turbo/image-to-video', undefined, '480p')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', duration: 5, resolution: '480P', prompt_expansion_mode: 'balanced' });
+    expect(await body('minimax/h3-max-turbo/image-to-video', undefined, '1080p')).toMatchObject({ resolution: '1080P' });
     expect(await body('fal-ai/minimax/hailuo-2.3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg' });
   });
 
@@ -83,7 +89,7 @@ describe('fal', () => {
     expect(withEnd.sort()).toEqual([
       'bytedance/seedance-2.0/us/image-to-video', 'bytedance/seedance-2.5/us/image-to-video', 'fal-ai/bytedance/seedance/v1.5/pro/image-to-video', 'fal-ai/bytedance/seedance/v1/pro/image-to-video',
       'fal-ai/kling-video/o3/pro/reference-to-video', 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video', 'fal-ai/kling-video/v2.6/pro/image-to-video', 'fal-ai/kling-video/v3/pro/image-to-video',
-      'fal-ai/wan/v2.7/image-to-video', 'google/gemini-omni-flash/v1.2/image-to-video', 'minimax/h3-max/image-to-video', 'minimax/h3-max/reference-to-video',
+      'fal-ai/wan/v2.7/image-to-video', 'google/gemini-omni-flash/v1.2/image-to-video', 'minimax/h3-max-turbo/image-to-video', 'minimax/h3-max/image-to-video', 'minimax/h3-max/reference-to-video',
     ]);
     const crops: Record<string, (string | undefined)[]> = {};
     const { fn, calls } = fakeFetch(...withEnd.map(() => [200, { request_id: 'r' }] as [number, unknown]));
@@ -199,11 +205,14 @@ describe('fal', () => {
       'google/gemini-omni-flash/v1.2/reference-to-video': 'google/gemini-omni-flash/v1.2/text-to-video',
       'google/gemini-omni-flash/v1.2/image-to-video': 'google/gemini-omni-flash/v1.2/text-to-video',
       'fal-ai/veo3.1/image-to-video': 'fal-ai/veo3.1',
+      'fal-ai/veo3.1/lite/image-to-video': 'fal-ai/veo3.1/lite',
+      'fal-ai/veo3.1/fast/image-to-video': 'fal-ai/veo3.1/fast',
       'xai/grok-imagine-video/v1.5/image-to-video': 'xai/grok-imagine-video/v1.5/text-to-video',
       'fal-ai/wan/v2.7/reference-to-video': 'fal-ai/wan/v2.7/text-to-video',
       'fal-ai/wan/v2.7/image-to-video': 'fal-ai/wan/v2.7/text-to-video',
       'minimax/h3-max/reference-to-video': 'minimax/h3-max/text-to-video',
       'minimax/h3-max/image-to-video': 'minimax/h3-max/text-to-video',
+      'minimax/h3-max-turbo/image-to-video': 'minimax/h3-max-turbo/text-to-video',
     });
     const app = (e: string) => e.split('/').slice(0, 2).join('/');
     const { fn, calls } = fakeFetch(...withText.flatMap(() => [[200, { request_id: 'r' }], [200, { request_id: 'r' }]] as [number, unknown][]));
