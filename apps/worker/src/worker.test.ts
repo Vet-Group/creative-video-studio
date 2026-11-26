@@ -573,6 +573,23 @@ describe('Motion Control orientation', () => {
   });
 });
 
+describe('Hook effects padding', () => {
+  test('a hook_effect job asks the adapter to pad its frames; any other job sends no pad', async () => {
+    const requests: SubmitRequest[] = [];
+    await start(counting(300, (inner) => ({ ...inner, submit: async (req) => (requests.push(req), inner.submit(req)) })));
+    const hook = await newJob('u1', { prompt: 'hook' });
+    await pool.query(`update jobs set feature = 'hook_effect' where id = $1`, [hook]);
+    const plain = await newJob('u2', { prompt: 'plain' });
+    await send(hook, 'u1');
+    await send(plain, 'u2');
+    await waitFor('both submits', async () => requests.length === 2);
+    const by = Object.fromEntries(requests.map((r) => [r.prompt, r]));
+    expect(by.hook!.pad).toBe(true);
+    expect(by.plain!.pad).toBeUndefined();
+    await waitFor('both jobs to finish', async () => (await status(hook)) === 'succeeded' && (await status(plain)) === 'succeeded');
+  });
+});
+
 describe('Motion Control reference length', () => {
   /** A Motion Control job on a model that takes up to 30 s, whose reference plays `seconds` and whose header says the same. */
   async function motionJob(user: string, prompt: string, ref: string, seconds: number, orientation: string): Promise<string> {

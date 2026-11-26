@@ -3,19 +3,19 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-apps';
 import { GARMENT_PRESETS, POSE_PRESETS, POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, relatedApps, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, HOOK_EFFECTS, hookEffect, hookEffectPrompt, hookReason, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, JOB_APPS, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, relatedApps, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has twenty-one apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
-    expect(APPS).toHaveLength(21);
-    expect(new Set(APPS.map((a) => a.slug)).size).toBe(21);
+  it('has twenty-two apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
+    expect(APPS).toHaveLength(22);
+    expect(new Set(APPS.map((a) => a.slug)).size).toBe(22);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
-      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && !['breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set'].includes(a.feature) && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
+      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && !['breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set', 'hook_effect'].includes(a.feature) && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
     }
   });
 
@@ -23,14 +23,14 @@ describe('the app list', () => {
     expect(appBySlug('smart-remake')).toMatchObject({ slots: [], feature: 'video', category: 'video' });
   });
 
-  it('offers Smart Remake only when its flags are on: the first twenty apps keep their places and it comes last', () => {
-    expect(visibleApps(false)).toHaveLength(20);
+  it('offers Smart Remake only when its flags are on: the first twenty-one apps keep their places and it comes last', () => {
+    expect(visibleApps(false)).toHaveLength(21);
     expect(visibleApps(false).map((a) => a.slug)).not.toContain('smart-remake');
     expect(visibleApps(true).at(-1)!.slug).toBe('smart-remake');
-    expect(filterApps('all', '')).toHaveLength(20); // off unless asked for
-    expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
-    expect(filterApps('all', '', true)).toHaveLength(21);
-    expect(filterApps('video', '', true).map((a) => a.slug)).toEqual(['motion-control', 'smart-remake']);
+    expect(filterApps('all', '')).toHaveLength(21); // off unless asked for
+    expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control', 'hook-effects']);
+    expect(filterApps('all', '', true)).toHaveLength(22);
+    expect(filterApps('video', '', true).map((a) => a.slug)).toEqual(['motion-control', 'hook-effects', 'smart-remake']);
     expect(filterApps('all', 'remake', true).map((a) => a.slug)).toEqual(['smart-remake']);
     expect(filterApps('all', 'remake')).toEqual([]);
   });
@@ -121,7 +121,7 @@ describe('relatedApps', () => {
   it('tops a group of one up with photo apps, offers Smart Remake only when it is on, and nothing for an unknown page', () => {
     expect(slugs('media-optimizer')).toEqual(['background-changer', 'reframe', 'image-upscale']);
     expect(slugs('motion-control')).not.toContain('smart-remake');
-    expect(slugs('motion-control', true)[0]).toBe('smart-remake');
+    expect(slugs('motion-control', true)[0]).toBe('hook-effects');
     expect(slugs('smart-remake')).toEqual([]);
     expect(slugs('')).toEqual([]);
   });
@@ -129,10 +129,10 @@ describe('relatedApps', () => {
 
 describe('filterApps', () => {
   it('filters by category and by name or description, ignoring accents and case', () => {
-    expect(filterApps('all', '')).toHaveLength(20);
-    expect(filterApps('all', '').at(-1)!.slug).toBe('listing-set'); // ours comes after the live apps, which keep their order
+    expect(filterApps('all', '')).toHaveLength(21);
+    expect(filterApps('all', '').at(-1)!.slug).toBe('hook-effects'); // ours comes after the live apps, which keep their order
     expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on', 'lingerie-try-on', 'ai-fashion-model', 'pose-generator']);
-    expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
+    expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control', 'hook-effects']);
     expect(filterApps('all', 'DOI NEN').map((a) => a.slug)).toEqual(['background-changer']);
     expect(filterApps('all', 'xoá nền').map((a) => a.slug)).toContain('background-remover');
     expect(filterApps('photo', 'khuôn mặt')).toHaveLength(0);
@@ -721,5 +721,47 @@ describe('isNewApp', () => {
     expect(isNewApp({}, Date.parse('2026-11-20T00:00:00+07:00'))).toBe(false);
     // Every day set is a real date, so no card is new forever or never.
     for (const a of APPS.filter((x) => x.added)) expect(Number.isNaN(Date.parse(`${a.added}T00:00:00+07:00`))).toBe(false);
+  });
+});
+
+describe('the hook effects app', () => {
+  const END = 'From two seconds on, the product holds still, sharp and undistorted, exactly as in the image: same shape, proportions, colors, print and text, on the same background, with a steady camera. No added text or watermarks.';
+
+  it('sits after the listing set and before Smart Remake, as a video app on its own feature, and is a job app', () => {
+    const slugs = APPS.map((a) => a.slug);
+    expect(slugs.indexOf('hook-effects')).toBe(slugs.indexOf('listing-set') + 1);
+    expect(slugs.indexOf('smart-remake')).toBe(slugs.indexOf('hook-effects') + 1);
+    expect(appBySlug('hook-effects')).toMatchObject({ feature: 'hook_effect', category: 'video', name: 'Hiệu ứng mở đầu', slots: [] });
+    expect(JOB_APPS.map((a) => a.slug)).toContain('hook-effects');
+  });
+
+  it('has the four probed effects, each with its endpoint and exactly the prompt the probe sent', () => {
+    expect(HOOK_EFFECTS.map((e) => [e.id, e.label, e.endpoint])).toEqual([
+      ['squish', 'Phồng rồi bóp', 'minimax/h3-max-turbo/image-to-video'],
+      ['melt', 'Tan chảy thành sản phẩm', 'minimax/h3-max-turbo/image-to-video'],
+      ['drop', 'Rơi vào khung', 'minimax/h3-max-turbo/image-to-video'],
+      ['box-burst', 'Hộp bung mở', 'minimax/h3-max/reference-to-video'],
+    ]);
+    expect(hookEffectPrompt('squish')).toBe(`In the first second the product puffs up like a soft balloon, then an invisible press squishes it flat, and by two seconds it springs back to its exact original shape with a small wobble. ${END}`);
+    expect(hookEffectPrompt('melt')).toBe(`In the first second the product melts down into a glossy puddle of liquid in its own colors, then the liquid surges back up and re-forms into the product, its edges snapping crisp again by two seconds. ${END}`);
+    expect(hookEffectPrompt('drop')).toBe(`In the first instant the product is snapped up out of the top of the frame, then drops straight back into its place, landing with a weighty bounce and a small puff of dust by 1.5 seconds. ${END}`);
+    expect(hookEffectPrompt('box-burst')).toBe('A closed kraft gift box sits alone on a clean white surface. At one second the box bursts open, its walls flying outward out of frame, revealing the product from Image 1 standing in the center. From two seconds on, the product holds still, sharp and undistorted, exactly as in Image 1: same shape, proportions, colors, print and text, with a steady camera. No added text or watermarks.');
+    expect(hookEffect('confetti')).toBeUndefined();
+  });
+
+  it('labels and prompts a job by its effect, and a removed effect names nothing without throwing', () => {
+    expect(itemPrompt('hook_effect', { effect: 'melt' })).toBe(hookEffectPrompt('melt'));
+    expect(itemLabel({ effect: 'melt' })).toBe('Tan chảy thành sản phẩm');
+    expect(itemLabel({ effect: 'confetti' })).toBeNull();
+  });
+
+  it('says what stops a Run in the order the form is filled', () => {
+    const models = (count: number, best: string | null, failed = false) => ({ count, best, failed });
+    expect(hookReason({ models: null, photo: false })).toBe('Đang tải danh sách mô hình...');
+    expect(hookReason({ models: models(0, null, true), photo: false })).toBe('Không tải được danh sách mô hình.');
+    expect(hookReason({ models: models(0, null), photo: false })).toBe('Hiệu ứng này chưa được Admin bật');
+    expect(hookReason({ models: models(1, null), photo: false })).toBe('Hiệu ứng này tạm thời không chạy được.');
+    expect(hookReason({ models: models(1, 'm'), photo: false })).toBe('Tải lên ảnh: Sản phẩm.');
+    expect(hookReason({ models: models(1, 'm'), photo: true })).toBeNull();
   });
 });

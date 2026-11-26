@@ -1253,6 +1253,56 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'hook-effects': {
+    title: 'Video mở đầu gây chú ý từ một ảnh sản phẩm',
+    sections: [
+      {
+        title: 'Hiệu ứng mở đầu là gì?',
+        blocks: [
+          'Từ một ảnh sản phẩm, ứng dụng tạo video dọc 5 giây có hiệu ứng gây chú ý trong 2–3 giây đầu, rồi sản phẩm trở lại đúng như trong ảnh: phồng rồi bóp, tan chảy rồi hiện lại, rơi vào khung hoặc bung ra từ một chiếc hộp. Dùng làm đoạn mở đầu để người xem dừng lại khi lướt.',
+          `Ảnh không đúng khung dọc 9:16 được thêm viền cùng màu nền hai bên hoặc trên dưới, sản phẩm không bị cắt, và đoạn cuối luôn trùng với ảnh bạn tải lên. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Tạo video trong 3 bước',
+        lead: 'Tải ảnh sản phẩm, chọn hiệu ứng, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải ảnh sản phẩm', text: 'Dùng một ảnh rõ nét, sản phẩm ở giữa, nền trơn; ảnh nền trắng cho kết quả sạch nhất.' },
+              { title: 'Chọn hiệu ứng', text: 'Bốn hiệu ứng: Phồng rồi bóp, Tan chảy thành sản phẩm, Rơi vào khung và Hộp bung mở. Hiệu ứng đang chọn phát video mẫu.' },
+              { title: 'Chạy', text: 'Bấm Chạy và xem video trong tab Lịch sử. Muốn hiệu ứng khác với cùng ảnh, chọn hiệu ứng đó rồi chạy lại.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Mẹo để có kết quả đẹp',
+        blocks: [
+          {
+            list: [
+              'Chữ nhỏ trên sản phẩm có thể bị nhoè hoặc méo trong lúc hiệu ứng chạy; nên dùng sản phẩm có chữ to hoặc ít chữ.',
+              'Clip có sẵn âm thanh do mô hình tự tạo, có thể có tiếng nói; tắt tiếng khi ghép video nếu không cần.',
+              'Hiệu ứng rơi vào đúng khung ở 2–3 giây đầu; phần còn lại là sản phẩm đứng yên, hợp để chèn chữ hoặc ghép tiếp cảnh sau.',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Một lần chạy tốn bao nhiêu?', `${APP_COST} Với giá hiện tại, ba hiệu ứng đầu khoảng $0.125 một clip, còn Hộp bung mở khoảng $0.25 vì dùng mô hình khác. Chi phí thật nằm trên video trong Thư viện.`],
+              ['Sản phẩm có bị cắt hay đổi hình không?', 'Không bị cắt: ảnh được thêm viền thay vì cắt. Đoạn cuối trùng với ảnh gốc; chỉ phần hiệu ứng ở đầu làm sản phẩm biến dạng tạm thời.'],
+              ['Chữ trên sản phẩm có giữ được không?', 'Đoạn cuối giữ chữ như trong ảnh, nhưng chữ nhỏ có thể bị nhoè hoặc méo trong lúc hiệu ứng chạy. Hãy xem lại video trước khi đăng.'],
+              ['Vì sao Hộp bung mở đắt hơn?', 'Hiệu ứng này chạy trên một mô hình khác, dùng ảnh sản phẩm làm ảnh tham chiếu để hiện ra từ chiếc hộp, nên giá mỗi clip cao hơn ba hiệu ứng còn lại.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'smart-remake': {
     title: 'Làm lại video mẫu với sản phẩm của bạn',
     sections: [

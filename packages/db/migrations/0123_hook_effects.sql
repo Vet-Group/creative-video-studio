@@ -1,0 +1,6 @@
+ALTER TABLE "jobs" DROP CONSTRAINT "jobs_feature_check";--> statement-breakpoint
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_feature_check" CHECK ("jobs"."feature" in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on', 'fashion_model', 'multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set', 'hook_effect'));--> statement-breakpoint
+-- Hook effects app (owner-approved 2026-11-26, probe 2026-11-27, apps/web/src/lib/apps.ts): one job feature, `hook_effect`, a 50 USD soft cap, and the two MiniMax H3 480P rows it runs on
+-- (Turbo image-to-video for squish, melt and drop; Max reference-to-video for box-burst). No row is enabled or repriced here.
+INSERT INTO "feature_caps" ("feature", "monthly_usd") VALUES ('hook_effect', 50) ON CONFLICT DO NOTHING;--> statement-breakpoint
+UPDATE "model_configs" SET "features" = array_append("features", 'hook_effect'), "updated_at" = now() WHERE "id" IN ('minimax-h3-max-turbo-480p', 'minimax-h3-max-reference-480p') AND NOT 'hook_effect' = ANY("features");

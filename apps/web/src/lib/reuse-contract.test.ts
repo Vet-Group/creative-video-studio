@@ -38,6 +38,7 @@ const READERS: Record<string, string[]> = {
   background: ['components/AppPage.tsx'], // the pose generator's background
   color: ['components/AppPage.tsx'], // the product recolor app's colour
   shot: ['components/AppPage.tsx'], // the listing set's shot
+  effect: ['components/HookEffectsApp.tsx'], // the hook effects app's effect
   format: ['components/MarketingStudio.tsx'],
   hook: ['components/MarketingStudio.tsx'],
   location: ['components/MarketingStudio.tsx'],

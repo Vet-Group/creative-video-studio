@@ -255,6 +255,8 @@ export const USERS = {
   // preset-notes.e2e: the preset card on Create, and Marketing Studio's format filter on History and Examples.
   notea: { email: 'notea@e2e.test', name: 'E2E Notes A', role: 'member' },
   noteb: { email: 'noteb@e2e.test', name: 'E2E Notes B', role: 'member' },
+  // hook-effects.e2e: the hook effects app, its History, Reuse and Library chip.
+  hooka: { email: 'hooka@e2e.test', name: 'E2E Hook A', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;
