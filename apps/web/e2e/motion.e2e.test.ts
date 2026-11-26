@@ -101,3 +101,60 @@ for (const scheme of ['light', 'dark'] as const) {
     });
   });
 }
+
+// A person's tab switch cross-fades the panels in a view transition at the fast duration (WorkTabs); the shown tab, a switch under reduced motion and
+// About's back-to-form button (a click from code, which reads the form in the next frame) switch at once, as before.
+test('a tab switch cross-fades in a short view transition at 1440 and 390 px, and not under reduced motion', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  // Counts the transitions and keeps the durations of the last one's animations.
+  await page.addInitScript(() => {
+    const w = window as unknown as { fades: number; durations?: number[] };
+    const start = document.startViewTransition.bind(document);
+    w.fades = 0;
+    document.startViewTransition = (update?: Parameters<typeof start>[0]) => {
+      w.fades++;
+      const t = start(update);
+      t.ready.then(
+        () => (w.durations = document.documentElement.getAnimations({ subtree: true }).filter((a) => (a.effect as KeyframeEffect).pseudoElement?.startsWith('::view-transition')).map((a) => Number(a.effect!.getTiming().duration))),
+        () => {},
+      );
+      return t;
+    };
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await signIn(page, 'motion');
+  const fades = () => page.evaluate(() => (window as unknown as { fades: number }).fades);
+  const tab = (name: string) => page.getByRole('tab', { name, exact: true });
+
+  await tab('Lịch sử').click();
+  await expect(tab('Lịch sử')).toHaveAttribute('aria-selected', 'true');
+  expect(await fades()).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { durations?: number[] }).durations?.length ?? 0)).toBeGreaterThan(0);
+  expect(new Set(await page.evaluate(() => (window as unknown as { durations: number[] }).durations))).toEqual(new Set([150]));
+  // The keyboard fades too; the tab already shown does not.
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('Ví dụ')).toHaveAttribute('aria-selected', 'true');
+  await tab('Ví dụ').click();
+  expect(await fades()).toBe(2);
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await tab('Giới thiệu').click();
+  await expect(tab('Giới thiệu')).toHaveAttribute('aria-selected', 'true');
+  expect(await fades()).toBe(2);
+
+  // On a phone the form is a tab of its own.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await tab('Tạo').click();
+  await expect(tab('Tạo')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#create-panel-create')).toBeVisible();
+  expect(await fades()).toBe(3);
+  await tab('Giới thiệu').click();
+  await page.getByRole('region', { name: 'Bắt đầu' }).getByRole('button', { name: 'Mở form' }).click();
+  await expect(tab('Tạo')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#create-panel-create :focus')).toHaveCount(1);
+  expect(await fades()).toBe(4);
+  expect(errors).toEqual([]);
+});

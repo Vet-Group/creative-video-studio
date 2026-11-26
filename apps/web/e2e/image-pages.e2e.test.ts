@@ -609,6 +609,7 @@ for (const [width, height] of [[390, 844], [1024, 768], [1440, 1000]] as const) 
       await expect(page.getByRole('tab').first()).toBeVisible();
       for (const tab of await page.getByRole('tab').all()) {
         await tab.click();
+        await expect(tab).toHaveAttribute('aria-selected', 'true'); // a switch lands after its cross-fade's first snapshot, a frame later
         expect(await fits(), `${path} ${await tab.textContent()}`).toBe(true);
       }
     }

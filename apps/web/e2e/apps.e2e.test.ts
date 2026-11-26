@@ -665,6 +665,7 @@ for (const [width, height, columns] of [[390, 844, 2], [1024, 768, 2], [1440, 10
       heads.add(Math.round((await page.locator('.app-head').boundingBox())!.height));
       for (const tab of await page.getByRole('tab').all()) {
         await tab.click();
+        await expect(tab).toHaveAttribute('aria-selected', 'true'); // a switch lands after its cross-fade's first snapshot, a frame later
         expect(await fits(page), `${slug} ${await tab.textContent()}`).toBe(true);
       }
     }

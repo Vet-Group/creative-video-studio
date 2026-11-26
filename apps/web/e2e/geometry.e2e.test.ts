@@ -216,6 +216,7 @@ test.describe('1440x1000', () => {
     const r = await box(reason);
     near((await box(bar)).y - (r.y + r.height), 8, 'reason line to divider', 1);
     await tab(page, 'Lịch sử').click(); // the Examples pane scrolls the page, as on the live site; an empty History keeps it one screen tall
+    await expect(tab(page, 'Lịch sử')).toHaveAttribute('aria-selected', 'true');
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   });
 
@@ -511,6 +512,7 @@ test.describe('1280x800', () => {
     await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
     near((await box(run)).y, b.y, 'run y after scrolling the form', 1);
     await tab(page, 'Lịch sử').click(); // as in C2: an empty History keeps the page one screen tall
+    await expect(tab(page, 'Lịch sử')).toHaveAttribute('aria-selected', 'true');
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   });
 

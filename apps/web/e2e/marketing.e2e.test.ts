@@ -310,11 +310,13 @@ for (const [width, height] of [[390, 844], [1024, 768], [1440, 1000]] as const) 
     if (width === 1440) expect((await page.locator('.marketing-head').boundingBox())!.height).toBe(130);
     for (const tab of await page.getByRole('tab').all()) {
       await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true'); // a switch lands after its cross-fade's first snapshot, a frame later
       expect(await fits(page), (await tab.textContent()) ?? '').toBe(true);
     }
     if (width === 390) {
       await expect(page.getByRole('tab')).toHaveText(['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu']);
       await page.getByRole('tab', { name: 'Tạo' }).click();
+      await expect(page.getByRole('tab', { name: 'Tạo' })).toHaveAttribute('aria-selected', 'true');
       expect((await page.locator('.marketing-head').boundingBox())!.height).toBe(100); // Fash's phone format card
       const run = (await runButton(page).boundingBox())!;
       expect(run.y + run.height).toBeLessThanOrEqual(height);

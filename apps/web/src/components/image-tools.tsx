@@ -2,6 +2,7 @@
 // What the Try On and Image Generation pages share: the image-model picker data, the choice of model, ratio and resolution, the upload slot,
 // the tab strip and the gallery of the company's outputs.
 import { type CSSProperties, type ImgHTMLAttributes, type KeyboardEvent, type ReactNode, type Ref, type RefObject, useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
@@ -577,21 +578,26 @@ export function RunSummary({ items }: { items: (string | false | null | undefine
   ) : null;
 }
 
-/** The tab strip of a page: arrows, Home and End move between the tabs. */
+/** The tab strip of a page: arrows, Home and End move between the tabs. A person's switch cross-fades the panels (globals.css). */
 export function WorkTabs<T extends string>({ prefix, tabs, labels, shown, onSelect }: { prefix: string; tabs: T[]; labels: Record<T, string>; shown: T; onSelect: (t: T) => void }) {
+  function select(t: T, byPerson: boolean) {
+    // A click from code (About's back-to-form button) reads the new panel in the next frame, so only a person's switch waits for the fade's snapshot.
+    if (!byPerson || t === shown || !('startViewTransition' in document) || matchMedia('(prefers-reduced-motion: reduce)').matches) return onSelect(t);
+    document.startViewTransition(() => flushSync(() => onSelect(t))).ready.catch(() => {}); // a quicker next switch skips this fade
+  }
   function onKey(e: KeyboardEvent) {
     const i = tabs.indexOf(shown);
     const moves: Record<string, number> = { ArrowRight: (i + 1) % tabs.length, ArrowLeft: (i + tabs.length - 1) % tabs.length, Home: 0, End: tabs.length - 1 };
     const next = moves[e.key];
     if (next === undefined) return;
     e.preventDefault();
-    onSelect(tabs[next]!);
+    select(tabs[next]!, e.isTrusted);
     document.getElementById(`${prefix}-tab-${tabs[next]}`)?.focus();
   }
   return (
     <div className="tabs" role="tablist" aria-label="Khu vực làm việc" onKeyDown={onKey}>
       {tabs.map((t) => (
-        <button key={t} type="button" role="tab" id={`${prefix}-tab-${t}`} aria-selected={shown === t} aria-controls={shown === t ? `${prefix}-panel-${t}` : undefined} tabIndex={shown === t ? 0 : -1} onClick={() => onSelect(t)}>
+        <button key={t} type="button" role="tab" id={`${prefix}-tab-${t}`} aria-selected={shown === t} aria-controls={shown === t ? `${prefix}-panel-${t}` : undefined} tabIndex={shown === t ? 0 : -1} onClick={(e) => select(t, e.isTrusted)}>
           {labels[t]}
         </button>
       ))}

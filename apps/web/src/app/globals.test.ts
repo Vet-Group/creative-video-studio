@@ -115,6 +115,15 @@ test('dialog and toast entrances and the press scale play only under no-preferen
   expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.runbar button\.primary\.run \{ transition: none; \} \}/);
 });
 
+// A view transition holds every click until it ends, so a tab switch's cross-fade (WorkTabs) is as short as the fast token, and only under no-preference.
+test('the view transition pseudo-elements run at the fast duration, inside the no-preference block only', () => {
+  const css = stripComments(readFileSync(new URL('./globals.css', import.meta.url), 'utf8'));
+  const motion = blockOf(css, '@media (prefers-reduced-motion: no-preference) {\n  button, .button');
+  expect(motion).toContain('::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: var(--dur-fast); }');
+  expect(css.replace(motion, '')).not.toContain('::view-transition');
+  expect(css).toMatch(/--dur-fast: 150ms;/);
+});
+
 const toHex = (v: string) => {
   const rgb = v.match(/^rgb\((\d+), (\d+), (\d+)\)$/);
   return rgb ? `#${rgb.slice(1).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}` : v;

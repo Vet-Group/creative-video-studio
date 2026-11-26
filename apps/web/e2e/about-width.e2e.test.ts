@@ -46,11 +46,13 @@ test('at 1100 px the other tabs keep the form beside them and only the About goe
   await page.goto('/try-on');
   const form = (await page.locator('#tryon-panel-create').boundingBox())!;
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
+  await expect(page.getByRole('tab', { name: 'Ví dụ' })).toHaveAttribute('aria-selected', 'true'); // a switch lands after its cross-fade's first snapshot, a frame later
   expect((await page.locator('.side').boundingBox())!.x).toBeGreaterThan(form.x + form.width);
   await page.getByRole('tab', { name: 'Giới thiệu' }).click();
   const width = (await page.locator('article.about').boundingBox())!.width;
   expect(width).toBeGreaterThanOrEqual(600);
   expect(width).toBeLessThanOrEqual(736); // Try On's About reads at the same 46rem as the others in one column
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   expect((await page.locator('#tryon-panel-create').boundingBox())!.y).toBeLessThan(400);
 });
