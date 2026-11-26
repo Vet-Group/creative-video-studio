@@ -54,12 +54,14 @@ export const reaAnalyzeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean
 // --no-stems --no-speakers: ac47077 separates vocals/music and diarizes speakers by default, which nothing here reads; the
 //   stems pass alone was OOM-killed at 2G on prod (50s/720p clip, 2026-11-19). Without both: 898 MB peak / 4.5 min, survey on.
 //   The flags are unknown to earlier rea-video, so the host's install must be ac47077 or later.
+// --no-moments: from c11f1bd, --vlm also hunts "special moments" (magic reveals, twists, goofs) by default, 3-5 more VLM calls that
+//   nothing here reads. Unknown to ac47077, so the host's install must be c11f1bd or later.
 // Killed a minute before the queue's expiry (at once when the job's signal aborts), so a hung rea-video cannot hold the one analysis slot.
 const DECOMPOSE_TIMEOUT_MS = ANALYZE_QUEUE_OPTIONS.expireInSeconds * 1000 - 60_000;
 const realDecompose = async (video: string, outDir: string, env: Record<string, string>, signal?: AbortSignal): Promise<void> => {
   await run(
     process.env.REA_VIDEO_BIN || 'rea-video',
-    ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en', '--workers', '5', '--max-vlm-shots', '40', '--no-stems', '--no-speakers'],
+    ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en', '--workers', '5', '--max-vlm-shots', '40', '--no-stems', '--no-speakers', '--no-moments'],
     { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024, timeout: DECOMPOSE_TIMEOUT_MS, killSignal: 'SIGKILL', signal },
   );
 };

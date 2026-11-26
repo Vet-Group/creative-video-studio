@@ -339,6 +339,7 @@ test("runs rea-video with the queue job's signal and a timeout inside the queue'
   expect(opts.killSignal).toBe('SIGKILL');
   expect(opts.timeout).toBeGreaterThan(0);
   expect(opts.timeout).toBeLessThan(ANALYZE_QUEUE_OPTIONS.expireInSeconds * 1000);
+  expect(execFile.mock.calls[0]![1]).toEqual(expect.arrayContaining(['--no-stems', '--no-speakers', '--no-moments'])); // the passes nothing here reads stay off
   expect((await row(id)).status).toBe('failed');
 });
 
