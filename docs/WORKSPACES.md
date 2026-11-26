@@ -43,6 +43,7 @@ Root rows carry it; children are reached through their parent.
 | `jobs`, `assets`, `analyses`, `remakes`, `suggestion_runs` | NOT NULL, FK | A worker output takes its job's (or remake's) workspace. |
 | `user_templates`, `user_choices` | NOT NULL, FK | "Company" templates and hooks (`is_company`) become the workspace's. |
 | `fashion_models` | NOT NULL, FK | `shared` means shared inside the workspace. |
+| `products` | NOT NULL, FK | A member's saved product (a name and 2 to 4 of their own photos): private to its owner, no sharing and no Admin bypass. |
 | `stores` | NOT NULL, FK | A store belongs to one workspace; `user_stores`, brand kits and store-scoped templates follow it. An Admin creates a partner's stores in its workspace. |
 | `feedback` | NOT NULL, FK | Each workspace has its own board (see the exception above). |
 | `preset_proposals` | NOT NULL, FK | Proposing to the shared preset catalog is company-only: refused outside `ws_vet`. |
@@ -120,7 +121,7 @@ Cross-user reads:
 The caller's own rows (each must also match the active workspace):
 - Uploads picker `/api/assets` GET, `keptInputs` (`packages/db/src/assets.ts`), `/api/assets/copy`, `/api/assets/finalize-video`, `/api/assets/samples`.
 - `/api/jobs` POST end-frame, audio and video checks, retry and rerun; `/api/jobs` GET (History).
-- `/api/recall`, `/api/recent-prompts`, `/api/templates` (own), `/api/choices` (own), `/api/fashion-models` (own), `/api/analyses` (own), `/api/remakes` (own), `/api/suggestions/[id]`, `/api/feedback` POST (photos), `/api/rating`.
+- `/api/recall`, `/api/recent-prompts`, `/api/templates` (own), `/api/choices` (own), `/api/fashion-models` (own), `/api/products` and `/api/products/[id]` (own only: the shelf's list, add, change and delete), `/api/analyses` (own), `/api/remakes` (own), `/api/suggestions/[id]`, `/api/feedback` POST (photos), `/api/rating`.
 
 Worker and core (`apps/worker/src`, `packages/core/src`):
 - Output and poster assets (`worker.ts`), previews (`preview.ts`), remake outputs (`remake.ts`) take the parent's workspace.
