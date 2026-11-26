@@ -2,7 +2,7 @@
 // A custom select: a button that opens a listbox under it. It follows the ARIA select-only combobox pattern:
 // focus stays on the button and aria-activedescendant names the highlighted option.
 import { type KeyboardEvent, useEffect, useId, useState } from 'react';
-import { firstEnabled, moveActive } from '@/lib/listbox';
+import { alignEnd, firstEnabled, moveActive } from '@/lib/listbox';
 import { Icon, type IconName } from './Icon';
 
 export interface SelectOption {
@@ -38,6 +38,7 @@ export function Select({ label, icon, heading, value, options, onChange, chip = 
   const optionId = (i: number) => `${uid}-option-${i}`;
   const [open, setOpen] = useState<false | 'down' | 'up'>(false);
   const [cap, setCap] = useState<number | undefined>(undefined);
+  const [end, setEnd] = useState(false);
   const [active, setActive] = useState(0);
   const flags = options.map((o) => !!o.disabled);
   const selected = options.findIndex((o) => o.value === value);
@@ -61,6 +62,7 @@ export function Select({ label, icon, heading, value, options, onChange, chip = 
     const fit = Math.min(POP_MAX, up ? need : Math.max(below, POP_MIN));
     // A list that scrolls shows whole rows, so no option is cut in half under the heading.
     setCap(full > fit ? POP_HEADING + Math.floor((fit - POP_HEADING) / POP_ROW) * POP_ROW : undefined);
+    setEnd(alignEnd(box.left, box.width, window.innerWidth));
     setOpen(up ? 'up' : 'down');
   }
   function pick(i: number) {
@@ -95,7 +97,7 @@ export function Select({ label, icon, heading, value, options, onChange, chip = 
       <label htmlFor={triggerId} className={chip ? 'field-label sr-only' : 'field-label'}>
         {label}
       </label>
-      <div className="select" data-open={open !== false} data-up={open === 'up' || undefined}>
+      <div className="select" data-open={open !== false} data-up={open === 'up' || undefined} data-end={end || undefined}>
         <button
           type="button"
           id={triggerId}
