@@ -9,6 +9,6 @@ export default {
     'Tháng chốt tự động ghi người chốt là Hệ thống (tự động). Tháng nào Admin đã mở lại thì hệ thống không tự chốt lại, Admin chốt tay khi cần.',
   ],
   href: '/admin/costs/teams',
-  prs: [],
+  prs: [661],
   audience: 'admin',
 } satisfies ChangeEntry;
