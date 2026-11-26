@@ -761,7 +761,7 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
 
 /**
  * The "Ứng dụng" row with a chevron that opens a sub-list of the apps behind it (Jewelry Try-On to Background Changer, as on the reference site), under the
- * "Tất cả ứng dụng" link; an app launched in the last NEW_DAYS days carries the "Mới" badge. The choice is kept in localStorage (closed until chosen, and always when storage is unavailable); the icon rail hides both.
+ * "Tất cả ứng dụng" link; an app launched in the last NEW_DAYS days carries the New badge. The choice is kept in localStorage (closed until chosen, and always when storage is unavailable); the icon rail hides both.
  */
 function AppsNav({ row, pathname }: { row: ReactNode; pathname: string }) {
   const listId = useId();

@@ -66,7 +66,7 @@ function CopyScript({ text }: { text: string }) {
 
 /** The analysis result, Vietnamese display with each shot's English prompt. Pure, so it render-tests without the page.
  * With `seek` (a source video is beside it) each scene's time is a button that plays the video from there; `activeShot` marks the scene being played.
- * `frames` (one per scene, undefined while still being cut) adds a thumbnail that seeks the same way. `collapsed` keeps the scenes behind a "Xem N cảnh" disclosure
+ * `frames` (one per scene, undefined while still being cut) adds a thumbnail that seeks the same way. `collapsed` keeps the scenes behind a "see N scenes" disclosure
  * (the Examples tab, where every sample open at once ran several screens long). */
 export function AnalysisResult({ analysis, seek, activeShot, frames, collapsed = false }: { analysis: Analysis; seek?: (sec: number) => void; activeShot?: number | null; frames?: (string | undefined)[] | null; collapsed?: boolean }) {
   // Vietnamese for reading when the worker translated it; the English prompt is still what the "use this prompt" button sends to Create.

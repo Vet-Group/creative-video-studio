@@ -10,7 +10,7 @@ interface NavItem {
   text: string;
   icon: IconName;
   badge?: string;
-  /** The day the page went live (ICT): it carries the "Mới" badge for NEW_DAYS days from then, as a new app's card does (lib/apps.ts isNewApp). */
+  /** The day the page went live (ICT): it carries the New badge for NEW_DAYS days from then, as a new app's card does (lib/apps.ts isNewApp). */
   added?: string;
   /** What the tool is for, beside the item on hover or focus and under it in the phone drawer. */
   hint?: string;
@@ -58,7 +58,7 @@ const ANALYZE_ITEM: NavItem = { href: '/analyze', text: 'Phân tích', icon: 'ch
 /**
  * `feedbackNew`, shown as a badge on the feedback item: for an Admin the count of items still at status `new` to triage, for a member the count of their items the Admin has changed since they last opened them.
  * `members`: the user owns the partner workspace they are in, so the management group lists its Members page.
- * `now`, the viewer's clock: an item with an `added` day carries the "Mới" badge until NEW_DAYS days after it, so no release has to take it off. Left out
+ * `now`, the viewer's clock: an item with an `added` day carries the New badge until NEW_DAYS days after it, so no release has to take it off. Left out
  * (the server's render) no item does, as on the Apps index.
  */
 export const navGroups = (isAdmin: boolean, feedbackNew = 0, analyzeEnabled = false, members = false, now?: number): NavGroup[] => {
