@@ -57,8 +57,9 @@ beforeAll(async () => {
   users.bob = await newUser('bob');
   users.carl = await newUser('carl'); // the limit tests
   users.dina = await newUser('dina'); // the limit race
+  users.erin = await newUser('erin'); // the limit across workspaces
   users.seller = await newUser('seller', 'sales-a');
-  for (const who of ['ann', 'bob']) await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_p', $1, 'member')`, [users[who]!.id]);
+  for (const who of ['ann', 'bob', 'erin']) await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_p', $1, 'member')`, [users[who]!.id]);
 });
 
 afterAll(async () => {
@@ -175,8 +176,17 @@ describe('POST and GET /api/products', () => {
     const race = await Promise.all([add(dina, { name: 'Race one', assetIds: [c, d] }), add(dina, { name: 'Race two', assetIds: [c, d] })]);
     expect(race.map((r) => r.status).sort()).toEqual([201, 409]);
     expect((await pool.query(`select count(*)::int as n from products where user_id = $1`, [dina.id])).rows[0].n).toBe(100);
-    // Another workspace's products count too: ann has products in ws_vet, and the limit is per member, not per workspace.
-    await pool.query(`insert into products (id, user_id, workspace_id, name, asset_ids) values ('dina-p', $1, 'ws_p', 'Partner side', $2::text[])`, [users.ann!.id, [c, d]]);
+  });
+
+  test('the limit is per member, not per workspace: products in one workspace count against an add in another', async () => {
+    const erin = users.erin!;
+    const [a, b] = await photos(erin.id, 2);
+    await pool.query(`insert into products (id, user_id, workspace_id, name, asset_ids) select 'erin-' || n, $1, 'ws_vet', 'Erin ' || n, $2::text[] from generate_series(1, 99) n`, [erin.id, [a, b]]);
+    const [c, d] = await photos(erin.id, 2, { workspace: 'ws_p' });
+    expect((await add(erin, { name: 'Partner one', assetIds: [c, d] }, '; cvs_ws=ws_p')).status).toBe(201);
+    const res = await add(erin, { name: 'Partner two', assetIds: [c, d] }, '; cvs_ws=ws_p');
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'product_limit' });
   });
 
   test('a photo deleted after the product was saved drops out of the list, and the others keep their order', async () => {

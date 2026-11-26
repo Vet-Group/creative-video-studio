@@ -7,7 +7,7 @@
 .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .photos img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px; background: var(--fill); }
 .photos img:first-child { grid-column: 1 / -1; aspect-ratio: 4 / 3; border-radius: 10px; }
-.card h3 { margin: 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 600; overflow-wrap: anywhere; }
+.card h2 { margin: 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 600; overflow-wrap: anywhere; }
 .card p { margin: 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .actions :is(button, a) { min-height: 32px; padding: 0 10px; font-size: 13px; }

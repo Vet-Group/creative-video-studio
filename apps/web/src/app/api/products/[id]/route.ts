@@ -28,7 +28,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if ((e as { code?: string }).code === '23505') return Response.json({ error: 'you already have a product with this name', code: PRODUCT_NAME_TAKEN }, { status: 409 });
     throw e;
   }
-  return Response.json((await listProducts(userId, g.workspaceId, { id }))[0]);
+  const updated = (await listProducts(userId, g.workspaceId, { id }))[0];
+  return updated ? Response.json(updated) : notFound(); // deleted between the update and the read
 }
 
 /** Deletes one of the caller's own products (404 for any other). Its photos stay as uploads. */

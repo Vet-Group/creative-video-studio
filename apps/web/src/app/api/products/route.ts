@@ -47,5 +47,6 @@ export async function POST(request: Request) {
   } finally {
     client.release();
   }
-  return Response.json((await listProducts(userId, g.workspaceId, { id }))[0], { status: 201 });
+  const created = (await listProducts(userId, g.workspaceId, { id }))[0];
+  return created ? Response.json(created, { status: 201 }) : Response.json({ error: 'not found' }, { status: 404 }); // deleted between the insert and the read
 }

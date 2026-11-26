@@ -54,7 +54,7 @@ test('"Sản phẩm" is the last pill; choosing it clears the search and filters
   await expect(page.getByRole('button', { name: 'Chọn', exact: true })).toHaveCount(0);
   await expect(page.locator('.library-active')).toHaveCount(0);
   await expect(page.locator('.library-skeleton')).toHaveCount(0);
-  await expect(page.getByText('Chưa có sản phẩm nào. Thêm 2–4 ảnh một lần', { exact: false })).toBeVisible();
+  await expect(page.getByText('Chưa có sản phẩm nào. Bấm Thêm sản phẩm', { exact: false })).toBeVisible();
 
   // A finished job makes the tray reload the Library; with the shelf showing it does not.
   await runViaApi(page);

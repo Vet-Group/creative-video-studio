@@ -8,13 +8,13 @@ const item = (over: Partial<ProductItem>): ProductItem => ({ id: 'p1', name: 'Á
 const render = (products: ProductItem[], filtered = false) => renderToStaticMarkup(<ProductCards products={products} filtered={filtered} onEdit={() => undefined} onDelete={() => undefined} />).replaceAll('<!-- -->', '');
 
 test('an empty shelf says how to fill it; an empty store filter points back at all stores', () => {
-  expect(render([])).toContain('Chưa có sản phẩm nào. Thêm 2–4 ảnh một lần, rồi chọn lại ở Tạo video, Thử đồ, Ứng dụng và Marketing Studio.');
+  expect(render([])).toContain('Chưa có sản phẩm nào. Bấm Thêm sản phẩm để lưu 2–4 ảnh của một sản phẩm cùng tên và cửa hàng.');
   expect(render([], true)).toContain('Chưa có sản phẩm nào của cửa hàng này. Chọn &quot;Tất cả cửa hàng&quot; để xem mọi sản phẩm.');
 });
 
 test('a card shows its photos, its name, "<store> · <type>" and the three actions, with Tạo thêm góc opening the multi-angle app on the first photo', () => {
   const html = render([item({})]);
-  expect(html).toContain('<h3>Áo thun mèo</h3>');
+  expect(html).toContain('<h2>Áo thun mèo</h2>');
   expect(html).toContain('Shop A · Áo thun');
   expect(html).toContain('href="/apps/multi-angle?image=a1"');
   expect(html.match(/<img /g)).toHaveLength(2);

@@ -14,7 +14,7 @@ import { Select } from './Select';
 import { type StoreOption, StorePicker } from './StorePicker';
 import s from './ProductShelf.module.css';
 
-const NO_PRODUCTS = 'Chưa có sản phẩm nào. Thêm 2–4 ảnh một lần, rồi chọn lại ở Tạo video, Thử đồ, Ứng dụng và Marketing Studio.';
+const NO_PRODUCTS = 'Chưa có sản phẩm nào. Bấm Thêm sản phẩm để lưu 2–4 ảnh của một sản phẩm cùng tên và cửa hàng.';
 const NO_STORE_PRODUCTS = 'Chưa có sản phẩm nào của cửa hàng này. Chọn "Tất cả cửa hàng" để xem mọi sản phẩm.';
 
 /** The form's words for a refused save: the two codes of POST and PATCH, then the shared reasons (another team's store, too many requests). */
@@ -42,7 +42,7 @@ export function ProductCards({ products, filtered, onEdit, onDelete }: { product
                 ))}
               </div>
             )}
-            <h3>{p.name}</h3>
+            <h2>{p.name}</h2>
             {detail && <p className="muted">{detail}</p>}
             <div className={s.actions}>
               {p.photos[0] && (
@@ -68,7 +68,8 @@ export function ProductCards({ products, filtered, onEdit, onDelete }: { product
 function ProductForm({ product, stores, onClose, onSaved }: { product: ProductItem | null; stores: StoreOption[]; onClose: () => void; onSaved: () => void }) {
   const nameId = useId();
   const [name, setName] = useState(product?.name ?? '');
-  const [storeId, setStoreId] = useState(product?.storeId ?? '');
+  // A store that was closed since the product was saved is no longer offered, so it is dropped here rather than sent (the server refuses it).
+  const [storeId, setStoreId] = useState(product?.storeId && (stores.length === 0 || stores.some((s) => s.id === product.storeId)) ? product.storeId : '');
   const [type, setType] = useState(product?.productType ?? '');
   const [images, setImages] = useState<Img[]>(product?.photos ?? []);
   const [busy, setBusy] = useState(false);
@@ -105,7 +106,8 @@ function ProductForm({ product, stores, onClose, onSaved }: { product: ProductIt
         <label className="field-label" htmlFor={nameId}>
           Tên sản phẩm
         </label>
-        <input id={nameId} value={name} maxLength={MAX_PRODUCT_NAME} onChange={(e) => setName(e.target.value)} />
+        {/* Capped in code points, as the server counts; maxLength counts UTF-16 units. */}
+        <input id={nameId} value={name} onChange={(e) => setName([...e.target.value].slice(0, MAX_PRODUCT_NAME).join(''))} />
       </div>
       <StorePicker label="Cửa hàng" heading="Cửa hàng" value={storeId} stores={stores} noneLabel="Không chọn cửa hàng" onChange={setStoreId} />
       <Select label="Loại sản phẩm" icon="model" heading="Loại sản phẩm" value={type} options={[{ value: '', label: 'Chưa chọn' }, ...Object.entries(PRODUCT_TYPES).map(([value, label]) => ({ value, label }))]} onChange={setType} />
@@ -171,7 +173,7 @@ export function ProductShelf() {
   return (
     <div className="product-shelf">
       <div className={s.top}>
-        <p className="muted">Sản phẩm của bạn, dùng lại ở mọi trang. Chỉ bạn thấy.</p>
+        <p className="muted">Sản phẩm bạn đã lưu: tên, cửa hàng và 2–4 ảnh. Chỉ bạn thấy.</p>
         <button type="button" className="primary" onClick={() => setEditing('new')}>
           Thêm sản phẩm
         </button>
