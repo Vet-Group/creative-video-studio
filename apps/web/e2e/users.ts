@@ -148,6 +148,7 @@ export const USERS = {
   // camera-angles.e2e: several camera angles on Create, one member per test.
   angla: { email: 'angla@e2e.test', name: 'E2E Angles A', role: 'member' },
   anglb: { email: 'anglb@e2e.test', name: 'E2E Angles B', role: 'member' },
+  anglc: { email: 'anglc@e2e.test', name: 'E2E Angles C', role: 'member' },
   // prompt-sections.e2e: the prompt templates dialog's recent group (sectc), whose jobs must be the only ones the member has.
   sectc: { email: 'sectc@e2e.test', name: 'E2E Sections C', role: 'member' },
   // marketing-formats.e2e: the Unboxing and Review formats, one member per test.

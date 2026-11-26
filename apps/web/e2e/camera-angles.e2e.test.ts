@@ -7,6 +7,9 @@ import { modelButton, png, signIn } from './support.test';
 const BODY = 'The model turns slowly in soft light.';
 const angles = (page: Page) => page.getByRole('group', { name: /^Nhiều góc máy/ });
 const runButton = (page: Page, name: RegExp) => page.getByRole('button', { name });
+const tile = (page: Page, label: string) => angles(page).locator('label', { has: page.getByText(label, { exact: true }) });
+/** The tiles whose shirt is moving, by their place in the list. */
+const moving = (page: Page) => angles(page).locator('.cam-world').evaluateAll((ws) => ws.flatMap((w, i) => (w.getAnimations().length > 0 ? [i] : [])));
 
 async function ready(page: Page): Promise<void> {
   await page.goto('/create');
@@ -29,8 +32,12 @@ test('Create: two camera angles start two clips with different prompts, and with
   await expect(angles(page).getByRole('checkbox')).toHaveCount(CAMERA_ANGLES.length);
 
   const [first, , third] = CAMERA_ANGLES;
-  await angles(page).getByText(first!.label, { exact: true }).click();
+  // Picked in reverse: Run still makes the clips in the list's order, and each picked tile shows its clip's number in it.
   await angles(page).getByText(third!.label, { exact: true }).click();
+  await angles(page).getByText(first!.label, { exact: true }).click();
+  await expect(tile(page, first!.label).locator('.cam-order')).toHaveText('1');
+  await expect(tile(page, third!.label).locator('.cam-order')).toHaveText('2');
+  await expect(angles(page).locator('.cam-order')).toHaveCount(2);
   await expect(page.getByRole('status').filter({ hasText: /^2 clip × \$[\d.]+ = \$[\d.]+$/ })).toBeVisible();
   // The preview names each clip's prompt by its angle.
   await expect(page.locator('.prompt-preview p')).toHaveText([`${first!.label}: ${anglePrompt(BODY, first!)}`, `${third!.label}: ${anglePrompt(BODY, third!)}`]);
@@ -44,7 +51,7 @@ test('Create: two camera angles start two clips with different prompts, and with
   expect((await prompts(page)).sort()).toEqual([anglePrompt(BODY, first!), anglePrompt(BODY, third!)].sort());
 });
 
-test('Create: a refused angle stops the rest and says how many clips went, and the chips fit a phone', async ({ page }) => {
+test('Create: a refused angle stops the rest and says how many clips went, and the tiles fit a phone', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await signIn(page, 'anglb');
   await ready(page);
@@ -63,4 +70,35 @@ test('Create: a refused angle stops the rest and says how many clips went, and t
   await expect(page.locator('.form-message').getByRole('alert')).toContainText('Bạn đã dùng hết số clip trong ngày hôm nay Đã gửi 1/3 clip.');
   expect(posts).toBe(2);
   expect(await prompts(page)).toEqual([anglePrompt(BODY, CAMERA_ANGLES[0]!)]);
+});
+
+test('Create: a camera tile plays its move on hover, on keyboard focus and while picked, Space picks it, and under reduced motion nothing moves', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await signIn(page, 'anglc');
+  await ready(page);
+  await angles(page).scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  await expect.poll(() => moving(page)).toEqual([]);
+  await angles(page).getByText(CAMERA_ANGLES[2]!.label, { exact: true }).hover();
+  await expect.poll(() => moving(page)).toEqual([2]);
+
+  // The keyboard reaches each tile as a checkbox: the focused one plays, Space picks it, and a picked one keeps playing once the focus moves on.
+  await page.mouse.move(0, 0);
+  const boxes = angles(page).getByRole('checkbox');
+  await boxes.nth(1).focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(boxes.first()).toBeFocused();
+  await expect.poll(() => moving(page)).toEqual([0]);
+  await page.keyboard.press('Space');
+  await expect(boxes.first()).toBeChecked();
+  await page.keyboard.press('Tab');
+  await expect(boxes.nth(1)).toBeFocused();
+  await expect.poll(() => moving(page)).toEqual([0, 1]);
+
+  // Reduced motion: nothing plays, picked, focused or hovered, and every tile keeps its arrow as the hint.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await angles(page).getByText(CAMERA_ANGLES[3]!.label, { exact: true }).hover();
+  await expect.poll(() => moving(page)).toEqual([]);
+  for (const glyph of await angles(page).locator('.cam-glyph').all()) await expect(glyph).toBeVisible();
 });
