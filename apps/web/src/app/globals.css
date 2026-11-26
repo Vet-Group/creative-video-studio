@@ -1791,7 +1791,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .explore-job[data-status='running'] .explore-job-media img { filter: saturate(.4); }
 .explore-job[data-status='running'] .explore-job-media::after { content: ''; position: absolute; top: 10px; left: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 3px rgb(var(--light) / .85); }
 .explore-job .muted { font-size: 13px; line-height: 18px; }
-.explore-job-model { overflow: hidden; color: var(--text-muted); font-size: 13px; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.explore-job-model { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--text-muted); font-size: 13px; line-height: 18px; } /* two lines, so a model's variant name is not cut */
 .explore-job-prompt { display: -webkit-box; overflow: hidden; color: var(--ink-3); font-size: 12px; line-height: 17px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .explore-job:is([data-status='failed'], [data-status='failed_unknown'], [data-status='timed_out']) .muted { color: var(--danger); }
 /* The tools: compact tiles, a loop or still above the icon and name; 2 columns on a phone, 3 on a tablet, one row of 6 on a desktop. */
@@ -2168,6 +2168,9 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 @media (pointer: coarse) { .photo-jump button { height: 44px; } }
 /* The unpicked option of a two-way choice reads as a chip, not as plain text beside the picked one. */
 .app-page .orientation-choice label:not(:has(:checked)) { box-shadow: inset 0 0 0 1px var(--border); }
+/* The two orientations as two equal columns across the form, each label wrapping inside its own half, instead of two uneven rows on a phone. */
+.app-page .orientation-choice { display: grid; grid-template-columns: 1fr 1fr; justify-self: stretch; }
+.app-page .orientation-choice label { justify-content: center; height: auto; min-height: 30px; padding-block: 6px; white-space: normal; text-align: center; }
 /* Samples in an empty slot (live Try On): a grey strip of pictures to pick from, then the upload tile with a plus and its label. */
 .slot-samples { display: flex; flex: 1; align-items: center; min-width: 0; height: 79px; margin: 0; padding: 0; overflow-x: auto; scrollbar-width: none; border-radius: 12px; background: var(--fill); list-style: none; }
 .slot-samples li { flex: none; height: 100%; overflow: hidden; }
@@ -2699,6 +2702,8 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .lib-info { min-width: 0; padding: 8px 2px 0; }
 .lib-info p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-title { color: var(--ink-strong); font-size: 13px; line-height: 18px; font-weight: 600; }
+/* A long model name takes a second line rather than an ellipsis, so "Pro" and "Standard" stay told apart. */
+.lib-info .lib-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
 /* A long name gives way, never the cost. */
 .lib-info .lib-meta { display: flex; column-gap: 4px; color: var(--text-muted); font-size: 12px; line-height: 17px; }
 .lib-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

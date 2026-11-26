@@ -6,7 +6,7 @@ import { REFRAME_FILLS, REFRAME_RATIOS, type ReframeFill, type ReframeRatio } fr
 import { JOB_APPS } from '@/lib/apps';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { downloadCompressed, downloadCompressedVideo, downloadReframedVideo } from '@/lib/compress-download';
-import { confirmRerun } from '@/lib/run-guard';
+import { confirmRerun, usd } from '@/lib/run-guard';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
@@ -392,7 +392,7 @@ export function ClipCard({ clip, view, index, lead = false, select, selecting = 
           </span>
           {clip.costUsd !== null && (
             <span title={clip.costFinal ? 'Chi phí thật' : 'Chi phí thật, tạm tính'}>
-              ${clip.costUsd}
+              {usd(clip.costUsd)}
               {!clip.costFinal && '*'}
             </span>
           )}

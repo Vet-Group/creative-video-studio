@@ -70,7 +70,7 @@ for (const size of SIZES) {
     // The Library: the grid of clips with controls, poster, cost and verdict.
     await page.goto('/library');
     await expect(page.getByRole('article')).toHaveCount(3);
-    await expect(page.getByTitle('Chi phí thật', { exact: true })).toHaveText(['$0.0000', '$0.0000', '$0.0000']);
+    await expect(page.getByTitle('Chi phí thật', { exact: true })).toHaveText(['$0.00', '$0.00', '$0.00']);
     // A grid video loads nothing until hover (preload none), so what shows is its poster: wait for every poster to load so the screenshot is stable.
     const posters = await page.locator('.card video').evaluateAll((vs) => vs.map((v) => (v as HTMLVideoElement).poster));
     expect(posters.every(Boolean)).toBe(true);

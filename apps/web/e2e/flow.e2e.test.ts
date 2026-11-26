@@ -29,7 +29,7 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   const card = page.getByRole('article').filter({ hasText: 'E2E Member 1' });
   await expect(card).toHaveCount(1);
   await expect(card.getByText('MOCK', { exact: true })).toBeVisible();
-  await expect(card.getByTitle('Chi phí thật', { exact: true })).toHaveText('$0.0000');
+  await expect(card.getByTitle('Chi phí thật', { exact: true })).toHaveText('$0.00');
   // Re-assigning the store is for Admins, in the detail view: a Member has no such control there.
   await card.getByRole('button', { name: 'Xem chi tiết' }).click();
   await expect(page.getByRole('dialog').getByLabel('Cửa hàng')).toHaveCount(0);
