@@ -1862,7 +1862,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about-loop .banner-empty { display: block; width: 448px; max-width: 100%; aspect-ratio: 9 / 16; }
 /* A page's tutorial (About.tsx Tutorial): full column width, 16:9 like the reference site's How to Use clips. */
 .about-video { position: relative; margin: 32px 0 24px; overflow: hidden; border-radius: 12px; background: var(--media-bg); }
-.about-video video { display: block; width: 100%; aspect-ratio: 16 / 9; }
+.about-video video, .about-video:empty { display: block; width: 100%; aspect-ratio: 16 / 9; }
 /* Its poster under one large play button until started; then the native controls. */
 .about-video-play { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--on-dark); cursor: pointer; }
 .about-video-play > span { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: rgb(var(--shade) / .62); box-shadow: 0 6px 24px rgb(var(--shade) / .25); transition: background var(--dur-base), transform var(--dur-base); }
