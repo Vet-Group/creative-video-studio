@@ -1,5 +1,5 @@
 'use client';
-import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { type DragEvent, useEffect, useId, useRef, useState } from 'react';
 import { resolutionVariants } from '@/lib/resolution-variants';
 import { api, type Clip as LibraryClip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, DEMO_TITLE, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
@@ -25,7 +25,7 @@ import { confirmDialog } from './Confirm';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
-import { ClipDetail, copyError, copySamples, EXAMPLE_USED, ExampleNote, ExampleOrder, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, TileSkeleton, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
+import { ClipDetail, copyError, copySamples, EXAMPLE_USED, ExampleNote, ExampleOrder, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, TileSkeleton, UploadedPhotos, uploadError, uploadImages, useSize, WorkTabs } from './image-tools';
 import { dropPhoto, FormContext, isPhotoDrag, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -654,15 +654,6 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
   const prevStep = useRef<HTMLButtonElement>(null);
   const nextStep = useRef<HTMLButtonElement>(null);
 
-  function onTabKey(e: KeyboardEvent) {
-    const i = tabs.indexOf(shown);
-    const moves: Record<string, number> = { ArrowRight: (i + 1) % tabs.length, ArrowLeft: (i + tabs.length - 1) % tabs.length, Home: 0, End: tabs.length - 1 };
-    const next = moves[e.key];
-    if (next === undefined) return;
-    e.preventDefault();
-    setTab(tabs[next]!);
-    document.getElementById(`create-tab-${tabs[next]}`)?.focus();
-  }
   // A photo dragged from History goes through the page's own put (a click's); a full box is no target.
   const photoRoom = hydrated && images.length < maxImages;
   function onDragOver(e: DragEvent) {
@@ -828,13 +819,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
         Tạo video
       </h1>
       <div className="create-grid">
-        <div className="tabs" role="tablist" aria-label="Khu vực làm việc" onKeyDown={onTabKey}>
-          {tabs.map((t) => (
-            <button key={t} type="button" role="tab" id={`create-tab-${t}`} aria-selected={shown === t} aria-controls={shown === t ? `create-panel-${t}` : undefined} tabIndex={shown === t ? 0 : -1} onClick={() => setTab(t)}>
-              {TAB_LABEL[t]}
-            </button>
-          ))}
-        </div>
+        <WorkTabs prefix="create" tabs={tabs} labels={TAB_LABEL} shown={shown} onSelect={setTab} />
 
         <div className="card form-card" id="create-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'create-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">

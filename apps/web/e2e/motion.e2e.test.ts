@@ -101,3 +101,44 @@ for (const scheme of ['light', 'dark'] as const) {
     });
   });
 }
+
+// A tool page's tab panel fades in as it shows (opacity, the fast duration), after a switch that lands in the click itself; under reduced motion it shows at once.
+test('a tab panel fades in at the fast duration once the tab has switched, at 1440 and 390 px, and not under reduced motion', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await signIn(page, 'motion');
+  // The duration of every panel fade that starts, read later from the log, as a 150 ms fade can end before a check looks.
+  await page.evaluate(() => {
+    const w = window as unknown as { fades: string[] };
+    w.fades = [];
+    document.addEventListener('animationstart', (e) => void (e.animationName === 'panel-in' && w.fades.push(getComputedStyle(e.target as Element).animationDuration)));
+  });
+  const fades = () => page.evaluate(() => (window as unknown as { fades: string[] }).fades.splice(0));
+  const tab = (name: string) => page.getByRole('tab', { name, exact: true });
+  const frames = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+
+  await tab('Lịch sử').click();
+  expect(await tab('Lịch sử').getAttribute('aria-selected')).toBe('true'); // no frame's wait: the next action reaches the new panel
+  await expect.poll(() => page.evaluate(() => (window as unknown as { fades: string[] }).fades.length)).toBeGreaterThan(0);
+  expect(new Set(await fades())).toEqual(new Set(['0.15s']));
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await frames();
+  await fades(); // a History child that mounted late, before the switch to reduce
+  await tab('Ví dụ').click();
+  expect(await tab('Ví dụ').getAttribute('aria-selected')).toBe('true');
+  await frames();
+  expect(await fades()).toEqual([]);
+  expect(await page.evaluate(() => document.getAnimations().filter((a) => a instanceof CSSAnimation && a.animationName === 'panel-in').length)).toBe(0);
+
+  // On a phone the form is a tab of its own, and it fades in as it shows again.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(tab('Tạo')).toBeVisible();
+  await frames();
+  await fades(); // the panels the narrower layout showed
+  await tab('Tạo').click();
+  expect(await tab('Tạo').getAttribute('aria-selected')).toBe('true');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { fades: string[] }).fades.length)).toBeGreaterThan(0);
+  expect(new Set(await fades())).toEqual(new Set(['0.15s']));
+});

@@ -115,6 +115,15 @@ test('dialog and toast entrances and the press scale play only under no-preferen
   expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.runbar button\.primary\.run \{ transition: none; \} \}/);
 });
 
+// A tool page's tab panel fades in as it shows: opacity only, so it never holds the switch, a click or the layout, and only under no-preference.
+test('a shown tab panel fades in at the fast duration, opacity only, inside the no-preference block only', () => {
+  const css = stripComments(readFileSync(new URL('./globals.css', import.meta.url), 'utf8'));
+  const motion = blockOf(css, '@media (prefers-reduced-motion: no-preference) {\n  button, .button');
+  expect(motion).toContain(":where([role='tabpanel'] > :not(dialog)) { animation: panel-in var(--dur-fast) ease-out; }");
+  expect(css.replace(motion, '')).not.toContain('panel-in var(');
+  expect(css).toMatch(/^@keyframes panel-in \{ from \{ opacity: 0; \} \}$/m);
+});
+
 const toHex = (v: string) => {
   const rgb = v.match(/^rgb\((\d+), (\d+), (\d+)\)$/);
   return rgb ? `#${rgb.slice(1).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}` : v;

@@ -479,8 +479,8 @@ test("an app's card art tops its About and fills its empty History; an app witho
   await expect(empty.getByRole('button', { name: 'Bắt đầu ngay' })).toBeVisible();
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
-    // The colours a theme switch fades (the current nav item's background, for one) settle before axe reads them.
-    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => {}))));
+    // The colours a theme switch fades (the current nav item's background, for one) and the History panel's fade-in settle before axe reads them.
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a instanceof CSSTransition || (a instanceof CSSAnimation && a.animationName === 'panel-in')).map((a) => a.finished.catch(() => {}))));
     expect((await new AxeBuilder({ page }).exclude('nextjs-portal').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]); // as e2e/a11y
   }
 
