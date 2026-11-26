@@ -54,8 +54,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const published: boolean = b.published ?? app.published;
     await tx.query(
       `update custom_apps set name = $2, description = $3, category = $4, prompt = $5, inputs = $6::jsonb,
-              published_at = case when $7::boolean then coalesce(published_at, now()) end, updated_at = now() where id = $1`,
-      [id, next.name, next.description, next.category, next.prompt, JSON.stringify(stored), published],
+              published_at = case when $7::boolean then coalesce(published_at, now()) end, updated_at = now() where id = $1 and workspace_id = $8`,
+      [id, next.name, next.description, next.category, next.prompt, JSON.stringify(stored), published, g.workspaceId],
     );
     if (changed.length > 0) {
       await audit(tx, {

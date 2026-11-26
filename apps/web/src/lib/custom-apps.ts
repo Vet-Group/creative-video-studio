@@ -89,7 +89,8 @@ export function appInputProblem(fields: AppFields, sourceInputCount: number, max
   if (length(a.description) > MAX_APP_DESCRIPTION) return `Mô tả ngắn tối đa ${MAX_APP_DESCRIPTION} ký tự.`;
   if (!CATEGORIES.some((c) => c.id !== 'all' && c.id === a.category)) return 'Hãy chọn danh mục.';
   if (a.prompt === '') return 'Hãy nhập mô tả gửi cho mô hình.';
-  if (length(a.prompt) > maxPromptChars) return `Mô tả gửi cho mô hình tối đa ${maxPromptChars} ký tự.`;
+  if (/\u0000/.test(a.description + a.prompt)) return 'Mô tả có ký tự không hợp lệ.'; // Postgres text refuses NUL
+  if (a.prompt.length > maxPromptChars) return `Mô tả gửi cho mô hình tối đa ${maxPromptChars} ký tự.`; // UTF-16 units, as /api/jobs counts them
   if (a.inputs.length !== sourceInputCount) return `Ứng dụng cần đúng ${sourceInputCount} ảnh đầu vào, như lượt gốc.`;
   const slots = a.inputs.flatMap((i) => ('slot' in i ? [i.slot] : []));
   if (slots.length === 0) return 'Cần ít nhất một ô để người dùng tải ảnh lên.';

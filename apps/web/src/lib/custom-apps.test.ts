@@ -81,6 +81,12 @@ describe('appInputProblem', () => {
     expect(problem({ prompt: 'a\nb' })).toBeNull();
     expect(problem({ prompt: 'x'.repeat(100) })).toBeNull();
     expect(problem({ prompt: 'x'.repeat(101) })).toMatch(/tối đa 100 ký tự/);
+    expect(problem({ prompt: '😀'.repeat(51) })).toMatch(/tối đa 100 ký tự/); // UTF-16 units, as /api/jobs counts them
+  });
+
+  test('refuses a NUL in the prompt or the description', () => {
+    expect(problem({ prompt: 'a\u0000b' })).toMatch(/không hợp lệ/);
+    expect(problem({ description: 'a\u0000b' })).toMatch(/không hợp lệ/);
   });
 
   test('needs one entry per source input and at least one slot', () => {

@@ -43,9 +43,9 @@ export async function appSource(q: Queryable, jobId: string, workspaceId: string
   };
 }
 
-/** The apps whose source clip is live, with the ids of each one's pair of models (the app's model and its dearer twins). */
+/** The apps whose source clip is live, with the ids of each one's pair of models (the app's model and its twins, also after a pair changes direction as in migration 0093). */
 const LIVE_APPS = `select a.id, a.feature, a.name, a.description, a.category, a.aspect, a.duration_s, a.params, a.inputs, a.published_at, j.output_asset_id, j.poster_asset_id,
-    array(select m.id from model_configs m where m.id = a.model or m.twin_of = a.model order by m.id) as pair_ids
+    array(select m.id from model_configs m where m.id = a.model or m.twin_of = a.model or m.id = (select twin_of from model_configs where id = a.model) order by m.id) as pair_ids
   from custom_apps a join jobs j on j.id = a.source_job_id
   where a.workspace_id = $1 and ${LIVE_CLIP}`;
 

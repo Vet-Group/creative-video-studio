@@ -41,7 +41,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   const credit = await falCreditUsd(pool, await falBalance());
   const locked = (v: { kind: string; provider: string; usd_per_second: string | null }) => v.kind === 'video' && v.usd_per_second !== null && overCredit(v.provider, estimateUsd(v.usd_per_second, app.duration_s), credit);
   let modelId: string | undefined;
-  for (const m of (await pool.query('select id from model_configs where id = $1 or twin_of = $1 order by id = $1 desc, id', [app.model])).rows) {
+  for (const m of (await pool.query('select id from model_configs where id = $1 or twin_of = $1 or id = (select twin_of from model_configs where id = $1) order by id = $1 desc, id', [app.model])).rows) {
     if (await offeredNow(pool, m.id, locked)) {
       modelId = m.id;
       break;

@@ -358,6 +358,22 @@ describe('POST /api/custom-apps/[id]/run', () => {
     expect((await publishedApps('ws_vet')).find((a) => a.slug === id)?.custom.modelIds).toEqual(['tw-cheap', 'tw-dear']);
   });
 
+  test('an app still runs, and still lists both rows, after its pair changes direction (as migration 0093 did to Veo)', async () => {
+    const { id } = await published({ model: 'tw-dear' });
+    await pool.query(`update model_configs set twin_of = null where id = 'tw-dear'`);
+    await pool.query(`update model_configs set twin_of = 'tw-dear' where id = 'tw-cheap'`);
+    try {
+      const m = await fresh();
+      const res = await run(m, id, { assetIds: [await slotPhoto(m)] });
+      expect(res.status).toBe(201);
+      expect((await pool.query('select model from jobs where id = $1', [(await json(res)).id])).rows[0].model).toBe('tw-dear');
+      expect((await publishedApps('ws_vet')).find((a) => a.slug === id)?.custom.modelIds).toEqual(['tw-cheap', 'tw-dear']);
+    } finally {
+      await pool.query(`update model_configs set twin_of = null where id = 'tw-cheap'`);
+      await pool.query(`update model_configs set twin_of = 'tw-cheap' where id = 'tw-dear'`);
+    }
+  });
+
   test('a cap that refuses answers 429, the same as a direct Run, and nothing is made', async () => {
     const { id } = await published();
     const m = await fresh();
@@ -380,10 +396,10 @@ describe('DELETE /api/jobs/[id] for a clip that is an app’s source', () => {
     const owner = await newUser();
     const s = await source({ owner: owner.id });
     const { id } = await json(await make(admin, mk(s.id, { name: 'Ứng dụng của tôi' })));
-    for (const who of [owner, admin]) {
+    for (const [who, next] of [[owner, 'Hãy báo Admin xoá ứng dụng trước.'], [admin, 'Hãy xoá ứng dụng trước.']] as const) {
       const res = await delClip(who, s.id);
       expect(res.status).toBe(409);
-      expect(await json(res)).toEqual({ error: 'Clip này đang là nguồn của ứng dụng «Ứng dụng của tôi». Hãy gỡ ứng dụng trước.', code: 'app_source' });
+      expect(await json(res)).toEqual({ error: `Clip này đang là nguồn của ứng dụng «Ứng dụng của tôi». ${next}`, code: 'app_source' });
     }
     expect((await pool.query('select deleted_at from jobs where id = $1', [s.id])).rows[0].deleted_at).toBeNull();
     expect((await pool.query(`select count(*)::int as n from assets where id in ($1, $2) and deleted_at is not null`, [`${s.id}-out`, `${s.id}-poster`])).rows[0].n).toBe(0);

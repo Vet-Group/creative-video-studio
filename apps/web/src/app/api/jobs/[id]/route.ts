@@ -83,7 +83,7 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     if (job.user_id !== userId && role !== 'admin') return Response.json({ error: 'forbidden' }, { status: 403 });
     // After the 403, so a member who may not delete the clip never learns an app's name. An app made of the clip (draft or published) needs it (docs/WORKSPACES.md §2).
     const app = (await tx.query('select name from custom_apps where source_job_id = $1 and workspace_id = $2 order by created_at limit 1', [id, g.workspaceId])).rows[0];
-    if (app) return Response.json({ error: `Clip này đang là nguồn của ứng dụng «${app.name}». Hãy gỡ ứng dụng trước.`, code: APP_SOURCE_CODE }, { status: 409 });
+    if (app) return Response.json({ error: `Clip này đang là nguồn của ứng dụng «${app.name}». ${role === 'admin' ? 'Hãy xoá ứng dụng trước.' : 'Hãy báo Admin xoá ứng dụng trước.'}`, code: APP_SOURCE_CODE }, { status: 409 });
     await tx.query('update jobs set deleted_at = now() where id = $1', [id]);
     await tx.query('update assets set deleted_at = now() where id = any($1::text[]) and workspace_id = $2', [[job.output_asset_id, job.poster_asset_id].filter(Boolean), g.workspaceId]);
     if (job.user_id !== userId) await audit(tx, { actorId: userId, action: 'clip.delete', target: `job:${id}`, oldValue: { ownerId: job.user_id, deleted: false }, newValue: { ownerId: job.user_id, deleted: true } });
