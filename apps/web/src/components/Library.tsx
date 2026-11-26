@@ -1639,6 +1639,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
       ) : (
         <>
       {ownBoard && <BoardTools board={ownBoard} boards={boards} onDeleted={clearFilters} />}
+      {filters.board && filters.kind !== 'products' && boards.boards === null && boards.failed && <LoadError text="Không tải được bảng." onRetry={boards.reload} />}
       {state === 'loading' && clips.length === 0 && (
         <div className={view === 'list' ? 'library-list library-skeleton' : 'grid library-skeleton'} style={{ '--card-min': SIZES[size] } as CSSProperties} role="status">
           <span className="sr-only">Đang tải...</span>

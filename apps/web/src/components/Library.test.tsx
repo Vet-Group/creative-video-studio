@@ -186,7 +186,7 @@ test('with no board the Library renders no Bảng control, and a ?board= link re
 });
 
 test('the detail offers the Bảng button only to a page that passes the boards (the History and curated mounts do not)', () => {
-  const boards = { boards: [{ id: 'b1', name: 'Tết 2027', count: 2 }], reload: async () => undefined, create: async () => ({ id: 'b2', name: 'x', count: 0 }), rename: async () => undefined, remove: async () => undefined, setItems: async () => undefined };
+  const boards = { boards: [{ id: 'b1', name: 'Tết 2027', count: 2 }], failed: false, reload: async () => undefined, create: async () => ({ id: 'b2', name: 'x', count: 0 }), rename: async () => undefined, remove: async () => undefined, setItems: async () => undefined };
   const withBoards = (c: Clip) => renderToStaticMarkup(<ClipDetail clips={[c]} index={0} admin={false} boards={boards} onIndex={() => undefined} onChange={() => undefined} />);
   expect(detail(sample)).not.toMatch(/>Bảng/);
   expect(withBoards(sample)).toMatch(/aria-haspopup="dialog">.*?Bảng<\/button>/);

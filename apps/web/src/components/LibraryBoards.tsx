@@ -2,23 +2,30 @@
 // The Library's boards (lib/library-boards.ts): a member's named, private sets of results. `useLibraryBoards` holds the list the Library filters by, `BoardsModal`
 // adds results to boards (from the detail view or the selection bar) and `BoardTools` renames or deletes the open board.
 import { type FormEvent, useCallback, useEffect, useId, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, ApiError, type Clip, errorText, sendJson } from '@/lib/api';
 import { BOARD_LIMIT, BOARD_NAME_TAKEN, type LibraryBoard, MAX_BOARD_NAME, MAX_BOARDS } from '@/lib/library-boards';
 import { confirmDialog } from './Confirm';
+import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import s from './LibraryBoards.module.css';
 
 /** The boards of the caller in this workspace (null until loaded) and what changes them; each change reloads the list, so counts and names stay current. */
 export function useLibraryBoards() {
   const [boards, setBoards] = useState<LibraryBoard[] | null>(null);
+  const [failed, setFailed] = useState(false); // the last read failed; the list stays as it was
   const reload = useCallback(async () => {
     try {
       setBoards((await api<{ boards: LibraryBoard[] }>('/api/library/boards')).boards);
-    } catch {} // the list stays as it was
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    }
   }, []);
   useEffect(() => void reload(), [reload]);
   return {
     boards,
+    failed,
     reload,
     create: async (name: string) => {
       const made = await api<LibraryBoard>('/api/library/boards', sendJson('POST', { name }));
@@ -56,6 +63,14 @@ export function BoardsModal({ open, onClose, ids, clips, boards, onChange }: { o
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const picked = clips.filter((c) => ids.includes(c.id));
+  useEffect(() => {
+    if (open) setProblem(''); // a refusal belongs to the opening it was made in
+  }, [open]);
+  const target = ids.join(',');
+  useEffect(() => {
+    setName(''); // a half-typed name and a refusal belong to the items they were typed for; not a remount, so a closing dialog still returns focus
+    setProblem('');
+  }, [target]);
   const on = (boardId: string) => picked.filter((c) => c.boardIds?.includes(boardId)).length;
 
   /** Puts every picked result on the board or takes them all off, then lets the page update each one's `boardIds` (which may drop it from an open board). */
@@ -74,16 +89,20 @@ export function BoardsModal({ open, onClose, ids, clips, boards, onChange }: { o
       setBusy(false);
     }
   }
+  // aria-disabled, not disabled, while saving or with no name: a focused control that becomes disabled drops focus to the page, and the detail's keys (1, →) then act on the item behind the dialog.
+  const blocked = busy || picked.length === 0 || !name.trim();
   const create = (e: FormEvent) => {
     e.preventDefault();
+    if (blocked) return;
     void run(async () => {
       await put((await boards.create(name.trim())).id, true);
       setName('');
     });
   };
-  return (
+  const dialog = (
     <Modal open={open} onClose={onClose} label="Thêm vào bảng" className="choice-dialog">
       <h2>Thêm vào bảng</h2>
+      {boards.failed && <LoadError text="Không tải được danh sách bảng." onRetry={boards.reload} />}
       {boards.boards !== null && boards.boards.length === 0 && <p className="muted">Chưa có bảng nào. Đặt tên để tạo bảng đầu tiên.</p>}
       {boards.boards !== null && boards.boards.length > 0 && (
         <div className={s.list} role="group" aria-label="Bảng của bạn">
@@ -98,8 +117,9 @@ export function BoardsModal({ open, onClose, ids, clips, boards, onChange }: { o
                   ref={(box) => {
                     if (box) box.indeterminate = n > 0 && !all;
                   }}
-                  disabled={busy || picked.length === 0}
-                  onChange={() => void run(() => put(b.id, !all))}
+                  disabled={picked.length === 0}
+                  aria-busy={busy}
+                  onChange={() => busy || void run(() => put(b.id, !all))}
                 />
                 {b.name} ({b.count})
               </label>
@@ -113,7 +133,7 @@ export function BoardsModal({ open, onClose, ids, clips, boards, onChange }: { o
         </label>
         <div className={s.row}>
           <input id={nameId} type="text" maxLength={MAX_BOARD_NAME} placeholder="Ví dụ: Tết 2027 – áo thun" value={name} onChange={(e) => setName(e.target.value)} />
-          <button type="submit" className="primary" disabled={busy || picked.length === 0 || !name.trim()}>
+          <button type="submit" className="primary" aria-disabled={blocked}>
             Tạo bảng
           </button>
         </div>
@@ -125,6 +145,8 @@ export function BoardsModal({ open, onClose, ids, clips, boards, onChange }: { o
       )}
     </Modal>
   );
+  // In the page's body, not inside the detail or the selection bar, whose rules (.lightbox .modal-body, .zip-float button) would restyle it. The server renders nothing open, so it is inline there.
+  return typeof document === 'undefined' ? dialog : createPortal(dialog, document.body);
 }
 
 /** The open board's row atop the results: its name and size, and the two ways to change the board itself (the results stay in the Library either way). */

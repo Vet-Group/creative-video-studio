@@ -190,7 +190,9 @@ test('Library boards: make, fill, open, rename and delete a board, with the keys
 
     // The shelf shows none of the board UI, for a board of the member's and for an id that is none of theirs.
     for (const id of [board!.id, 'no-such-board']) {
+      const answered = page.waitForResponse((r) => r.url().endsWith('/api/library/boards') && r.request().method() === 'GET'); // the boards are known before the absence is asserted
       await page.goto(`/library?kind=products&board=${id}`);
+      await answered;
       await expect(page.locator('.product-shelf')).toBeVisible();
       for (const text of [`Bảng: ${RENAMED}`, 'Đổi tên bảng', 'Bảng này chưa có mục nào.', 'Không tìm thấy bảng này.']) await expect(page.getByText(text)).toHaveCount(0);
     }
@@ -246,10 +248,120 @@ test('Library boards: make, fill, open, rename and delete a board, with the keys
     expect(await boardsNow()).toEqual([]);
     await mineOnly();
     await expect(page.getByRole('article')).toHaveCount(3);
+    expect(verdicts).toEqual([]); // no key of the whole flow marked an item
   } finally {
     await other.context().close();
     await dropBoards();
     // Leave nothing behind for the other specs that read the shared Library.
     for (const id of jobs) expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
+  }
+});
+
+// The dialogs sit in the page's body, not in the detail's or the selection bar's markup, so the rules of the lightbox and of the selection bar do not reach them.
+test('the boards dialog of the detail and of the selection bar is a plain dialog: one column, a list that scrolls, the create form on screen, and nothing carried to the next item', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'libboard');
+  const clip = async (prompt: string) => {
+    const up = (await (await page.request.post('/api/assets', { multipart: { file: { name: 'board.png', mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] };
+    const res = await page.request.post('/api/jobs', { data: { assetIds: [up.assets[0]!.id], modelId: 'mock-e2e', prompt, enhance: false, ratio: '9:16', durationSec: 5 } });
+    expect(res.status()).toBe(201);
+    return ((await res.json()) as { id: string }).id;
+  };
+  const dropBoards = async () => {
+    const { boards } = (await (await page.request.get('/api/library/boards')).json()) as { boards: { id: string }[] };
+    for (const b of boards) expect((await page.request.delete(`/api/library/boards/${b.id}`)).status()).toBe(204);
+  };
+  await dropBoards();
+  const older = await clip('plain words one');
+  const newer = await clip('plain words two');
+  const named = (n: number) => `Bảng thử ${String(n).padStart(2, '0')}`;
+  try {
+    for (let n = 1; n <= 20; n++) expect((await page.request.post('/api/library/boards', { data: { name: named(n) } })).status()).toBe(201);
+    await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.filter((j) => [older, newer].includes(j.id) && j.status === 'succeeded').length, { timeout: 60_000 }).toBe(2);
+    const verdicts: string[] = [];
+    page.on('request', (r) => r.method() === 'PUT' && r.url().includes('/verdict') && verdicts.push(r.url()));
+    const detail = page.locator('dialog.lightbox');
+    const boardsDialog = page.getByRole('dialog', { name: 'Thêm vào bảng' });
+    const words = (text: string) => detail.getByText(text, { exact: true });
+    const openDetail = async () => {
+      await page.goto(`/library?item=${newer}`);
+      await expect(detail).toBeVisible();
+      await expect(words('plain words two')).toBeVisible();
+    };
+    // A dialog of the house: its body is one padded column under the title, the list scrolls with the wheel to its last board, and the create form ends on screen.
+    const plain = async (dialog: Locator) => {
+      const body = dialog.locator('.modal-body');
+      expect(await body.evaluate((e) => getComputedStyle(e).display)).not.toBe('grid');
+      expect(await body.evaluate((e) => parseFloat(getComputedStyle(e).paddingLeft))).toBeGreaterThan(0);
+      const title = (await dialog.getByRole('heading', { name: 'Thêm vào bảng' }).boundingBox())!;
+      const first = (await dialog.getByRole('checkbox').first().boundingBox())!;
+      expect(first.y).toBeGreaterThanOrEqual(title.y + title.height - 1); // under the title, not beside it
+      const close = dialog.getByRole('button', { name: 'Đóng' });
+      expect(await close.evaluate((e) => [e.getBoundingClientRect().width, e.getBoundingClientRect().height, getComputedStyle(e).paddingLeft])).toEqual([28, 28, '0px']);
+      const last = dialog.getByRole('checkbox', { name: new RegExp(`^${named(20)} `) });
+      await dialog.hover();
+      await page.mouse.wheel(0, 5000);
+      await expect(last).toBeInViewport({ ratio: 1 });
+      await expect(dialog.getByRole('button', { name: 'Tạo bảng' })).toBeInViewport({ ratio: 1 });
+    };
+    for (const size of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(size);
+      await openDetail();
+      await detail.getByRole('button', { name: 'Bảng', exact: true }).click();
+      await expect(boardsDialog).toBeVisible();
+      await plain(boardsDialog);
+      await boardsDialog.getByRole('button', { name: 'Đóng' }).click();
+    }
+
+    // The selection bar's dialog is the same dialog, with the same × as everywhere.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto('/library');
+    await page.getByLabel('Người tạo').selectOption({ label: 'E2E Library Board' });
+    await page.getByRole('button', { name: 'Chọn', exact: true }).click();
+    await page.locator(`article[data-clip-id="${newer}"]`).getByRole('checkbox').check();
+    await page.getByRole('group', { name: 'Bảng', exact: true }).getByRole('button', { name: 'Thêm vào bảng…' }).click();
+    await expect(boardsDialog).toBeVisible();
+    await plain(boardsDialog);
+    await boardsDialog.getByRole('button', { name: 'Đóng' }).click();
+
+    // Nothing carries to the next item: a refusal and a half-typed name stay with the item they were typed for, and a refusal is gone when the dialog opens again.
+    await openDetail();
+    await detail.getByRole('button', { name: 'Bảng', exact: true }).click();
+    await boardsDialog.getByLabel('Tên bảng mới').fill(named(1));
+    await boardsDialog.getByRole('button', { name: 'Tạo bảng' }).click();
+    await expect(boardsDialog.getByRole('alert')).toHaveText('Đã có bảng tên này.');
+    await boardsDialog.getByRole('button', { name: 'Đóng' }).click();
+    await detail.getByRole('button', { name: 'Bảng', exact: true }).click();
+    await expect(boardsDialog.getByRole('alert')).toHaveCount(0); // opened again: the refusal is gone
+    await boardsDialog.getByRole('button', { name: 'Đóng' }).click();
+    await page.keyboard.press('ArrowRight');
+    await expect(words('plain words one')).toBeVisible();
+    await detail.getByRole('button', { name: 'Bảng', exact: true }).click();
+    await expect(boardsDialog.getByLabel('Tên bảng mới')).toHaveValue('');
+    await expect(boardsDialog.getByRole('alert')).toHaveCount(0);
+
+    // Ticking a board right before a key: the key must not reach the detail (the box may be disabled while it saves, which must not drop focus to the page).
+    await openDetail();
+    await detail.getByRole('button', { name: 'Bảng', exact: true }).click();
+    await boardsDialog.getByRole('checkbox', { name: new RegExp(`^${named(2)} `) }).click();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('1');
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await expect(words('plain words one')).toHaveCount(0); // the detail did not step
+    expect(verdicts).toEqual([]); // and nothing was marked
+    await expect(boardsDialog.getByRole('checkbox', { name: new RegExp(`^${named(2)} \\(1\\)`) })).toBeChecked();
+    // The same right after Tạo bảng, which empties its own field and so loses its enabled state.
+    await boardsDialog.getByLabel('Tên bảng mới').fill('Bảng mới ngay');
+    await boardsDialog.getByRole('button', { name: 'Tạo bảng' }).click();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('1');
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await expect(words('plain words one')).toHaveCount(0);
+    expect(verdicts).toEqual([]);
+    await expect(boardsDialog.getByRole('checkbox', { name: /^Bảng mới ngay \(1\)/ })).toBeChecked();
+    await expect(words('plain words two')).toBeVisible();
+  } finally {
+    await dropBoards();
+    for (const id of [older, newer]) expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
   }
 });
