@@ -25,6 +25,7 @@ import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import { Preview } from './Preview';
 import { Select } from './Select';
+import { offersShelf, ShelfPicker } from './ShelfPicker';
 import { StorePicker, type StoreOption } from './StorePicker';
 import { SampleDetail } from './SampleDetail';
 import type { ModelOption } from './ModelPicker';
@@ -483,6 +484,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
           {name}
           {counter}
           {onPick && (!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} slot={slot ?? slotOfLabel(label)} onPick={(img) => (setCut(0), onPick(img))} />}
+          {onPick && (!full || max === 1) && offersShelf(slot ?? slotOfLabel(label)) && <ShelfPicker name={`Từ kệ sản phẩm cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} onPick={(img) => (setCut(0), onPick(img))} />}
         </div>
       ) : (
         name
