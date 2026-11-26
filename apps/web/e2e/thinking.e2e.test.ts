@@ -26,7 +26,7 @@ test('Image Generation offers the thinking level only on a model that lists one,
   await pickModel(page, /Mock image Solo/);
   const cost = form.getByRole('button', { name: /^Tạo ảnh/ }).locator('.run-cost');
   await expect(thinking).toHaveAttribute('data-value', 'minimal');
-  await expect(cost).toHaveText('· $0.0400');
+  await expect(cost).toHaveText('· $0.04');
   await thinking.click();
   await expect(optionsOf(page, 'Mức suy luận')).toHaveText(['Tối thiểu', 'Vừa', 'Cao']);
   await thinking.click();

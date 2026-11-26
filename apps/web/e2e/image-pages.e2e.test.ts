@@ -107,7 +107,7 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   await page.getByLabel('Ảnh người mẫu').setInputFiles(file('person.png'));
   await expect(run).toBeEnabled();
   await expect(reason).toHaveCount(0);
-  await expect(run).toContainText('$0.0000'); // a mock model books 0
+  await expect(run).toContainText('$0.00'); // a mock model books 0
   // The slot is full after one model photo, and a photo can be taken out again.
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveCount(1);
   await page.getByRole('button', { name: 'Bỏ ảnh person.png' }).click();

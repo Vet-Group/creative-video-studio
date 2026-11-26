@@ -474,7 +474,7 @@ test.describe('1440x1000', () => {
     await page.getByLabel('Mô tả chuyển động').fill('Slow turn of the bottle.');
     await expect(run).toHaveCSS('background-color', 'rgb(220, 38, 38)');
     expect(await css(run, 'background-color', 'color', 'font-size', 'font-weight', 'border-top-left-radius', 'padding-top', 'padding-right', 'column-gap', 'justify-content')).toEqual(['rgb(220, 38, 38)', 'rgb(255, 255, 255)', '16px', '500', '8px', '12px', '16px', '12px', 'center']);
-    await expect(run).toContainText('$0.8000');
+    await expect(run).toContainText('$0.80');
   });
 
   test('history empty state: a 16px title over a 14px rgb(102,102,102) hint like the Library', async ({ page }) => {
@@ -618,7 +618,7 @@ test.describe('390x844', () => {
     await expect(run).toHaveCSS('background-color', 'rgb(220, 38, 38)');
     expect(await css(run, 'border-top-left-radius', 'background-color')).toEqual(['8px', 'rgb(220, 38, 38)']);
     expect(await css(page.locator('.runbar'), 'box-shadow', 'background-color', 'border-top-width')).toEqual(['none', 'rgba(0, 0, 0, 0)', '0px']);
-    await expect(run).toContainText('$0.8000');
+    await expect(run).toContainText('$0.80');
   });
 
   test('T3 narrow tabs: four equal pills, 30 tall, padding 6px 4px, radius 8, 12px/600, 2px gaps, active black on white', async ({ page }) => {

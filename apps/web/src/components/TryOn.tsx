@@ -5,7 +5,7 @@ import { useEffect, useId, useState } from 'react';
 import { api, errorText, thumbUrl } from '@/lib/api';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { tryOnPlaces, tryOnSlots } from '@/lib/reuse';
-import { confirmRun, sendRun } from '@/lib/run-guard';
+import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { parseFashionTraits } from '@/lib/fashion-model';
@@ -391,7 +391,7 @@ export function TryOn({ reuse, model }: { reuse?: string; model?: Img }) {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Thử đồ
-              {busy ? <span className="run-cost">· Đang gửi…</span> : !recall.answered || models === null ? <span className="run-cost">· Đang tải…</span> : pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : !recall.answered || models === null ? <span className="run-cost">· Đang tải…</span> : pick.estimate !== undefined && <span className="run-cost">· {usd(pick.estimate)}</span>}
             </button>
           </div>
         </div>

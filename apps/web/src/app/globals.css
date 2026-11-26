@@ -3410,6 +3410,11 @@ dialog.modal.compare-two { width: min(1100px, calc(100vw - 32px)); max-width: no
 .imagebar :is(.select-pop, .store-pop):not(dialog *) { right: auto; min-width: 12rem; }
 .imagebar .store-pop:not(dialog *) { min-width: 16rem; }
 .imagebar .locked-fields:not(dialog *) { display: contents; }
+/* While the model list loads, the stand-in pills take about the room of the real ones, so on a phone they wrap into as many rows and the bar does not grow when the pills arrive. */
+@media (max-width: 1023px) {
+  .imagebar .locked-fields[data-loading]:not(dialog *) .select-trigger { min-width: 7rem; }
+  .imagebar-chips .locked-fields[data-loading]:not(dialog *) .field:first-child .select-trigger { min-width: 15rem; }
+}
 .imagebar-more-on { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--ink); color: var(--on-ink); font-size: 12px; line-height: 18px; text-align: center; }
 .imagebar-chips > .run { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; margin: 0 0 0 auto; padding: 0 20px; border: 0; border-radius: 999px; font-size: 14px; line-height: 21px; font-weight: 500; white-space: nowrap; transition: background-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), scale var(--dur-fast) var(--ease-out); }
 /* Not ready: the neutral grey of the other tools' Run (.runbar), not the brand red at half strength. */
@@ -3614,3 +3619,8 @@ dialog.modal.compare-two { width: min(1100px, calc(100vw - 32px)); max-width: no
   .usage > .usage-team td[data-prefix]:has(~ td:not([data-empty]))::after { content: ' \00b7'; }
 }
 @media (prefers-reduced-motion: reduce) { .usage-real .switch::after { transition: none; } }
+
+/* Vietnamese line breaks: short centred text is balanced and longer text avoids a lone last word. */
+:is(.dropzone-hint, .slot-hint, .app-head strong, .banner-text strong, .explore-hero h1, .about h2, .about-start h3) { text-wrap: balance; }
+:is(.about p, .about-lead, .about-cards > li, .about-steps > li, .help) { text-wrap: pretty; }
+@media (max-width: 599px) { .about > h2 + p { text-align: left; } } /* seven centred lines are hard to read on a phone */

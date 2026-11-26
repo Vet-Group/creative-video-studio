@@ -547,7 +547,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
 
   /** One job per picked angle, sent one after another (the API takes one job per POST); the first refusal stops the rest and says how many went. */
   async function run() {
-    if (!(await (n > 1 ? confirmDialog({ title: `Tạo ${n} clip, mỗi góc máy một clip, tổng $${total}?`, confirmLabel: 'Tiếp tục' }) : confirmRun(unit)))) return;
+    if (!(await (n > 1 ? confirmDialog({ title: `Tạo ${n} clip, mỗi góc máy một clip, tổng ${usd(total ?? 0)}?`, confirmLabel: 'Tiếp tục' }) : confirmRun(unit)))) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -1086,7 +1086,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
               ) : (
                 <>
                   {picked.length > 0 ? `Tạo ${n} clip` : 'Tạo video'}
-                  {chosen && <span className="run-cost">· ${picked.length > 0 ? total : unit}</span>}
+                  {total !== undefined && <span className="run-cost">· {usd(total)}</span>}
                 </>
               )}
             </button>

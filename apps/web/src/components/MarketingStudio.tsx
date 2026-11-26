@@ -13,7 +13,7 @@ import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { WIZARD_KEY } from '@/lib/onboarding';
 import { type BrandKit, withBrand } from '@/lib/brand';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun, sendRun } from '@/lib/run-guard';
+import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { confirmDialog } from './Confirm';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
@@ -570,7 +570,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   /** One job per hook variant, sent one after another (the API takes one job per POST); a refused variant does not stop the rest. */
   async function run() {
     // One question: the variants one when there are several, else the price one from 1 USD.
-    if (!(await (n > 1 ? confirmDialog({ title: `Tạo ${n} clip, mỗi hook một clip, tổng $${total}?`, confirmLabel: 'Tiếp tục' }) : confirmRun(total)))) return;
+    if (!(await (n > 1 ? confirmDialog({ title: `Tạo ${n} clip, mỗi hook một clip, tổng ${usd(total ?? 0)}?`, confirmLabel: 'Tiếp tục' }) : confirmRun(total)))) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -868,7 +868,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
                   <>
                     Tạo video
                     {n > 1 && ` ${n} clip`}
-                    {chosen && <span className="run-cost">· {fresh ? `$${total}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
+                    {chosen && <span className="run-cost">· {fresh && total !== undefined ? usd(total) : '…'}</span>} {/* the estimate is for the duration of the last list */}
                   </>
                 )}
               </button>

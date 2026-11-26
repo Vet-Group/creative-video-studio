@@ -12,7 +12,7 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await expect(page.getByRole('dialog', { name: 'Chọn mô hình' }).getByText('$0.0000')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(modelButton(page)).toBeFocused();
-  await expect(page.getByRole('button', { name: 'Tạo video' })).toContainText('$0.0000');
+  await expect(page.getByRole('button', { name: 'Tạo video' })).toContainText('$0.00');
   await expect(page.getByText('Tháng này bạn đã dùng: $0.0000')).toBeVisible();
   await expect(page.getByText('Ngân sách tháng còn lại')).toHaveCount(0);
 
