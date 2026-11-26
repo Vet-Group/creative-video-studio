@@ -841,6 +841,13 @@
 			"when": 1797200000000,
 			"tag": "0120_cheap_fal_models",
 			"breakpoints": true
+		},
+		{
+			"idx": 120,
+			"version": "7",
+			"when": 1797300000000,
+			"tag": "0121_products",
+			"breakpoints": true
 		}
 	]
 }

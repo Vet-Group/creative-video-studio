@@ -793,6 +793,32 @@ export const userTemplates = pgTable(
   ],
 );
 
+// A product a member saved on the shelf (the Library's Products view, the shelf picker): a name and one to four of the member's own input photos, private to them in one workspace.
+// `asset_ids` are not foreign keys, as with `feedback.image_asset_ids`: a key would block the purge's delete (apps/worker/src/purge.ts), so the purge and the duplicate
+// sweep skip any asset a product names instead. The name is stored NFC and is unique per member and workspace without regard to case; the API asks for two photos or more.
+export const products = pgTable(
+  'products',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: workspaceId(),
+    name: text('name').notNull(),
+    storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
+    // A lib/product-types.ts key, checked by the API only (examples.product_type has its own check, so a new type needs a migration there anyway).
+    productType: text('product_type'),
+    assetIds: text('asset_ids').array().notNull(),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('products_user_name_key').on(t.userId, t.workspaceId, sql`lower(${t.name})`),
+    index('products_workspace_id_idx').on(t.workspaceId),
+    check('products_name_check', sql`char_length(${t.name}) between 1 and 60`),
+    check('products_photos_check', sql`cardinality(${t.assetIds}) between 1 and 4`),
+  ],
+);
+
 export const CHOICE_KINDS = ['hook', 'location', 'ending'] as const;
 export type ChoiceKind = (typeof CHOICE_KINDS)[number];
 

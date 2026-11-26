@@ -1168,3 +1168,49 @@ describe('migration 0120 cheaper fal models', () => {
     expect(EXTRA_INPUT_IMAGE_USD['bytedance/seedream/v5.5/edit']).toBe(0.012);
   });
 });
+
+describe('migration 0121 products', () => {
+  let owner = '';
+  let other = '';
+  const make = (id: string, name: string, assets: string[], user = owner, workspace = 'ws_vet') =>
+    pool.query(`insert into products (id, user_id, workspace_id, name, asset_ids) values ($1, $2, $3, $4, $5::text[])`, [id, user, workspace, name, assets]);
+
+  beforeAll(async () => {
+    owner = await insertUser();
+    other = await insertUser();
+    await pool.query(`insert into workspaces (id, name) values ('ws_0121', 'Partner 0121')`);
+  });
+
+  test('keeps one to four photos: none and five are refused', async () => {
+    await expect(make('p-0', 'None', [])).rejects.toThrow(/products_photos_check/);
+    await expect(make('p-5', 'Five', ['a', 'b', 'c', 'd', 'e'])).rejects.toThrow(/products_photos_check/);
+    for (const n of [1, 2, 3, 4]) await make(`p-n${n}`, `Photos ${n}`, ['a', 'b', 'c', 'd'].slice(0, n));
+    await expect(pool.query(`insert into products (id, user_id, workspace_id, name, asset_ids) values ('p-null', $1, 'ws_vet', 'Null', null)`, [owner])).rejects.toThrow(/null value/);
+  });
+
+  test('keeps the name to 1 to 60 characters, counted as characters: an empty and a 61-character name are refused', async () => {
+    await expect(make('p-empty', '', ['a'])).rejects.toThrow(/products_name_check/);
+    await expect(make('p-61', 'x'.repeat(61), ['a'])).rejects.toThrow(/products_name_check/);
+    await make('p-60', 'x'.repeat(60), ['a']);
+    await make('p-emoji', '😀'.repeat(60), ['a']); // 60 characters, 240 bytes
+  });
+
+  test('a second name that differs only in case is refused for the same member and workspace, and accepted for another member or in another workspace', async () => {
+    await make('p-u1', 'Áo Thun', ['a']);
+    await expect(make('p-u2', 'áo thun', ['a'])).rejects.toThrow(/products_user_name_key/);
+    await expect(make('p-u3', 'ÁO THUN', ['a'])).rejects.toThrow(/products_user_name_key/);
+    await make('p-u4', 'Áo Thun', ['a'], other);
+    await make('p-u5', 'Áo Thun', ['a'], owner, 'ws_0121');
+  });
+
+  test('a deleted user takes their products, a deleted store only clears the products’ store, and a workspace with products cannot be deleted', async () => {
+    const user = await insertUser();
+    await pool.query(`insert into stores (id, name, code, workspace_id) values ('st-0121', 'Shop 0121', 'S0121', 'ws_vet')`);
+    await pool.query(`insert into products (id, user_id, workspace_id, name, store_id, asset_ids) values ('p-s', $1, 'ws_vet', 'With store', 'st-0121', '{a}')`, [user]);
+    await pool.query(`delete from stores where id = 'st-0121'`);
+    expect((await pool.query(`select store_id from products where id = 'p-s'`)).rows[0].store_id).toBeNull();
+    await expect(pool.query(`delete from workspaces where id = 'ws_0121'`)).rejects.toThrow(/products_workspace_id_workspaces_id_fk/);
+    await pool.query(`delete from users where id = $1`, [user]);
+    expect((await pool.query(`select 1 from products where id = 'p-s'`)).rowCount).toBe(0);
+  });
+});

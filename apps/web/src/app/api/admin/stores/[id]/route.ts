@@ -57,7 +57,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 }
 
 /**
- * Admin: delete a store nothing points at yet (owner decision, 2026-11-11): no job, cost entry, upload, template or saved choice. Any of
+ * Admin: delete a store nothing points at yet (owner decision, 2026-11-11): no job, cost entry, upload, template, saved choice or product. Any of
  * those is 409, so the costs of past months keep their store; close the store instead. Audited `store.delete`.
  */
 export async function DELETE(request: Request, { params }: RouteContext) {
@@ -69,10 +69,10 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     if (!old) return bad('not found', 404);
     const used = await tx.query(
       `select 1 from jobs where store_id = $1 union all select 1 from cost_entries where store_id = $1 union all select 1 from assets where store_id = $1
-       union all select 1 from user_templates where store_id = $1 union all select 1 from user_choices where store_id = $1 limit 1`,
+       union all select 1 from user_templates where store_id = $1 union all select 1 from user_choices where store_id = $1 union all select 1 from products where store_id = $1 limit 1`,
       [id],
     );
-    if (used.rowCount) return bad('the store has clips, costs, uploads, templates or choices; close it instead', 409);
+    if (used.rowCount) return bad('the store has clips, costs, uploads, templates, choices or products; close it instead', 409);
     await tx.query('delete from stores where id = $1', [id]);
     await audit(tx, { actorId: g.session.user.id, action: 'store.delete', target: `store:${id}`, oldValue: { name: old.name, code: old.code }, newValue: null });
     return Response.json({ ok: true });

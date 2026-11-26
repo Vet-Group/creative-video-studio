@@ -83,7 +83,7 @@ function StoreRow({ store, teams, run, pending, onBrand }: { store: Store; teams
             type="button"
             className="danger"
             disabled={pending || store.inUse}
-            title={store.inUse ? 'Cửa hàng đã có clip, chi phí hoặc mẫu: hãy Đóng thay vì xoá.' : undefined}
+            title={store.inUse ? 'Cửa hàng đã có clip, chi phí, mẫu hoặc sản phẩm: hãy Đóng thay vì xoá.' : undefined}
             onClick={() => void remove()}
           >
             Xoá

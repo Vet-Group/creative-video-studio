@@ -237,6 +237,21 @@ describe('stores', () => {
     ]);
   });
 
+  test('a store only a product names is in use: it reports inUse, its delete is 409 with the products in the message, and it can be closed', async () => {
+    const remove = (id: string) => storeRoute.DELETE(call(admin.cookie, `/api/admin/stores/${id}`, 'DELETE'), ctx(id));
+    const { id } = (await (await create('Shop With Product', 'POD-PRODUCT')).json()) as { id: string };
+    expect((await list()).find((s) => s.id === id)).toMatchObject({ inUse: false });
+    await pool.query(`insert into products (id, user_id, workspace_id, name, store_id, asset_ids) values ('prod-store-guard', $1, 'ws_vet', 'Shirt', $2, '{a,b}')`, [member.id, id]);
+    expect((await list()).find((s) => s.id === id)).toMatchObject({ inUse: true });
+    const refused = await remove(id);
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toBe('the store has clips, costs, uploads, templates, choices or products; close it instead');
+    expect((await pool.query('select 1 from stores where id = $1', [id])).rowCount).toBe(1);
+    expect((await patch(id, { hidden: true })).status).toBe(200); // closing is the way out
+    await pool.query(`delete from products where id = 'prod-store-guard'`);
+    expect((await remove(id)).status).toBe(200); // nothing points at it now
+  });
+
   test('deletes a store nothing points at, audited; refuses one with a clip (409, nothing changed) and an unknown one (404)', async () => {
     const remove = (id: string) => storeRoute.DELETE(call(admin.cookie, `/api/admin/stores/${id}`, 'DELETE'), ctx(id));
     const { id: unused } = (await (await create('Shop Unused', 'POD-U')).json()) as { id: string };
