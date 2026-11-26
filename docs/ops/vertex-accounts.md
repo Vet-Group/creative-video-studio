@@ -37,8 +37,9 @@ first rows arrive about a day after it is enabled.
 
 Several Vertex image jobs started together can make Google answer HTTP 429 RESOURCE_EXHAUSTED for some of them. The image provider retries only a 429, at most 3
 times, waiting 20 to 60 s each time (the `Retry-After` seconds if larger, plus up to 20 s of jitter, never more than 60 s); the wait does not count toward the
-job's run limit, which starts once Google accepts the call. A refused call is not billed. After the third retry the job fails with the usual
-`vertex: HTTP 429 ...` text and releases its estimate. Veo and Omni calls are not retried.
+job's run limit, which starts once Google accepts the call. A refused call is not billed. After the third retry the worker puts the job back in the
+queue, keeping its estimate, and the next reconcile pass sends it again. A 429 round that ends more than 15 minutes after the job was created fails the
+job with the usual `vertex: HTTP 429 ...` text and releases its estimate. Veo and Omni calls are not retried.
 
 ## Credits and switching
 

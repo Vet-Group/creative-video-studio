@@ -47,6 +47,8 @@ export interface WorkerOptions {
   lateDeliveryMs: number;
   /** A queued job without a live pg-boss job is sent again after this long. */
   resendAfterMs: number;
+  /** A Vertex image job Google still refuses with 429 after the adapter's retries goes back to queued; a round of retries that ends more than this long after the job was created fails it unbilled. */
+  requeue429Ms: number;
   perUserLimit: number;
   globalLimit: number;
   pollingIntervalSeconds: number;
@@ -66,6 +68,8 @@ export const DEFAULT_OPTIONS: WorkerOptions = {
   runTimeoutMs: 20 * 60_000,
   lateDeliveryMs: 2 * 60 * 60_000,
   resendAfterMs: 30_000,
+  // About five rounds of the adapter's 429 retries (up to about 3 min each, vertex.ts) before the member is told; an image takes 6 to 8 s.
+  requeue429Ms: 15 * 60_000,
   perUserLimit: 2,
   globalLimit: 5,
   pollingIntervalSeconds: 2,
@@ -302,6 +306,28 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       } catch (e) {
         // Shutting down mid-call: the row stays submitting and the next worker turns it into failed_unknown.
         if (signal.aborted) return;
+        // Google refused a Vertex image call with 429 after the adapter's retries and bills no refusal, so the job keeps its estimate and goes back to queued
+        // for resendQueued to send again; a round that ends past requeue429Ms after the job was created fails it unbilled, as before. A database error is
+        // tried again as for saving an id below, since a job left submitting ends failed_unknown and keeps an estimate Google never billed. `fresh` is read
+        // once, so a retry after a write that did commit changes nothing.
+        if (e instanceof ProviderHttpError && e.status === 429 && job.provider === 'vertex' && job.kind === 'image') {
+          let fresh: boolean | undefined;
+          for (let n = 0; ; n++) {
+            try {
+              fresh ??= (await pool.query(`select created_at > now() - ($2::float8 * interval '1 millisecond') as fresh from jobs where id = $1`, [jobId, o.requeue429Ms])).rows[0]?.fresh === true;
+              if (!fresh) await release(pool, jobId, e.message);
+              else if ((await pool.query(`update jobs set status = 'queued', claimed_by = null where id = $1 and status = 'submitting' and claimed_by = $2`, [jobId, id])).rowCount) {
+                log(`vertex 429 on ${jobId}, queued again`, e);
+              }
+              return;
+            } catch (err) {
+              const last = n === o.saveIdRetryMs.length;
+              log(`vertex 429 on ${jobId}, attempt ${n + 1} to queue it again or fail it${last ? '; giving up: it ends failed_unknown, so release its estimate by hand (Google billed nothing)' : ''}`, err);
+              if (last) throw err;
+              await new Promise((r) => setTimeout(r, o.saveIdRetryMs[n]));
+            }
+          }
+        }
         // The adapter refused an input before any network call, or the provider refused the request with a 4xx: nothing was submitted, so the
         // estimate is released. A 408 (timeout) or 429 (rate limit) does not say the provider never took it, so those stay failed_unknown.
         if (e instanceof ImageReadError || (e instanceof ProviderHttpError && e.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429)) {

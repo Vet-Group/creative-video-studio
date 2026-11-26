@@ -170,6 +170,8 @@ export function createVertexImageProvider(opts: {
         // A 200 without an image (a safety block, for example) is still billed for its tokens; the estimate stands for that small amount.
         outcomes.set(id, out ? { state: 'succeeded', outputUrl: `data:${out.mimeType};base64,${out.data}`, ...billed } : { state: 'failed', error: `vertex returned no image: ${JSON.stringify(answer).slice(0, 300)}`, ...billed });
       } catch (e) {
+        // A 429 left after the retries goes back to the worker, which queues the job again (worker.ts submit): Google bills no refused call.
+        if (e instanceof ProviderHttpError && e.status === 429) throw e;
         // Only a 200 is billed, so an HTTP error costs nothing and the worker releases the estimate; a timeout or a lost connection may have been billed.
         const cost = e instanceof ProviderHttpError ? { costUsd: 0, costSource: 'reported' as const } : billed;
         outcomes.set(id, { state: 'failed', error: e instanceof Error ? e.message : String(e), ...cost });

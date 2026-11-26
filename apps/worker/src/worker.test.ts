@@ -1098,6 +1098,122 @@ describe('image jobs', () => {
     await waitFor('the stored outcome to be removed', async () => !(await hasObject(`vertex-outcomes/${(await job(id)).provider_job_id}.json`)));
   });
 
+  describe('a Vertex image call Google still refuses with 429 after the adapter retries', () => {
+    const refused = () => Response.json({ error: { code: 429, status: 'RESOURCE_EXHAUSTED' } }, { status: 429 });
+    const pictured = async () => {
+      const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#ffffff' } }).png().toBuffer();
+      const answer = { candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: png.toString('base64') } }] } }] };
+      return () => Response.json(answer);
+    };
+    beforeAll(async () => {
+      await pool.query(`insert into users (id, email, name) values ('u5', 'u5@example.test', 'u5')`);
+    });
+
+    /** The real Vertex adapter over canned Google answers (the last one repeats; nothing leaves the machine), its retry waits skipped, as provider vertex beside `others`. */
+    async function startVertex(answers: (() => Response)[], options: Partial<WorkerOptions> = {}, others: Partial<Record<string, ImageProvider>> = {}, db = pool) {
+      const calls = { n: 0 };
+      const fetch = async () => answers[Math.min(calls.n++, answers.length - 1)]!();
+      const vertex = createVertexImageProvider({ key: { client_email: 'sa@test.invalid', private_key: 'unused' }, project: 'proj', fetch, token: async () => 'tok', sleep: async () => undefined });
+      // The mock model has no Vertex request, so the call is made as Nano Banana Pro.
+      const image: ImageProvider = { ...vertex, submit: (req) => vertex.submit({ ...req, model: { ...req.model, endpoint: 'gemini-3-pro-image' } }) };
+      workers.push(await startWorker({ pool: db, connectionString: testDb.url, providers: { mock: counting(300) }, imageProviders: { vertex: image, ...others }, options: { ...FAST, ...options } }));
+      return calls;
+    }
+    const vertexJob = async () => {
+      const id = await newImageJob('u5');
+      await pool.query(`update jobs set provider = 'vertex' where id = $1`, [id]);
+      return id;
+    };
+
+    test('the job goes back to queued with its one estimate, is sent again and succeeds, billed once', async () => {
+      const calls = await startVertex([refused, refused, refused, refused, await pictured()], { resendAfterMs: 2_000 });
+      const id = await vertexJob();
+      await send(id, 'u5');
+      await waitFor('the job to be queued again', async () => calls.n === 4 && (await status(id)) === 'queued');
+      expect((await job(id)).claimed_by).toBeNull();
+      expect(await total(id)).toEqual({ usd: '0.1500', is_final: false });
+      await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+      expect(calls.n).toBe(5);
+      expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.1500'], ['actual_adjustment', '0.0000']]);
+    });
+
+    test('a round that ends more than requeue429Ms (15 min) after the job was created fails it unbilled with the 429, as before', async () => {
+      const calls = await startVertex([refused]);
+      const id = await vertexJob();
+      await pool.query(`update jobs set created_at = now() - interval '16 minutes' where id = $1`, [id]);
+      await send(id, 'u5');
+      await waitFor('the job to fail', async () => (await status(id)) === 'failed');
+      expect((await job(id)).error).toMatch(/^vertex: HTTP 429 .*RESOURCE_EXHAUSTED/);
+      expect(calls.n).toBe(4);
+      expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.1500'], ['release', '-0.1500']]);
+      expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
+    });
+
+    test('under 429s that never end, the job is queued again round after round until a round ends past requeue429Ms, then fails with one estimate and one release', async () => {
+      const errors = vi.spyOn(console, 'error');
+      const calls = await startVertex([refused], { requeue429Ms: 3_000 });
+      const id = await vertexJob();
+      await send(id, 'u5');
+      await waitFor('the job to fail', async () => (await status(id)) === 'failed');
+      const requeues = errors.mock.calls.filter((c) => String(c[0]).includes(`vertex 429 on ${id}, queued again`)).length;
+      errors.mockRestore();
+      expect(requeues).toBeGreaterThanOrEqual(1);
+      expect(calls.n).toBe((requeues + 1) * 4);
+      expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.1500'], ['release', '-0.1500']]);
+    });
+
+    test('a database error on the first write that queues the job again or fails it is tried again, so neither job is left submitting to end failed_unknown', async () => {
+      const [late, fresh] = [await vertexJob(), await vertexJob()];
+      await pool.query(`update jobs set created_at = now() - interval '16 minutes' where id = $1`, [late]);
+      // The first requeue of `fresh` and the first release of `late` (a query inside its transaction) fail as while Postgres restarts.
+      const broken = new Set([fresh, late]);
+      const failOnce = (sql: unknown, params: unknown) => {
+        if (typeof sql === 'string' && /set status = 'queued', claimed_by = null|then status else 'failed' end/.test(sql) && broken.delete((params as string[] | undefined)?.[0] ?? '')) {
+          throw new Error('Connection terminated unexpectedly');
+        }
+      };
+      const flaky = <T extends object>(target: T): T =>
+        new Proxy(target, {
+          get(t, p) {
+            const v = Reflect.get(t, p, t);
+            if (p === 'query') return async (sql: unknown, ...a: unknown[]) => (failOnce(sql, a[0]), (v as (...x: unknown[]) => unknown).call(t, sql, ...a));
+            if (p === 'connect') return async () => flaky(await (v as () => Promise<object>).call(t));
+            return typeof v === 'function' ? v.bind(t) : v;
+          },
+        });
+      const errors = vi.spyOn(console, 'error');
+      const calls = await startVertex([refused, refused, refused, refused, refused, refused, refused, refused, await pictured()], {}, {}, flaky(pool));
+      await send(late, 'u5');
+      await waitFor('the late job to fail', async () => (await status(late)) === 'failed');
+      await send(fresh, 'u5');
+      await waitFor('the fresh job to succeed', async () => (await status(fresh)) === 'succeeded');
+      const logged = errors.mock.calls.map((c) => String(c[0]));
+      errors.mockRestore();
+      expect(broken.size).toBe(0);
+      for (const id of [late, fresh]) expect(logged.filter((m) => m.includes(`vertex 429 on ${id}, attempt 1 to queue it again or fail it`))).toHaveLength(1);
+      expect(calls.n).toBe(9);
+      expect((await costs(late)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.1500'], ['release', '-0.1500']]);
+      expect((await costs(fresh)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.1500'], ['actual_adjustment', '0.0000']]);
+    });
+
+    test("other failures are unchanged: a Vertex 503 fails unbilled without a retry, and another image provider's 429 ends failed_unknown with its estimate", async () => {
+      const throttled: ImageProvider = {
+        ...createMockImageProvider({ runMs: 300, dir: mockDir }),
+        submit: async () => {
+          throw new ProviderHttpError(429, '{}', 'fal submit: HTTP 429 {}');
+        },
+      };
+      const calls = await startVertex([() => Response.json({ error: 'unavailable' }, { status: 503 })], {}, { mock: throttled });
+      const [unavailable, other] = [await vertexJob(), await newImageJob('u5')];
+      for (const id of [unavailable, other]) await send(id, 'u5');
+      await waitFor('both jobs to end', async () => (await status(unavailable)) === 'failed' && (await status(other)) === 'failed_unknown');
+      expect((await job(unavailable)).error).toMatch(/^vertex: HTTP 503/);
+      expect(calls.n).toBe(1);
+      expect(await total(unavailable)).toEqual({ usd: '0.0000', is_final: true });
+      expect(await total(other)).toEqual({ usd: '0.1500', is_final: false });
+    });
+  });
+
   test('sends the model, resolution, ratio, quality, thinking level and view to the image adapter and books the per-image price of that level', async () => {
     await pool.query(`update model_configs set thinking_levels = '{minimal,medium,high}', thinking_prices = '{"minimal": {"1K": "0.1500", "2K": "0.3000"}, "high": {"1K": "0.2000", "2K": "0.4000"}}' where id = 'mock-image'`);
     try {
