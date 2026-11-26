@@ -745,6 +745,40 @@ export const favorites = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.jobId] })],
 );
 
+// A member's named set of Library results, private to them in one workspace: a favourites list with a name. The name is stored NFC and is unique per member
+// and workspace without regard to case. Its items go with the board or the job; deleting a board never touches a job, a favourite or a mark.
+export const libraryBoards = pgTable(
+  'library_boards',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: workspaceId(),
+    name: text('name').notNull(),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('library_boards_user_name_key').on(t.userId, t.workspaceId, sql`lower(${t.name})`),
+    index('library_boards_workspace_id_idx').on(t.workspaceId),
+    check('library_boards_name_check', sql`char_length(${t.name}) between 1 and 60`),
+  ],
+);
+
+export const libraryBoardItems = pgTable(
+  'library_board_items',
+  {
+    boardId: text('board_id')
+      .notNull()
+      .references(() => libraryBoards.id, { onDelete: 'cascade' }),
+    jobId: text('job_id')
+      .notNull()
+      .references(() => jobs.id, { onDelete: 'cascade' }),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.boardId, t.jobId] }), index('library_board_items_job_id_idx').on(t.jobId)],
+);
+
 /** A Library result an Admin put on its page's Examples tab, beside the fixed samples. A featured mark only suggests one; it never puts it there. */
 export const examples = pgTable(
   'examples',

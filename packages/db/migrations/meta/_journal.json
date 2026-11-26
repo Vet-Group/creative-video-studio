@@ -848,6 +848,13 @@
 			"when": 1797300000000,
 			"tag": "0121_products",
 			"breakpoints": true
+		},
+		{
+			"idx": 121,
+			"version": "7",
+			"when": 1797400000000,
+			"tag": "0122_library_boards",
+			"breakpoints": true
 		}
 	]
 }
