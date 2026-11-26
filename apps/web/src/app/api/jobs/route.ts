@@ -13,7 +13,7 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
-import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, isHexColor, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_MODELS, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS } from '@/lib/apps';
+import { BATCH_FEATURES, cleanName, DOG_BREEDS, HOOK_RATIO, HOOK_SECONDS, hookEffect, isBatchId, isHexColor, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_MODELS, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS } from '@/lib/apps';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
@@ -30,7 +30,7 @@ const MAX_ADVANCED_IMAGES = 7;
 /** An image job may name more inputs; the model's own max_images is checked under the lock. */
 const MAX_IMAGE_INPUTS = 16;
 /** The features that run on a video model; every other feature runs on an image model. */
-const VIDEO_FEATURES = ['video', 'marketing', 'motion_control'];
+const VIDEO_FEATURES = ['video', 'marketing', 'motion_control', 'hook_effect'];
 /** The features that offer Enhance, as on Fash: Create Videos and Image Generation. */
 const ENHANCE_FEATURES = ['video', 'image'];
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
@@ -48,7 +48,7 @@ type Spec = {
   useBrand: boolean;
 };
 /** What the item of each app that writes its own prompt is called, in the refusal of another prompt. */
-const ITEM: Record<string, string> = { breed_swap: 'breed', pet_portrait: 'style', mockup_pack: 'product', name_swap: 'name', pose_generator: 'pose', product_recolor: 'color', listing_set: 'shot' };
+const ITEM: Record<string, string> = { breed_swap: 'breed', pet_portrait: 'style', mockup_pack: 'product', name_swap: 'name', pose_generator: 'pose', product_recolor: 'color', listing_set: 'shot', hook_effect: 'effect' };
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 
 /**
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
       text: r.params.brief ?? r.params.poseText ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
       traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, style: r.params.style ?? null, product: r.params.product ?? null, name: r.params.name ?? null,
       // The pose generator's pose (Try On keeps its own pose too, which its card does not name) or its own words.
-      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, poseRef: r.params.poseRef ?? null, faceMatch: r.face_match, color: r.params.color ?? null, shot: r.params.shot ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
+      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, poseRef: r.params.poseRef ?? null, faceMatch: r.face_match, color: r.params.color ?? null, shot: r.params.shot ?? null, effect: r.params.effect ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
     })),
   });
 }
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced', 'unboxing' or 'review'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText', 'poseRef', 'background'] : feature === 'product_recolor' ? ['color'] : feature === 'listing_set' ? ['shot'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText', 'poseRef', 'background'] : feature === 'product_recolor' ? ['color'] : feature === 'listing_set' ? ['shot'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : feature === 'hook_effect' ? ['effect', 'endAssetId'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -217,6 +217,13 @@ export async function POST(request: Request) {
     if ((feature === 'product_recolor' || feature === 'listing_set') && assetIds.length !== 1) return bad(`the ${feature === 'product_recolor' ? 'product recolor' : 'listing set'} takes exactly one image: the product`);
     if (feature === 'product_recolor' && !isHexColor(given.color ?? '')) return bad('params.color must be one color as #RRGGBB, in capitals');
     if (feature === 'listing_set' && !LISTING_SHOTS.some((s) => s.id === given.shot)) return bad(`params.shot must be one of ${LISTING_SHOTS.map((s) => s.id).join(', ')}`);
+    // One product photo, one effect, a 5 s vertical clip that ends on the photo itself (the end frame is the first image).
+    if (feature === 'hook_effect') {
+      if (assetIds.length !== 1) return bad('the hook effects app takes exactly one image: the product');
+      if (!hookEffect(given.effect ?? '')) return bad('params.effect must be one of the hook effects');
+      if (ratio !== HOOK_RATIO || durationSec !== HOOK_SECONDS) return bad(`a hook effect clip is ${HOOK_RATIO} and ${HOOK_SECONDS} seconds`);
+      if (given.endAssetId !== assetIds[0]) return bad('params.endAssetId must be the product image: the clip ends on it');
+    }
     // The apps that write their own prompt per item take exactly that one (with the mockup pack's blank as the second image).
     const own = itemPrompt(feature, given, assetIds.length > 1);
     if (own !== undefined && (typeof freePrompt !== 'string' || freePrompt.trim() !== own)) return bad(`the prompt must be the one the ${ITEM[feature]} makes`);
@@ -437,6 +444,10 @@ export async function POST(request: Request) {
     const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, thinking_levels, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices, thinking_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
+    // Each hook effect runs only on the endpoint it was probed on, for a Run, a retry and a rerun alike; a retry or rerun of a job whose effect was removed since is refused.
+    const effect = feature === 'hook_effect' ? hookEffect(params.effect ?? '') : undefined;
+    if (feature === 'hook_effect' && !effect) return Response.json({ error: 'this effect is no longer offered' }, { status: 409 });
+    if (effect && model.endpoint !== effect.endpoint) return bad('the effect runs on its own model');
     if ((feature === 'image' || feature === 'fashion_model') && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
     // A retry copies a Run this check already passed.
     if (!original && feature === 'video' && assetIds.length === 0 && !videoInputs(model.endpoint).textOnly) return bad('the model needs at least one input image');

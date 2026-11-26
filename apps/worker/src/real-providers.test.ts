@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { assetReader, cropToRatio, fitForInline, MAX_INLINE_BYTES, realProviders } from './real-providers';
+import { assetReader, cropToRatio, fitForInline, MAX_INLINE_BYTES, padToRatio, realProviders } from './real-providers';
 
 const asset = { s3_key: 'inputs/a1', mime: 'image/png' };
 const pool = (rows: unknown[]) => ({ query: vi.fn(async () => ({ rows })) }) as never;
@@ -178,6 +178,59 @@ describe('cropToRatio', () => {
     const sent = Buffer.from((bodies[0]!.start_image_url as string).split(',')[1]!, 'base64');
     expect(await sharp(sent).metadata().then((m) => [m.width, m.height])).toEqual([450, 800]);
     expect(bodies[0]).toEqual({ prompt: 'p', start_image_url: expect.any(String), duration: '5', generate_audio: false });
+  });
+});
+
+describe('padToRatio', () => {
+  const solid = (w: number, h: number, background: string) => sharp({ create: { width: w, height: h, channels: 3, background } }).png().toBuffer().then((b) => new Uint8Array(b));
+  const size = async (out: { bytes: Uint8Array }) => sharp(out.bytes).metadata().then((m) => [m.width, m.height]);
+  const pixel = async (out: { bytes: Uint8Array }, x: number, y: number) => {
+    const { data, info } = await sharp(out.bytes).raw().toBuffer({ resolveWithObject: true });
+    return [...data.subarray((y * info.width + x) * info.channels, (y * info.width + x) * info.channels + 3)];
+  };
+  const near = (got: number[], want: number[]) => got.forEach((c, i) => expect(Math.abs(c - want[i]!)).toBeLessThanOrEqual(3));
+
+  test('pads a wide image to 9:16 with white bands and the whole original, red bar to both edges, kept', async () => {
+    // The bar is 37.5% of the image: a whole-image mean would tint the bands pink.
+    const wide = await sharp(await solid(1200, 800, '#ffffff')).composite([{ input: { create: { width: 1200, height: 300, channels: 3, background: '#ff0000' } }, top: 250, left: 0 }]).png().toBuffer();
+    const out = await padToRatio(new Uint8Array(wide), '9:16');
+    const [w, h] = (await size(out)) as [number, number];
+    expect([w, h]).toEqual([1200, 2133]);
+    expect(Math.abs(w / h - 9 / 16)).toBeLessThan(0.001);
+    near(await pixel(out, 0, 1066), [255, 0, 0]);
+    near(await pixel(out, 1199, 1066), [255, 0, 0]);
+    near(await pixel(out, 600, 5), [255, 255, 255]);
+    near(await pixel(out, 600, 2128), [255, 255, 255]);
+  });
+
+  test('each band takes the colour of its own edge', async () => {
+    const square = await sharp(await solid(800, 800, '#3366cc')).composite([{ input: { create: { width: 800, height: 400, channels: 3, background: '#cc6633' } }, top: 400, left: 0 }]).png().toBuffer();
+    const out = await padToRatio(new Uint8Array(square), '9:16');
+    near(await pixel(out, 400, 5), [51, 102, 204]);
+    near(await pixel(out, 400, (await size(out))[1]! - 5), [204, 102, 51]);
+    const tall = await sharp(await solid(400, 1000, '#3366cc')).composite([{ input: { create: { width: 200, height: 1000, channels: 3, background: '#cc6633' } }, top: 0, left: 200 }]).png().toBuffer();
+    const sides = await padToRatio(new Uint8Array(tall), '9:16');
+    const [w] = (await size(sides)) as [number, number];
+    expect(w).toBe(563);
+    near(await pixel(sides, 5, 500), [51, 102, 204]);
+    near(await pixel(sides, w - 5, 500), [204, 102, 51]);
+  });
+
+  test('pads the sides of a tall image, keeps one already at the ratio, and flattens transparency onto white', async () => {
+    expect(await size(await padToRatio(await png(300, 1000), '9:16'))).toEqual([563, 1000]);
+    expect(await size(await padToRatio(await png(450, 800), '9:16'))).toEqual([450, 800]);
+    const clear = await sharp({ create: { width: 450, height: 800, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer();
+    const out = await padToRatio(new Uint8Array(clear), '9:16');
+    expect(out.contentType).toBe('image/jpeg');
+    near(await pixel(out, 225, 400), [255, 255, 255]);
+    await expect(padToRatio(await png(40, 40), 'auto')).rejects.toThrow('cannot pad to ratio auto');
+  });
+
+  test('the asset reader pads instead of cropping when asked', async () => {
+    const out = await assetReader(pool([asset]), async () => png(1200, 800))('asset://a1', { ratio: '9:16', pad: true });
+    const [w, h] = (await size(out)) as [number, number];
+    expect(Math.abs(w / h - 9 / 16)).toBeLessThan(0.002);
+    expect(h).toBe(2048); // 1200x2133 is shrunk to the 2048 px limit, ±1 px of 9:16
   });
 });
 

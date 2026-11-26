@@ -342,11 +342,11 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
       if (req.audioUrls?.length && !spec.audio) throw new ImageReadError(`fal video: ${req.model.endpoint} takes no reference audio`);
       if (req.videoUrls?.length && (!spec.video || req.videoUrls.length > 1)) throw new ImageReadError(`fal video: ${req.model.endpoint} takes ${spec.video ? 'one' : 'no'} reference video`);
       // 'auto' follows the input image, so there is no shape to crop to.
-      const crop = spec.crop && req.ratio !== 'auto' ? { ratio: req.ratio } : undefined;
+      const crop = spec.crop && req.ratio !== 'auto' ? { ratio: req.ratio, ...(req.pad && { pad: true }) } : undefined;
       const inputs = spec.upload || req.imageUrls.length > MAX_INLINE_INPUTS ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage, crop);
       const body = spec.build(req, inputs);
-      // The end frame is read like the inputs, cropped to the ratio where they are, so both frames have one shape.
-      if (req.endImageUrl) [body[spec.end!]] = await resolveImages([req.endImageUrl], opts.readImage, crop);
+      // The end frame is read like the inputs, cropped to the ratio where they are, so both frames have one shape; a padded Run pads it on every endpoint.
+      if (req.endImageUrl) [body[spec.end!]] = await resolveImages([req.endImageUrl], opts.readImage, req.pad && req.ratio !== 'auto' ? { ratio: req.ratio, pad: true } : crop);
       if (req.audioUrls?.length) body[spec.audio!.field] = await uploadInputs(f, opts.apiKey, req.audioUrls, opts.readImage);
       if (req.videoUrls?.length) {
         const [url] = await uploadInputs(f, opts.apiKey, req.videoUrls, opts.readImage);

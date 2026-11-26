@@ -321,6 +321,17 @@ export const APPS: AppConfig[] = [
     shots: true,
   },
   {
+    // Ours too (owner-approved 2026-11-26): one product photo, a 5 s vertical clip that opens with an attention-grabbing effect and ends exactly on the photo. Its own page, components/HookEffectsApp.tsx.
+    slug: 'hook-effects',
+    added: '2026-11-27',
+    feature: 'hook_effect',
+    name: 'Hiệu ứng mở đầu',
+    description: 'Từ một ảnh sản phẩm, tạo video dọc 5 giây với hiệu ứng gây chú ý trong 2–3 giây đầu: phồng rồi bóp, tan chảy, rơi vào khung hoặc hộp bung mở.',
+    keywords: 'hook effects, hook, hiệu ứng, scroll stopper, effects',
+    category: 'video',
+    slots: [],
+  },
+  {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
     // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
     slug: 'smart-remake',
@@ -737,6 +748,56 @@ export const listingShotPrompt = (shot: string): string =>
   'Reproduce the product exactly as it is in [Image1]: the same shape, proportions, colors, material, print, text and spelling, logo and every detail, not redrawn, restyled, recolored, mirrored or simplified. ' +
   'Show a single one of this product, in sharp focus, photorealistic, with natural light and shadows. Do not add any other text, logos, watermarks, price tags or badges.';
 
+/** The two fal endpoints the hook effects run on, both probed at 480P: first frame = end frame = the photo (image-to-video), and the photo as the reference with the end frame (reference-to-video). */
+const HOOK_I2V = 'minimax/h3-max-turbo/image-to-video';
+const HOOK_REVEAL = 'minimax/h3-max/reference-to-video';
+const HOOK_END = 'From two seconds on, the product holds still, sharp and undistorted, exactly as in the image: same shape, proportions, colors, print and text, on the same background, with a steady camera. No added text or watermarks.';
+
+export interface HookEffect {
+  id: string;
+  label: string;
+  /** The only model endpoint the effect runs on (POST /api/jobs holds the Run to it). */
+  endpoint: string;
+  /** The English prompt the probe sent, word for word; a job keeps exactly this one. */
+  prompt: string;
+}
+
+/** The effects of the hook effects app, in the page's order. Prompts are the probed ones (2026-11-27), shipped unchanged: the reference prompt says "Image 1" literally, which the reference builder passes through. */
+export const HOOK_EFFECTS: HookEffect[] = [
+  { id: 'squish', label: 'Phồng rồi bóp', endpoint: HOOK_I2V, prompt: `In the first second the product puffs up like a soft balloon, then an invisible press squishes it flat, and by two seconds it springs back to its exact original shape with a small wobble. ${HOOK_END}` },
+  { id: 'melt', label: 'Tan chảy thành sản phẩm', endpoint: HOOK_I2V, prompt: `In the first second the product melts down into a glossy puddle of liquid in its own colors, then the liquid surges back up and re-forms into the product, its edges snapping crisp again by two seconds. ${HOOK_END}` },
+  { id: 'drop', label: 'Rơi vào khung', endpoint: HOOK_I2V, prompt: `In the first instant the product is snapped up out of the top of the frame, then drops straight back into its place, landing with a weighty bounce and a small puff of dust by 1.5 seconds. ${HOOK_END}` },
+  {
+    id: 'box-burst',
+    label: 'Hộp bung mở',
+    endpoint: HOOK_REVEAL,
+    prompt: 'A closed kraft gift box sits alone on a clean white surface. At one second the box bursts open, its walls flying outward out of frame, revealing the product from Image 1 standing in the center. From two seconds on, the product holds still, sharp and undistorted, exactly as in Image 1: same shape, proportions, colors, print and text, with a steady camera. No added text or watermarks.',
+  },
+];
+/** Every hook effect clip is a 5 s vertical one. */
+export const HOOK_RATIO = '9:16';
+export const HOOK_SECONDS = 5;
+
+/** The effect of an id; undefined for an unknown one, or one removed since a job was made. */
+export const hookEffect = (id: string): HookEffect | undefined => HOOK_EFFECTS.find((e) => e.id === id);
+export const hookEffectPrompt = (id: string): string | undefined => hookEffect(id)?.prompt;
+
+/** What the hook effects page has: the models its effect runs on (null while they load) and the photo. */
+export interface HookDraft {
+  models: { count: number; best: string | null; failed: boolean } | null;
+  photo: boolean;
+}
+
+/** The first thing that stops a hook effect Run, in the order the form is filled; null when it can go. */
+export function hookReason(d: HookDraft): string | null {
+  if (d.models === null) return 'Đang tải danh sách mô hình...';
+  if (d.models.failed) return 'Không tải được danh sách mô hình.';
+  if (d.models.count === 0) return 'Hiệu ứng này chưa được Admin bật';
+  if (d.models.best === null) return 'Hiệu ứng này tạm thời không chạy được.';
+  if (!d.photo) return 'Tải lên ảnh: Sản phẩm.';
+  return null;
+}
+
 /** One job of a batch app, as its params keep it: the view, breed, style, product, name, pose (one of POSES, or the member's own words), colour or shot it made. */
 export interface BatchItem {
   view?: string | null;
@@ -751,6 +812,8 @@ export interface BatchItem {
   background?: string | null;
   color?: string | null;
   shot?: string | null;
+  /** The hook effect (an id of HOOK_EFFECTS) a job made. */
+  effect?: string | null;
 }
 
 /**
@@ -765,7 +828,7 @@ export function unsentPicks(runs: BatchItem[], done: number): Record<'view' | 'b
   return { view: all('view'), breed: all('breed'), style: all('style'), product: all('product'), name: all('name'), pose: all('pose'), poseText: all('poseText'), poseRef: all('poseRef'), color: all('color'), shot: all('shot'), left: rest.filter((r) => !kept.includes(r)) };
 }
 
-/** What one job of a batch app made, for its History card's title: the view's, style's, product's, pose's or shot's label (OWN_POSE for the member's own words, REF_POSE for a pose photo),
+/** What one job of a batch app made, for its History card's title: the view's, style's, product's, pose's, shot's or effect's label (OWN_POSE for the member's own words, REF_POSE for a pose photo),
  * the colour's (colorLabel), the name (with its breed) or the breed; null for any other job. */
 export const itemLabel = (p: BatchItem): string | null =>
   (p.view && VIEW_LABELS[p.view]) ||
@@ -776,11 +839,12 @@ export const itemLabel = (p: BatchItem): string | null =>
   (p.poseRef && REF_POSE) ||
   (p.color && isHexColor(p.color) && colorLabel(p.color)) ||
   (p.shot && LISTING_SHOTS.find((s) => s.id === p.shot)?.label) ||
+  (p.effect && hookEffect(p.effect)?.label) || // a removed effect names nothing
   (p.name && [p.name, p.breed].filter(Boolean).join(' · ')) ||
   p.breed ||
   null;
 
-/** The prompt of one job of an app that writes its own (breed swap, pet portrait, mockup pack, name swap, pose generator, product recolor, listing set), which POST /api/jobs holds the job to; undefined for any other app.
+/** The prompt of one job of an app that writes its own (breed swap, pet portrait, mockup pack, name swap, pose generator, product recolor, listing set, hook effect), which POST /api/jobs holds the job to; undefined for any other app.
  * `blank`: the mockup pack's job has the member's blank product photo. */
 export function itemPrompt(feature: string, p: BatchItem, blank = false): string | undefined {
   if (feature === 'breed_swap') return breedSwapPrompt(p.breed!);
@@ -790,5 +854,6 @@ export function itemPrompt(feature: string, p: BatchItem, blank = false): string
   if (feature === 'pose_generator') return p.poseRef ? poseRefPrompt(p.background) : posePrompt(poseOf(p.pose)?.words ?? p.poseText!, p.background);
   if (feature === 'product_recolor') return recolorPrompt(p.color!);
   if (feature === 'listing_set') return listingShotPrompt(p.shot!);
+  if (feature === 'hook_effect') return hookEffectPrompt(p.effect ?? '');
   return undefined;
 }

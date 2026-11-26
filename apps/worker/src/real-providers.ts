@@ -47,7 +47,33 @@ export async function cropToRatio(bytes: Uint8Array, ratio: string): Promise<{ b
   return { bytes: new Uint8Array(out), contentType: hasAlpha ? 'image/png' : 'image/jpeg' };
 }
 
-/** `asset://<id>` is an input asset in MinIO: the adapters inline an image as a data URL before any call to the provider, cropped when asked, shrunk by fitForInline. A video or an audio clip passes as it is (fal uploads it). */
+/**
+ * The image turned upright and padded to `ratio` ('9:16') without cutting or scaling it: the original sits centred, and each band takes the mean colour of the
+ * 4 px edge beside it (a two-tone backdrop gets a matching band on each side). A transparent image is flattened onto white first, even when it is at the ratio.
+ */
+export async function padToRatio(bytes: Uint8Array, ratio: string): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const [rw, rh] = ratio.split(':').map(Number);
+  if (!rw || !rh) throw new Error(`cannot pad to ratio ${ratio}`);
+  const upright = await sharp(bytes).rotate().flatten({ background: '#ffffff' }).toBuffer();
+  const { width: W = 0, height: H = 0 } = await sharp(upright).metadata();
+  const [w, h] = [Math.max(W, Math.round((H * rw) / rh)), Math.max(H, Math.round((W * rh) / rw))];
+  const [top, left] = [Math.floor((h - H) / 2), Math.floor((w - W) / 2)];
+  const [tw, th] = [Math.min(4, W), Math.min(4, H)];
+  // Only one axis grows, so each band's colour comes from the original and the bands can be added in any order.
+  // The strip is buffered before stats(): in sharp a chained extract().stats() measures the whole image.
+  let img = upright;
+  for (const [side, size, region] of [
+    ['top', top, { left: 0, top: 0, width: W, height: th }], ['bottom', h - H - top, { left: 0, top: H - th, width: W, height: th }],
+    ['left', left, { left: 0, top: 0, width: tw, height: H }], ['right', w - W - left, { left: W - tw, top: 0, width: tw, height: H }],
+  ] as const) {
+    if (!size) continue;
+    const [r, g, b] = (await sharp(await sharp(upright).extract(region).toBuffer()).stats()).channels.slice(0, 3).map((c) => Math.round(c.mean));
+    img = await sharp(img).extend({ [side]: size, background: { r, g, b } }).toBuffer();
+  }
+  return { bytes: new Uint8Array(await sharp(img).jpeg({ quality: 92, mozjpeg: true }).toBuffer()), contentType: 'image/jpeg' };
+}
+
+/** `asset://<id>` is an input asset in MinIO: the adapters inline an image as a data URL before any call to the provider, cropped or padded when asked, shrunk by fitForInline. A video or an audio clip passes as it is (fal uploads it). */
 export const assetReader =
   (pool: WorkerDeps['pool'], read: (key: string) => Promise<Uint8Array> = getObject): ReadImage =>
   async (url, opts) => {
@@ -56,8 +82,8 @@ export const assetReader =
     const bytes = await read(rows[0].s3_key);
     if (rows[0].mime.startsWith('video/') || rows[0].mime.startsWith('audio/')) return { bytes, contentType: rows[0].mime };
     if (!opts?.ratio) return fitForInline(bytes, rows[0].mime);
-    const cropped = await cropToRatio(bytes, opts.ratio);
-    return fitForInline(cropped.bytes, cropped.contentType);
+    const fitted = await (opts.pad ? padToRatio : cropToRatio)(bytes, opts.ratio);
+    return fitForInline(fitted.bytes, fitted.contentType);
   };
 
 /**

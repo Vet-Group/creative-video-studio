@@ -7,6 +7,7 @@ import { VIDEO_BODIES, videoInputs } from '../../core/src/providers/fal';
 import { VERTEX_OMNI_MODEL } from '../../core/src/providers/vertex-omni';
 import { PRESETS } from '../../core/src/presets';
 import { createPool } from './client';
+import { FEATURES } from './schema';
 import { createTestDatabase } from './testing';
 
 const testDb = await createTestDatabase();
@@ -520,7 +521,8 @@ describe('migration 0036 Minimax H3 Max resolutions', () => {
     for (const r of rows.filter((r) => r.res !== '768p')) {
       expect(r.enabled, r.id).toBe(false);
       const { features, ratios, durations_sec, max_images } = twin(r.id.replace(/-(480p|1080p)$/, ''));
-      expect({ features: r.features, ratios: r.ratios, durations_sec: r.durations_sec, max_images: r.max_images }, r.id).toEqual({ features, ratios, durations_sec, max_images });
+      // 0123 adds hook_effect to the two 480p rows only.
+      expect({ features: r.features.filter((f: string) => f !== 'hook_effect'), ratios: r.ratios, durations_sec: r.durations_sec, max_images: r.max_images }, r.id).toEqual({ features, ratios, durations_sec, max_images });
     }
   });
 });
@@ -1250,5 +1252,19 @@ describe('migration 0122 library boards', () => {
     await pool.query(`delete from library_boards where id = 'b-c1'`);
     expect((await pool.query(`select 1 from library_board_items where board_id = 'b-c1'`)).rowCount).toBe(0);
     expect((await pool.query(`select 1 from jobs where id = $1`, [j2])).rowCount).toBe(1);
+  });
+});
+
+describe('migration 0123 hook effects', () => {
+  test('lists hook_effect on exactly the two 480p MiniMax H3 rows (none enabled or repriced), a 50 USD soft cap, and accepts the feature on a job beside every other one', async () => {
+    const { rows } = await pool.query(`select id, enabled, usd_per_second::text as usd, features from model_configs where 'hook_effect' = any(features) order by id`);
+    expect(rows).toEqual([
+      { id: 'minimax-h3-max-reference-480p', enabled: false, usd: '0.0500', features: expect.arrayContaining(['video', 'hook_effect']) },
+      { id: 'minimax-h3-max-turbo-480p', enabled: false, usd: '0.0250', features: ['video', 'hook_effect'] },
+    ]);
+    expect((await pool.query(`select monthly_usd::int as usd from feature_caps where feature = 'hook_effect'`)).rows[0].usd).toBe(50);
+    const id = await insertJob(userId);
+    for (const feature of FEATURES) await pool.query(`update jobs set feature = $2 where id = $1`, [id, feature]);
+    await expect(pool.query(`update jobs set feature = 'hook' where id = $1`, [id])).rejects.toThrow(/jobs_feature_check/);
   });
 });

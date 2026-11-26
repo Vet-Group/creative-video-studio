@@ -13,6 +13,7 @@ process.env.APP_URL = 'http://localhost';
 vi.mock('@/lib/current-user', () => ({ currentUser: vi.fn() }));
 vi.mock('@/components/AppPage', () => ({ AppPage: () => null }));
 vi.mock('@/components/FashionModelApp', () => ({ FashionModelApp: () => null }));
+vi.mock('@/components/HookEffectsApp', () => ({ HookEffectsApp: () => null }));
 vi.mock('@/components/MediaOptimizer', () => ({ MediaOptimizer: () => null }));
 vi.mock('@/components/SmartRemakeApp', () => ({ SmartRemakeApp: () => null }));
 

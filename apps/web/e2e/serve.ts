@@ -83,6 +83,13 @@ await pool.query(
      ('mock-breeds-priced', 'fal', 'fal-ai/e2e-breeds-priced', 'Mock breeds priced', 'image', '{breed_swap}', '{auto}', '{}', 1, '{"1K": "0.04"}', '{}', true),
      ('mock-pets-priced', 'fal', 'fal-ai/e2e-pets-priced', 'Mock pets priced', 'image', '{pet_portrait,mockup_pack,name_swap,pose_generator,product_recolor,listing_set}', '{auto}', '{}', 2, '{"1K": "0.15"}', '{}', true)`,
 );
+// The two models of the hook effects app, on the mock provider (the worker picks the adapter by provider) with the real endpoints it holds each effect to (POST /api/jobs, GET /api/models).
+// A mock job books 0 USD, so the page shows $0; the real rows' prices are checked in api/jobs/hook-effect.test.ts.
+await pool.query(
+  `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values
+     ('mock-hook-i2v-e2e', 'mock', 'minimax/h3-max-turbo/image-to-video', 'Mock hook I2V E2E', 'video', '{hook_effect}', '{9:16}', '{5}', 1, '720p', 0.025, '{}', true),
+     ('mock-hook-reveal-e2e', 'mock', 'minimax/h3-max/reference-to-video', 'Mock hook reveal E2E', 'video', '{hook_effect}', '{9:16}', '{5}', 1, '720p', 0.05, '{}', true)`,
+);
 // A store the Create picker offers, for the specs that tag a clip with one.
 await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-e2e', 'E2E Shop', 'E2E-SEED', 'ws_vet')`);
 // A store whose brand kit store-brand.e2e fills, so no other spec's store gets one.

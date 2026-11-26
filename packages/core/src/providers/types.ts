@@ -18,6 +18,8 @@ export interface SubmitRequest {
   videoUrls?: string[];
   /** Motion Control only: whose orientation the character keeps. 'video' (default) allows a 30 s reference, 'image' 10 s. */
   orientation?: 'video' | 'image';
+  /** Hook effects: the first and end frames are padded to `ratio` (the original is centred, never cut) instead of centre-cropped. */
+  pad?: boolean;
 }
 
 /** fal's queue URLs include the model endpoint, so polling needs the model as well as the id. */
