@@ -24,6 +24,8 @@ import { Icon } from './Icon';
 import { uploadImages } from './image-tools';
 import { ImageToolButtons } from './ImageToolButtons';
 import { useFreshResults, useJobs } from './jobs';
+import { BoardsModal, BoardTools, type LibraryBoards, useLibraryBoards } from './LibraryBoards';
+import boardStyles from './LibraryBoards.module.css';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import { ProductShelf } from './ProductShelf';
@@ -84,9 +86,10 @@ interface StoreOption {
   hidden: boolean;
 }
 
-/** Keys that type into a field are not shortcuts. */
+/** Keys that type into a field are not shortcuts, nor are keys pressed in a dialog stacked over the detail view (its nearest dialog is not the lightbox). */
 // A focused player keeps its own keys too: ←/→ seek there.
-const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA', 'VIDEO', 'AUDIO'].includes(t.tagName));
+const typing = (t: EventTarget | null) =>
+  (t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA', 'VIDEO', 'AUDIO'].includes(t.tagName))) || (t instanceof Element && t.closest('dialog')?.classList.contains('lightbox') === false);
 
 /**
  * The card an arrow key moves to from card `from`, given every card's offsetTop in order: Left/Right step one, Home/End jump to the ends, Up/Down keep the column in the row above or below
@@ -488,13 +491,14 @@ export function RepeatTiles({ src, label, tile, ratio }: { src: string; label: s
  * settings, who made it, when and for how much, the store for an Admin, download / fullscreen / open in a new tab / copy, the marks and Reuse.
  * Arrows and ←/→ step through the loaded items; 1, 2 and 3 mark.
  */
-export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onUse }: { clips: Clip[]; index: number; stores?: StoreOption[]; admin: boolean; onIndex: (i: number | null) => void; onChange: (c: Clip) => void; onUse?: (c: Clip) => void }) {
+export function ClipDetail({ clips, index, stores, admin, boards, onIndex, onChange, onUse }: { clips: Clip[]; index: number; stores?: StoreOption[]; admin: boolean; boards?: LibraryBoards; onIndex: (i: number | null) => void; onChange: (c: Clip) => void; onUse?: (c: Clip) => void }) {
   const clip = clips[index]!;
   const image = clip.mediaType === 'image';
   const [job, setJob] = useState<ClipInputs | null>(null);
   const [presets, setPresets] = useState<Map<string, string> | null>(null); // null until read, or when the read failed
   const [note, setNote] = useState('');
   const [comparing, setComparing] = useState(false);
+  const [boardsFor, setBoardsFor] = useState<string | null>(null); // the item whose boards dialog is open; it belongs to that item, so stepping to another closes it
   const [rerunning, setRerunning] = useState(false);
   const [shown, setShown] = useState<{ id: string; filename: string } | null>(null); // an input photo shown large in the result's place, instead of a new tab
   const [full, setFull] = useState<string | null>(null); // the picture full screen loaded at its own size (the box shows a 1600 px preview)
@@ -518,6 +522,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
     setJob(null);
     setNote('');
     setComparing(false);
+    setBoardsFor(null);
     setShown(null);
     api<ClipInputs>(`/api/jobs/${clip.id}`).then(setJob, () => setJob(NO_INPUTS));
   }, [clip.id]);
@@ -788,6 +793,15 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
             <Icon name="download" />
             Tải xuống
           </button>
+          {boards && (
+            <>
+              <button type="button" className={`icon-button labelled ${boardStyles.boardsButton}`} aria-haspopup="dialog" onClick={() => setBoardsFor(clip.id)}>
+                <Icon name="library" />
+                {`Bảng${clip.boardIds?.length ? ` (${clip.boardIds.length})` : ''}`}
+              </button>
+              <BoardsModal open={boardsFor === clip.id} onClose={() => setBoardsFor(null)} ids={[clip.id]} clips={[clip]} boards={boards} onChange={onChange} />
+            </>
+          )}
           <button type="button" className="icon-button" disabled={compressing} aria-busy={compressing} onClick={() => void compress()} aria-label="Nén & tải về" title="Nén & tải về">
             <Icon name="compress" />
           </button>
@@ -1029,8 +1043,9 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
  * The selection bar's own actions: Pass, or Fail with one fault, for the picked items the viewer may edit, and for an Admin one store for every
  * picked item. Each item is saved on its own, so one refusal does not stop the rest; the note says how many were saved and why others were not.
  */
-function BulkActions({ ids, clips, stores, onChange }: { ids: string[]; clips: Clip[]; stores?: StoreOption[]; onChange: (c: Clip) => void }) {
+function BulkActions({ ids, clips, stores, boards, onChange }: { ids: string[]; clips: Clip[]; stores?: StoreOption[]; boards?: LibraryBoards; onChange: (c: Clip) => void }) {
   const [fault, setFault] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const picked = clips.filter((c) => ids.includes(c.id));
@@ -1061,6 +1076,7 @@ function BulkActions({ ids, clips, stores, onChange }: { ids: string[]; clips: C
     each(picked, async (c) => (await api(`/api/admin/jobs/${c.id}/store`, sendJson('PUT', { storeId: storeId || null })), { ...c, storeId: storeId || null }));
 
   return (
+    <>
     <span className="bulk-actions" role="group" aria-label="Chấm nhiều mục">
       <button type="button" disabled={busy || editable.length === 0} onClick={() => void mark({ verdict: 'pass' })}>
         Đạt
@@ -1102,6 +1118,16 @@ function BulkActions({ ids, clips, stores, onChange }: { ids: string[]; clips: C
         </span>
       )}
     </span>
+    {boards && (
+      <span className="bulk-actions" role="group" aria-label="Bảng">
+        <button type="button" className={boardStyles.bulkButton} onClick={() => setBulkOpen(true)}>
+          Thêm vào bảng…
+        </button>
+        {/* Closed once every picked item has left the list (an untick on the open board): an empty selection ticks nothing. */}
+        <BoardsModal open={bulkOpen && picked.length > 0} onClose={() => setBulkOpen(false)} ids={ids} clips={clips} boards={boards} onChange={onChange} />
+      </span>
+    )}
+    </>
   );
 }
 
@@ -1110,6 +1136,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   // The filters and search box start from the address (read by the page on the server), so a shared or bookmarked /library?… link opens the same view and the first render matches the server's.
   const [filters, setFilters] = useState<LibraryFilters>(initialFilters);
   const [search, setSearch] = useState(initialFilters.q); // the search box; its words reach the filters once typing pauses
+  const boards = useLibraryBoards();
   const [view, setView] = useState<LibraryView>('grid');
   const [size, setSize] = useState(1);
   const [clips, setClips] = useState<Clip[]>([]);
@@ -1171,8 +1198,10 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   }, [pickDay]);
   const active = activeFilters(filters);
   const shelf = filters.kind === 'products';
+  // The open board when it is one of the caller's; the board UI is also gated on the kind, so a hand-made ?kind=products&board=… shows none of it.
+  const ownBoard = filters.board && filters.kind !== 'products' ? boards.boards?.find((b) => b.id === filters.board) : undefined;
   const inApps = filters.kind === 'apps' || APP_KINDS.some((k) => k.id === filters.kind);
-  const chips = activeFilterChips(filters, { creator: creators.find((c) => c.id === filters.creator)?.name, store: storeNames.find((s) => s.id === filters.store)?.name, kind: [...KINDS, ...APP_KINDS].find((k) => k.id === filters.kind)?.label });
+  const chips = activeFilterChips(filters, { board: boards.boards === null ? '' : boards.boards.find((b) => b.id === filters.board)?.name, creator: creators.find((c) => c.id === filters.creator)?.name, store: storeNames.find((s) => s.id === filters.store)?.name, kind: [...KINDS, ...APP_KINDS].find((k) => k.id === filters.kind)?.label });
   const inSheet = chips.filter((c) => c.key !== 'q' && c.key !== 'kind').length; // the search box and the type pills stay on the page
   // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
   const listed = useRef(clips); // the list as last rendered, for a refresh to count what it adds
@@ -1191,13 +1220,14 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
       setUnmarked((n) => n + 1);
     }
     setClips((cur) => (cur.some((x) => x.id === clip.id) ? cur : [...cur.slice(0, at), clip, ...cur.slice(at)]));
+    if (clip.boardIds?.length) void boards.reload(); // the boards' counts take the item back
   };
   const update = (next: Clip) => {
     if (next.verdict) uncount(clips.find((x) => x.id === next.id)); // a first mark
-    setClips((cur) => ((filters.favoritesOnly && !next.favorite) || (filters.examplesOnly && !next.example) || (filters.suggestedOnly && (next.example || !next.verdict?.featured)) || !matchesVerdict(filters.verdict, next.verdict) ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))));
+    setClips((cur) => ((filters.favoritesOnly && !next.favorite) || (filters.board && !next.boardIds?.includes(filters.board)) || (filters.examplesOnly && !next.example) || (filters.suggestedOnly && (next.example || !next.verdict?.featured)) || !matchesVerdict(filters.verdict, next.verdict) ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))));
   };
   // Declared after `update`: the bar renders the bulk actions while this hook runs.
-  const zip = useZipDownload({ hover: true, actions: (ids) => <BulkActions ids={ids} clips={clips} stores={isAdmin ? stores : undefined} onChange={update} /> });
+  const zip = useZipDownload({ hover: true, actions: (ids) => <BulkActions ids={ids} clips={clips} stores={isAdmin ? stores : undefined} boards={boards} onChange={update} /> });
   useEffect(() => {
     if (detail !== null && !clips[detail]) setDetail(null); // the last item left the list under a filter
   }, [clips, detail]);
@@ -1362,6 +1392,12 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
     setPickDay(false);
     setFilters((cur) => ({ ...NO_FILTERS, sort: cur.sort, showSystem: cur.showSystem }));
   }
+  /** Opening a board starts from clean filters, as Xoá lọc does, so the list matches the board's count; the other filters still narrow inside it afterwards. */
+  function openBoard(id: string) {
+    setSearch('');
+    setPickDay(false);
+    setFilters((cur) => ({ ...NO_FILTERS, board: id, sort: cur.sort, showSystem: cur.showSystem }));
+  }
   /** The shelf pill: like Xoá lọc, it clears the search and every filter, so the address is /library?kind=products. */
   function showShelf() {
     setSearch('');
@@ -1392,6 +1428,19 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   // The filters beyond search and type: a row on a wide screen, a sheet on a phone (where the row hid most of them sideways).
   const fields = (
     <>
+      {(boards.boards?.length || filters.board) && (
+        <label className="library-field">
+          <span>Bảng</span>
+          <select value={filters.board} onChange={(e) => (e.target.value ? openBoard(e.target.value) : set({ board: '' }))}>
+            <option value="">Tất cả</option>
+            {boards.boards?.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name} ({x.count})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="library-field">
         <span>Người tạo</span>
         <select value={filters.creator} onChange={(e) => set({ creator: e.target.value })}>
@@ -1589,6 +1638,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
         <ProductShelf />
       ) : (
         <>
+      {ownBoard && <BoardTools board={ownBoard} boards={boards} onDeleted={clearFilters} />}
       {state === 'loading' && clips.length === 0 && (
         <div className={view === 'list' ? 'library-list library-skeleton' : 'grid library-skeleton'} style={{ '--card-min': SIZES[size] } as CSSProperties} role="status">
           <span className="sr-only">Đang tải...</span>
@@ -1598,10 +1648,26 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
         </div>
       )}
       {state === 'error' && <LoadError text="Không tải được thư viện." onRetry={() => (setState('loading'), load(0))} />}
-      {state === 'ready' && clips.length === 0 && (
+      {state === 'ready' && clips.length === 0 && !(filters.board && filters.kind !== 'products' && boards.boards === null) && (
         <div className="library-empty">
           <EmptyArt search={active > 0} />
-          {active > 0 ? (
+          {filters.board && filters.kind !== 'products' && !ownBoard ? (
+            <>
+              <p className="library-empty-title">Không tìm thấy bảng này.</p>
+              <p className="muted">Bảng chỉ người tạo xem được, hoặc đã bị xoá.</p>
+              <button type="button" onClick={clearFilters}>
+                Xoá lọc
+              </button>
+            </>
+          ) : ownBoard && active === 1 ? (
+            <>
+              <p className="library-empty-title">Bảng này chưa có mục nào.</p>
+              <p className="muted">Mở một kết quả rồi bấm Bảng, hoặc chọn nhiều mục rồi bấm Thêm vào bảng.</p>
+              <button type="button" onClick={clearFilters}>
+                Xoá lọc
+              </button>
+            </>
+          ) : active > 0 ? (
             <>
               <p className="library-empty-title">Chưa có {emptyNoun(filters.kind)} nào khớp bộ lọc.</p>
               <p className="muted">Bỏ bớt bộ lọc hoặc thử từ khoá khác.</p>
@@ -1663,6 +1729,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
                     onDeleted={(id) => {
                       const gone = clips.find((x) => x.id === id);
                       uncount(gone);
+                      if (gone?.boardIds?.length) void boards.reload(); // the boards' counts drop the item
                       setClips((cur) => cur.filter((x) => x.id !== id));
                       if (gone) setUndo({ key: id, text: `Đã xoá ${gone.mediaType === 'image' ? 'ảnh' : 'clip'}.`, undo: () => restore(gone, clips.indexOf(gone)) });
                     }}
@@ -1674,7 +1741,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           );
         })}
       </div>
-      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} admin={isAdmin} onIndex={setDetail} onChange={update} />}
+      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} admin={isAdmin} boards={boards} onIndex={setDetail} onChange={update} />}
       {hasMore && (
         <button ref={moreButton} type="button" className="library-more" onClick={() => void loadMore()}>
           Tải thêm

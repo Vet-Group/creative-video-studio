@@ -175,6 +175,8 @@ export interface Clip {
   verdict: { verdict: 'pass' | 'fail'; fault: string | null; featured: boolean; markedBy: string } | null;
   /** In the caller's own favourites. */
   favorite: boolean;
+  /** The caller's own boards holding it; set by GET /api/library only. */
+  boardIds?: string[];
   /** On its page's Examples tab, put there by an Admin. */
   example: boolean;
   /** The product an Admin tagged it with on that tab (a key of lib/product-types.ts), else null. */

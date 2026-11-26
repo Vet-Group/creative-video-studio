@@ -1,0 +1,16 @@
+.list { display: grid; gap: 2px; margin: 0 0 12px; }
+.choice { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 8px; border-radius: 8px; cursor: pointer; overflow-wrap: anywhere; }
+.choice:hover { background: var(--surface-2); }
+.choice input { flex: none; width: 18px; height: 18px; margin: 0; }
+.create { display: grid; gap: 6px; margin: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.create input[type='text'] { flex: 1 1 12rem; min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+.create button { min-height: 44px; margin: 0; }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 18px; }
+.tools > span { margin-right: 4px; overflow-wrap: anywhere; }
+.tools > p { flex-basis: 100%; margin: 0; }
+.tool, .bulkButton { height: 36px; margin: 0; padding: 0 12px; font-size: 13px; line-height: 34px; }
+/* Touch screens: 44 px taps, like the rest of the Library's controls (globals.css). */
+@media (pointer: coarse) {
+  .tool, .bulkButton, .boardsButton { min-height: 44px; }
+}
