@@ -9,7 +9,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { ANALYZE_COST_USD, type Analysis, type AnalysisVi, mergeShots, parseBreakdown } from '@cvs/core/analysis/breakdown';
+import { ANALYZE_COST_USD, type Analysis, type AnalysisVi, mergeShots, parseBreakdown, VLM_NO_ANSWER } from '@cvs/core/analysis/breakdown';
 import { createAnalysisPromptWriter, writeScenePrompts } from '@cvs/core/analysis/prompts';
 import { analysisChat, type Chat, createAnalysisTranslator, translateAnalysisVi } from '@cvs/core/analysis/translate';
 import { OPENAI_PRICES } from '@cvs/core/enhance';
@@ -138,6 +138,17 @@ export async function analysisFromBreakdown(
   return { analysis, costUsd, prompts };
 }
 
+/**
+ * Why a breakdown.json holds no VLM reading, or null when it holds one (also when only some calls failed). From rea-video ac47077 on,
+ * `analysis.vlm.used` says whether any VLM answer came back; without one the result is the deterministic cut list only, which mergeShots folds
+ * into one empty scene, so it fails instead of being stored and booked. A breakdown without the block (an older rea-video) passes.
+ */
+export function vlmFailure(raw: unknown): string | null {
+  const vlm = (raw as { analysis?: { vlm?: { requested?: boolean; used?: boolean; status?: string; errors?: string[]; error?: string } } } | null)?.analysis?.vlm;
+  if (!vlm?.requested || vlm.used) return null;
+  return `${VLM_NO_ANSWER} (${vlm.status ?? 'failed'}): ${vlm.errors?.[0] ?? vlm.error ?? 'no reason given'}`;
+}
+
 /** Claims a queued analysis row, runs rea-video over its source video, and stores the result. Safe to
  * call more than once for the same id: only a `queued` row is claimed. */
 export async function runReaAnalyze(pool: Pool, analysisId: string, seams: AnalyzeSeams = {}, signal?: AbortSignal): Promise<void> {
@@ -163,8 +174,11 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
     const { env, provider, model } = await vlmEnv();
     await decompose(video, out, env, signal);
     const rawBytes = await readFile(join(out, 'breakdown.json'));
+    const raw = JSON.parse(rawBytes.toString('utf8'));
+    const noVlm = vlmFailure(raw);
+    if (noVlm) throw new Error(noVlm);
     // Best-effort prompts and Vietnamese display: a failed or missing LLM leaves the points and English only, still succeeded.
-    const { analysis, costUsd } = await analysisFromBreakdown(JSON.parse(rawBytes.toString('utf8')), { writePrompts, translate }, (line) => console.warn(`worker: analysis ${analysisId}: ${line}`));
+    const { analysis, costUsd } = await analysisFromBreakdown(raw, { writePrompts, translate }, (line) => console.warn(`worker: analysis ${analysisId}: ${line}`));
     const cost = ANALYZE_COST_USD + costUsd;
     const rawKey = `analyses/${analysisId}/breakdown.json`;
     await write(rawKey, rawBytes, 'application/json');

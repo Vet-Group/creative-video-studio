@@ -1,4 +1,4 @@
-import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
+import { type Analysis, mergeShots, VLM_NO_ANSWER } from '@cvs/core/analysis/breakdown';
 // The reference-video analysis feature (rea-video). Off by default: the /api/analyses routes 404 and the worker
 // queue is not created until a deploy sets REA_ANALYZE_ENABLED=1 (Stage 3, once rea-video is installed on the
 // worker). Mirrors the worker's reaAnalyzeEnabled (apps/worker/src/analyze.ts); the two tiers read the same env.
@@ -86,6 +86,7 @@ export const ANALYSIS_RUN = { p50: 125, p75: 232 };
 export function analysisError(error: string | null | undefined): string {
   if (error?.includes('could not queue')) return 'Máy chủ phân tích đang bận nên chưa nhận video. Hãy thử lại sau ít phút.';
   if (error && /invalid data found|moov atom not found|unsupported/i.test(error)) return 'Không đọc được video này. Hãy thử một video MP4 hoặc MOV khác.';
+  if (error?.startsWith(VLM_NO_ANSWER)) return 'Dịch vụ AI xem video đang không phản hồi nên chưa phân tích được. Video không có lỗi, hãy thử lại sau ít phút.';
   return 'Phân tích không thành công. Hãy thử lại với video khác.';
 }
 

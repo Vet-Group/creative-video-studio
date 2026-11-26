@@ -36,7 +36,7 @@ function cut(raw: unknown, start: number, end: number): Raw {
     description: str(vlm.description) || undefined,
     shot_size: str(framing.shot_size) || str(vlm.shot_size) || undefined,
     position: str(framing.position) || undefined,
-    camera: [str(camera.support), str(camera.motion), str(vlm.camera_move)].filter(Boolean).join(', ') || undefined,
+    camera: [str(camera.support), str(camera.motion), str(camera.move), str(vlm.camera_move)].filter(Boolean).join(', ') || undefined,
     look: Object.keys(look).length ? look : undefined,
     style: str(vlm.style) || undefined,
   };
@@ -56,7 +56,8 @@ export async function writeScenePrompts(a: Analysis, raw: unknown, chat: Chat): 
   const unit = obj((obj(obj(raw).production_plan).units as unknown[] | undefined)?.[0]);
   const input = JSON.stringify({
     count: scenes.length,
-    video: { summary: a.summary || undefined, format: str(whole.format) || undefined, look: str(unit.prompt).split('\n')[0] || undefined },
+    // From rea-video ac47077 the plan unit has no prompt, so the look falls back to the whole-video style.
+    video: { summary: a.summary || undefined, format: str(whole.format) || undefined, look: str(unit.prompt).split('\n')[0] || str(whole.style) || undefined },
     scenes: scenes.map((idx, k) => {
       const head = a.shots[idx[0]!]!;
       return {

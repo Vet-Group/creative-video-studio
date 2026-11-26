@@ -204,6 +204,30 @@ test('records a failure when decompose throws, without leaving the row running',
   expect(r.error).toContain('rea-video boom');
 });
 
+test('fails, unbooked, an analysis no VLM call answered, with the first reason; a partial or older breakdown still succeeds', async () => {
+  const withVlm = (vlm: object) =>
+    seams({
+      decompose: async (_video, outDir) => {
+        await mkdir(outDir, { recursive: true });
+        await writeFile(join(outDir, 'breakdown.json'), JSON.stringify({ ...sample, analysis: { vlm } }));
+      },
+    });
+  const dead = await queued();
+  await runReaAnalyze(pool, dead, withVlm({ requested: true, used: false, status: 'failed', errors: ['whole: 401 Unauthorized'] }));
+  const r = await row(dead);
+  expect(r.status).toBe('failed');
+  expect(r.error).toBe('the video model answered no call (failed): whole: 401 Unauthorized');
+  expect(r.cost_usd).toBeNull();
+  expect((await pool.query(`select count(*)::int as n from cost_entries where ref like $1`, [`%${dead}%`])).rows[0].n).toBe(0);
+
+  const partial = await queued();
+  await runReaAnalyze(pool, partial, withVlm({ requested: true, used: true, status: 'partial', whole_ok: false, errors: ['whole: timeout'] }));
+  expect((await row(partial)).status).toBe('succeeded');
+  const older = await queued(); // the plain sample has no analysis.vlm block
+  await runReaAnalyze(pool, older, seams());
+  expect((await row(older)).status).toBe('succeeded');
+});
+
 test('the feature flag is off unless explicitly set', () => {
   expect(reaAnalyzeEnabled({} as NodeJS.ProcessEnv)).toBe(false);
   expect(reaAnalyzeEnabled({ REA_ANALYZE_ENABLED: '1' } as NodeJS.ProcessEnv)).toBe(true);

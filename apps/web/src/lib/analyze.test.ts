@@ -106,5 +106,6 @@ test('a failed analysis reads why in words a member can act on, and anything unk
   expect(analysisError('Command failed: rea-video decompose x.mp4\n[mov] moov atom not found')).toContain('Không đọc được video này');
   expect(analysisError('Invalid data found when processing input')).toContain('Không đọc được video này');
   expect(analysisError('boom')).toBe('Phân tích không thành công. Hãy thử lại với video khác.');
+  expect(analysisError('the video model answered no call (failed): whole: 401 Unauthorized')).toContain('thử lại sau ít phút');
   expect(analysisError(null)).toBe('Phân tích không thành công. Hãy thử lại với video khác.');
 });

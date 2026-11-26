@@ -98,6 +98,15 @@ test('reads the ac47077 breakdown: each cut keeps its action and look, and the v
   expect(Object.keys(cut.look)).toEqual(expect.arrayContaining(['framing', 'camera', 'lighting', 'grade']));
   expect(sent.video.format).toBe('product showcase');
   expect(sent.video.look).toBeUndefined();
+  expect(cut.camera).toContain('push-in'); // the measured move, which the VLM's own camera words can contradict
+});
+
+test('takes the video look from the whole-video style when the plan unit has no prompt', async () => {
+  const fixture = JSON.parse(readFileSync(new URL('./__fixtures__/breakdown.survey.sample.json', import.meta.url), 'utf8'));
+  fixture.whole_video_vlm.style = 'Bright, airy studio look with soft daylight.';
+  let user = '';
+  await writeScenePrompts(parseBreakdown(fixture), fixture, async (_s, u) => ((user = u), { text: '{"prompts":["a","b","c"]}', costUsd: null }));
+  expect(JSON.parse(user).video.look).toBe('Bright, airy studio look with soft daylight.');
 });
 
 test('createAnalysisPromptWriter is undefined without a key, and a function with OpenAI or fal', () => {
