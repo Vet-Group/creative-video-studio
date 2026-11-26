@@ -1,7 +1,7 @@
 import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
-import { APP_ABOUT } from './about-content';
+import { APP_ABOUT } from './about-apps';
 import { GARMENT_PRESETS, POSE_PRESETS, POSES } from './try-on-stock';
 import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, relatedApps, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
 
