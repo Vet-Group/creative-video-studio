@@ -38,6 +38,7 @@ test('groupRecent collapses a run of the same action by the same actor within mi
 test('auditTarget drops the sample prefix and the extension and leaves other targets alone', () => {
   expect(auditTarget('sample:preset-style-flat-lay.jpg')).toBe('preset-style-flat-lay');
   expect(auditTarget('team:t1')).toBe('team:t1');
+  expect(auditTarget('job:ba099b6a-1c2d-4e5f-8a9b-0c1d2e3f4a5b')).toBe('job:ba099b6a');
 });
 
 test('auditLabel words the cap, Vertex and sample events and keeps the code of an unknown one', () => {

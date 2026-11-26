@@ -30,7 +30,7 @@ interface Overview {
   jobs: { today: number; succeeded: number; failed: number; running: number };
   users: { active: number; locked: number };
   models: { enabled: number; total: number };
-  audit: { actorName: string; action: string; target: string }[];
+  audit: { actorName: string; action: string; target: string; targetName: string | null }[];
   sellers: { id: string; name: string; team: string; lastUsedAt: string | null; lastSeenAt: string | null }[];
 }
 let admin: Awaited<ReturnType<typeof newUser>>;
@@ -147,5 +147,15 @@ describe('GET /api/admin/overview', () => {
     const entries = (await overview()).audit;
     expect(entries.slice(0, 5).map((e) => e.target)).toEqual(['team:t6', 'team:t5', 'team:t4', 'team:t3', 'team:t2']);
     expect(entries[0]).toMatchObject({ actorName: 'admin@example.test', action: 'team.rename' });
+  });
+
+  test("names an entry's user, team or store target, and leaves other targets unnamed", async () => {
+    await audit(pool, { actorId: admin.id, action: 'team.rename', target: 'team:ot' });
+    await audit(pool, { actorId: admin.id, action: 'user.update', target: `user:${admin.id}` });
+    await audit(pool, { actorId: admin.id, action: 'clip.delete', target: 'job:ba099b6a-1c2d-4e5f-8a9b-0c1d2e3f4a5b' });
+    const [job, user, team] = (await overview()).audit;
+    expect(job).toMatchObject({ targetName: null });
+    expect(user).toMatchObject({ targetName: 'admin@example.test' });
+    expect(team).toMatchObject({ targetName: 'Overview Team' });
   });
 });
