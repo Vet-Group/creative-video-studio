@@ -19,6 +19,7 @@ import { reloadSamples, samplesFailed, samplesPending, useSamples, versionedSamp
 import { asExample, dropRefillQuery, exampleFrom, lostInputs, nothingNote, nothingRefilled, refillFrom, skippedNote } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
+import { CameraTiles } from './CameraTiles';
 import { CardMedia } from './CardMedia';
 import { PhraseChoice, useChoiceLists } from './Choices';
 import { confirmDialog } from './Confirm';
@@ -983,14 +984,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
                 <span id={anglesId} className="field-label">
                   Nhiều góc máy (tuỳ chọn)
                 </span>
-                <div className="segmented theme-choice angle-choice" role="group" aria-labelledby={anglesId}>
-                  {CAMERA_ANGLES.map((a) => (
-                    <label key={a.id} title={lockedWhy(a) ?? undefined}>
-                      <input type="checkbox" checked={angles.includes(a.id)} disabled={lockedWhy(a) !== null} onChange={() => setAngles((cur) => (cur.includes(a.id) ? cur.filter((x) => x !== a.id) : [...cur, a.id]))} />
-                      {a.label}
-                    </label>
-                  ))}
-                </div>
+                <CameraTiles labelledBy={anglesId} picked={angles} lockedWhy={lockedWhy} onToggle={(id) => setAngles((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))} />
                 <p className="help">Chọn 1 đến {MAX_ANGLES} góc máy: mỗi góc tạo một clip riêng và tính tiền riêng. Không chọn thì tạo một clip như bình thường.</p>
                 {lockedNotes.map((w) => (
                   <p key={w} className="help">

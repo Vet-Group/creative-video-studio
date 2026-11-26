@@ -61,6 +61,9 @@ const PATHS = {
   coin: 'M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z M10 6.2c-.4-.6-1.1-.9-2-.9-1.2 0-2 .6-2 1.4 0 1.9 4 .9 4 2.8 0 .8-.8 1.5-2 1.5-.9 0-1.7-.4-2.1-1 M8 4v1.3 M8 10.8V12',
   log: 'M3.5 2h9v12h-9z M5.5 5h5 M5.5 8h5 M5.5 11h3',
   list: 'M6 4h8 M6 8h8 M6 12h8 M2.5 4h.01 M2.5 8h.01 M2.5 12h.01',
+  orbit: 'M13.5 8a5.5 5.5 0 1 1-1.6-3.9 M11.9 4.1H9.4 M11.9 4.1V1.6',
+  arrowdown: 'M8 2.5v11 M4 9.5l4 4 4-4',
+  arrowup: 'M8 13.5v-11 M4 6.5l4-4 4 4',
 } as const;
 
 /** Solid shapes for the sidebar, as the live one draws its menu; an icon without one fills its outline path. */

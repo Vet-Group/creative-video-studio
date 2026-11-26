@@ -1659,7 +1659,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .theme-choice input { position: absolute; inset: 0; width: 100%; min-width: 0; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .theme-choice label:has(:disabled) { opacity: .5; }
 .theme-choice input:disabled { cursor: not-allowed; }
-.angle-choice { flex-wrap: wrap; justify-self: start; max-width: 100%; } /* Create's camera angles: chips that wrap on a phone */
+.angle-choice { flex-wrap: wrap; justify-self: start; max-width: 100%; } /* an app's multi-pick chips: they wrap on a phone */
 /* The pose generator's marketplace presets: text buttons in the segmented frame, which is sized for icons. */
 .segmented.preset-chips button { width: auto; padding: 0 12px; color: var(--text-2); font-size: 13px; line-height: 18px; font-weight: 500; } /* text-subtle read 3.8:1 on the track, as the labels' did */
 .segmented.preset-chips button:hover { color: var(--ink); }
@@ -1668,6 +1668,47 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .pick-count { color: var(--text-muted); font-size: 13px; line-height: 18px; white-space: nowrap; }
 .pick-count .link-button { font-size: 13px; }
 @media (pointer: coarse) { .pick-count .link-button { min-height: 44px; } }
+/* Create's camera angles: tiles that show each angle on a plain shirt in a small frame; a picked tile carries its clip's number, in the order Run makes the clips.
+   The move plays on hover, on keyboard focus and on a picked tile while the group is on screen (the component sets data-paused off screen): transform only, on its own layer,
+   and never under reduced motion, where the arrow in the corner is the hint. Each tile stands over 44 px, so it needs no hit area of its own on a phone. */
+.cam-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; min-width: 0; max-width: 624px; margin: 8px 0 0; } /* min-width 0: else the max width sets the column count of its min-content size, six, and the row overflows a phone */
+.cam-tile { position: relative; display: grid; gap: 6px; margin: 0; padding: 6px 6px 8px; border: 1px solid rgb(var(--tint) / .1); border-radius: 10px; background: var(--surface-1); color: var(--text-2); font-size: 13px; line-height: 16px; font-weight: 500; text-align: center; cursor: pointer; }
+.cam-tile input { position: absolute; inset: 0; width: 100%; min-width: 0; height: 100%; margin: 0; padding: 0; opacity: 0; pointer-events: none; } /* the tile's label takes the click, so a click on its name lands on the name */
+.cam-tile:has(:checked) { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); color: var(--ink); }
+.cam-tile:has(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+.cam-tile:has(:disabled) { opacity: .5; cursor: not-allowed; }
+@media (hover: hover) { .cam-tile:hover:has(:enabled:not(:checked)) { border-color: rgb(var(--tint) / .28); color: var(--ink); } }
+.cam-stage { position: relative; display: block; height: 48px; overflow: hidden; border-radius: 6px; background: rgb(var(--tint) / .045); perspective: 100px; }
+.cam-world { position: absolute; inset: 0; transform-origin: 50% 47%; }
+.cam-world svg { display: block; width: 100%; height: 100%; }
+.cam-floor { fill: rgb(var(--tint) / .14); }
+.cam-shirt { fill: var(--icon-muted); }
+.cam-print { fill: var(--brand); }
+.cam-glyph { position: absolute; top: 4px; right: 4px; color: var(--text-subtle); }
+.cam-tile:has(:checked) .cam-shirt { fill: var(--ink); }
+.cam-tile:has(:checked) .cam-glyph { color: var(--ink); }
+.cam-tile[data-move='eye-level'] .cam-stage::after { content: ''; position: absolute; top: 45%; right: 10px; left: 10px; border-top: 1px dashed rgb(var(--tint) / .4); }
+.cam-name { display: grid; place-items: center; min-height: 32px; text-wrap: balance; }
+.cam-order { position: absolute; top: 10px; left: 10px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--ink); color: var(--on-ink); font-size: 12px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--surface-1); } /* the ring keeps it apart from a shirt pushed in under it */
+.cam-tile[data-move='close-up'] { --cam-move: cam-push; }
+.cam-tile[data-move='wide'] { --cam-move: cam-pull; }
+.cam-tile[data-move='orbit'] { --cam-move: cam-orbit; }
+.cam-tile[data-move='top-down'] { --cam-move: cam-top; }
+.cam-tile[data-move='low'] { --cam-move: cam-low; }
+@media (prefers-reduced-motion: no-preference) {
+  .cam-tiles:not([data-paused]) .cam-tile:has(:checked) .cam-world, .cam-tile:has(:focus-visible:enabled) .cam-world { animation: var(--cam-move, none) 2.6s ease-in-out infinite; }
+  .cam-tiles:not([data-paused]) .cam-tile:has(:checked) .cam-stage::after, .cam-tile:has(:focus-visible:enabled) .cam-stage::after { animation: cam-line 2.6s ease-in-out infinite; }
+  @media (hover: hover) {
+    .cam-tile:hover:has(:enabled) .cam-world { animation: var(--cam-move, none) 2.6s ease-in-out infinite; }
+    .cam-tile:hover:has(:enabled) .cam-stage::after { animation: cam-line 2.6s ease-in-out infinite; }
+  }
+}
+@keyframes cam-push { 0%, 12%, 100% { transform: none; } 42%, 82% { transform: scale(2.2); } }
+@keyframes cam-pull { 0%, 12%, 100% { transform: none; } 42%, 82% { transform: scale(.62); } }
+@keyframes cam-orbit { 0%, 100% { transform: none; } 25% { transform: rotateY(-55deg); } 75% { transform: rotateY(55deg); } }
+@keyframes cam-top { 0%, 12%, 100% { transform: none; } 42%, 82% { transform: translateY(4px) rotateX(-52deg); } }
+@keyframes cam-low { 0%, 12%, 100% { transform: none; } 42%, 82% { transform: translateY(-3px) rotateX(48deg) scale(1.15); } }
+@keyframes cam-line { 0%, 100% { transform: none; } 14% { transform: scaleX(0); } 50% { transform: none; } }
 /* Product recolor: each colour chip shows its swatch, ringed so white and black show on either theme; the member's own hex goes in by a short box and an add button. */
 .swatch { width: 14px; height: 14px; flex: none; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(var(--tint) / .35); }
 .hex-add { display: flex; gap: 8px; align-items: center; }
