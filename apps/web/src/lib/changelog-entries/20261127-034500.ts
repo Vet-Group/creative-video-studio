@@ -10,6 +10,6 @@ export default {
     'Bảng chỉ bạn thấy; đổi tên hay xoá bảng không xoá kết quả nào.',
   ],
   href: '/library',
-  prs: [677],
+  prs: [],
   audience: 'all',
 } satisfies ChangeEntry;

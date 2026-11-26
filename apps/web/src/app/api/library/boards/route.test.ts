@@ -202,10 +202,10 @@ describe('PUT /api/library/boards/[id]/items', () => {
     expect((await pool.query('select count(*)::int as n from library_board_items where board_id = $1', [id])).rows[0].n).toBe(0);
   });
 
-  test('one deleted, failed, purged, unknown or other-workspace id in an add answers 404 and writes nothing; a hidden result can still be taken off', async () => {
+  test('one deleted, failed, purged, system-account, unknown or other-workspace id in an add answers 404 and writes nothing; a hidden result can still be taken off', async () => {
     const id = await make(users.gus!, 'All or nothing');
     const [ok, soft, purged] = [await job(users.gus!.id), await job(users.gus!.id, { deleted: true }), await job(users.gus!.id, { purged: true })];
-    const bad = [soft, purged, await job(users.gus!.id, { status: 'failed' }), await job(users.gus!.id, { workspace: 'ws_b' }), 'unknown-id'];
+    const bad = [soft, purged, await job(users.gus!.id, { status: 'failed' }), await job(users.gus!.id, { workspace: 'ws_b' }), await job(users.sys!.id), 'unknown-id']; // a system account's result is not in the Library list
     for (const other of bad) expect((await put(users.gus!, id, { jobIds: [ok, other], inBoard: true })).status, other).toBe(404);
     expect((await pool.query('select count(*)::int as n from library_board_items where board_id = $1', [id])).rows[0].n).toBe(0);
     expect((await put(users.gus!, id, { jobIds: [ok], inBoard: true })).status).toBe(200);

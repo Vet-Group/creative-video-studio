@@ -1,6 +1,6 @@
 import { pool } from '@/lib/auth';
 import { readJson, type RouteContext } from '@/lib/assets';
-import { LIVE_CLIP } from '@/lib/clips';
+import { LIBRARY_LISTED, LIVE_CLIP } from '@/lib/clips';
 import { BOARD_ID, MAX_BOARD_BATCH } from '@/lib/library-boards';
 import { guard } from '@/lib/session';
 
@@ -8,8 +8,8 @@ const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
 
 /**
  * Adds results to one of the caller's own boards, or takes them off: `{ jobIds, inBoard }`, one to 50 different job ids. 400 for a bad body; 404 for a board that is
- * not the caller's (another workspace's too, or one deleted meanwhile) and, when adding, for any id that is not a live Library result of this workspace, with nothing
- * written. Adding what is already there changes nothing; taking off needs no liveness, so a hidden result can be cleared. Answers `{ jobIds, inBoard }`.
+ * not the caller's (another workspace's too, or one deleted meanwhile) and, when adding, for any id that is not a live result the Library lists in this workspace (one of a system
+ * account's is not), with nothing written. Adding what is already there changes nothing; taking off needs no liveness, so a hidden result can be cleared. Answers `{ jobIds, inBoard }`.
  */
 export async function PUT(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
@@ -30,7 +30,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
       return notFound();
     }
     if (b.inBoard) {
-      const live = await client.query(`select count(*)::int as n from jobs j where j.id = any($1::text[]) and j.workspace_id = $2 and ${LIVE_CLIP}`, [ids, g.workspaceId]);
+      const live = await client.query(`select count(*)::int as n from jobs j where j.id = any($1::text[]) and j.workspace_id = $2 and ${LIVE_CLIP} and ${LIBRARY_LISTED}`, [ids, g.workspaceId]);
       if (live.rows[0].n !== ids.length) {
         await client.query('rollback');
         return notFound();

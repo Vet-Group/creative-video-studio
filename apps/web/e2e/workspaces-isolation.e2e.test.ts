@@ -70,6 +70,7 @@ test.afterAll(async () => {
     await db.query('delete from feedback where id = $1', [C.feedback]);
     await db.query('delete from products where id = $1', [C.product]);
     await db.query('delete from library_boards where id = $1', [C.board]);
+    await db.query(`delete from library_boards where name = 'Partner board'`); // the partner's own board, left by a run that failed before deleting it
     await db.query(`delete from assets where id like 'wsiso-%'`);
     await db.query('delete from stores where id = $1', [C.store]);
   } finally {
