@@ -108,13 +108,15 @@ export async function gotoTryOn(page: Page): Promise<void> {
 /** The account button: the sidebar's bottom chip, or the avatar in the top bar below 1024 px. */
 export const accountButton = (page: Page): Locator => page.getByRole('button', { name: /^Tài khoản: / });
 
-/** Opens a page tab such as History. Retries the click, as a click before hydration does nothing (as openSettings does with the account menu). */
+/** Opens a page tab such as History. Retries the click, as a click before hydration does nothing (as openSettings does with the account menu). Then waits out
+ * the switch's cross-fade (WorkTabs), during which the page takes no click, so a click at coordinates right after it would be lost. */
 export async function openTab(page: Page, name: string): Promise<void> {
   const tab = page.getByRole('tab', { name });
   await expect(async () => {
     await tab.click();
     await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2_000 });
   }).toPass();
+  await page.waitForFunction(() => !document.activeViewTransition);
 }
 
 /** Image Generation's prompt bar folds the store, its brand kit, the saved settings and the sent prompt under a more-options pill on a wide screen: opens

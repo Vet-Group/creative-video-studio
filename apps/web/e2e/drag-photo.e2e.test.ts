@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { clearMyJobs, png, runViaApi, signIn } from './support.test';
+import { clearMyJobs, openTab, png, runViaApi, signIn } from './support.test';
 
 // A pointer extra over the click: a photo dragged from History onto a form slot does what a click on it does, in the role the slot gives it.
 const up = async (page: Page, name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: { name, mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
@@ -21,7 +21,7 @@ test('Image Generation: a History input and result drag onto the reference slot,
   const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [await up(page, 'drag-1.png'), await up(page, 'drag-2.png')], ratio: '1:1', prompt: 'drag shot', enhance: false, params: { resolution: '1K' } } });
   expect(res.status()).toBe(201);
   await page.goto('/image-generation');
-  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  await openTab(page, 'Lịch sử');
   const card = historyCard(page, 'drag shot');
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   const slot = page.locator('.slot');

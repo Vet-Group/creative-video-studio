@@ -124,7 +124,7 @@ test('an image result opens full screen from the picture in History, and an imag
       expect(await page.evaluate(() => document.fullscreenElement?.getAttribute('src'))).toBe(`/api/assets/${out}/content`);
       await page.evaluate(() => document.exitFullscreen());
 
-      await page.getByRole('tab', { name: 'Ví dụ' }).click();
+      await openTab(page, 'Ví dụ');
       const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
       // A sample without a details file opens in place too (owner, 2026-11-18): the picture and its file actions, no new tab.
       const sample = gallery.locator('.gallery-item:has(img[src="/api/samples/image-example-1.jpg"])');
