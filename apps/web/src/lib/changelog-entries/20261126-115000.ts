@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-26T11:00:00+07:00',
+  at: '2026-11-26T11:50:00+07:00',
   kind: 'improved',
   title: 'Nhãn "Mới" tự hết sau 14 ngày, tab Ví dụ của Phân tích gọn hơn',
   details: [
