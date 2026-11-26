@@ -157,3 +157,29 @@ test('model and background slots, Motion Control and Media Optimizer have no she
     await expect(anyShelf, path).toHaveCount(0);
   }
 });
+
+// At 390 px a link takes a 44 px tap through its ::after; on a filled slot that box must stay clear of every photo's remove button, or a tap meant for the link deletes the photo.
+test('on a filled slot at 390 px no link takes a tap over a photo\'s remove button', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const overlaps = (field: Locator) =>
+    field.evaluate((el) => {
+      const rect = (e: Element) => e.getBoundingClientRect();
+      const hit = (l: Element) => {
+        const r = rect(l), after = getComputedStyle(l, '::after');
+        const [w, h] = [parseFloat(after.width) || r.width, parseFloat(after.height) || r.height];
+        return { left: r.x + r.width / 2 - w / 2, right: r.x + r.width / 2 + w / 2, top: r.y + r.height / 2 - h / 2, bottom: r.y + r.height / 2 + h / 2 };
+      };
+      const links = [...el.querySelectorAll('.uploads-link')].filter((l) => !l.closest('dialog'));
+      const removes = [...el.querySelectorAll('.slot-thumbs button')].map(rect);
+      return links.flatMap((l) => removes.filter((b) => hit(l).left < b.right && b.left < hit(l).right && hit(l).top < b.bottom && b.top < hit(l).bottom).map(() => l.getAttribute('aria-label')));
+    });
+  for (const [path, input, group] of [['/apps/multi-angle', 'Ảnh sản phẩm', 'Sản phẩm'], ['/apps/background-remover', 'Ảnh cần xoá nền', 'Ảnh'], ['/try-on', 'Ảnh trang phục', 'Trang phục']] as const) {
+    await page.goto(path);
+    await expect(page.getByLabel(input)).toBeEnabled();
+    await page.getByLabel(input).setInputFiles(Array.from({ length: path === '/try-on' ? 2 : 1 }, (_, i) => file(`${group}-${i}.png`)));
+    const slot = page.getByRole('group', { name: group, exact: true });
+    await expect(slot.getByRole('img').first()).toBeVisible();
+    await expect(shelfLink(page, `Từ kệ sản phẩm cho ${group}`)).toBeVisible();
+    expect(await overlaps(page.locator('.field').filter({ has: slot })), path).toEqual([]);
+  }
+});

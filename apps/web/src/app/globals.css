@@ -2372,7 +2372,8 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 /* The product shelf link (ShelfPicker) sits beside the uploaded-photos link: an icon and its words, and the words are hidden where the head is narrow (the name stays in aria-label and title). */
 .uploads-link:has(.shelf-text) { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 18px; min-height: 18px; }
 .field-head:has(.uploads-link ~ .uploads-link) { flex-wrap: wrap; row-gap: 2px; justify-content: flex-start; }
-.field-head:has(.uploads-link ~ .uploads-link) > .uploads-link:first-of-type { margin-left: auto; }
+.field-head:has(.uploads-link ~ .uploads-link) > .uploads-link:not(.uploads-link ~ .uploads-link) { margin-left: auto; }
+.app-slots:not([data-two='true']) > .field:has(.slot[data-one]) > .field-head:has(.uploads-link ~ .uploads-link) { padding-right: 28px; } /* a filled full-width slot: both links' tap areas end before the photo's remove button */
 .dropzone-foot:has(.uploads-link ~ .uploads-link) { display: flex; justify-content: flex-end; align-items: flex-end; gap: 12px; padding-right: 12px; }
 .dropzone-foot:has(.uploads-link ~ .uploads-link) .uploads-link { position: relative; right: auto; bottom: auto; margin-bottom: 10px; }
 .dropzone[data-filled='true']:has(+ .dropzone-foot .uploads-link ~ .uploads-link) .dropzone-pick { padding-right: 200px; }
