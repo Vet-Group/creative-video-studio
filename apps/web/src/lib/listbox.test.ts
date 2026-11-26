@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { firstEnabled, moveActive } from './listbox';
+import { alignEnd, firstEnabled, moveActive } from './listbox';
 
 const none = [false, false, false, false];
 
@@ -31,4 +31,11 @@ test('firstEnabled finds the first usable option', () => {
   expect(firstEnabled([true, false, false])).toBe(1);
   expect(firstEnabled([true, true])).toBe(-1);
   expect(firstEnabled([false, true, false], 1)).toBe(2);
+});
+
+test('a chip list lines up with the right side of its trigger only when lining up with its left side would run off the screen', () => {
+  expect(alignEnd(215, 120, 390)).toBe(true); // the 390 px Image generation bar: the thinking-level chip at x 215, whose 192-256 px list ended past 390
+  expect(alignEnd(16, 120, 390)).toBe(false); // a chip at the left of the row
+  expect(alignEnd(600, 120, 1440)).toBe(false); // a wide screen has room
+  expect(alignEnd(16, 380, 390)).toBe(true); // a trigger as wide as the screen is no wider than its list: the right edge is the same as the left
 });

@@ -4,7 +4,7 @@
 // Admin assigns to them (theirs) lead the list under their own heading; a star on each row pins or unpins it when `onPin` is given. It
 // follows the same select-only combobox pattern as Select: focus moves into the search box and aria-activedescendant names the highlighted row.
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
-import { firstEnabled, moveActive } from '@/lib/listbox';
+import { alignEnd, firstEnabled, moveActive } from '@/lib/listbox';
 import { Icon, type IconName } from './Icon';
 
 export interface StoreOption {
@@ -50,6 +50,7 @@ export function StorePicker({
   const searchRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [dropUp, setDropUp] = useState(false);
+  const [end, setEnd] = useState(false);
 
   // Fold away Vietnamese diacritics and đ so a quick "my pham" matches "Mỹ Phẩm".
   const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
@@ -89,6 +90,7 @@ export function StorePicker({
     const r = triggerRef.current?.getBoundingClientRect();
     const below = r ? window.innerHeight - r.bottom : Infinity;
     setDropUp(!!r && below < 300 && r.top > below); // open upward when there isn't room below (the picker is the last field on Create)
+    setEnd(!!r && alignEnd(r.left, r.width, window.innerWidth));
     setQuery('');
     setActive(selected >= 0 ? selected : Math.max(0, firstEnabled(flags)));
     setOpen(true);
@@ -133,7 +135,7 @@ export function StorePicker({
       <label htmlFor={triggerId} className="field-label">
         {label}
       </label>
-      <div className="store-picker" data-open={open} data-drop={dropUp ? 'up' : 'down'}>
+      <div className="store-picker" data-open={open} data-drop={dropUp ? 'up' : 'down'} data-end={end || undefined}>
         <button ref={triggerRef} type="button" id={triggerId} className="select-trigger" data-value={value} role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => (open ? setOpen(false) : openList())} onKeyDown={onKeyDown} onBlur={closeOnBlur}>
           <Icon name={icon} />
           <span className="select-value">{current?.name ?? noneLabel ?? ''}</span>
