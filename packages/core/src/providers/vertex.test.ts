@@ -2,7 +2,7 @@
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import type { ImageModelConfig } from '../models';
-import { ImageReadError, MAX_INLINE_CHARS } from './http';
+import { ImageReadError, MAX_INLINE_CHARS, ProviderHttpError } from './http';
 import type { ImageSubmitRequest } from './types';
 import { createVertexImageProvider, serviceAccountToken } from './vertex';
 
@@ -221,14 +221,17 @@ describe('vertex 429 retry', () => {
     expect(waits).toEqual([55_000, 60_000, 30_000]);
   });
 
-  test('after 3 retries the 429 fails as before, at no cost', async () => {
+  test('after 3 retries the 429 is thrown, so the worker can queue the job again; no outcome is kept', async () => {
     waits.length = 0;
     const { fn, calls } = scripted(limited(), limited(), limited(), limited());
-    const p = retrying(fn);
-    const { providerJobId } = await p.submit(req(PRO));
+    const puts: string[] = [];
+    const p = createVertexImageProvider({ key: KEY, project: 'proj', fetch: fn, readImage, token: async () => 'tok', sleep: async (ms) => void waits.push(ms), random: () => 0.5, store: { put: async (key) => void puts.push(key), get: async () => new Uint8Array(), delete: async () => undefined } });
+    const err = await p.submit(req(PRO)).catch((e: unknown) => e);
     expect(calls).toHaveLength(4);
     expect(waits).toHaveLength(3);
-    expect(await statusOf(p, providerJobId)).toMatchObject({ state: 'failed', error: expect.stringMatching(/^vertex: HTTP 429 .*RESOURCE_EXHAUSTED/), costUsd: 0, costSource: 'reported' });
+    expect(err).toBeInstanceOf(ProviderHttpError);
+    expect(err).toMatchObject({ status: 429, message: expect.stringMatching(/^vertex: HTTP 429 .*RESOURCE_EXHAUSTED/) });
+    expect(puts).toEqual([]);
   });
 
   test('other statuses are not retried', async () => {

@@ -47,6 +47,8 @@ export interface WorkerOptions {
   lateDeliveryMs: number;
   /** A queued job without a live pg-boss job is sent again after this long. */
   resendAfterMs: number;
+  /** A Vertex image job Google still refuses with 429 after the adapter's retries goes back to queued until this long after it was created; after it, the job fails unbilled. */
+  requeue429Ms: number;
   perUserLimit: number;
   globalLimit: number;
   pollingIntervalSeconds: number;
@@ -66,6 +68,8 @@ export const DEFAULT_OPTIONS: WorkerOptions = {
   runTimeoutMs: 20 * 60_000,
   lateDeliveryMs: 2 * 60 * 60_000,
   resendAfterMs: 30_000,
+  // About five rounds of the adapter's 429 retries (up to about 3 min each, vertex.ts) before the member is told; an image takes 6 to 8 s.
+  requeue429Ms: 15 * 60_000,
   perUserLimit: 2,
   globalLimit: 5,
   pollingIntervalSeconds: 2,
@@ -302,6 +306,16 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       } catch (e) {
         // Shutting down mid-call: the row stays submitting and the next worker turns it into failed_unknown.
         if (signal.aborted) return;
+        // Google refused a Vertex image call with 429 after the adapter's retries and bills no refusal, so the job keeps its estimate and goes back to queued
+        // for resendQueued to send again; past requeue429Ms after it was created it fails unbilled, as before.
+        if (e instanceof ProviderHttpError && e.status === 429 && job.provider === 'vertex' && job.kind === 'image') {
+          const { rowCount } = await pool.query(
+            `update jobs set status = 'queued', claimed_by = null where id = $1 and status = 'submitting' and created_at > now() - ($2::float8 * interval '1 millisecond')`,
+            [jobId, o.requeue429Ms],
+          );
+          if (!rowCount) await release(pool, jobId, e.message);
+          return;
+        }
         // The adapter refused an input before any network call, or the provider refused the request with a 4xx: nothing was submitted, so the
         // estimate is released. A 408 (timeout) or 429 (rate limit) does not say the provider never took it, so those stay failed_unknown.
         if (e instanceof ImageReadError || (e instanceof ProviderHttpError && e.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429)) {
