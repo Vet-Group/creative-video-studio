@@ -9,6 +9,6 @@ export default {
     'Tạo ảnh có thêm Seedream 5.5, khoảng 0,042 USD một ảnh ở 1K, cộng 0,012 USD cho mỗi ảnh đầu vào thêm.',
   ],
   href: '/create',
-  prs: [],
+  prs: [673],
   audience: 'all',
 } satisfies ChangeEntry;
