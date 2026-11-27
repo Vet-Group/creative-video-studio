@@ -7,6 +7,8 @@ import { offersRetry, pickNote, remakeHref, savedProduct, SmartRemakeApp } from 
 
 // The video slot lists the member's recent clips, which the app shell's jobs provider holds.
 vi.mock('./jobs', async (original) => ({ ...(await original<typeof import('./jobs')>()), useJobs: () => ({ jobs: [] }) }));
+const media = vi.hoisted(() => ({ narrow: false }));
+vi.mock('@/lib/use-media-query', async (original) => ({ ...(await original<typeof import('@/lib/use-media-query')>()), useMediaQuery: () => media.narrow }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), api: vi.fn() }));
 
 test('the app asks for two things only, a reference video and one product image, with the tip, and shows no remake form before they are set', () => {
@@ -75,4 +77,20 @@ test('"Thử phân tích lại" is offered for a failed analysis and for one the
   expect(offersRetry(null, false)).toBe(false);
   expect(offersRetry({ status: 'queued' }, false)).toBe(false);
   expect(offersRetry({ status: 'succeeded' }, false)).toBe(false);
+});
+
+test('the form says once that one video and one product image are enough: in the help line on a wide screen, in the app lede on a phone', () => {
+  const render = () => renderToStaticMarkup(<SmartRemakeApp app={appBySlug('smart-remake')!} />);
+  const wide = render();
+  expect(wide).toContain('Chỉ cần một video mẫu và một ảnh sản phẩm. AI phân tích video');
+  expect(wide.match(/Chỉ cần một video/g)).toHaveLength(1);
+  media.narrow = true;
+  try {
+    const phone = render();
+    expect(phone).toContain('class="help app-lede"');
+    expect(phone).toContain('<p class="help">AI phân tích video');
+    expect(phone.match(/Chỉ cần một video/g)).toHaveLength(1);
+  } finally {
+    media.narrow = false;
+  }
 });
