@@ -1137,6 +1137,49 @@ describe('image jobs', () => {
     await waitFor('the stored outcome to be removed', async () => !(await hasObject(`vertex-outcomes/${(await job(id)).provider_job_id}.json`)));
   });
 
+  describe('a running job the provider ends for quota (a Vertex Omni interaction with RESOURCE_EXHAUSTED)', () => {
+    const quota: ProviderStatus = { state: 'failed', error: 'Vertex Omni interaction failed: Resource exhausted. Please try again later.', costUsd: 0, costSource: 'estimate', rateLimited: true };
+    /** The mock provider whose first `refusals` status reads end the job for quota. */
+    const refusing = (refusals: number) => {
+      let left = refusals;
+      return counting(300, (inner) => ({ ...inner, status: async (j) => (left-- > 0 ? quota : inner.status(j)) }));
+    };
+
+    test('goes back to queued with its one estimate, is sent again and succeeds, billed once', async () => {
+      const errors = vi.spyOn(console, 'error');
+      const before = counting.submits;
+      await start(refusing(1), { resendAfterMs: 500 });
+      const id = await newJob('u3', { estimate: '0.3475' });
+      await send(id, 'u3');
+      await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+      const requeues = errors.mock.calls.filter((c) => String(c[0]).includes(`vertex 429 on ${id}, queued again`)).length;
+      errors.mockRestore();
+      expect([requeues, counting.submits - before]).toEqual([1, 2]);
+      expect((await costs(id)).filter((c) => c.kind !== 'actual_adjustment').map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.3475']]);
+      expect((await total(id)).is_final).toBe(true);
+    });
+
+    test('past requeue429Ms after it was created, it fails unbilled with the quota error', async () => {
+      await start(refusing(99));
+      const id = await newJob('u3', { estimate: '0.3475' });
+      await pool.query(`update jobs set created_at = now() - interval '16 minutes' where id = $1`, [id]);
+      await send(id, 'u3');
+      await waitFor('the job to fail', async () => (await status(id)) === 'failed');
+      expect((await job(id)).error).toMatch(/Resource exhausted/);
+      expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
+    });
+
+    test('a failure that is not a quota refusal still fails at once, keeping what the provider billed', async () => {
+      const before = counting.submits;
+      await start(counting(300, (inner) => ({ ...inner, status: async () => ({ ...quota, error: 'Vertex Omni interaction failed: blocked', costUsd: 0.3475, rateLimited: undefined }) })));
+      const id = await newJob('u3', { estimate: '0.3475' });
+      await send(id, 'u3');
+      await waitFor('the job to fail', async () => (await status(id)) === 'failed');
+      expect(counting.submits - before).toBe(1);
+      expect(await total(id)).toEqual({ usd: '0.3475', is_final: true });
+    });
+  });
+
   describe('a Vertex image call Google still refuses with 429 after the adapter retries', () => {
     const refused = () => Response.json({ error: { code: 429, status: 'RESOURCE_EXHAUSTED' } }, { status: 429 });
     const pictured = async () => {

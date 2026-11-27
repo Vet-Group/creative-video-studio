@@ -35,7 +35,8 @@ export type ProviderStatus =
   | { state: 'queued' | 'running'; queuePosition?: number }
   /** `tokens`: the tokens the provider billed, when it reports them (BytePlus Seedance); it feeds the resource pack balance. */
   | { state: 'succeeded'; outputUrl: string; costUsd: number; costSource: CostSource; tokens?: number }
-  | { state: 'failed' | 'canceled'; error: string; costUsd: number; costSource: CostSource };
+  /** `rateLimited`: the provider ended the job for quota (Vertex RESOURCE_EXHAUSTED) and bills nothing, so the worker may send it again. */
+  | { state: 'failed' | 'canceled'; error: string; costUsd: number; costSource: CostSource; rateLimited?: boolean };
 
 export interface VideoProvider {
   submit(req: SubmitRequest): Promise<{ providerJobId: string }>;

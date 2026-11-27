@@ -91,7 +91,10 @@ export function createVertexOmniProvider(opts: {
       if (data.status === 'in_progress') return { state: 'running' };
       if (data.status !== 'completed') {
         const reason = Array.isArray(data.errors) && typeof data.errors[0]?.message === 'string' ? `: ${data.errors[0].message.slice(0, 200)}` : '';
-        return failed(`Vertex Omni interaction ${typeof data.status === 'string' ? data.status.slice(0, 40) : 'malformed'}${reason}`);
+        const error = `Vertex Omni interaction ${typeof data.status === 'string' ? data.status.slice(0, 40) : 'malformed'}${reason}`;
+        // A quota refusal (prod job 215001be, 2026-11-26) made no video. shortcut: billed as nothing like a refused 429 call; check the billing export after the next one.
+        if (data.status === 'failed' && /resource.?exhausted|\b429\b/i.test(reason)) return { state: 'failed', error, costUsd: 0, costSource: 'estimate', rateLimited: true };
+        return failed(error);
       }
       const videos = (Array.isArray(data.steps) ? data.steps : [])
         .filter((s: any) => s?.type === 'model_output' && Array.isArray(s.content))

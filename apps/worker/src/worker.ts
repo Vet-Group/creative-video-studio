@@ -581,6 +581,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         if (status.state === 'succeeded') {
           await deliver(row, status.outputUrl, status.costUsd, status.tokens);
           await forget();
+        } else if (status.state === 'failed' && status.rateLimited && (await requeueRateLimited(row.id, status.error))) {
+          await forget();
         } else if (status.state === 'failed' || status.state === 'canceled') {
           if (await settle(pool, row.id, { status: 'failed', costUsd: status.costUsd, error: status.error })) await forget();
         } else if (row.expired && (await timeOut(row.id)) && adapter) await adapter.cancel().catch((e) => log(`cancel ${row.id}`, e));
@@ -590,6 +592,21 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         if (row.expired && !draining.signal.aborted) await timeOut(row.id).catch((err) => log(`time out ${row.id}`, err));
       }
     }
+  }
+
+  /**
+   * A running job the provider ended for quota (a Vertex Omni interaction with RESOURCE_EXHAUSTED) goes back to queued with its estimate for
+   * resendQueued to send again, like a Vertex image refused with 429 at submit; past requeue429Ms after it was created it fails unbilled instead.
+   * False when it was not queued again (too old, or no longer running).
+   */
+  async function requeueRateLimited(jobId: string, error: string): Promise<boolean> {
+    const { rowCount } = await pool.query(
+      `update jobs set status = 'queued', provider_job_id = null, started_at = null, claimed_by = null, provider_queue_position = null
+        where id = $1 and status = 'running' and created_at > now() - ($2::float8 * interval '1 millisecond')`,
+      [jobId, o.requeue429Ms],
+    );
+    if (rowCount) log(`vertex 429 on ${jobId}, queued again`, error);
+    return !!rowCount;
   }
 
   /**
