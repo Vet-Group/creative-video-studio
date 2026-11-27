@@ -21,6 +21,7 @@ import { useDraftState } from '@/lib/use-draft';
 import { GALLERY_SAMPLES } from '@/lib/examples';
 import { sampleThumb, samplesPending, useSamples } from '@/lib/use-samples';
 import { About } from './About';
+import { FreeLeft } from './AllowanceBar';
 import { CustomAppForm } from './CustomAppForm';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { CsvNames } from './CsvNames';
@@ -872,6 +873,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
             <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
+            <FreeLeft />
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
               {/* The usual wait of the model beside its price, from the company's recent runs, so a first Run is not a guess. */}
@@ -1129,6 +1131,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
             <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
+            <FreeLeft />
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
               {/* Before a video the price is per second (the 5 s estimate over 5), so the member knows what a clip will cost; then the video's total. */}

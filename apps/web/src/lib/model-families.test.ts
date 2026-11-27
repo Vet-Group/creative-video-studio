@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { byFamily, FEATURED, familyOf, featured } from './model-families';
+import { byFamily, FEATURED, familyOf, featured, shortList } from './model-families';
 
 test('a model falls into its family by id, provider twins included; an unknown id falls into the other family', () => {
   const keys = (ids: string[]) => ids.map((id) => familyOf(id).key);
@@ -24,4 +24,15 @@ test('the featured models: the recommended one first, then the best scores among
   const list = [m('a', 40), m('b', 90, false), m('c', 70), m('d', 60, true, true), m('e', 70), m('f', 50), m('g', 10)];
   expect(featured(list).map((x) => x.id)).toEqual(['d', 'c', 'e', 'f', 'a']); // b is ruled out; c before e on a tie
   expect(featured(list)).toHaveLength(FEATURED);
+});
+
+test('the short list: the chosen model and the recommended one, or null when it would hide fewer than two models', () => {
+  const m = (id: string, score: number, supported = true, recommended = false) => ({ id, score, supported, recommended });
+  const list = [m('a', 40), m('b', 90, false), m('c', 70), m('d', 60, true, true)];
+  expect(shortList(list, 'd')?.map((x) => x.id)).toEqual(['d']); // the default pick: only the recommended model
+  expect(shortList(list, 'a')?.map((x) => x.id)).toEqual(['a', 'd']); // an earlier pick stays in sight, beside the recommended one
+  expect(shortList(list, '')?.map((x) => x.id)).toEqual(['d']);
+  expect(shortList([m('a', 40), m('c', 70), m('d', 60, true, true)], 'a')).toBeNull(); // folding one model away saves nothing
+  expect(shortList([m('a', 40), m('d', 60, true, true)], 'd')).toBeNull();
+  expect(shortList([m('b', 90, false)], '')).toBeNull();
 });

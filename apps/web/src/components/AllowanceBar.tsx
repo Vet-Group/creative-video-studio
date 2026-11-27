@@ -2,6 +2,10 @@
 // The bar is neutral below 75% of the allowance, a warning from 75%, and past 100% the part over the allowance is its own segment, billed to
 // the team; the line under it says the same in words, so nothing rests on colour alone. With `forecastUsd` (this month only) one more line says where
 // the month is heading at its pace so far and what that would bill: an estimate, never charged and never a block.
+// FreeLeft is the one-line version over a form's Run button, so a seller sees the team's free money before spending it (seller survey 2026-11-27).
+'use client';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 
 const usd = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -45,4 +49,33 @@ export function AllowanceBar({ totalUsd, freeUsd, label, forecastUsd }: { totalU
       )}
     </div>
   );
+}
+
+/** The line over Run: what the team's free allowance still holds this month, or that it is used up. Null for a team without an allowance. */
+export function freeLeftText({ monthUsd, freeUsd }: { monthUsd: string; freeUsd: string }): string | null {
+  const free = Number(freeUsd);
+  if (!(free > 0)) return null;
+  const left = free - Math.max(0, Number(monthUsd));
+  return left > 0 ? `Team bạn còn ${usd(left)} miễn phí tháng này` : `Team bạn đã dùng hết ${usd(free)} miễn phí tháng này; phần vượt tính cho team`;
+}
+
+/**
+ * The team's free allowance left, from /api/me/limits: only a member of a billing team in the company's workspace gets `team` there, so a partner
+ * workspace, a non-billing team or no team shows nothing (the Run button already carries the price).
+ * shortcut: read once when the form opens, so the team's spend since then shows after a reload; poll or refetch after a Run if sellers ask.
+ */
+export function FreeLeft({ className = 'run-summary run-free' }: { className?: string }) {
+  const [team, setTeam] = useState<{ monthUsd: string; freeUsd: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    api<{ team?: { monthUsd: string; freeUsd: string } }>('/api/me/limits').then(
+      (r) => live && setTeam(r.team ?? null),
+      () => {}, // the line is a hint: without it the form works as before
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  const text = team && freeLeftText(team);
+  return text ? <p className={className}>{text}</p> : null;
 }

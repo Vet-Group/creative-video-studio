@@ -16,6 +16,7 @@ import { useDraftState } from '@/lib/use-draft';
 import { sampleThumb, useSamples } from '@/lib/use-samples';
 import { backgroundsIn, GARMENT_CATEGORIES, garmentCap, garmentsOf, PORTRAIT_FILTERS, portraitGender, portraitName, type PortraitFilter, portraitsIn, poseOf, POSES, posesOf, stockModels } from '@/lib/try-on-stock';
 import { About } from './About';
+import { FreeLeft } from './AllowanceBar';
 import { copyError, copySamples, fashionTiles, FormNotice, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import type { UploadSlot } from '@/lib/upload-slots';
 import { Icon } from './Icon';
@@ -389,6 +390,7 @@ export function TryOn({ reuse, model }: { reuse?: string; model?: Img }) {
             <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
+            <FreeLeft />
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Thử đồ
               {busy ? <span className="run-cost">· Đang gửi…</span> : !recall.answered || models === null ? <span className="run-cost">· Đang tải…</span> : pick.estimate !== undefined && <span className="run-cost">· {usd(pick.estimate)}</span>}

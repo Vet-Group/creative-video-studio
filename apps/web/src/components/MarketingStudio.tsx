@@ -22,6 +22,7 @@ import { sampleThumb, useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
 import { alignInputs, asExample, dropRefillQuery, lostInputs, nothingNote, nothingRefilled, placesOf, queryOf, skippedNote } from '@/lib/reuse';
 import { About } from './About';
+import { FreeLeft } from './AllowanceBar';
 import { AudioSwitch } from './AudioSwitch';
 import { BrandPicker } from './BrandKit';
 import { CardMedia, LoopVideo } from './CardMedia';
@@ -919,6 +920,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
           </div>
           <div className="runbar">
             <RunSummary items={[chosen?.label, shapes.join(' + '), `${durationSec} giây`, audioOn && 'có âm thanh']} />
+            <FreeLeft />
             {wizard && step > 0 && (
               <button type="button" onClick={() => setStep((s) => s - 1)}>
                 Quay lại

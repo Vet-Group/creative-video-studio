@@ -39,3 +39,12 @@ export function featured<T extends { supported: boolean; score?: number; recomme
     .sort((a, b) => Number(!!b.recommended) - Number(!!a.recommended) || (b.score ?? -1) - (a.score ?? -1))
     .slice(0, FEATURED);
 }
+
+/**
+ * What the picker opens on until the member presses Advanced: the chosen model (kept even when it is not the recommended one) and the top featured
+ * model, the recommended one. Null when that would hide fewer than two models, so a short list stays whole (seller survey 2026-11-27: fewer choices).
+ */
+export function shortList<T extends { id: string; supported: boolean; score?: number; recommended?: boolean }>(models: T[], value: string): T[] | null {
+  const top = [...new Set([models.find((m) => m.id === value), featured(models)[0]])].filter((m): m is T => m !== undefined);
+  return top.length > 0 && models.length - top.length >= 2 ? top : null;
+}

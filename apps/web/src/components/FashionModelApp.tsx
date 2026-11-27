@@ -12,6 +12,7 @@ import { waitLabel } from '@/lib/explore';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { FreeLeft } from './AllowanceBar';
 import { AppAbout, AppHeader, AppHistoryArt, TAB_LABEL, type Tab } from './AppPage';
 import s from './FashionModelApp.module.css';
 import { FashionModelList } from './FashionModelList';
@@ -257,6 +258,7 @@ export function FashionModelApp({ app, isAdmin, reuse }: { app: AppConfig; isAdm
             <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
+            <FreeLeft />
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={minor || reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
               {running ? <span className="run-cost">· Đang gửi…</span> : chosen && <span className="run-cost">· {usd(total)}{chosen.typicalSec && ` · ${waitLabel(chosen.typicalSec)}`}</span>}

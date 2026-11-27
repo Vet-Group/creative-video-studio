@@ -1,12 +1,12 @@
 import { expect, type Page, test } from '@playwright/test';
-import { modelButton, png, signIn } from './support.test';
+import { modelButton, png, pickModel as search, signIn } from './support.test';
 
 const runButton = (page: Page) => page.getByRole('button', { name: /^Chạy/ });
 const views = (page: Page) => page.getByRole('group', { name: 'Góc cần tạo' });
 const cost = (page: Page) => page.getByRole('status').filter({ hasText: 'ảnh ×' });
+// The search reaches every model: the panel opens on the chosen and the recommended one only.
 const pickModel = async (page: Page, name: RegExp) => {
-  await modelButton(page).click();
-  await page.getByRole('option', { name }).click();
+  await search(page, name);
   await expect(modelButton(page)).toContainText(name);
 };
 
