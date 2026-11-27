@@ -3,6 +3,7 @@ import { type DragEvent, useEffect, useId, useRef, useState } from 'react';
 import { resolutionVariants } from '@/lib/resolution-variants';
 import { api, type Clip as LibraryClip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, DEMO_TITLE, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
+import { hdName } from '@/lib/draft-hd';
 import { endFrameModel } from '@/lib/end-frame-model';
 import { adjustNote } from '@/lib/video-adjust';
 import { anglePrompt, CAMERA_ANGLES, MAX_ANGLES } from '@/lib/camera-angles';
@@ -392,14 +393,15 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
         // A saved template may leave these out; the form's defaults stay.
         if (j.ratio) setRatio(j.ratio);
         if (j.durationSec) setDurationSec(j.durationSec);
-        if (j.modelId) setModelId(j.modelId);
+        const pick = model ?? j.modelId; // Làm bản HD: the clip's inputs on its HD sibling (`model`)
+        if (pick) setModelId(pick);
         if (source.recipe) {
           setRefetch((n) => n + 1); // the photo count may not change, so the picker reloads to map a pair's twin id onto its entry
           notify(`${EXAMPLE_USED} Cửa hàng của bạn được giữ nguyên.`); // a company example's store is not the member's
         } else {
           setStoreId(j.storeId ?? '');
           recreated(reuse);
-          left.current = { modelLabel: j.modelLabel ?? null, lost: lostInputs(j), store: j.storeLost === true };
+          left.current = { modelLabel: (model && hdName(model)) ?? j.modelLabel ?? null, lost: lostInputs(j), store: j.storeLost === true };
           setRefetch((n) => n + 1); // the counts may not change, so the list is asked again to say what was left out
         }
         dropRefillQuery();
