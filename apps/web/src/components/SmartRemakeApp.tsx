@@ -229,7 +229,8 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
         <div className="card form-card" id="app-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'app-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
             <AppHeader app={app} />
-            <p className="help">Chỉ cần một video mẫu và một ảnh sản phẩm. AI phân tích video, chọn sẵn các cảnh có sản phẩm giống của bạn, rồi bạn bấm một nút để tạo video.</p>
+            {/* On a phone AppHeader's lede already says one video and one product image (owner, 2026-11-27): no repeat there. */}
+            <p className="help">{!narrow && 'Chỉ cần một video mẫu và một ảnh sản phẩm. '}AI phân tích video, chọn sẵn các cảnh có sản phẩm giống của bạn, rồi bạn bấm một nút để tạo video.</p>
             <p className="help">
               Chỉ cần đổi màu áo hoặc nền? Dùng <Link href="/apps/video-edit">Sửa video</Link>: rẻ hơn và giữ âm thanh gốc.
             </p>
