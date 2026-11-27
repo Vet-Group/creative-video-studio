@@ -3,12 +3,14 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { CardMedia } from '@/components/CardMedia';
 import { ExploreJobNote } from '@/components/ExploreJobNote';
+import { ExploreSort } from '@/components/ExploreSort';
 import { ExploreStrip } from '@/components/ExploreStrip';
 import { Icon, type IconName } from '@/components/Icon';
 import { KindChip } from '@/components/KindChip';
 import { ToolGuideButton } from '@/components/ToolGuide';
 import { Welcome } from '@/components/Welcome';
 import { MODEL_CARD_TEXT } from '@/lib/about-model-cards';
+import { JOB_APPS } from '@/lib/apps';
 import { thumbUrl } from '@/lib/api';
 import { pool } from '@/lib/auth';
 import { CHANGELOG } from '@/lib/changelog';
@@ -21,18 +23,20 @@ import { featureLabel } from '@/lib/features';
 import { MIN_MARKS } from '@/lib/model-marks';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { onePerPair } from '@/lib/model-twins';
+import { usesLine, weeklyUses } from '@/lib/popular';
 import { pageOf } from '@/lib/reuse';
 import { listSamples } from '@/lib/samples';
 import { TOOL_GOALS, toolGuide } from '@/lib/tool-guide';
 
 // The tools the app has, in the live sidebar order; uploaded samples override these fallback posters.
-const FEATURES: { href: string; sample: string; title: string; icon: IconName; poster: string }[] = [
-  { href: '/try-on', sample: 'feature-try-on', title: 'Thử đồ', icon: 'tryon', poster: EXAMPLES[2]!.poster },
-  { href: '/image-generation', sample: 'feature-image-generation', title: 'Tạo ảnh', icon: 'image', poster: EXAMPLES[3]!.poster },
-  { href: '/create', sample: 'feature-create-videos', title: 'Tạo video', icon: 'create', poster: EXAMPLES[0]!.poster },
-  { href: '/marketing-studio', sample: 'feature-marketing-studio', title: 'Marketing Studio', icon: 'megaphone', poster: EXAMPLES[1]!.poster },
-  { href: '/apps', sample: 'feature-apps', title: 'Ứng dụng', icon: 'apps', poster: '/artwork/explore-apps.svg' },
-  { href: '/library', sample: 'feature-library', title: 'Thư viện', icon: 'library', poster: '/artwork/explore-library.svg' },
+// `features` are the job features whose Runs the "most used" sort counts for a tool (the Library makes none).
+const FEATURES: { href: string; sample: string; title: string; icon: IconName; poster: string; features: string[] }[] = [
+  { href: '/try-on', sample: 'feature-try-on', title: 'Thử đồ', icon: 'tryon', poster: EXAMPLES[2]!.poster, features: ['try_on'] },
+  { href: '/image-generation', sample: 'feature-image-generation', title: 'Tạo ảnh', icon: 'image', poster: EXAMPLES[3]!.poster, features: ['image'] },
+  { href: '/create', sample: 'feature-create-videos', title: 'Tạo video', icon: 'create', poster: EXAMPLES[0]!.poster, features: ['video'] },
+  { href: '/marketing-studio', sample: 'feature-marketing-studio', title: 'Marketing Studio', icon: 'megaphone', poster: EXAMPLES[1]!.poster, features: ['marketing'] },
+  { href: '/apps', sample: 'feature-apps', title: 'Ứng dụng', icon: 'apps', poster: '/artwork/explore-apps.svg', features: JOB_APPS.map((a) => a.feature) },
+  { href: '/library', sample: 'feature-library', title: 'Thư viện', icon: 'library', poster: '/artwork/explore-library.svg', features: [] },
 ];
 
 const TZ = 'Asia/Ho_Chi_Minh';
@@ -65,15 +69,17 @@ const cardText = (id: string) => MODEL_CARD_TEXT[id] ?? MODEL_CARD_TEXT[id.repla
 const toolText = (href: string) => toolGuide(href)?.oneLine ?? 'Mọi clip và ảnh công ty đã tạo, để xem, tải xuống và chấm điểm.';
 
 /** Explore: the member's start page: a greeting with their day and recent work, then the tools, the enabled models and the company presets, each linking into Create.
- * `?models=all` lists every enabled model instead of the featured few. */
-export default async function ExplorePage({ searchParams }: { searchParams: Promise<{ models?: string | string[] }> }) {
-  const allModels = (await searchParams).models === 'all';
+ * `?models=all` lists every enabled model instead of the featured few. `?sort=popular` orders the tools and the motion presets by their Runs in the last 7 days in the member's workspace (lib/popular.ts), the curated order breaking ties. */
+export default async function ExplorePage({ searchParams }: { searchParams: Promise<{ models?: string | string[]; sort?: string | string[] }> }) {
+  const query = await searchParams;
+  const allModels = query.models === 'all';
+  const popular = query.sort === 'popular';
   // The (app) layout does not rerun on a client navigation, so a page that reads data itself checks the forced password change again.
   const user = await currentUser();
   if (user?.mustChangePassword) redirect('/account/password');
   const now = new Date();
   const workspaceId = user?.workspaceId ?? ''; // the layout shows a notice instead of the page to a user in no workspace
-  const [models, presets, samples, videoStats, imageStats, clips, jobs, today, made, stripRows] = await Promise.all([
+  const [models, presets, samples, videoStats, imageStats, clips, jobs, today, made, stripRows, uses] = await Promise.all([
     // Video models open Create Videos and image models open Image Generation, as the live page features both.
     pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null; twin_of: string | null }>(
       `select id, label, provider, kind, ratios, durations_sec, usd_per_second, image_prices, twin_of from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
@@ -105,7 +111,12 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         where j.workspace_id = $1 and ${LIVE_CLIP} and (j.poster_asset_id is not null or o.mime like 'image/%') order by ${EXAMPLE_ORDER} limit 12`,
       [workspaceId],
     ),
+    weeklyUses(pool, workspaceId),
   ]);
+  // The sorts are stable, so the curated order breaks ties; the free-prompt tile stays first, as it counts no preset.
+  const count = (features: string[]) => features.reduce((n, f) => n + (uses.features.get(f) ?? 0), 0);
+  const tools = popular ? [...FEATURES].sort((a, b) => count(b.features) - count(a.features)) : FEATURES;
+  const motion = popular ? [...presets.rows].sort((a, b) => (uses.presets.get(b.id) ?? 0) - (uses.presets.get(a.id) ?? 0)) : presets.rows;
   // One model of each duplicate pair (lib/model-twins.ts); fal's balance lock is not read here, as the cards name no price to lock.
   const offered = await onePerPair(pool, models.rows);
   const news = visibleEntries(CHANGELOG, user?.role === 'admin').slice(0, 3);
@@ -236,9 +247,10 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         </ul>
       </section>
 
+      <ExploreSort sort={popular ? 'popular' : 'suggested'} />
       <h2>Công cụ</h2>
       <ul className="explore-tools" aria-label="Công cụ">
-        {FEATURES.map((f) => (
+        {tools.map((f) => (
           <li key={f.href}>
             <Link href={f.href} className="explore-tool">
               <CardMedia {...cardSample(have, f.sample, f.poster)} />
@@ -289,13 +301,19 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
       <p className="muted explore-sub">Chọn một mẫu, tải ảnh đầu lên và nhận video.</p>
       {/* A masonry of looping tiles like the live page: the name and a Create button show on hover or focus. The first tile is the free prompt. */}
       <ul className="explore-prompts" aria-label="Mẫu chuyển động">
-        {[{ id: 'none', label: 'Tự viết mô tả', sample: 'preset-general' }, ...presets.rows.map((p) => ({ ...p, sample: `preset-${p.id}` }))].map((p) => {
+        {[{ id: 'none', label: 'Tự viết mô tả', sample: 'preset-general' }, ...motion.map((p) => ({ ...p, sample: `preset-${p.id}` }))].map((p) => {
           const ex = exampleForPreset(p.id, have);
           const media = cardSample(have, p.sample, ex ? sampleSrc(have, ex.poster) : null);
+          const used = usesLine(uses.presets.get(p.id));
           return (
             <li key={p.id}>
-              <Link href={`/create?preset=${encodeURIComponent(p.id)}`} className="explore-prompt" aria-label={p.label}>
+              <Link href={`/create?preset=${encodeURIComponent(p.id)}`} className="explore-prompt" aria-label={used ? `${p.label}, ${used}` : p.label}>
                 <CardMedia video={media.video ?? (ex ? sampleSrc(have, ex.src) : null)} poster={media.poster} />
+                {used && (
+                  <span className="explore-prompt-uses" aria-hidden="true">
+                    {used}
+                  </span>
+                )}
                 <span className="explore-prompt-hover" aria-hidden="true">
                   <strong>{p.label}</strong>
                   <span className="explore-prompt-go">

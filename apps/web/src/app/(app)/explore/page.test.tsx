@@ -8,7 +8,7 @@ vi.mock('@/lib/samples', () => ({ listSamples: vi.fn(async () => []) }));
 vi.mock('@/lib/clips', () => ({ bestClips: vi.fn(async () => new Map()), LIVE_CLIP: 'true', EXAMPLE_ORDER: 'e.job_id' }));
 vi.mock('@/lib/current-user', () => ({ currentUser: vi.fn(async () => ({ mustChangePassword: false })) }));
 vi.mock('@cvs/core/limits', () => ({ dailyClips: vi.fn(async () => ({ today: 2, cap: 5 })) }));
-vi.mock('next/navigation', () => ({ redirect: vi.fn((to: string) => { throw new Error(`redirect ${to}`); }) }));
+vi.mock('next/navigation', () => ({ redirect: vi.fn((to: string) => { throw new Error(`redirect ${to}`); }), useRouter: () => ({ replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
 vi.mock('@/components/CardMedia', () => ({ CardMedia: ({ poster, video }: { poster: string; video: string }) => <img src={poster} data-video={video} alt="" /> }));
 
 import { pool } from '@/lib/auth';
@@ -251,4 +251,48 @@ test('a Continue card names its model and, when the member wrote it, their promp
   expect(cards[0]).toMatch(/<span class="explore-job-prompt" title="a slow turn of the red mug">a slow turn of the red mug<\/span>/);
   expect(cards[1]).toContain('<span class="explore-job-model" title="Seedance 2.0">Seedance 2.0</span>');
   expect(cards[1]).not.toContain('explore-job-prompt'); // a composed prompt is not shown
+});
+
+/** The page's markup with the workspace's Runs of the week (lib/popular.ts rows) and the enabled motion presets, for `?sort=` or none. */
+async function withWeek(weekly: Record<string, unknown>[], sort?: string) {
+  vi.mocked(currentUser).mockResolvedValueOnce({ id: 'u1', name: 'Hưng', mustChangePassword: false, workspaceId: 'ws_vet' } as Awaited<ReturnType<typeof currentUser>>);
+  vi.mocked(pool.query).mockImplementation((async (sql: string) => ({ rows: sql.includes('count(distinct') ? weekly : sql.includes('from presets') ? [{ id: 'a', label: 'Mẫu A' }, { id: 'b', label: 'Mẫu B' }, { id: 'c', label: 'Mẫu C' }] : [] })) as never);
+  try {
+    return renderToStaticMarkup(await ExplorePage({ searchParams: Promise.resolve({ sort }) }));
+  } finally {
+    vi.mocked(pool.query).mockImplementation((async () => ({ rows: [] })) as never);
+  }
+}
+const toolOrder = (html: string) => [...html.match(/<ul class="explore-tools"[\s\S]*?<\/ul>/)![0].matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
+const presetOrder = (html: string) => [...html.matchAll(/href="\/create\?preset=([^"]+)"/g)].map((m) => m[1]);
+const week = [
+  { feature: 'marketing', preset_id: null, n: 9 },
+  { feature: 'try_on', preset_id: null, n: 2 },
+  { feature: 'reframe', preset_id: null, n: 4 }, // the Apps tool counts every app
+  { feature: 'video', preset_id: 'c', n: 5 },
+  { feature: 'video', preset_id: 'b', n: 1 },
+];
+
+test('the default order keeps the curated tools and presets, with the sort switch on Gợi ý', async () => {
+  const html = await withWeek(week);
+  expect(toolOrder(html)).toEqual(['/try-on', '/image-generation', '/create', '/marketing-studio', '/apps', '/library']);
+  expect(presetOrder(html)).toEqual(['none', 'a', 'b', 'c']);
+  expect(html).toMatch(/<button type="button" aria-pressed="true">Gợi ý<\/button><button type="button" aria-pressed="false">Đang được dùng nhiều<\/button>/);
+});
+
+test('?sort=popular orders the tools and the presets by the week\'s Runs, ties and the free-prompt tile keeping their place', async () => {
+  const html = await withWeek(week, 'popular');
+  // Marketing 9, Create 5 (the presets' video jobs), Apps 4, Try On 2, then Image and Library at 0 in the curated order.
+  expect(toolOrder(html)).toEqual(['/marketing-studio', '/create', '/apps', '/try-on', '/image-generation', '/library']);
+  expect(presetOrder(html)).toEqual(['none', 'c', 'b', 'a']);
+  expect(html).toMatch(/<button type="button" aria-pressed="false">Gợi ý<\/button><button type="button" aria-pressed="true">Đang được dùng nhiều<\/button>/);
+});
+
+test('a preset tile shows the week\'s Runs from 3 and names them for screen readers', async () => {
+  const html = await withWeek(week);
+  const tile = (id: string) => html.match(new RegExp(`<a[^>]*href="/create\\?preset=${id}"[^>]*>[\\s\\S]*?</a>`))![0];
+  expect(tile('c')).toContain('aria-label="Mẫu C, 5 lượt dùng tuần này"');
+  expect(tile('c')).toContain('<span class="explore-prompt-uses" aria-hidden="true">5 lượt dùng tuần này</span>');
+  expect(tile('b')).toContain('aria-label="Mẫu B"');
+  expect(tile('b')).not.toContain('explore-prompt-uses');
 });

@@ -1,15 +1,16 @@
 'use client';
-// The Apps index: a search box, the category chips and a card for each app.
+// The Apps index: a search box, the category chips and a card for each app. `uses` is each app's Runs of the last 7 days by slug (lib/popular.ts).
 import Link from 'next/link';
 import { useId, useState } from 'react';
 import { type AppCategory, type AppConfig, CATEGORIES, filterApps, isNewApp } from '@/lib/apps';
+import { usesLine } from '@/lib/popular';
 import { useHydrated } from '@/lib/use-hydrated';
 import { AppArt } from './AppPage';
 import { Icon } from './Icon';
 import { useSmartRemakeEnabled } from './SmartRemakeGate';
 import { PageHint } from './ToolGuide';
 
-export function AppsIndex({ extra = [] }: { extra?: AppConfig[] }) {
+export function AppsIndex({ extra = [], uses = {} }: { extra?: AppConfig[]; uses?: Record<string, number> }) {
   const [category, setCategory] = useState<AppCategory | 'all'>('all');
   const [search, setSearch] = useState('');
   const searchId = useId();
@@ -52,6 +53,7 @@ export function AppsIndex({ extra = [] }: { extra?: AppConfig[] }) {
                   {a.soon ? <span className="badge-soon">Sắp có</span> : hydrated && isNewApp(a) && <span className="badge-soon badge-new">Mới</span>}
                 </span>
                 <span className="muted">{a.description}</span>
+                {usesLine(uses[a.slug]) && <span className="muted app-card-uses">{usesLine(uses[a.slug])}</span>}
               </Link>
             </li>
           ))}

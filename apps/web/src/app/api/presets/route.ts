@@ -2,6 +2,7 @@ import { withTransaction } from '@cvs/core/ledger';
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { bad, readBody } from '@/lib/admin';
 import { pool } from '@/lib/auth';
+import { MIN_USES, weeklyUses } from '@/lib/popular';
 import { BAD_GROUP, createPreset, presetFeature, presetFields, presetGroup } from '@/lib/presets';
 import { guard, isEditor } from '@/lib/session';
 
@@ -9,7 +10,8 @@ import { guard, isEditor } from '@/lib/session';
  * The preset picker of `?feature=` (`video`, Create's motion presets, when left out; `image`, Image Generation's styles): the enabled presets in display
  * order, by id, label and `group` (the picker section), and `canEdit` for a template editor (lib/session.ts), who also gets the switched-off presets
  * and each one's prompt, order and state. A member's prompt stays on the server, where Run reads it. `canPropose`: proposals to the shared catalog are the
- * company workspace's only (/api/preset-proposals refuses them elsewhere), so a partner's picker offers none.
+ * company workspace's only (/api/preset-proposals refuses them elsewhere), so a partner's picker offers none. A preset the caller's workspace Ran at least MIN_USES times
+ * in the last 7 days also carries `uses` (lib/popular.ts), for the picker's weekly-use line.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -23,7 +25,9 @@ export async function GET(request: Request) {
       : 'select id, label, "group" from presets where feature = $1 and enabled order by sort_order, id',
     [feature],
   );
-  return Response.json({ presets: rows, canEdit, canPropose: g.workspaceId === COMPANY_WORKSPACE_ID });
+  const { presets: uses } = await weeklyUses(pool, g.workspaceId);
+  const presets = rows.map((r) => ((uses.get(r.id) ?? 0) >= MIN_USES ? { ...r, uses: uses.get(r.id) } : r));
+  return Response.json({ presets, canEdit, canPropose: g.workspaceId === COMPANY_WORKSPACE_ID });
 }
 
 /** Template editor: add a preset (`label` and `prompt`, optional `sortOrder`, `enabled`, `feature`, default `video`, and `group`, default `product`), audited as preset.create. Its id comes from the label. */

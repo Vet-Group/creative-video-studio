@@ -5,6 +5,7 @@
 // style's prompt: Run sends its id and the server adds the prompt to the member's own.
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { usesLine } from '@/lib/popular';
 import { useSamples, versionedSample } from '@/lib/use-samples';
 import { Icon } from './Icon';
 import { TileImg } from './image-tools';
@@ -109,6 +110,7 @@ export function StylePicker({ value, onChange, onStyle }: { value: string; onCha
                       {p.label}
                     </button>
                   )}
+                  {usesLine(p.uses) && <span className="muted preset-uses">{usesLine(p.uses)}</span>}
                   {(canEdit || canPropose) && (
                     <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa phong cách ${p.label}` : `Đề xuất sửa phong cách ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
                       <Icon name="edit" size={12} />
