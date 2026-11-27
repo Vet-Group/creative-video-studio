@@ -136,12 +136,20 @@ test('an Admin makes an app of a Library clip, publishes and takes it down, and 
   await admin.getByRole('combobox', { name: 'Danh mục' }).selectOption('video');
   await admin.getByRole('checkbox', { name: 'Đăng lên trang Ứng dụng ngay' }).check();
   await expect(save).toBeEnabled();
+  // Huỷ on a changed form asks first; the dialog's own Huỷ keeps the edit.
+  await admin.getByRole('link', { name: 'Huỷ' }).click();
+  await admin.getByRole('dialog', { name: 'Bỏ các thay đổi chưa lưu?' }).getByRole('button', { name: 'Huỷ' }).click();
+  await expect(admin.getByRole('textbox', { name: 'Tên ứng dụng' })).toHaveValue(NAME2);
   expect((await new AxeBuilder({ page: admin }).exclude('nextjs-portal').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
   await save.click();
   await expect(admin).toHaveURL(/\/admin\/apps$/);
   const row = admin.getByRole('row').filter({ hasText: NAME2 });
   await expect(row.getByText('Đã đăng')).toBeVisible();
   const appId = ((await row.getByRole('link', { name: /^Mở/ }).getAttribute('href')) ?? '').replace('/apps/', '');
+  // An unchanged editor leaves on Huỷ without asking.
+  await admin.goto(`/admin/apps/${appId}`);
+  await admin.getByRole('link', { name: 'Huỷ' }).click();
+  await expect(admin).toHaveURL(/\/admin\/apps$/);
 
   // The clip is held: the Library card shows the 409 text that names the app.
   await admin.goto('/library');
@@ -163,6 +171,9 @@ test('an Admin makes an app of a Library clip, publishes and takes it down, and 
   await admin.goto('/admin/apps');
   await row.getByRole('button', { name: /^Gỡ khỏi trang Ứng dụng/ }).click();
   await expect(row.getByText('Nháp')).toBeVisible();
+  // Keyboard focus goes to the page title, not the body, and the status line says what happened.
+  await expect(admin.getByRole('heading', { name: 'Ứng dụng tự tạo', level: 1 })).toBeFocused();
+  await expect(admin.getByRole('status').filter({ hasText: `Đã gỡ «${NAME2}» khỏi trang Ứng dụng.` })).toBeVisible();
   await member.goto('/apps');
   await expect(member.getByRole('list', { name: 'Danh sách ứng dụng' }).getByRole('link').filter({ hasText: NAME2 })).toHaveCount(0);
   expect((await member.goto(`/apps/${appId}`))!.status()).toBe(404);
@@ -171,6 +182,8 @@ test('an Admin makes an app of a Library clip, publishes and takes it down, and 
   await row.getByRole('button', { name: /^Xoá ứng dụng/ }).click();
   await admin.getByRole('dialog', { name: `Xoá ứng dụng «${NAME2}»?` }).getByRole('button', { name: 'Xoá ứng dụng' }).click();
   await expect(row).toHaveCount(0);
+  await expect(admin.getByRole('status').filter({ hasText: `Đã xoá ứng dụng «${NAME2}».` })).toBeVisible();
+  await expect(admin.getByRole('heading', { name: 'Ứng dụng tự tạo', level: 1 })).toBeFocused();
   expect((await admin.request.delete(`/api/jobs/${jobId}`)).status()).toBe(200);
 });
 

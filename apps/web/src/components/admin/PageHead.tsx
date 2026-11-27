@@ -1,12 +1,14 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { Icon } from '@/components/Icon';
 
-/** An Admin page's title with its one-line description, and the page-wide controls (month, CSV) on the right. */
-export function PageHead({ id, title, lead, children }: { id: string; title: string; lead: ReactNode; children?: ReactNode }) {
+/** An Admin page's title with its one-line description, and the page-wide controls (month, CSV) on the right. `headRef` makes the title focusable, for a page that moves focus to it. */
+export function PageHead({ id, title, lead, children, headRef }: { id: string; title: string; lead: ReactNode; children?: ReactNode; headRef?: Ref<HTMLHeadingElement> }) {
   return (
     <header className="admin-head">
       <div>
-        <h1 id={id}>{title}</h1>
+        <h1 id={id} ref={headRef} tabIndex={headRef ? -1 : undefined}>
+          {title}
+        </h1>
         <p>{lead}</p>
       </div>
       {children && <div className="admin-head-tools">{children}</div>}
