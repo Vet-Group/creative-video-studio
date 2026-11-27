@@ -1,5 +1,5 @@
 // Draft → HD: a cheap video row and its bigger sibling, which takes the same photos and prompt. A clip made on the draft row offers
-// "Làm bản …" on its History card: Create reopens with the clip's inputs on the sibling, and the member sees the price before running it.
+// an HD remake button on its History card: Create reopens with the clip's inputs on the sibling, and the member sees the price before running it.
 
 type Hd = { id: string; short: string; name: string };
 
