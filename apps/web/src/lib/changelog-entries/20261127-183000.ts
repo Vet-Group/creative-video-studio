@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-27T17:00:00+07:00',
+  at: '2026-11-27T18:30:00+07:00',
   kind: 'new',
   title: 'Xem ứng dụng và mẫu nào đang được dùng nhiều',
   details: [
@@ -9,6 +9,6 @@ export default {
     'Trang Khám phá có nút sắp xếp "Đang được dùng nhiều" cho công cụ và mẫu chuyển động.',
   ],
   href: '/apps',
-  prs: [0], // placeholder: the coordinator sets the PR number (the changelog test needs one)
+  prs: [705],
   audience: 'all',
 } satisfies ChangeEntry;
