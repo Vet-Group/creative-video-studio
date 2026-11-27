@@ -1345,7 +1345,7 @@ describe('migration 0125 video edit', () => {
   });
 });
 
-describe('migration 0127 print fix', () => {
+describe('migration 0126 print fix', () => {
   test('adds the print fix to the Nano Banana 2.1 and Pro rows and their Vertex twins (none enabled or repriced), a 50 USD soft cap, and accepts the feature on a job', async () => {
     const { rows } = await pool.query(`select id, enabled, image_prices from model_configs where 'print_fix' = any(features) order by id`);
     expect(rows.map((r) => [r.id, r.enabled])).toEqual([['nano-banana-2.1', false], ['nano-banana-2.1-vertex', false], ['nano-banana-pro', false], ['nano-banana-pro-vertex', false]]);
