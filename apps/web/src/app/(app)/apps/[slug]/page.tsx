@@ -42,7 +42,7 @@ export default async function AppRoute({ params, searchParams }: { params: Promi
   }
   if (app.slug === 'video-edit') {
     const from = refillFrom(q) ?? exampleFrom(q); // History's, the Library's or an example's Dùng lại: the job's clip and edit back on the form
-    return <VideoEditApp key={from} app={app} reuse={from} />;
+    return <VideoEditApp key={from} app={app} reuse={from} remake={smartRemakeAppEnabled()} />;
   }
   const from = refillFrom(q) ?? exampleFrom(q);
   // A photo for the first slot (History's Background Remover and Image Upscale buttons copy a result into a new input first): only the member's own image input in the active workspace.
