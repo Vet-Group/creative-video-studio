@@ -45,6 +45,8 @@ export interface AppConfig {
   slots: AppSlot[];
   /** A prompt box. `background` (Background Changer) excludes the reference image; `optional` (the two swaps) adds the member's text to the fixed instruction. The other apps send their fixed prompt. */
   prompt?: 'background' | 'optional';
+  /** The `optional` prompt box's own placeholder, where the generic one would mislead (the print fix's note says where the print is). */
+  notePlaceholder?: string;
   /** Shows the ratio field (Reframe); the options are the model's own ratios. */
   ratio?: boolean;
   /** Shows the resolution field (Upscale); the options are the keys of the model's prices. */
@@ -347,6 +349,23 @@ export const APPS: AppConfig[] = [
     keywords: 'video edit, edit video, chỉnh video, recolor',
     category: 'video',
     slots: [],
+  },
+  {
+    // Ours too (owner pick 2026-11-27): a result whose print came out garbled or wrong, redone with the seller's own design file, the rest of the photo kept. History and the Library open it
+    // on an image result or a clip's first frame (ImageToolButtons). The note is appended to the fixed instruction (FEATURE_PROMPTS.print_fix).
+    slug: 'print-fix',
+    added: '2026-11-27',
+    feature: 'print_fix',
+    name: 'Sửa lại hình in',
+    description: 'Hình in trên ảnh bị méo, sai chữ hay sai mẫu? Thay lại bằng đúng file design gốc, giữ nguyên người mẫu, sản phẩm, nền và khung hình.',
+    keywords: 'print fix, fix print, design, hình in, sửa chữ, POD',
+    category: 'photo',
+    slots: [
+      { label: 'Ảnh cần sửa', inputLabel: 'Ảnh cần sửa hình in', empty: 'Thêm 1 ảnh có hình in bị sai cần sửa' },
+      { label: 'File design gốc', inputLabel: 'Ảnh design gốc', empty: 'Thêm file design gốc, tốt nhất là PNG nền trong' },
+    ],
+    prompt: 'optional',
+    notePlaceholder: 'Ví dụ: hình in ở lưng áo, hoặc chỉ sửa dòng chữ trên ngực',
   },
   {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend

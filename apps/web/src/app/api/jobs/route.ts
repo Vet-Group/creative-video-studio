@@ -168,7 +168,7 @@ export async function GET(request: Request) {
  * MAX_POSE_TEXT characters), or two (the person, then a pose photo) and `params.poseRef` naming that second image; exactly one of the three, and an optional `params.background` (a value of
  * POSE_BACKGROUNDS), with exactly the prompt posePrompt (poseRefPrompt for a pose photo) makes of them: one job per pose and model photo (a catalogue Run is the same poses for up to MAX_MODELS photos).
  * `product_recolor` and `listing_set` take exactly one image (the product) and `params.color` (#RRGGBB in capitals, a swatch's or the member's own) or `params.shot` (an id of
- * LISTING_SHOTS), with exactly the prompt its item makes: one job per colour or shot.
+ * LISTING_SHOTS), with exactly the prompt its item makes: one job per colour or shot. `print_fix` takes exactly two images (the photo to fix, then the design) and its fixed instruction with the member's optional note after it.
  * The batch apps (BATCH_FEATURES) and Create image (a Run of 2 or 4 pictures) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again. As on the pages, a Run
  * (the caller's jobs of this workspace with that id) has at most MAX_BATCH jobs (a pose generator Run MAX_POSES per model photo, the job's first input, and MAX_MODELS photos; a product recolor or listing set Run MAX_PICTURES), and a mockup pack Run with a blank product photo one job (400 for one more).
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
@@ -253,6 +253,7 @@ export async function POST(request: Request) {
     if ((feature === 'product_recolor' || feature === 'listing_set') && assetIds.length !== 1) return bad(`the ${feature === 'product_recolor' ? 'product recolor' : 'listing set'} takes exactly one image: the product`);
     if (feature === 'product_recolor' && !isHexColor(given.color ?? '')) return bad('params.color must be one color as #RRGGBB, in capitals');
     if (feature === 'listing_set' && !LISTING_SHOTS.some((s) => s.id === given.shot)) return bad(`params.shot must be one of ${LISTING_SHOTS.map((s) => s.id).join(', ')}`);
+    if (feature === 'print_fix' && assetIds.length !== 2) return bad('the print fix takes exactly two images: the photo to fix, then the design');
     // One product photo, one effect, a 5 s vertical clip that ends on the photo itself (the end frame is the first image).
     if (feature === 'hook_effect') {
       if (assetIds.length !== 1) return bad('the hook effects app takes exactly one image: the product');

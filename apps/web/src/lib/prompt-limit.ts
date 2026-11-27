@@ -8,8 +8,8 @@ import { FEATURE_PROMPTS } from '@cvs/core/models';
 export const promptTooLong = (model: { label: string; maxPromptChars: number } | null | undefined, length: number, added = ''): string | null =>
   model && length > model.maxPromptChars ? `Mô hình ${model.label} nhận tối đa ${model.maxPromptChars} ký tự${added && ` (gồm ${added})`}, hãy rút gọn hoặc chọn mô hình khác.` : null;
 
-/** The swaps, whose fixed instruction keeps its place and takes the member's words after it; on the other tools the member's words replace it. */
-export const APPEND_TO_INSTRUCTION = ['character_swap', 'model_swap', 'lingerie_try_on'];
+/** The swaps (and the print fix, whose words are a note such as where the print is), whose fixed instruction keeps its place and takes the member's words after it; on the other tools the member's words replace it. */
+export const APPEND_TO_INSTRUCTION = ['character_swap', 'model_swap', 'lingerie_try_on', 'print_fix'];
 
 /** The prompt POST /api/jobs starts from (before a preset, a style or the brand kit): shared with the pages' prompt preview (PromptPreview) so the two cannot drift. */
 export const basePrompt = (feature: string, written: string | undefined): string | undefined =>

@@ -24,7 +24,7 @@ import { EmptyArt } from './EmptyArt';
 import { Icon } from './Icon';
 import { ImageViewer } from './ImageViewer';
 import { uploadImages } from './image-tools';
-import { ImageToolButtons } from './ImageToolButtons';
+import { ImageToolButtons, resultTools } from './ImageToolButtons';
 import { toggleFullscreen, useFreshResults, useJobs } from './jobs';
 import { BoardsModal, BoardTools, type LibraryBoards, useLibraryBoards } from './LibraryBoards';
 import boardStyles from './LibraryBoards.module.css';
@@ -866,10 +866,10 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
         {admin && <ExampleControl key={`example-${clip.id}`} clip={clip} onChange={onChange} />}
         {makeApp && job && <MakeAppLink clip={clip} job={{ inputCount: job.inputIds.length, presetId: job.presetId, brand: job.brand }} />}
         {clip.canEdit && <p className="recipe-keys">Phím tắt: 1 Đạt · 2 Nổi bật · 3 Không đạt · ←/→ mục trước, sau</p>}
-        {/* As on a History card, on any member's picture: the copy is the viewer's own new input (POST /api/assets/copy takes a Library clip of the workspace). */}
-        {image && (
+        {/* As on a History card, on any member's picture or a clip's first frame (its poster): the copy is the viewer's own new input (POST /api/assets/copy takes a Library clip of the workspace). */}
+        {(image || (clip.posterAssetId && resultTools(clip.feature, true).length > 0)) && (
           <div className="lightbox-tools">
-            <ImageToolButtons assetId={clip.videoAssetId} feature={clip.feature} className="lightbox-result" act={act} />
+            <ImageToolButtons assetId={image ? clip.videoAssetId : clip.posterAssetId!} feature={clip.feature} video={!image} className="lightbox-result" act={act} />
           </div>
         )}
         {/* Pinned under the recipe, which scrolls (a Marketing brief ran 1164 px in a 760 px dialog): the last action's note, the marks and Reuse. */}

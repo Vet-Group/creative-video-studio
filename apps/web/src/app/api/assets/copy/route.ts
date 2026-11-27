@@ -11,7 +11,9 @@ import { COPY_HOURLY_LIMIT } from '../samples/route';
  * Copies a finished result (`{ assetId }`, the output of a job) into a new input asset of the caller's on the server: an output is not an input, so a job cannot name it.
  * The result is the caller's own (from History) or a live Library clip of the active workspace (LIVE_CLIP, the rule that lets every member read it, owner decision
  * 2026-11-20); an Admin gets no more than that. The asset and its job are in the active workspace either way. An MP4 clip (Advanced's reference video; its length comes from the
- * file's header, else from the job's duration) or a JPEG, PNG or WebP image (the "Use result" button and the photo tools), of at most 50 MB. 429 beyond
+ * file's header, else from the job's duration) or a JPEG, PNG or WebP image (the "Use result" button and the photo tools), of at most 50 MB. A clip's poster, its first frame
+ * (at most 480 px wide, apps/worker/src/media.ts extractPoster), counts as its result too: the print fix opens a clip on it. An image job's poster does not: it is a
+ * downscaled tile preview (imagePreview, at most 1024 px) of a picture the tools copy whole. 429 beyond
  * COPY_HOURLY_LIMIT new inputs an hour, as the sample copy.
  */
 export async function POST(request: Request) {
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
   const userId = g.session.user.id;
   const found = (
     await pool.query(
-      `select a.s3_key, a.bytes, a.mime, j.duration_s from assets a join jobs j on j.output_asset_id = a.id
+      `select a.s3_key, a.bytes, a.mime, j.duration_s from assets a join jobs j on (j.output_asset_id = a.id or (j.poster_asset_id = a.id and j.duration_s > 0))
         where a.id = $1 and (a.owner_id = $2 or (${LIVE_CLIP})) and a.workspace_id = $3 and j.workspace_id = $3 and a.kind = 'output' and a.mime in ('video/mp4', 'image/png', 'image/jpeg', 'image/webp') and a.deleted_at is null and j.deleted_at is null and j.purged_at is null`,
       [body.assetId, userId, g.workspaceId],
     )

@@ -187,6 +187,9 @@ export const USERS = {
   // recolor-listing.e2e: product recolor's and the listing set's Runs of one job per colour or shot.
   recolora: { email: 'recolora@e2e.test', name: 'E2E Recolor A', role: 'member' },
   listinga: { email: 'listinga@e2e.test', name: 'E2E Listing A', role: 'member' },
+  // print-fix.e2e: the print fix's Run, and its action on a History picture and on a clip's first frame.
+  printa: { email: 'printa@e2e.test', name: 'E2E Print A', role: 'member' },
+  printb: { email: 'printb@e2e.test', name: 'E2E Print B', role: 'member' },
   // result-tools.e2e: a breed swap's ZIP named by breed, History's Background Remover button on an image result, and Media Optimizer's listing preset.
   toolsa: { email: 'toolsa@e2e.test', name: 'E2E Tools A', role: 'member' },
   toolsb: { email: 'toolsb@e2e.test', name: 'E2E Tools B', role: 'member' },

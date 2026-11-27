@@ -95,6 +95,11 @@ export const FEATURE_PROMPTS: Record<string, string> = {
   jewelry_try_on: 'Put the jewelry from every image but the last on the person in the last image, each piece where it is worn and at a realistic scale. Keep its design, metal colour and stones exactly, and match its reflections and shadows to the light of the photo. Keep the person, face, pose, clothing and background exactly unchanged. Do not add any text, logos or watermarks.',
   lingerie_try_on: 'Dress the person in the last image in the lingerie pieces from every image but the last, each piece worn as intended and fitted to the body. Keep the fabric details (lace, mesh, satin, straps, seams) and the colours exactly. Keep the face, body shape, pose, skin tone and background. Keep natural adult proportions: if the photo is cropped above the hips, widen the shot to show the body down to mid-thigh rather than enlarging the head or shortening the torso. Do not add any text, logos or watermarks',
   multi_angle: "Keep the product exactly as it is: its shape, print, colours and details. Infer the sides the photo does not show from the product's construction, with seams, closures and back details consistent with the front. Do not add any text, logos or watermarks.",
+  // The photo to fix first, then the design file. No full stop at the end: the member's note follows it (APPEND_TO_INSTRUCTION), as on Lingerie Try-On.
+  print_fix:
+    "Replace only the printed graphic on the garment or product in the first image with the design from the second image. Match the original print's placement, size and perspective, following the curves, fabric folds and wrinkles, with the same lighting, shading and print texture, so it looks really printed on the material. " +
+    'Use the design exactly as it is: the same colors, text and spelling, layout and proportions, not redrawn, cropped, mirrored or added to. Spell every word exactly as in the design. Print only its artwork: a transparent or plain white background around the design is not part of the print. ' +
+    "Keep everything else in the first image exactly unchanged: the person, face, hair, body and pose, the garment's color and cut, the background, the framing and the aspect ratio. Do not add any other text, logos or watermarks",
 };
 
 /**

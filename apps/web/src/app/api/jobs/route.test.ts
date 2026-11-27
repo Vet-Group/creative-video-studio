@@ -720,6 +720,7 @@ describe('POST /api/jobs for an image feature', () => {
       ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 4, 'auto'], ['app-lingerie', 'lingerie_try_on', 4, 'auto'], ['app-fashion', 'fashion_model', 1, '3:4,auto'],
       ['app-angles', 'multi_angle', 1, 'auto'], ['app-breeds', 'breed_swap', 1, 'auto'], ['app-pets', 'pet_portrait', 1, 'auto'], ['app-mockups', 'mockup_pack', 3, 'auto'], ['app-names', 'name_swap', 1, 'auto'],
       ['app-poses', 'pose_generator', 2, 'auto'], ['app-recolor', 'product_recolor', 2, 'auto'], ['app-listing', 'listing_set', 2, 'auto'],
+      ['app-print', 'print_fix', 3, 'auto'],
     ];
     beforeAll(async () => {
       for (const [id, feature, max, ratios] of appModels) {
@@ -762,6 +763,17 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await app('background_remover', 2)).status).toBe(400);
       expect(await app('image_upscale', 1, { params: { resolution: '2K' } })).toMatchObject({ status: 201, job: { params: { resolution: '2K' } } });
       expect((await app('image_upscale', 1, { params: { resolution: '4K' } })).status).toBe(400); // this model has no 4K price
+    });
+
+    test("the print fix takes exactly two images, the photo to fix then the design, even on a model that takes more, and puts the member's note after its fixed instruction", async () => {
+      const refused = 'the print fix takes exactly two images: the photo to fix, then the design';
+      expect(await app('print_fix', 1)).toMatchObject({ status: 400, error: refused });
+      expect(await app('print_fix', 3)).toMatchObject({ status: 400, error: refused });
+      const ok = await app('print_fix', 2);
+      expect([ok.status, ok.job]).toEqual([201, { feature: 'print_fix', model: 'app-print', prompt: FEATURE_PROMPTS.print_fix, aspect: 'auto', params: { resolution: '1K' } }]);
+      const noted = await app('print_fix', 2, { prompt: ' hình in ở lưng áo ', params: { resolution: '1K', brief: 'hình in ở lưng áo' } });
+      expect([noted.status, noted.job?.prompt, noted.job?.params]).toEqual([201, `${FEATURE_PROMPTS.print_fix}. hình in ở lưng áo`, { resolution: '1K', brief: 'hình in ở lưng áo' }]);
+      expect((await app('print_fix', 2, { params: { resolution: '1K', color: '#111111' } })).error).toBe('params may hold only resolution, quality, thinking and brief, as text');
     });
 
     test('Jewelry Try-On takes one or more pieces and then the person, up to the model limit, and stores its fixed instruction', async () => {
