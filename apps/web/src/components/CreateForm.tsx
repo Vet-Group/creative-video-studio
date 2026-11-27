@@ -219,6 +219,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
   /** Said when the form changed a setting itself; it shows only while the form still has the values it set. */
   const [adjusted, setAdjusted] = useState<{ text: string; ratio: string; durationSec: number; modelId?: string } | null>(null);
   const wanted = useRef(model); // the Explore choice, honoured once: the form takes its ratio and duration rather than dropping it
+  const hdPick = useRef(reuse ? model || undefined : undefined); // Làm bản HD (`?reuse=` with `?model=`): the first refill only, so a later in-place Dùng lại keeps its clip's own model
   const endWanted = useRef(end !== undefined); // the two pictures from History: once the models are listed with the end frame, the form moves to one that takes it
   const left = useRef<{ modelLabel: string | null; lost: number; store: boolean } | null>(null); // what a refill left out; the models fetch that follows tells it with the model, once
   const [storeId, setStoreId] = useState('');
@@ -364,6 +365,8 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
         if (stale) return;
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
+        const hd = hdPick.current;
+        hdPick.current = undefined;
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         if (nothingRefilled({ ...j, prompt: j.prompt ?? j.hookText ?? j.ending })) {
           notify(nothingNote(lostInputs(j), reuse)); // nothing to bring back: the form stays as it is
@@ -393,7 +396,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
         // A saved template may leave these out; the form's defaults stay.
         if (j.ratio) setRatio(j.ratio);
         if (j.durationSec) setDurationSec(j.durationSec);
-        const pick = model ?? j.modelId; // Làm bản HD: the clip's inputs on its HD sibling (`model`)
+        const pick = hd ?? j.modelId; // Làm bản HD: the clip's inputs on its HD sibling
         if (pick) setModelId(pick);
         if (source.recipe) {
           setRefetch((n) => n + 1); // the photo count may not change, so the picker reloads to map a pair's twin id onto its entry
@@ -401,7 +404,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
         } else {
           setStoreId(j.storeId ?? '');
           recreated(reuse);
-          left.current = { modelLabel: (model && hdName(model)) ?? j.modelLabel ?? null, lost: lostInputs(j), store: j.storeLost === true };
+          left.current = { modelLabel: (hd && hdName(hd)) || j.modelLabel || null, lost: lostInputs(j), store: j.storeLost === true };
           setRefetch((n) => n + 1); // the counts may not change, so the list is asked again to say what was left out
         }
         dropRefillQuery();
