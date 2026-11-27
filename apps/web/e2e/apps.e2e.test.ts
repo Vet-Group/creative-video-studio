@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { expectOptions, jpg, modelButton, openTab, png, select, selectValue, settled, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
@@ -290,25 +290,32 @@ test('Face Swap (two slots): each required slot has its reason, and a mock job t
   await expect(page.getByRole('group', { name: 'Khuôn mặt nguồn' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Ảnh cần đổi khuôn mặt' })).toBeVisible();
   await expect(page.getByText('Thêm 1 ảnh có khuôn mặt cần thay', { exact: true })).toBeVisible(); // each half-width tile says what photo it wants
+  // The product shelf is offered for the photo to change, not for the face put into it.
+  await expect(page.getByRole('button', { name: 'Từ kệ sản phẩm cho Ảnh cần đổi khuôn mặt', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Từ kệ sản phẩm cho Khuôn mặt nguồn', exact: true })).toHaveCount(0);
   await expect(runButton(page)).toBeDisabled();
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Khuôn mặt nguồn.');
 
   await page.getByLabel('Ảnh khuôn mặt nguồn').setInputFiles(file('source.png'));
   await expect(page.getByRole('img', { name: 'source.png' })).toBeVisible();
   await expect(runButton(page)).toBeDisabled();
-  // Filled, a half tile shows its photo whole with its name bottom left, and the uploads links (uploaded photos, product shelf) move to the top left, off the name.
-  const filled = page.locator('.app-slots > .field').first();
-  const chip = (await filled.locator('.slot-chip').boundingBox())!;
-  await expect(filled.locator('.uploads-link')).toHaveCount(2);
-  for (const link of await filled.locator('.uploads-link').all()) {
-    const box = (await link.boundingBox())!;
-    expect(box.y + box.height).toBeLessThan(chip.y);
-  }
+  // Filled, a half tile shows its photo whole with its name bottom left, and the uploads links move to the top left, off the name.
+  // The source face has only Ảnh đã tải (no product shelf); the target, filled below, has both links.
+  const linksClearName = async (filled: Locator, count: number) => {
+    const chip = (await filled.locator('.slot-chip').boundingBox())!;
+    await expect(filled.locator('.uploads-link')).toHaveCount(count);
+    for (const link of await filled.locator('.uploads-link').all()) {
+      const box = (await link.boundingBox())!;
+      expect(box.y + box.height).toBeLessThan(chip.y);
+    }
+  };
+  await linksClearName(page.locator('.app-slots > .field').first(), 1);
   expect((await page.getByRole('img', { name: 'source.png' }).boundingBox())!.height).toBeGreaterThan(150);
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Ảnh cần đổi khuôn mặt.');
 
   await page.locator('input[type=file][aria-label="Ảnh cần đổi khuôn mặt"]').setInputFiles(file('target.png'));
   await expect(page.getByRole('img', { name: 'target.png' })).toBeVisible();
+  await linksClearName(page.locator('.app-slots > .field').nth(1), 2);
   await expect(runButton(page)).toBeEnabled();
   await runButton(page).click();
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });

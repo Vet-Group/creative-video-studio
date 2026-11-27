@@ -29,6 +29,8 @@ export interface AppSlot {
   stock?: { title: string; groups: { label?: string; prefix: string }[] };
   /** Its tile also offers the saved AI models the member may use (the AI model group of Try On's model picker), when there are any. */
   aiModels?: boolean;
+  /** False for a slot no product photo goes in (the person or pet put into the result) whose label maps to no upload slot; a slot whose label maps to the model slot is already left out. */
+  shelf?: false;
 }
 
 export interface AppConfig {
@@ -90,7 +92,7 @@ export const APPS: AppConfig[] = [
     keywords: 'character swap',
     category: 'fashion',
     slots: [
-      { label: 'Nhân vật mới', inputLabel: 'Ảnh nhân vật mới', empty: 'Thêm 1 ảnh người sẽ xuất hiện trong kết quả' },
+      { label: 'Nhân vật mới', inputLabel: 'Ảnh nhân vật mới', empty: 'Thêm 1 ảnh người sẽ xuất hiện trong kết quả', shelf: false },
       { label: 'Ảnh cần thay người', inputLabel: 'Ảnh cần thay người', empty: 'Thêm 1 ảnh có người cần thay' },
     ],
     prompt: 'optional',
@@ -103,7 +105,7 @@ export const APPS: AppConfig[] = [
     keywords: 'model swap',
     category: 'fashion',
     slots: [
-      { label: 'Người mẫu mới', inputLabel: 'Ảnh người mẫu mới', empty: 'Thêm 1 ảnh người mẫu mới' },
+      { label: 'Người mẫu mới', inputLabel: 'Ảnh người mẫu mới', empty: 'Thêm 1 ảnh người mẫu mới', shelf: false },
       { label: 'Ảnh cần thay người mẫu', inputLabel: 'Ảnh cần thay người mẫu', empty: 'Thêm 1 ảnh sản phẩm có người mẫu cần thay' },
     ],
     prompt: 'optional',
@@ -151,7 +153,7 @@ export const APPS: AppConfig[] = [
     keywords: 'face swap',
     category: 'fashion',
     slots: [
-      { label: 'Khuôn mặt nguồn', inputLabel: 'Ảnh khuôn mặt nguồn', empty: 'Thêm 1 ảnh có khuôn mặt muốn dùng' },
+      { label: 'Khuôn mặt nguồn', inputLabel: 'Ảnh khuôn mặt nguồn', empty: 'Thêm 1 ảnh có khuôn mặt muốn dùng', shelf: false },
       { label: 'Ảnh cần đổi khuôn mặt', inputLabel: 'Ảnh cần đổi khuôn mặt', empty: 'Thêm 1 ảnh có khuôn mặt cần thay' },
     ],
   },
@@ -194,7 +196,7 @@ export const APPS: AppConfig[] = [
     category: 'fashion',
     slots: [
       { label: 'Trang sức', inputLabel: 'Ảnh trang sức', empty: 'Thêm 1 hoặc nhiều món trang sức, chụp rõ trên nền trơn', many: true },
-      { label: 'Người đeo', inputLabel: 'Ảnh người đeo', empty: 'Thêm 1 ảnh người sẽ đeo trang sức', stock: { title: 'Chọn mẫu', groups: JEWELRY_TEMPLATES } },
+      { label: 'Người đeo', inputLabel: 'Ảnh người đeo', empty: 'Thêm 1 ảnh người sẽ đeo trang sức', stock: { title: 'Chọn mẫu', groups: JEWELRY_TEMPLATES }, shelf: false },
     ],
     resolution: true,
   },
@@ -257,7 +259,7 @@ export const APPS: AppConfig[] = [
     description: 'Từ một ảnh thú cưng, tạo một thiết kế in sẵn nền trắng cho mỗi phong cách đã chọn: màu nước, hoạt hình, nét mực, chân dung hoàng gia và hơn nữa.',
     keywords: 'pet portrait',
     category: 'photo',
-    slots: [{ label: 'Thú cưng', inputLabel: 'Ảnh thú cưng', empty: 'Thêm 1 ảnh chụp rõ mặt của một thú cưng' }],
+    slots: [{ label: 'Thú cưng', inputLabel: 'Ảnh thú cưng', empty: 'Thêm 1 ảnh chụp rõ mặt của một thú cưng', shelf: false }],
     styles: true,
   },
   {

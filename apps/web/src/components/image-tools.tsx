@@ -383,12 +383,13 @@ type Drag = { preventDefault(): void; dataTransfer: DataTransfer };
  * `icon` is the empty slot's icon: a picture by default, a plus on Advanced's wide slot, as on the live page.
  * `onPick` adds the "Ảnh đã tải" link to the label's line while the slot has room (a one-photo slot always: a pick replaces its photo); `storeId` is the page's store, its first filter.
  * `slot` is the picker's first category, for a slot whose label names another page's category (Image Generation's reference photos); by default the label's.
+ * `shelf` false drops «Từ kệ sản phẩm» from a slot no product photo goes in that its label does not tell apart (an app's person or pet photo).
  * `addRef` is the add button, for a page that moves focus to it.
  * `count` shows how many photos the slot holds of its `max` ("3/13") beside its name once it holds one, or from "0/14" on with 'always' (Image
  * Generation's strip, where the count is the only sign of the limit); more than `max` (a model with a lower cap chosen since) reads as an error.
  * `zone` widens the drop target to a box around the slot (Image Generation's whole prompt bar), so a file dropped beside the small tile is not lost.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra, count, zone, one }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean | 'always'; zone?: RefObject<HTMLElement | null>; one?: boolean }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, shelf = true, addRef, extra, count, zone, one }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; shelf?: boolean; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean | 'always'; zone?: RefObject<HTMLElement | null>; one?: boolean }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -484,7 +485,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
           {name}
           {counter}
           {onPick && (!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} slot={slot ?? slotOfLabel(label)} onPick={(img) => (setCut(0), onPick(img))} />}
-          {onPick && (!full || max === 1) && offersShelf(slot ?? slotOfLabel(label)) && <ShelfPicker name={`Từ kệ sản phẩm cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} onPick={(img) => (setCut(0), onPick(img))} />}
+          {onPick && (!full || max === 1) && shelf && offersShelf(slot ?? slotOfLabel(label)) && <ShelfPicker name={`Từ kệ sản phẩm cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} onPick={(img) => (setCut(0), onPick(img))} />}
         </div>
       ) : (
         name
