@@ -16,6 +16,8 @@ export interface PresetRow {
   prompt?: string;
   enabled?: boolean;
   sortOrder?: number;
+  /** The caller's workspace's Runs of it in the last 7 days, given from MIN_USES (lib/popular.ts). */
+  uses?: number;
 }
 
 /** What the form works on: a preset, or null for a new one; `propose` for a member, whose change waits for an editor. */

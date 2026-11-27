@@ -24,3 +24,12 @@ test('a custom app is a card after the built-in apps, linking to its id with the
   expect(html, 'it sits past the first rows, so its poster stays lazy (#671)').not.toContain('poster-1');
   expect(html.indexOf('/apps/breed-swap')).toBeLessThan(html.indexOf(`/apps/${row.id}`));
 });
+
+test("a card shows the week's Runs from 3 and nothing under that, and a custom app gets none", () => {
+  const html = renderToStaticMarkup(<AppsIndex extra={[toAppConfig(row, ['m'])]} uses={{ reframe: 3, 'face-swap': 2 }} />);
+  const card = (slug: string) => html.split('<li>').find((li) => li.includes(`href="/apps/${slug}"`))!;
+  expect(html.match(/lượt dùng tuần này/g)).toHaveLength(1);
+  expect(card('reframe')).toContain('<span class="muted app-card-uses">3 lượt dùng tuần này</span>');
+  expect(card('face-swap')).not.toContain('lượt dùng');
+  expect(card(row.id)).not.toContain('lượt dùng');
+});

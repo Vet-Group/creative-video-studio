@@ -9,6 +9,7 @@ import { adjustNote } from '@/lib/video-adjust';
 import { anglePrompt, CAMERA_ANGLES, MAX_ANGLES } from '@/lib/camera-angles';
 import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
 import { PRODUCT_TYPES } from '@/lib/product-types';
+import { usesLine } from '@/lib/popular';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun, sendRun, usd } from '@/lib/run-guard';
@@ -1213,6 +1214,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
                       {p.label}
                     </button>
                   )}
+                  {usesLine(p.uses) && <span className="muted preset-uses">{usesLine(p.uses)}</span>}
                   {/* After the name, so the picker's buttons still read name first; it sits above the name's card-wide click area. */}
                   {(canEdit || canPropose) && (
                     <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa mẫu ${p.label}` : `Đề xuất sửa mẫu ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>

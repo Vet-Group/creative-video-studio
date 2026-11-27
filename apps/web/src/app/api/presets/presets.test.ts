@@ -104,6 +104,28 @@ describe('GET /api/presets', () => {
     }
     await pool.query(`update presets set enabled = true where id = 'slow-orbit'`);
   });
+
+  test("a preset the workspace Ran at least 3 times in the last 7 days carries `uses`, so the picker can show the week's count", async () => {
+    await pool.query(`insert into teams (id, name) values ('uses-team', 'Uses team')`);
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('uses-model', 'fal', 'x', 'Uses model', '{9:16}', '{5}', 2, '720p', 0.2, '{}', true)`,
+    );
+    const run = (id: string, preset: string, ago: string) =>
+      pool.query(
+        `insert into jobs (id, user_id, team_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, created_at, workspace_id)
+         values ($1, $2, 'uses-team', 'uses-model', 'fal', $3, 'p', '9:16', 5, '{}', now() - $4::interval, 'ws_vet')`,
+        [id, member.id, preset, ago],
+      );
+    for (const n of [1, 2, 3]) await run(`uses-a${n}`, 'slow-orbit', '1 hour');
+    await run('uses-b1', 'slow-orbit', '8 days'); // outside the window
+    for (const n of [1, 2]) await run(`uses-c${n}`, 'gentle-push-in', '1 hour'); // two: no line
+    for (const who of [member, editor, admin]) {
+      const { presets } = await list(who.cookie);
+      expect(presets.find((p) => p.id === 'slow-orbit')).toMatchObject({ uses: 3 });
+      expect(presets.find((p) => p.id === 'gentle-push-in')).not.toHaveProperty('uses');
+    }
+  });
 });
 
 describe('editing presets on Create', () => {

@@ -272,6 +272,9 @@ export const USERS = {
   touchcardp: { email: 'touchcardp@e2e.test', name: 'E2E Touch Card Phone', role: 'member' },
   touchcardt: { email: 'touchcardt@e2e.test', name: 'E2E Touch Card Tablet', role: 'member' },
   tabletcard: { email: 'tabletcard@e2e.test', name: 'E2E Tablet Card', role: 'member' },
+  // popular.e2e: the week's Run counts on the Apps cards and Explore's sort, seen from a workspace of its own (popw) and from the company's (popv).
+  popw: { email: 'popw@e2e.test', name: 'E2E Popular W', role: 'member' },
+  popv: { email: 'popv@e2e.test', name: 'E2E Popular V', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;
