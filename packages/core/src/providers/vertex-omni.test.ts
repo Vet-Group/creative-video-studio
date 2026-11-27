@@ -152,6 +152,15 @@ describe('Vertex Omni', () => {
     const out = await provider.status({ ...job, model });
     expect(out).toMatchObject({ state: 'failed', error: `Vertex Omni interaction failed: ${'z'.repeat(200)}` });
   });
+  test('a quota refusal (RESOURCE_EXHAUSTED) is marked rateLimited and books nothing; any other failure keeps the estimate', async () => {
+    const message = 'Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.';
+    const quota = setup({ id: 'abc', status: 'in_progress' }, { id: 'abc', status: 'failed', errors: [{ message }] });
+    const out = await quota.provider.status({ ...(await quota.provider.submit(request())), model });
+    expect(out).toEqual({ state: 'failed', error: `Vertex Omni interaction failed: ${message}`, costUsd: 0, costSource: 'estimate', rateLimited: true });
+    const other = setup({ id: 'abc', status: 'in_progress' }, { id: 'abc', status: 'failed', errors: [{ message: 'The prompt was blocked.' }] });
+    const kept = await other.provider.status({ ...(await other.provider.submit(request())), model });
+    expect(kept).toEqual({ state: 'failed', error: 'Vertex Omni interaction failed: The prompt was blocked.', costUsd: 0.3475, costSource: 'estimate' });
+  });
   test('rejects a wrong or foreign interaction identity', async () => {
     const { provider, calls } = setup({ id: '../evil', status: 'in_progress' }, { id: 'abc', status: 'in_progress' }, { id: 'other', status: 'completed' });
     await expect(provider.submit(request())).rejects.toThrow('interaction');
