@@ -122,6 +122,10 @@ test('an Admin makes an app of a Library clip, publishes and takes it down, and 
   await expect(admin.getByRole('heading', { name: 'Biến thành ứng dụng', level: 1 })).toBeVisible();
   await expect(admin.getByText('Mock E2E · 9:16 · 5 giây')).toBeVisible();
   await expect(admin.getByText('Mô hình, tỉ lệ và thời lượng giữ như lượt gốc.')).toBeVisible();
+  // The input choices are small radios with their label on one line, not text-field sized.
+  const upload = await admin.getByRole('radio', { name: 'Người dùng tải lên' }).boundingBox();
+  const label = await admin.locator('label').filter({ hasText: 'Người dùng tải lên' }).boundingBox();
+  expect([upload!.width <= 20, label!.height <= 30]).toEqual([true, true]);
 
   // Lưu waits for a name; the prompt starts as the clip's own.
   const save = admin.getByRole('button', { name: 'Lưu' });
