@@ -100,8 +100,6 @@ test("Explore's sort switch puts the most used tools and motion presets first, k
   await expect(tile(hot).locator('.explore-prompt-uses')).toHaveText('4 lượt dùng tuần này');
   await expect(tile(warm).locator('.explore-prompt-uses')).toHaveCount(0); // two Runs: nothing
 
-  await expect(page.getByRole('link', { name: /^Xem tất cả \d+ mô hình$/ })).toHaveAttribute('href', '/explore?models=all&sort=popular#models'); // the models link keeps the sort
-
   await page.reload();
   await expect(popular).toHaveAttribute('aria-pressed', 'true');
   expect((await tools())[0]).toBe('/apps');
@@ -121,6 +119,7 @@ test('the sort switch keeps another query (?models=all), and on a touch phone it
     const sort = page.getByRole('group', { name: 'Sắp xếp công cụ và mẫu chuyển động' });
     await sort.getByRole('button', { name: 'Đang được dùng nhiều' }).tap();
     await expect(page).toHaveURL(/\/explore\?(models=all&sort=popular|sort=popular&models=all)$/);
+    await expect(page.getByRole('link', { name: 'Chỉ xem nổi bật' })).toHaveAttribute('href', '/explore?sort=popular#models'); // the models link keeps the sort
     for (const button of await sort.getByRole('button').all()) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   } finally {
