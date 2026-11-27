@@ -11,14 +11,18 @@ test.describe('image viewer gestures', () => {
     return ((await up.json()) as { assets: { id: string }[] }).assets[0]!.id;
   }
 
-  /** A real finger drag (Chrome's touch input), as the page's pointer events see it. */
+  /** A real finger drag (Chrome's touch input), as the page's pointer events see it. Moves arrive about a frame apart, like a hand's. Chrome swallows a tap that follows a drag within about 150 ms (a bare page does too), so the helper waits that out. */
   async function swipe(page: Page, from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
     const cdp = await page.context().newCDPSession(page);
     const at = (t: number) => [{ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t }];
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(0) });
-    for (const t of [0.25, 0.5, 0.75, 1]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(t) });
+    for (let i = 1; i <= 20; i++) {
+      await page.waitForTimeout(16);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(i / 20) });
+    }
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await cdp.detach();
+    await page.waitForTimeout(250);
   }
 
   const scaleOf = (img: Locator) => img.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a);
