@@ -3300,7 +3300,20 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 /* Full screen on a picture (ImageViewer): the whole screen, and a 44 px close button a finger can reach. */
 dialog.modal.image-viewer { width: 100%; height: 100dvh; max-height: none; margin: 0; border-radius: 0; }
 .image-viewer .modal-body { grid-template-rows: minmax(0, 1fr); height: 100dvh; border-radius: 0; }
-.modal.image-viewer .modal-close { top: max(12px, env(safe-area-inset-top)); right: 12px; width: 44px; height: 44px; border-radius: 10px; font-size: 24px; }
+.modal.image-viewer .modal-close { top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); width: 44px; height: 44px; border-radius: 10px; font-size: 24px; }
+/* Gestures: the stage takes every touch itself (pinch, pan, swipe) and the picture moves by transform. Swiping down fades the dark backdrop (--viewer-fade) over the page. */
+dialog.modal.image-viewer { background: transparent; touch-action: none; overscroll-behavior: contain; } /* iOS must not scroll or rubber-band the page behind the gestures */
+.image-viewer .modal-body { background: color-mix(in srgb, var(--lightbox-bg) calc(var(--viewer-fade, 1) * 100%), transparent); }
+.image-viewer-stage { min-height: 0; overflow: hidden; touch-action: none; user-select: none; }
+.image-viewer-stage img { width: 100%; height: 100%; border-radius: 0; object-fit: contain; -webkit-user-drag: none; -webkit-touch-callout: none; }
+/* 44 px buttons clear of each other and of the close button: download beside it at the top right, the step arrows at the middle of each side. */
+.image-viewer-btn { position: absolute; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 10px; background: rgb(var(--shade) / 50%); color: var(--on-dark); font-size: 30px; line-height: 1; }
+.image-viewer-download { top: max(12px, env(safe-area-inset-top)); right: calc(max(12px, env(safe-area-inset-right)) + 52px); }
+.image-viewer-prev, .image-viewer-next { top: calc(50% - 22px); }
+.image-viewer-prev { left: max(12px, env(safe-area-inset-left)); }
+.image-viewer-next { right: max(12px, env(safe-area-inset-right)); }
+.image-viewer-btn:disabled { opacity: .35; }
+.image-viewer-note { position: absolute; z-index: 1; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%; margin: 0; padding: 8px 14px; transform: translateX(-50%); border-radius: 10px; background: rgb(var(--shade) / 70%); color: var(--on-dark); }
 .compare-modal .modal-body { height: min(860px, calc(100dvh - 64px)); padding: 0; overflow: hidden; border-radius: 16px; background: var(--lightbox-bg); }
 .compare-modal .modal-close, .input-viewer .modal-close { z-index: 1; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 8px; background: rgb(var(--shade) / 50%); color: var(--on-dark); font-size: 20px; }
 @media (pointer: coarse) { :is(.lightbox, .compare-modal, .input-viewer) .modal-close { width: 44px; height: 44px; } } /* a finger's way out of the dark dialogs (iPad) */

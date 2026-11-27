@@ -265,6 +265,9 @@ export const USERS = {
   tapmem: { email: 'tapmem@e2e.test', name: 'E2E Tap Member', role: 'member' },
   // touch-viewers.e2e: the "view large" controls on an iPad-sized touch screen.
   tabletv: { email: 'tabletv@e2e.test', name: 'E2E Tablet Viewer', role: 'member' },
+  // image-viewer.e2e: zoom, swipe, step arrows and download in the picture viewer.
+  viewergest: { email: 'viewergest@e2e.test', name: 'E2E Viewer Gestures', role: 'member' },
+  viewerhist: { email: 'viewerhist@e2e.test', name: 'E2E Viewer History', role: 'member' },
   // a11y.e2e: a History card's taps on a touch phone and a touch tablet.
   touchcardp: { email: 'touchcardp@e2e.test', name: 'E2E Touch Card Phone', role: 'member' },
   touchcardt: { email: 'touchcardt@e2e.test', name: 'E2E Touch Card Tablet', role: 'member' },
