@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-27T16:00:00+07:00',
+  at: '2026-11-27T21:35:00+07:00',
   kind: 'improved',
   title: 'Chọn mô hình gọn hơn, thấy phần miễn phí của team trước khi tạo',
   details: [
