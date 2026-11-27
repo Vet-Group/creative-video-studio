@@ -36,7 +36,7 @@ export async function GET(request: Request, { params }: RouteContext) {
 
 /**
  * Puts a result on its page's Examples tab (`PUT`) or takes it off (`DELETE`). Admin only, audited; a featured mark is only a suggestion and never does this.
- * Only a result of a page with such a tab (Create Videos, Image Generation, Try On, Marketing Studio, Jewelry Try-On, Lingerie Try-On, Pose Generator, Product Recolor, Listing Set, Motion Control) may go there. Repeating a call is harmless.
+ * Only a result of a page with such a tab (Create Videos, Image Generation, Try On, Marketing Studio, Jewelry Try-On, Lingerie Try-On, Pose Generator, Product Recolor, Listing Set, Motion Control, Video Edit, Print Fix) may go there. Repeating a call is harmless.
  * A PUT may give `{ productType }`, a key of lib/product-types.ts or null, which the tab filters by; on a result already there it changes only
  * that, audited as example.type.
  */
@@ -58,7 +58,7 @@ async function set(request: Request, { params }: RouteContext, on: boolean): Pro
   return withTransaction(pool, async (tx): Promise<Response> => {
     const job = (await tx.query(`select j.feature from jobs j where j.id = $1 and j.workspace_id = $2 and ${LIVE_CLIP} for update of j`, [id, g.workspaceId])).rows[0];
     if (!job) return Response.json({ error: 'not found' }, { status: 404 });
-    if (on && !Object.hasOwn(GALLERY_SAMPLES, job.feature)) return Response.json({ error: 'only a Create Videos, Image Generation, Try On, Marketing Studio, Jewelry Try-On, Lingerie Try-On, Pose Generator, Product Recolor, Listing Set, Motion Control or Video Edit result can be an example' }, { status: 400 });
+    if (on && !Object.hasOwn(GALLERY_SAMPLES, job.feature)) return Response.json({ error: 'only a Create Videos, Image Generation, Try On, Marketing Studio, Jewelry Try-On, Lingerie Try-On, Pose Generator, Product Recolor, Listing Set, Motion Control, Video Edit or Print Fix result can be an example' }, { status: 400 });
     const before = (await tx.query('select product_type from examples where job_id = $1', [id])).rows[0]; // the job's lock keeps it until commit
     const changed = on
       ? (await tx.query('insert into examples (job_id, added_by, product_type) values ($1, $2, $3) on conflict do nothing', [id, userId, productType ?? null])).rowCount

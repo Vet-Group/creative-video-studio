@@ -20,8 +20,8 @@ test('print fix: both slots, Run waits for the photo and then the design, and a 
   await page.getByRole('list', { name: 'Danh sách ứng dụng' }).getByRole('link').filter({ hasText: 'Sửa lại hình in' }).click();
   await expect(page).toHaveURL(/\/apps\/print-fix$/);
 
-  // The form before any upload: two slots, the optional note, no Examples tab yet; the page renders without card art.
-  await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Giới thiệu']);
+  // The form before any upload: two slots, the optional note, an Examples tab an Admin may put results on; the page renders without card art.
+  await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']);
   await expect(photoSlot(page)).toBeVisible();
   await expect(page.getByRole('group', { name: 'File design gốc', exact: true })).toBeVisible();
   await expect(reason(page)).toHaveText('Tải lên ảnh: Ảnh cần sửa.');

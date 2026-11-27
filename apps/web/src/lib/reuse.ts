@@ -23,9 +23,9 @@ export function refillFrom(q: { reuse?: unknown; template?: unknown }): string |
   return undefined;
 }
 
-/** Recreate on a sample of the Examples tab (`?example=`: `marketing-example-<n>` on Marketing Studio, `try-on-example-<n>` on Try On, `image-example-<n>` on Image Generation, `jewelry-try-on-example-<n>`, `lingerie-try-on-example-<n>`, `pose-generator-example-<n>`, `product-recolor-example-<n>`, `listing-set-example-<n>`, `motion-control-example-<n>` and `video-edit-example-<n>` on their apps, `example-<n>` on Create Videos): the sample's details file, read in the same shape, its photos named as samples. */
+/** Recreate on a sample of the Examples tab (`?example=`: `marketing-example-<n>` on Marketing Studio, `try-on-example-<n>` on Try On, `image-example-<n>` on Image Generation, `jewelry-try-on-example-<n>`, `lingerie-try-on-example-<n>`, `pose-generator-example-<n>`, `product-recolor-example-<n>`, `listing-set-example-<n>`, `motion-control-example-<n>`, `video-edit-example-<n>` and `print-fix-example-<n>` on their apps, `example-<n>` on Create Videos): the sample's details file, read in the same shape, its photos named as samples. */
 export function exampleFrom(q: { example?: unknown }): string | undefined {
-  return typeof q.example === 'string' && /^(marketing-|try-on-|image-|jewelry-try-on-|lingerie-try-on-|pose-generator-|product-recolor-|listing-set-|motion-control-|video-edit-)?example-[1-9]\d*$/.test(q.example) ? `/api/samples/${q.example}.json` : undefined;
+  return typeof q.example === 'string' && /^(marketing-|try-on-|image-|jewelry-try-on-|lingerie-try-on-|pose-generator-|product-recolor-|listing-set-|motion-control-|video-edit-|print-fix-)?example-[1-9]\d*$/.test(q.example) ? `/api/samples/${q.example}.json` : undefined;
 }
 
 /** Once a link's refill (?reuse=, ?template=, ?example=) is on the form, the address drops it: a reload or Back must not refill the form over the user's
