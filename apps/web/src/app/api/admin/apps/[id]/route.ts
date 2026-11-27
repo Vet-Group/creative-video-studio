@@ -6,7 +6,7 @@ import { type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { type AppInputBody, appInputProblem, cleanApp } from '@/lib/custom-apps';
 import { guard } from '@/lib/session';
-import { fixedInputs, onlyKeys, parseInputs } from '../fields';
+import { fixedInputs, LOST_FIXED, lostFixed, onlyKeys, parseInputs } from '../fields';
 
 const CONTENT = ['name', 'description', 'category', 'prompt', 'inputs'] as const;
 
@@ -49,6 +49,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (changed.length > 0) {
       const problem = appInputProblem(next, app.input_asset_ids.length, promptLimit(app.max_prompt_chars));
       if (problem) return bad(problem);
+    }
+    if (inputs) {
+      const live = await tx.query('select id from assets where id = any($1::text[]) and workspace_id = $2 and deleted_at is null', [app.input_asset_ids, g.workspaceId]);
+      if (lostFixed(inputs, app.input_asset_ids, new Set(live.rows.map((r: { id: string }) => r.id)))) return bad(LOST_FIXED);
     }
     const stored = inputs ? fixedInputs(next.inputs, app.input_asset_ids) : app.inputs;
     const published: boolean = b.published ?? app.published;

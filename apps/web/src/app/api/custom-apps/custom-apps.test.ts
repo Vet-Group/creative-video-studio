@@ -186,6 +186,18 @@ describe('POST /api/admin/apps', () => {
 });
 
 describe('PATCH and DELETE /api/admin/apps/[id]', () => {
+  test('a photo of the clip deleted since cannot be kept fixed, on create or on edit, and a slot in its place still saves', async () => {
+    const s = await source({ owner: admin.id });
+    const { id } = await json(await make(admin, mk(s.id, { inputs: [{ slot: { label: 'Ảnh sản phẩm', hint: '' } }, { slot: { label: 'Nền', hint: '' } }] })));
+    await pool.query('update assets set deleted_at = now() where id = $1', [s.inputIds[1]]);
+    const lost = 'Ảnh cố định của lượt gốc đã bị xoá: hãy để người dùng tải lên ô đó.';
+    const created = await make(admin, mk(s.id));
+    expect([created.status, (await json(created)).error]).toEqual([400, lost]);
+    const edited = await patch(admin, id, { inputs: [{ slot: { label: 'Ảnh sản phẩm', hint: '' } }, { fixed: true }] });
+    expect([edited.status, (await json(edited)).error]).toEqual([400, lost]);
+    expect((await patch(admin, id, { name: 'Đổi tên' })).status).toBe(200); // other fields still save
+  });
+
   const draft = async (over: Record<string, unknown> = {}) => {
     const s = await source({ owner: admin.id });
     return { s, id: (await json(await make(admin, mk(s.id, over)))).id as string };
@@ -483,11 +495,13 @@ describe('the source-guard lock', () => {
       expect(await appSource(tx, s.id, 'ws_vet', true)).not.toBeNull(); // `for share` on the job row
       let answered = false;
       const deleting = delClip(admin, s.id).then((res) => ((answered = true), res));
-      for (let i = 0; i < 100; i++) {
+      let waiting = false;
+      for (let i = 0; i < 100 && !waiting; i++) {
         // the DELETE's `for update` is queued behind our share lock, on its own connection
-        if ((await pool.query(`select 1 from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query like '%for update of j%'`)).rowCount) break;
-        await new Promise((r) => setTimeout(r, 50));
+        waiting = Boolean((await pool.query(`select 1 from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query like '%for update of j%'`)).rowCount);
+        if (!waiting) await new Promise((r) => setTimeout(r, 50));
       }
+      expect(waiting).toBe(true);
       expect(answered).toBe(false);
       await tx.query(
         `insert into custom_apps (id, workspace_id, source_job_id, feature, name, category, model, prompt, aspect, duration_s, inputs) values ($1, 'ws_vet', $2, 'video', 'Giữ khoá', 'video', 'app-fal', 'p', '9:16', 5, $3::jsonb)`,

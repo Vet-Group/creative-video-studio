@@ -5,7 +5,7 @@ import { type FormEvent, useId, useState } from 'react';
 import { api, sendJson, thumbUrl } from '@/lib/api';
 import { useAction } from '@/lib/admin-ui';
 import { CATEGORIES } from '@/lib/apps';
-import { type AppFields, appInputProblem, MAX_APP_DESCRIPTION, MAX_APP_NAME, MAX_SLOT_HINT, MAX_SLOT_LABEL } from '@/lib/custom-apps';
+import { type AppFields, appInputProblem, cleanApp, MAX_APP_DESCRIPTION, MAX_APP_NAME, MAX_SLOT_HINT, MAX_SLOT_LABEL } from '@/lib/custom-apps';
 import type { AdminApp, AppSource } from '@/lib/custom-apps-db';
 import { PageHead } from './PageHead';
 import styles from './AppEditor.module.css';
@@ -63,19 +63,30 @@ function EditorForm({ jobId, source, app }: { jobId: string; source: AppSource; 
   );
   const change = (n: number, patch: Partial<Row>) => setRows((cur) => cur.map((r, i) => (i === n ? { ...r, ...patch } : r)));
   const fields: AppFields = { name, description, category, prompt, inputs: rows.map((r) => (r.fixed ? { fixed: true } : { slot: { label: r.label, hint: r.hint } })) };
-  const reason = appInputProblem(fields, source.inputIds.length, source.maxPromptChars);
+  const live = (n: number) => source.images.some((i) => i.id === source.inputIds[n]);
+  // An edit sends only the fields that differ from the saved app, so it never overwrites another Admin's change to the rest (nor audits an unchanged save).
+  const clean = cleanApp(fields);
+  const saved = app && { name: app.name, description: app.description, category: app.category, prompt: app.prompt, inputs: app.inputs.map((i) => ('slot' in i ? { slot: { label: i.slot.label, hint: i.slot.hint } } : { fixed: true })) };
+  const patch = app && saved && {
+    ...Object.fromEntries((Object.keys(saved) as (keyof typeof saved)[]).filter((k) => JSON.stringify(clean[k]) !== JSON.stringify(saved[k])).map((k) => [k, fields[k]])),
+    ...(published !== app.published && { published }),
+  };
+  const reason =
+    appInputProblem(fields, source.inputIds.length, source.maxPromptChars) ??
+    (rows.some((r, n) => r.fixed && !live(n)) ? 'Ảnh cố định của lượt gốc đã bị xoá: hãy để người dùng tải lên ô đó.' : null) ??
+    (patch && Object.keys(patch).length === 0 ? 'Chưa có thay đổi nào để lưu.' : null);
 
   function save(e: FormEvent) {
     e.preventDefault();
     if (reason) return;
     void run(
-      () => (app ? api(`/api/admin/apps/${app.id}`, sendJson('PATCH', { ...fields, published })) : api('/api/admin/apps', sendJson('POST', { ...fields, jobId, publish: published }))),
+      () => (app ? api(`/api/admin/apps/${app.id}`, sendJson('PATCH', patch)) : api('/api/admin/apps', sendJson('POST', { ...fields, jobId, publish: published }))),
       'Không lưu được ứng dụng.',
     );
   }
 
   return (
-    <form className={styles.form} onSubmit={save} aria-describedby={reason ? `${id}-reason` : undefined}>
+    <form className={styles.form} onSubmit={save}>
       <section aria-labelledby={`${id}-inputs`}>
         <h2 id={`${id}-inputs`}>Ảnh đầu vào</h2>
         <ul className={styles.inputs}>
@@ -98,7 +109,7 @@ function EditorForm({ jobId, source, app }: { jobId: string; source: AppSource; 
                         Người dùng tải lên
                       </label>
                       <label>
-                        <input type="radio" name={`${id}-input-${n}`} checked={r.fixed} onChange={() => change(n, { fixed: true })} />
+                        <input type="radio" name={`${id}-input-${n}`} checked={r.fixed} disabled={!photo} onChange={() => change(n, { fixed: true })} />
                         Giữ cố định
                       </label>
                     </div>
@@ -121,13 +132,15 @@ function EditorForm({ jobId, source, app }: { jobId: string; source: AppSource; 
           })}
         </ul>
       </section>
-      <label>
-        Mô tả gửi cho mô hình
-        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-        <span className={styles.counter}>
-          {prompt.trim().length}/{source.maxPromptChars}
+      <div>
+        <label>
+          Mô tả gửi cho mô hình
+          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} aria-describedby={`${id}-count`} />
+        </label>
+        <span id={`${id}-count`} className={styles.counter}>
+          {prompt.trim().length}/{source.maxPromptChars} ký tự
         </span>
-      </label>
+      </div>
       <label>
         Tên ứng dụng
         <input value={name} maxLength={MAX_APP_NAME} onChange={(e) => setName(e.target.value)} />
@@ -156,13 +169,11 @@ function EditorForm({ jobId, source, app }: { jobId: string; source: AppSource; 
           {problem}
         </p>
       )}
-      {reason && (
-        <p id={`${id}-reason`} className="muted">
-          {reason}
-        </p>
-      )}
+      <p id={`${id}-reason`} className="muted" role="status">
+        {reason}
+      </p>
       <div className="actions">
-        <button type="submit" className="primary" disabled={pending || reason !== null}>
+        <button type="submit" className="primary" disabled={pending || reason !== null} aria-describedby={`${id}-reason`}>
           Lưu
         </button>
         <Link href="/admin/apps" className="button">

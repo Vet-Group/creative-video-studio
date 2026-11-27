@@ -105,6 +105,7 @@ describe('appInputProblem', () => {
     const two = (a: string, b: string) => ({ inputs: [{ slot: { label: a, hint: '' } }, { slot: { label: b, hint: '' } }] });
     expect(problem(two(' Ảnh ', 'ảnh'))).toBe('Hai ô không được trùng tên.');
     expect(problem(two('Ảnh 1', 'Ảnh 2'))).toBeNull();
+    expect(problem(two('Ảnh'.normalize('NFC'), 'Ảnh'.normalize('NFD')))).toBe('Hai ô không được trùng tên.'); // the same word typed in combining form
   });
 });
 

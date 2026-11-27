@@ -33,7 +33,7 @@ test('it shows the result, the settings the app keeps as a read-only line and th
   expect(html).toContain('Mock E2E · 9:16 · 5 giây · Có âm thanh');
   expect(html).toContain('Mô hình, tỉ lệ và thời lượng giữ như lượt gốc.');
   expect(html).toContain('>spin it</textarea>');
-  expect(html).toContain('>7/500<');
+  expect(html).toContain('>7/500 ký tự<');
 });
 
 test('an image source shows its picture and its resolution', () => {
@@ -45,11 +45,11 @@ test('an image source shows its picture and its resolution', () => {
 
 test('Lưu stays disabled with the reason until there is a name', () => {
   const html = render(source());
-  expect(html).toMatch(/<button type="submit" class="primary" disabled="">Lưu<\/button>/);
-  expect(html).toContain('Hãy đặt tên ứng dụng');
+  expect(html).toMatch(/<button type="submit" class="primary" disabled="" aria-describedby="[^"]+-reason">Lưu<\/button>/);
+  expect(html).toMatch(/<p id="[^"]+-reason" class="muted" role="status">Hãy đặt tên ứng dụng/);
 });
 
-test('editing prefills the fields of the app: its name, a slot, a kept photo, and Lưu is enabled', () => {
+test('editing prefills the fields of the app: its name, a slot, a kept photo, and Lưu waits for a change', () => {
   const app: AdminApp = { id: 'a1', name: 'Video xoay', category: 'video', published: true, sourceLive: true, sourceJobId: 'job-1', description: 'Xoay', prompt: 'saved prompt', inputs: [{ slot: { label: 'Ảnh sản phẩm', hint: 'Nền trắng' } }, { fixed: 'in-2' }] };
   const html = render(source(), app);
   expect(html).toContain('Sửa ứng dụng');
@@ -58,7 +58,8 @@ test('editing prefills the fields of the app: its name, a slot, a kept photo, an
   expect(html).toContain('value="Nền trắng"');
   expect(html).toContain('>saved prompt</textarea>');
   expect(html.match(/Tên ô/g)).toHaveLength(1); // the second input is kept
-  expect(html).toMatch(/<button type="submit" class="primary">Lưu<\/button>/);
+  expect(html).toMatch(/<button type="submit" class="primary" disabled="" aria-describedby="[^"]+-reason">Lưu<\/button>/);
+  expect(html).toContain('Chưa có thay đổi nào để lưu.'); // an unchanged app sends nothing
 });
 
 test('a source that cannot become an app shows its preview and the reason instead of the form', () => {
