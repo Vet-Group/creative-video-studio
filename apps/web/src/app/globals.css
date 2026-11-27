@@ -2941,13 +2941,20 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .apps > .tool-hint { margin-top: 12px; }
 .form-scroll > .tool-hint + .field { margin-top: 0; } /* the first field keeps its place under the hint */
 
-.explore-start { margin-bottom: 8px; }
+/* Explore's start-by-job buttons: one tap per job, into its tool; a row each on a phone, two columns from 600 px, four from 1200 px. */
+.start-jobs ul { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+@media (min-width: 600px) { .start-jobs ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .start-jobs ul { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.start-jobs li { display: grid; } /* the button fills its cell, so a short one matches the tallest in its row */
+.start-job { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px 8px 8px; border: 1px solid var(--border); border-radius: 12px; color: inherit; text-decoration: none; transition: background-color var(--dur-fast); }
+.start-job:hover { background: var(--fill); }
+.start-job-art { display: grid; flex: none; place-items: center; width: 48px; height: 48px; overflow: hidden; border-radius: 8px; background: var(--fill); color: var(--text-icon); }
+.start-job-art img { width: 100%; height: 100%; object-fit: cover; }
+.start-job:hover .start-job-art { color: var(--brand); }
+.start-job-text { display: grid; gap: 2px; min-width: 0; font-size: 14px; line-height: 20px; }
+.start-job-text .muted { font-size: 13px; line-height: 18px; }
 .explore-start-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
 .explore-start-head .link-button { display: inline-flex; align-items: center; gap: 4px; }
-.explore-start .tool-goals { grid-template-columns: minmax(0, 1fr); }
-.explore-start .tool-goals > li { display: grid; } /* the link fills its cell, so a short card matches the tallest in its row */
-@media (min-width: 720px) { .explore-start .tool-goals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1200px) { .explore-start .tool-goals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 /* The bottom space is a margin: a padding sits inside the clamped box and showed the top of a fourth line. */
 .explore-tool-text { display: -webkit-box; margin-bottom: 12px; padding: 0 12px; overflow: hidden; font-size: 12px; line-height: 17px; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 

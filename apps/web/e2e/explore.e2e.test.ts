@@ -41,6 +41,21 @@ test('Explore greets the member by given name and lists a job they start under C
   await expect(tile.locator('.explore-prompt-hover')).toHaveCSS('opacity', '1');
 });
 
+test('the job buttons open their tools, the TikTok video on the hook effects app, in one tap a phone can hit', async ({ page }) => {
+  await signIn(page, 'explorea');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/explore');
+  const jobs = page.getByRole('list', { name: 'Bắt đầu theo việc' }).getByRole('link');
+  // Smart Remake joins only when the REA flags are on (tool-guide.test.ts), so the rest are checked whatever this machine sets.
+  const hrefs = await jobs.evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+  expect(hrefs.filter((h) => h !== '/apps/smart-remake')).toEqual(['/apps/hook-effects', '/apps/listing-set', '/apps/mockup-pack', '/try-on', '/image-generation', '/marketing-studio']);
+  for (const height of await jobs.evaluateAll((as) => as.map((a) => a.getBoundingClientRect().height))) expect(height).toBeGreaterThanOrEqual(44);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await jobs.first().click();
+  await expect(page).toHaveURL(/\/apps\/hook-effects$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Hiệu ứng mở đầu' })).toBeAttached(); // the app's heading is for screen readers
+});
+
 test("a running job's elapsed time under Continue keeps counting without a reload", async ({ page }) => {
   await signIn(page, 'exploreb');
   await page.goto('/explore'); // compiled now, so the reload below is quick and finds the 4-second mock job still unfinished

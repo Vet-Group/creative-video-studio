@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { appBySlug } from './apps';
 import { navGroups } from './sidebar';
-import { ANALYZE_TOOL, TOOL_GOALS, TOOL_GUIDE, toolGoals, toolGuide, toolGuides } from './tool-guide';
+import { ANALYZE_TOOL, START_JOBS, startJobs, TOOL_GOALS, TOOL_GUIDE, toolGoals, toolGuide, toolGuides } from './tool-guide';
 
 // A link is to one of the five tools or to an app that exists.
 const reachable = (href: string) => TOOL_GUIDE.some((t) => t.href === href) || (href.startsWith('/apps/') && appBySlug(href.slice(6)) !== undefined);
@@ -52,5 +52,22 @@ describe('the analysis tool in the guide', () => {
       expect(reachable(n.href), n.href).toBe(true);
       expect(n.href).not.toBe('/analyze');
     }
+  });
+});
+
+describe("Explore's job buttons", () => {
+  it('list Smart Remake only when its flags are on, the other jobs either way', () => {
+    expect(startJobs(true)).toEqual(START_JOBS);
+    expect(startJobs(false).map((j) => j.href)).toEqual(START_JOBS.map((j) => j.href).filter((h) => h !== '/apps/smart-remake'));
+    expect(startJobs(true).some((j) => j.href === '/apps/smart-remake')).toBe(true);
+  });
+
+  it('open real pages, one job each, the TikTok video on the hook effects app', () => {
+    for (const j of START_JOBS) {
+      expect(reachable(j.href), j.href).toBe(true);
+      expect(j.get.length, j.title).toBeLessThanOrEqual(60); // one short line on a phone
+    }
+    expect(new Set(START_JOBS.map((j) => j.href)).size).toBe(START_JOBS.length);
+    expect(START_JOBS.find((j) => j.title === 'Video TikTok cho sản phẩm')?.href).toBe('/apps/hook-effects');
   });
 });

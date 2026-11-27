@@ -130,7 +130,7 @@ export const TOOL_GUIDE: ToolGuide[] = [
   },
 ];
 
-/** "I have ... and need ..." answers, in the order people usually ask: the guide's and Explore's first question. */
+/** "I have ... and need ..." answers, in the order people usually ask: the guide's first question. */
 export const TOOL_GOALS: { need: string; href: string; go: string }[] = [
   { need: 'Có ảnh quần áo, cần ảnh người mẫu mặc nó', href: '/try-on', go: 'Thử đồ' },
   { need: 'Có ảnh sản phẩm, cần ảnh ở bối cảnh mới', href: '/image-generation', go: 'Tạo ảnh' },
@@ -170,5 +170,19 @@ export const toolGuides = (analyzeEnabled: boolean): ToolGuide[] =>
   analyzeEnabled ? TOOL_GUIDE.flatMap((t) => (t.href === '/create' ? [t, ANALYZE_TOOL] : [t])) : TOOL_GUIDE;
 /** The goals list, with the analysis goal after the video goal only when the feature is on. */
 export const toolGoals = (analyzeEnabled: boolean): typeof TOOL_GOALS => (analyzeEnabled ? [...TOOL_GOALS.slice(0, 3), ANALYZE_GOAL, ...TOOL_GOALS.slice(3)] : TOOL_GOALS);
+
+/** Explore's job buttons (seller survey, 2026-11-27: sellers think in jobs, not tool names; the only start list there since the owner folded
+ * the older need-to-tool list into it): each opens a tool, which pre-selects its own default model; `art` is the uploaded sample whose still the button shows.
+ * The apps' own picks (listing shots, mockup products) have no link parameter, so those apps open plainly. Smart Remake is listed only when its flags are on. */
+export const START_JOBS: { title: string; get: string; href: string; art: string; icon: IconName }[] = [
+  { title: 'Video TikTok cho sản phẩm', get: 'Tải 1 ảnh, nhận video dọc 5 giây có hiệu ứng mở đầu', href: '/apps/hook-effects', art: 'app-hook-effects', icon: 'create' },
+  { title: 'Bộ ảnh listing', get: 'Tải 1 ảnh, nhận ảnh nền trắng, lifestyle, cận cảnh', href: '/apps/listing-set', art: 'app-listing-set', icon: 'list' },
+  { title: 'Mockup hàng loạt', get: 'Tải 1 thiết kế, nhận mockup áo, cốc, chăn…', href: '/apps/mockup-pack', art: 'app-mockup-pack', icon: 'apps' },
+  { title: 'Làm giống video mẫu', get: 'Đưa 1 video mẫu và 1 ảnh, nhận video tương tự', href: '/apps/smart-remake', art: 'app-smart-remake', icon: 'film' },
+  { title: 'Ảnh người mẫu mặc sản phẩm', get: 'Tải 1 ảnh áo, nhận ảnh người mẫu mặc nó', href: '/try-on', art: 'feature-try-on', icon: 'tryon' },
+  { title: 'Ảnh sản phẩm ở bối cảnh mới', get: 'Tải 1 ảnh, mô tả cảnh, nhận ảnh sản phẩm trong cảnh đó', href: '/image-generation', art: 'feature-image-generation', icon: 'image' },
+  { title: 'Video người thật giới thiệu', get: 'Ảnh người mẫu và ảnh sản phẩm, nhận clip khoe sản phẩm', href: '/marketing-studio', art: 'feature-marketing-studio', icon: 'megaphone' },
+];
+export const startJobs = (smartRemake: boolean): typeof START_JOBS => START_JOBS.filter((j) => smartRemake || j.href !== '/apps/smart-remake');
 
 export const toolGuide = (href: string): ToolGuide | undefined => [...TOOL_GUIDE, ANALYZE_TOOL].find((t) => href === t.href || href.startsWith(`${t.href}/`));

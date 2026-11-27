@@ -24,9 +24,10 @@ import { MIN_MARKS } from '@/lib/model-marks';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { onePerPair } from '@/lib/model-twins';
 import { usesLine, weeklyUses } from '@/lib/popular';
+import { smartRemakeAppEnabled } from '@/lib/remake';
 import { pageOf } from '@/lib/reuse';
 import { listSamples } from '@/lib/samples';
-import { TOOL_GOALS, toolGuide } from '@/lib/tool-guide';
+import { startJobs, toolGuide } from '@/lib/tool-guide';
 
 // The tools the app has, in the live sidebar order; uploaded samples override these fallback posters.
 // `features` are the job features whose Runs the "most used" sort counts for a tool (the Library makes none).
@@ -174,6 +175,30 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         {recent.length === 0 && <p className="muted explore-first">Bạn chưa tạo clip hay ảnh nào. Chọn một công cụ bên dưới: tải ảnh sản phẩm lên, chọn mẫu và nhận kết quả sau vài phút.</p>}
       </header>
       {stripRows.rows.length > 0 && <ExploreStrip ids={stripRows.rows.map((r) => r.id)} />}
+
+      <section aria-labelledby="explore-by-job" className="start-jobs">
+        <div className="explore-start-head">
+          <h2 id="explore-by-job">Bắt đầu theo việc</h2>
+          <ToolGuideButton className="link-button">So sánh các công cụ</ToolGuideButton>
+        </div>
+        <p className="muted explore-sub">Chọn việc cần làm, thêm ảnh sản phẩm của bạn rồi bấm tạo.</p>
+        <ul aria-label="Bắt đầu theo việc">
+          {startJobs(smartRemakeAppEnabled()).map((j) => {
+            const art = cardSample(have, j.art).poster;
+            return (
+              <li key={j.href}>
+                <Link href={j.href} className="start-job">
+                  <span className="start-job-art">{art ? <img src={art} alt="" decoding="async" /> : <Icon name={j.icon} size={20} />}</span>
+                  <span className="start-job-text">
+                    <strong>{j.title}</strong>
+                    <span className="muted">{j.get}</span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
       {recent.length === 0 && <Welcome pictures={[FEATURES[0]!, FEATURES[1]!, FEATURES[5]!].map((f) => cardSample(have, f.sample, f.poster))} />}
 
       {recent.length > 0 && (
@@ -225,27 +250,6 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
           </ul>
         </section>
       )}
-
-      <section aria-labelledby="explore-start" className="explore-start">
-        <div className="explore-start-head">
-          <h2 id="explore-start">Bắt đầu từ đâu</h2>
-          <ToolGuideButton className="link-button">So sánh các công cụ</ToolGuideButton>
-        </div>
-        <p className="muted explore-sub">Chọn việc bạn cần; mỗi dòng mở đúng công cụ.</p>
-        <ul className="tool-goals" aria-label="Bắt đầu từ đâu">
-          {TOOL_GOALS.map((g) => (
-            <li key={g.need}>
-              <Link href={g.href}>
-                <span>{g.need}</span>
-                <strong>
-                  {g.go}
-                  <Icon name="right" size={14} />
-                </strong>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       <ExploreSort sort={popular ? 'popular' : 'suggested'} />
       <h2>Công cụ</h2>

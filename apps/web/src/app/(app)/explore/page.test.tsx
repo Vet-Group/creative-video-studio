@@ -22,7 +22,6 @@ const props = (models?: string) => ({ searchParams: Promise.resolve({ models }) 
 beforeEach(() => vi.mocked(listSamples).mockResolvedValue([]));
 
 function card(html: string, href: string) {
-  html = html.replace(/<section[^>]*class="explore-start"[\s\S]*?<\/section>/, ''); // the start list links the same tools, without artwork
   return html.match(new RegExp(`<a[^>]*href="${href}"[^>]*>([\\s\\S]*?)</a>`))![1]!;
 }
 
