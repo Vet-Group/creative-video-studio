@@ -10,6 +10,7 @@ import { COMMENT_MAX, type FeedbackComment, feedbackMarkdown, feedbackTime, KIND
 import { avatarColor, initials } from '@/lib/profile';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
+import { ImageViewer } from './Modal';
 import { RichText } from './RichText';
 
 /** How a reply can be written; the same words sit under the Admin's reply box. */
@@ -28,6 +29,7 @@ export function FeedbackDetail({ id, isAdmin, shipped = [] }: { id: string; isAd
   const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
   const [reload, setReload] = useState(0);
   const [voteError, setVoteError] = useState(false);
+  const [viewing, setViewing] = useState<number | null>(null); // the attached photo shown large, in the page: a new tab had no way back in the installed app
 
   useEffect(() => {
     let live = true;
@@ -126,13 +128,14 @@ export function FeedbackDetail({ id, isAdmin, shipped = [] }: { id: string; isAd
           <ul className="fb-images" aria-label={`${item.imageAssetIds.length} ảnh đính kèm`}>
             {item.imageAssetIds.map((aid, i) => (
               <li key={aid}>
-                <a href={`/api/assets/${aid}/content`} target="_blank" rel="noreferrer" aria-label={`Mở ảnh ${i + 1} ở thẻ mới`}>
+                <button type="button" onClick={() => setViewing(i)} aria-label={`Xem lớn ảnh ${i + 1}`}>
                   <img src={thumbUrl(aid)} alt="" loading="lazy" />
-                </a>
+                </button>
               </li>
             ))}
           </ul>
         )}
+        {viewing !== null && item.imageAssetIds[viewing] && <ImageViewer src={`/api/assets/${item.imageAssetIds[viewing]}/content`} alt={`Ảnh ${viewing + 1}`} placeholder={thumbUrl(item.imageAssetIds[viewing]!)} onClose={() => setViewing(null)} />}
       </article>
 
       {item.adminNote && (

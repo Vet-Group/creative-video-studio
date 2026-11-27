@@ -8,6 +8,8 @@ import type { ProductItem } from '@/lib/products';
 import type { UploadSlot } from '@/lib/upload-slots';
 import { Icon } from './Icon';
 import { type Img, PhotoDialog } from './image-tools';
+import { Modal } from './Modal';
+import { ProductShelf } from './ProductShelf';
 import { type StoreOption, StorePicker } from './StorePicker';
 
 type Group = NonNullable<Parameters<typeof PhotoDialog>[0]['groups']>[number];
@@ -27,6 +29,7 @@ export function shelfGroups(products: ProductItem[], taken: Img[], onPick: (img:
 
 export function ShelfPicker({ name, taken, disabled, onPick, storeId = '', className = 'link-button uploads-link' }: { name: string; taken: Img[]; disabled?: boolean; onPick: (img: Img) => void; storeId?: string; className?: string }) {
   const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false); // the shelf itself, opened from an empty picker
   const [store, setStore] = useState('');
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [list, setList] = useState<ProductItem[] | 'failed' | null>(null);
@@ -74,14 +77,18 @@ export function ShelfPicker({ name, taken, disabled, onPick, storeId = '', class
         groups={groups}
         busy={false}
         onClose={() => setOpen(false)}
-        // The shelf is made in the Library; a new tab keeps the form the member is filling in here.
-        create={empty && !store ? { label: 'Thêm sản phẩm', onClick: () => void window.open('/library?kind=products', '_blank', 'noopener') } : undefined}
+        // The shelf opens over the form, which stays as filled in; a new tab had no way back in the installed app (iPad, iPhone).
+        create={empty && !store ? { label: 'Thêm sản phẩm', onClick: () => (setOpen(false), setAdding(true)) } : undefined}
         filter={
           <div className="uploads-filter">
             <StorePicker label="Lọc theo cửa hàng" heading="Lọc theo cửa hàng" value={store} stores={stores} noneLabel="Tất cả cửa hàng" onChange={setStore} />
           </div>
         }
       />
+      {/* Closing it opens the picker again, which reads the shelf anew. */}
+      <Modal open={adding} onClose={() => (setAdding(false), show())} label="Sản phẩm đã lưu" className="shelf-add">
+        {adding && <ProductShelf />}
+      </Modal>
     </>
   );
 }

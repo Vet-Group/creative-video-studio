@@ -261,6 +261,8 @@ export const USERS = {
   // one-tap-apps.e2e: the Admin who makes a custom app in the workspace ws_onetap, and the member of that workspace who runs it.
   tapadm: { email: 'tapadm@e2e.test', name: 'E2E Tap Admin', role: 'admin' },
   tapmem: { email: 'tapmem@e2e.test', name: 'E2E Tap Member', role: 'member' },
+  // touch-viewers.e2e: the "view large" controls on an iPad-sized touch screen.
+  tabletv: { email: 'tabletv@e2e.test', name: 'E2E Tablet Viewer', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;
