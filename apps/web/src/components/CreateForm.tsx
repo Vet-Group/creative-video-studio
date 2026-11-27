@@ -971,6 +971,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
                   extra: endSlot,
                 }}
                 templates={PROMPT_TEMPLATES.video}
+                productType={chosenType || undefined}
                 onTemplate={(t) => (sec ? (setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
                 filled={typed}
                 onRun={() => (canRun ? void run() : (reason?.text ?? false))}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { endingLine, hookLine, MAX_ENDING, MAX_HOOK } from './marketing';
-import { inSeason, PROMPT_TEMPLATES, STARTERS } from './prompt-starters';
+import { isProductType } from './product-types';
+import { inSeason, MOTION_KINDS, PROMPT_TEMPLATES, STARTERS, suits } from './prompt-starters';
 import { sampleType } from './samples';
 
 describe('inSeason', () => {
@@ -70,3 +71,22 @@ describe('PROMPT_TEMPLATES across pages', () => {
   });
 });
 
+
+describe('motion packs (Create templates by product type)', () => {
+  const video = PROMPT_TEMPLATES.video;
+  it('tags only Create templates, with real product types, each covered by a type chip', () => {
+    for (const t of Object.values(PROMPT_TEMPLATES).flat()) if (!video.includes(t)) expect(t.types).toBeUndefined();
+    const chipTypes = MOTION_KINDS.flatMap((k) => k.types);
+    for (const t of video) for (const type of t.types ?? []) (expect(isProductType(type)).toBe(true), expect(chipTypes).toContain(type));
+  });
+  it('gives every chip a motion of its own beside the ones for any product', () => {
+    for (const k of MOTION_KINDS) expect(video.some((t) => t.types && suits(t, k.types))).toBe(true);
+    expect(new Set(MOTION_KINDS.map((k) => k.label)).size).toBe(MOTION_KINDS.length);
+  });
+  it('shows an untyped template under every chip and a typed one only under its own', () => {
+    const mug = MOTION_KINDS.find((k) => k.label === 'Cốc, tumbler')!.types;
+    expect(suits(video.find((t) => t.id === 'xoay-360')!, mug)).toBe(true);
+    expect(suits(video.find((t) => t.id === 'coc-boc-hoi')!, mug)).toBe(true);
+    expect(suits(video.find((t) => t.id === 'treo-moc')!, mug)).toBe(false);
+  });
+});

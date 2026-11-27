@@ -23,10 +23,34 @@ export interface PromptTemplate {
   desc: string;
   /** Set when the template only works with a particular input photo: one short Vietnamese line, at most 60 characters. */
   needs?: string;
+  /** Create's templates only: the product types (PRODUCT_TYPES keys) the motion suits, which the dialog's type chips filter by. Unset: any product. */
+  types?: string[];
   hook: string;
   body: string;
   ending: string;
 }
+
+/** The clothes among PRODUCT_TYPES, which the garment motions suit. */
+const APPAREL = ['tshirt', 'jersey', 'hoodie', 'mask_hoodie', 'hawaiian', 'polo'];
+
+/** The type chips of Create's templates dialog: a few groups of PRODUCT_TYPES, so the row stays short. A template shows under a chip when its `types` meet the chip's. */
+export const MOTION_KINDS: { label: string; types: string[] }[] = [
+  { label: 'Quần áo', types: APPAREL },
+  { label: 'Cốc, tumbler', types: ['mug', 'tumbler'] },
+  { label: 'Ornament', types: ['ornament'] },
+  { label: 'Tranh, poster', types: ['poster', 'home'] },
+  { label: 'Chăn', types: ['blanket'] },
+  { label: 'Thảm', types: ['rug'] },
+  { label: 'Cờ', types: ['flag'] },
+  { label: 'Mũ', types: ['cap'] },
+  { label: 'Giày', types: ['shoes'] },
+  { label: 'Cửa, gara', types: ['garage', 'door', 'curtain'] },
+  { label: 'Decal', types: ['decal'] },
+  { label: 'Trang sức', types: ['jewelry'] },
+];
+
+/** Whether a template suits a chip's product types (an untyped template suits any). */
+export const suits = (t: PromptTemplate, types: string[]): boolean => !t.types || t.types.some((x) => types.includes(x));
 
 /** By page: Create's (`video`) and Marketing Studio's formats (`marketing` for UGC, `advanced`, `unboxing`, `review`), each hook and ending a sentence of its own. */
 export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unboxing' | 'review', PromptTemplate[]> = {
@@ -57,6 +81,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
     },
     {
       id: 'gio-nhe',
+      types: [...APPAREL, 'blanket', 'curtain'],
       name: 'Gió nhẹ',
       desc: 'Gió nhẹ lay vải, máy quay đứng yên',
       hook: 'The clip opens as a sudden gust of wind lifts the fabric.',
@@ -65,6 +90,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
     },
     {
       id: 'nguoi-mau-buoc-di',
+      types: APPAREL,
       name: 'Người mẫu bước đi',
       desc: 'Người mẫu mặc đồ bước về phía máy quay',
       needs: 'Cần ảnh người mẫu mặc đồ',
@@ -74,6 +100,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
     },
     {
       id: 'treo-moc',
+      types: APPAREL,
       name: 'Treo móc',
       desc: 'Áo treo trên móc đung đưa nhẹ, khoe phom và chất vải',
       needs: 'Cần ảnh áo treo trên móc, không có người',
@@ -83,6 +110,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
     },
     {
       id: 'ma-nanh-canh-vo-hinh',
+      types: APPAREL,
       name: 'Ma-nơ-canh vô hình',
       desc: 'Đồ dựng phom như có người mặc, xoay nhẹ sang hai bên',
       needs: 'Cần ảnh đồ dựng phom kiểu ma-nơ-canh vô hình',
@@ -92,6 +120,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
     },
     {
       id: 'selfie-guong',
+      types: APPAREL,
       name: 'Selfie gương',
       desc: 'Người mẫu chụp gương, xoay người khoe dáng đồ',
       needs: 'Cần ảnh người mẫu mặc đồ, chụp selfie trước gương',
@@ -101,12 +130,122 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
     },
     {
       id: 'keo-khoa-mat-na',
+      types: ['mask_hoodie'],
       name: 'Kéo khoá thành mặt nạ',
       desc: 'Trùm mũ rồi kéo khoá lên mặt: hoodie thành mặt nạ',
       needs: 'Cần ảnh người mẫu mặc hoodie mặt nạ, chưa trùm mũ',
       hook: 'The clip opens on the model exactly as in the photo, as they reach up and pull the hood over their head.',
       body: 'With one hand they take the zip pull at the chest and draw it slowly all the way up over the chin and face, so the hood closes into a full mask with only the eye opening left, the print on the hood lining up as it closes. Static camera at chest height, the front of the hoodie toward the camera.',
       ending: 'The clip ends with the masked model standing still and staring straight into the camera.',
+    },
+    // Motion packs: one or two motions for each kind of product the company sells besides clothes, found by the dialog's type chips.
+    {
+      id: 'coc-boc-hoi',
+      name: 'Cốc bốc hơi',
+      desc: 'Hơi nóng bốc lên, máy quay lướt quanh cốc khoe hình in',
+      types: ['mug', 'tumbler'],
+      hook: 'The clip opens on the mug from the photo on a wooden table as a thin curl of steam begins to rise from it.',
+      body: 'Steam rises gently from the hot drink while the camera arcs slowly around the mug, the print staying sharp, readable and exactly as in the photo. Warm morning window light, a softly blurred kitchen behind.',
+      ending: 'The clip ends on a still front view of the mug with its print facing the camera.',
+    },
+    {
+      id: 'rot-do-uong',
+      name: 'Rót đồ uống',
+      desc: 'Rót cà phê vào cốc, cận cảnh hình in',
+      types: ['mug', 'tumbler'],
+      hook: 'The clip opens as a stream of hot coffee starts pouring into the mug from the photo.',
+      body: 'Coffee pours into the mug and settles with a little swirl while the camera holds a steady close-up on its side, the print unchanged and in focus. Soft cafe light.',
+      ending: 'The clip ends with the filled mug standing still, its print toward the camera.',
+    },
+    {
+      id: 'ornament-cay-thong',
+      name: 'Ornament trên cây thông',
+      desc: 'Ornament đung đưa trên cành thông, đèn lấp lánh phía sau',
+      types: ['ornament'],
+      hook: 'The clip opens on the ornament from the photo hanging from a pine branch as fairy lights begin to twinkle behind it.',
+      body: 'The ornament sways gently on its ribbon while the camera pushes in slowly, warm fairy lights twinkling in a soft blur behind. The design on the ornament stays exactly as in the photo.',
+      ending: 'The clip ends on a still close-up of the ornament glowing in the warm light.',
+    },
+    {
+      id: 'tranh-tren-tuong',
+      name: 'Tranh trên tường',
+      desc: 'Đẩy chậm vào bức tranh treo trong phòng khách sáng',
+      types: ['poster', 'home'],
+      hook: 'The clip opens on a bright, tidy living room with the framed print from the photo hanging on the wall.',
+      body: 'A slow, steady push-in toward the print on the wall while soft daylight drifts across the room. The artwork stays flat and exactly as in the photo.',
+      ending: 'The clip ends on the print filling most of the frame, seen straight on.',
+    },
+    {
+      id: 'chan-phu-sofa',
+      name: 'Chăn phủ sofa',
+      desc: 'Chăn mở ra rồi phủ xuống sofa, khoe trọn hình in',
+      types: ['blanket'],
+      hook: 'The clip opens as the folded blanket from the photo is lifted above a cosy sofa.',
+      body: 'The blanket unfolds and drapes softly over the sofa, its print spreading out flat and readable. Warm lamp light in a calm living room.',
+      ending: 'The clip ends on the blanket lying smoothly over the sofa with its whole print in view.',
+    },
+    {
+      id: 'tham-nhin-tu-tren',
+      name: 'Thảm nhìn từ trên',
+      desc: 'Máy quay xoay chậm từ trên cao xuống tấm thảm',
+      types: ['rug'],
+      hook: 'The clip opens on a top-down view of the rug from the photo lying on a light wooden floor.',
+      body: 'The camera rotates slowly overhead and lowers a little toward the rug, soft daylight from a window. The pattern stays flat, sharp and exactly as in the photo.',
+      ending: 'The clip ends on a still top-down view of the whole rug.',
+    },
+    {
+      id: 'co-bay-trong-gio',
+      name: 'Cờ bay trong gió',
+      desc: 'Cờ tung bay trên cột dưới trời xanh',
+      types: ['flag'],
+      hook: 'The clip opens on the flag from the photo on a pole as a breeze begins to lift it.',
+      body: 'The flag ripples steadily in the wind against a clear blue sky, its design readable through the folds. Bright sunlight and a slow low-angle camera.',
+      ending: 'The clip ends with the flag spread wide in the wind, its design facing the camera.',
+    },
+    {
+      id: 'mu-xoay-tren-de',
+      name: 'Mũ xoay trên đế',
+      desc: 'Mũ xoay chậm trên đế, khoe mặt trước và vành',
+      types: ['cap'],
+      hook: 'The clip opens on the cap from the photo on a small stand as a soft spotlight comes up.',
+      body: 'The cap turns slowly on its stand to show the front panel, the side and the brim, then returns to the front. The embroidery or print stays exactly as in the photo, clean studio light.',
+      ending: 'The clip ends on a still front view of the cap.',
+    },
+    {
+      id: 'giay-buoc-tren-pho',
+      name: 'Giày bước trên phố',
+      desc: 'Máy quay sát đất theo đôi giày bước trên vỉa hè',
+      types: ['shoes'],
+      hook: 'The clip opens on a low close-up of the shoes from the photo as the first step lands on the pavement.',
+      body: 'A low tracking shot follows the shoes for a few steps along a sunny pavement. The design on the shoes stays exactly as in the photo, natural daylight.',
+      ending: 'The clip ends with the shoes standing still side by side, toes toward the camera.',
+    },
+    {
+      id: 'cua-nha-in-hinh',
+      name: 'Cửa nhà in hình',
+      desc: 'Máy quay tiến dần tới cửa nhà phủ cover in hình',
+      types: ['garage', 'door', 'curtain'],
+      hook: 'The clip opens on a wide shot of a house front with the printed cover from the photo on its door.',
+      body: 'The camera glides slowly up the driveway toward the door, late-afternoon sun on the house. The printed design stays flat and exactly as in the photo.',
+      ending: 'The clip ends on the door filling the frame, its design seen straight on.',
+    },
+    {
+      id: 'dan-decal',
+      name: 'Dán decal',
+      desc: 'Bàn tay vuốt decal lên nắp laptop rồi lột lớp đế',
+      types: ['decal'],
+      hook: 'The clip opens as a hand lays the sticker from the photo onto a clean laptop lid.',
+      body: 'The hand smooths the sticker down with a thumb and peels away the backing. The design stays exactly as in the photo, bright desk light.',
+      ending: 'The clip ends on a still close-up of the sticker on the laptop.',
+    },
+    {
+      id: 'trang-suc-lap-lanh',
+      name: 'Trang sức lấp lánh',
+      desc: 'Cận cảnh trang sức xoay chậm, ánh sáng lấp lánh',
+      types: ['jewelry'],
+      hook: 'The clip opens on a macro shot of the jewelry from the photo as a glint of light runs across it.',
+      body: 'The jewelry turns slowly on a velvet stand while small sparkles of light play across its surface, a shallow depth of field and a dark, soft background.',
+      ending: 'The clip ends on a still close-up of the jewelry catching the light.',
     },
   ],
   marketing: [
