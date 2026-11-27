@@ -266,6 +266,7 @@ export const USERS = {
   // a11y.e2e: a History card's taps on a touch phone and a touch tablet.
   touchcardp: { email: 'touchcardp@e2e.test', name: 'E2E Touch Card Phone', role: 'member' },
   touchcardt: { email: 'touchcardt@e2e.test', name: 'E2E Touch Card Tablet', role: 'member' },
+  tabletcard: { email: 'tabletcard@e2e.test', name: 'E2E Tablet Card', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;
