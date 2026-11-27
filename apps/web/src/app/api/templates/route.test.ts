@@ -320,7 +320,10 @@ describe('/api/templates', () => {
       const posed = await job(u, { feature: 'try_on', model: 'nano-banana-pro', aspect: '3:4', params: { resolution: '2K', garments: '1', pose: 'kneel' }, inputs: [u.asset, `${u.id}-g`] });
       expect((await saved(await fromJob(u, posed))).data).toMatchObject({ garments: 1, pose: 'kneel' }); // Try On's pose is kept with the garment count
       const hook = await job(u, { feature: 'hook_effect', model: 'minimax-h3-max-turbo-480p', duration: 5, params: { effect: 'drop', endAssetId: u.asset }, inputs: [u.asset] });
-      expect((await saved(await fromJob(u, hook))).data).toMatchObject({ images: [u.asset], effect: 'drop' }); // the hook effect is kept, so the page refills it
+      const hookRes = await fromJob(u, hook);
+      const hookId = ((await hookRes.clone().json()) as { id: string }).id;
+      expect((await saved(hookRes)).data).toMatchObject({ images: [u.asset], effect: 'drop' }); // the hook effect is kept, so the page refills it
+      expect(await (await one(req(u, `/api/templates/${hookId}`), ctx(hookId))).json()).toMatchObject({ feature: 'hook_effect', effect: 'drop' }); // ?template= refills from this answer
       const mkt = await job(u, { feature: 'marketing', model: 'kling-o3-pro', duration: 10, params: { format: 'advanced', audio: 'on', hook: `${u.id}-hook`, location: 'kitchen', brief: 'b', script: 's' }, inputs: [u.asset] });
       expect(await saved(await fromJob(u, mkt))).toEqual({
         feature: 'marketing', data: { images: [u.asset], brief: 'b', script: 's', hook: `${u.id}-hook`, location: 'kitchen', format: 'advanced', audio: 'on', ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 10 },
