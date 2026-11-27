@@ -100,4 +100,35 @@ test.describe('touch tablet', () => {
     await expect(shelf).toHaveCount(0);
     await expect(picker).toBeVisible();
   });
+
+  // Upright, the History card stacks (owner, 2026-11-27): the picture across the top, the details under it, the actions two to a row, and no blank beside them.
+  test('a History card stacks on an upright tablet and stays side by side on a desktop', async ({ page }) => {
+    await signIn(page, 'tabletcard');
+    const up = await page.request.post('/api/assets', { multipart: { file: { name: 'ref.png', mimeType: 'image/png', buffer: png() } } });
+    const input = ((await up.json()) as { assets: { id: string }[] }).assets[0]!.id;
+    const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [input], ratio: '3:4', prompt: 'a card laid out on a tablet', enhance: false, params: { resolution: '1K' } } });
+    expect(res.status()).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    try {
+      await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+      await page.goto('/image-generation');
+      await openTab(page, 'Lịch sử');
+      const card = page.locator('.job-card').first();
+      await expect(card.getByRole('button', { name: 'Toàn màn hình' })).toBeVisible();
+      const media = (await card.locator('.job-media').boundingBox())!;
+      const body = (await card.locator('.job-body').boundingBox())!;
+      expect(body.y, 'details under the picture').toBeGreaterThanOrEqual(media.y + media.height - 1);
+      expect(body.width, 'details across the card').toBeGreaterThan(600);
+      const actions = card.locator('.job-main > .job-reuse');
+      const [a, b] = [(await actions.nth(0).boundingBox())!, (await actions.nth(1).boundingBox())!];
+      expect(Math.abs(a.y - b.y), 'two actions to a row').toBeLessThan(2);
+      expect(b.x, 'the second action beside the first').toBeGreaterThan(a.x + a.width);
+
+      await page.setViewportSize({ width: 1280, height: 900 });
+      const wide = { media: (await card.locator('.job-media').boundingBox())!, body: (await card.locator('.job-body').boundingBox())! };
+      expect(wide.body.x, 'details beside the picture on a desktop').toBeGreaterThanOrEqual(wide.media.x + wide.media.width - 1);
+    } finally {
+      await page.request.delete(`/api/jobs/${id}`);
+    }
+  });
 });
