@@ -1353,6 +1353,55 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'print-fix': {
+    title: 'Hình in sai thì sửa lại bằng file design gốc',
+    sections: [
+      {
+        title: 'Sửa lại hình in là gì?',
+        blocks: [
+          'AI đôi khi in sai hình lên sản phẩm: chữ méo, sai chính tả, thiếu chi tiết hoặc ra một mẫu khác. Ứng dụng này lấy ảnh bị sai và file design gốc của bạn, rồi thay đúng phần hình in bằng design đó, đặt ở cùng vị trí, cùng cỡ, theo nếp vải và ánh sáng của ảnh.',
+          `Người mẫu, khuôn mặt, tư thế, màu và kiểu sản phẩm, nền và khung hình được giữ nguyên. Ảnh kết quả có cùng tỉ lệ với ảnh cần sửa. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Sửa hình in trong 3 bước',
+        lead: 'Chọn ảnh cần sửa, thêm file design gốc, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Chọn ảnh cần sửa', text: 'Tải lên ảnh có hình in bị sai, hoặc bấm "Sửa lại hình in" trên một kết quả trong Lịch sử hay Thư viện để mở sẵn ảnh đó. Với một video, ứng dụng lấy khung hình đầu tiên.' },
+              { title: 'Thêm file design gốc', text: 'Dùng đúng file bạn gửi nhà in, tốt nhất là PNG nền trong. Có thể ghi thêm một dòng ngắn ở ô Mô tả, ví dụ "hình in ở lưng áo".' },
+              { title: 'Chạy', text: 'Bấm Chạy và xem ảnh trong tab Lịch sử. Muốn làm lại video từ ảnh đã sửa, bấm "Tạo video" trên ảnh đó.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Mẹo để hình in đúng',
+        blocks: [
+          {
+            list: [
+              'File design càng nét càng tốt; chữ quá nhỏ trong design vẫn có thể bị nhoè trên ảnh.',
+              'Mỗi lần sửa một hình in. Sản phẩm có hình in ở cả trước và sau thì ghi rõ chỗ cần sửa ở ô Mô tả.',
+              'Ảnh lấy từ video là khung hình đầu, nhỏ hơn ảnh gốc; hãy xem kỹ ảnh đã sửa trước khi làm lại video.',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Một lần sửa tốn bao nhiêu?', `${APP_COST} Mỗi lần chạy tạo một ảnh.`],
+              ['Chữ trên ảnh đã sửa có chắc đúng chính tả không?', 'Câu lệnh dặn AI viết đúng từng chữ như trong design, nhưng hãy đọc lại chữ trên ảnh trước khi đăng bán.'],
+              ['Có sửa thẳng trên video được không?', 'Chưa. Ứng dụng sửa khung hình đầu của video thành một ảnh; từ ảnh đó, bấm "Tạo video" để làm lại clip.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'smart-remake': {
     title: 'Làm lại video mẫu với sản phẩm của bạn',
     sections: [

@@ -1,0 +1,7 @@
+ALTER TABLE "jobs" DROP CONSTRAINT "jobs_feature_check";--> statement-breakpoint
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_feature_check" CHECK ("jobs"."feature" in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on', 'fashion_model', 'multi_angle', 'breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set', 'hook_effect', 'video_edit', 'print_fix'));--> statement-breakpoint
+-- Print fix app (owner pick 2026-11-27, apps/web/src/lib/apps.ts): one job feature, `print_fix`, that redoes the garbled or wrong print of a result with the seller's own design file
+-- (the photo first, then the design), the rest of the photo kept, with the fixed instruction FEATURE_PROMPTS.print_fix. It runs on the Nano Banana edit rows the mockup pack and product
+-- recolor run on: Nano Banana 2.1 and Nano Banana Pro, each with its Vertex twin (0075). No row is enabled or repriced here. A soft cap of 50 USD a month, as the other photo apps got.
+INSERT INTO "feature_caps" ("feature", "monthly_usd") VALUES ('print_fix', 50) ON CONFLICT DO NOTHING;--> statement-breakpoint
+UPDATE "model_configs" SET "features" = array_append("features", 'print_fix') WHERE "id" IN ('nano-banana-2.1', 'nano-banana-2.1-vertex', 'nano-banana-pro', 'nano-banana-pro-vertex') AND NOT ('print_fix' = ANY("features"));

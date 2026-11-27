@@ -17,6 +17,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   name_swap: 'Đổi tên',
   product_recolor: 'Đổi màu sản phẩm',
   listing_set: 'Bộ ảnh listing',
+  print_fix: 'Sửa lại hình in',
   hook_effect: 'Hiệu ứng mở đầu',
   video_edit: 'Sửa video',
   background_changer: 'Đổi nền',

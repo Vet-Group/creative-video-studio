@@ -452,7 +452,8 @@ function HistoryCard({ job, isAdmin, select, selectBatch, onView }: { job: TrayJ
               <Icon name="film" /> Tạo video
             </Link>
           )}
-          {out && image && <ImageToolButtons assetId={out} feature={job.feature} className="job-reuse" act={act} />}
+          {/* A clip opens in the print fix on its poster, the first frame the worker cut. */}
+          {out && (image || job.posterAssetId) && <ImageToolButtons assetId={image ? out : job.posterAssetId!} feature={job.feature} video={!image} className="job-reuse" act={act} />}
         </div>
         {(savable || out) && (
           <div className="job-actions" role="group" aria-label="Thao tác khác">

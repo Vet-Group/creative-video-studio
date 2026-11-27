@@ -138,6 +138,25 @@ describe('POST /api/assets/copy', () => {
     expect((await pool.query(`select count(*)::int as n from assets where id = 'pic' and kind = 'output'`)).rows[0].n).toBe(1); // the result stays
   });
 
+  // The print fix opens a clip on its first frame: the poster the worker cut from frame 0 copies as the clip's result does; an image job's poster, a small preview, does not.
+  test('copies a finished clip’s poster as a new image input, and is 404 for an image job’s preview poster', async () => {
+    const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46, 0, 1]);
+    const poster = async (id: string, durationSec: number) => {
+      await clip(`${id}-out`, userId, { image: durationSec === 0 });
+      await putObject(`assets/${id}`, JPEG, 'image/jpeg');
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'output', $3, 'poster.jpg', 'image/jpeg', $4, 'ws_vet')`, [id, userId, `assets/${id}`, JPEG.length]);
+      await pool.query(`update jobs set poster_asset_id = $1, duration_s = $2 where id = $3`, [id, durationSec, `job-${id}-out`]);
+    };
+    await poster('clip-poster', 7);
+    await poster('pic-preview', 0);
+    const res = await copy(member, { assetId: 'clip-poster' });
+    expect(res.status).toBe(201);
+    const [made] = ((await res.json()) as { assets: { id: string; filename: string; mime: string; durationMs?: number }[] }).assets;
+    expect([made!.mime, made!.filename, made!.durationMs]).toEqual(['image/jpeg', `history-${made!.id.slice(0, 8)}.jpg`, undefined]);
+    expect((await pool.query('select owner_id, kind from assets where id = $1', [made!.id])).rows[0]).toEqual({ owner_id: userId, kind: 'input' });
+    expect((await copy(member, { assetId: 'pic-preview' })).status).toBe(404);
+  });
+
   test('is 415 for an image result whose file is not a JPEG, PNG or WebP', async () => {
     await clip('pic-bad', userId, { image: true, object: false });
     await putObject('assets/pic-bad', new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]), 'image/png');

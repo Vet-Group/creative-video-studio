@@ -23,4 +23,8 @@ describe('basePrompt', () => {
     expect(basePrompt('model_swap', '')).toBe('');
     expect(basePrompt('image', undefined)).toBeUndefined();
   });
+  it("keeps the print fix's instruction and adds the member's note after it", () => {
+    expect(basePrompt('print_fix', 'hình in ở lưng áo')).toBe(`${FEATURE_PROMPTS.print_fix}. hình in ở lưng áo`);
+    expect(basePrompt('print_fix', undefined)).toBe(FEATURE_PROMPTS.print_fix);
+  });
 });

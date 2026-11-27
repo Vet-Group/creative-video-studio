@@ -86,18 +86,22 @@ test('a long recipe text shows its first lines and Xem thêm; a short one shows 
   expect(short).not.toContain('Xem thêm');
 });
 
-test("an image's detail opens the picture in the image tools (Xoá nền, Tăng độ phân giải, Đổi nền, Đổi khung hình), another member's too, except the tool that made it; never a video", () => {
+test("an image's detail opens the picture in the image tools (Xoá nền, Tăng độ phân giải, Đổi nền, Đổi khung hình, Sửa lại hình in), another member's too, except the tool that made it; a video only in the print fix, on its poster", () => {
   const tools = (c: Clip) => [...detail(c).matchAll(/<button type="button" class="lightbox-result">([\s\S]*?)<\/button>/g)].map((m) => m[1]!.replace(/<[^>]*>/g, '').trim());
   const own: Clip = { ...clip('image'), feature: 'image', mine: true };
-  expect(tools(own)).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
-  expect(tools({ ...own, mine: false })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
+  expect(tools(own)).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình', 'Sửa lại hình in']);
+  expect(tools({ ...own, mine: false })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình', 'Sửa lại hình in']);
+  // A cutout's or an upscale's print is its source's, so neither offers the print fix; nor does the print fix's own result.
   expect(tools({ ...own, feature: 'background_remover' })).toEqual(['Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
   expect(tools({ ...own, feature: 'image_upscale' })).toEqual(['Xoá nền', 'Đổi nền', 'Đổi khung hình']);
-  expect(tools({ ...own, feature: 'reframe' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền']);
-  // The pose generator only on a person's result: an AI model's or a Try On's, not its own or any other.
-  for (const feature of ['fashion_model', 'try_on']) expect(tools({ ...own, feature })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình', 'Đổi tư thế']);
-  expect(tools({ ...own, feature: 'pose_generator' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
-  expect(tools({ ...clip('video'), mine: true })).toEqual([]);
+  expect(tools({ ...own, feature: 'reframe' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Sửa lại hình in']);
+  expect(tools({ ...own, feature: 'print_fix' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình']);
+  // The pose generator only on a person's result: an AI model's or a Try On's, not its own or any other; an AI model wears no seller's print.
+  expect(tools({ ...own, feature: 'fashion_model' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình', 'Đổi tư thế']);
+  expect(tools({ ...own, feature: 'try_on' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình', 'Đổi tư thế', 'Sửa lại hình in']);
+  expect(tools({ ...own, feature: 'pose_generator' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình', 'Sửa lại hình in']);
+  expect(tools({ ...clip('video'), mine: true })).toEqual([]); // no poster yet
+  expect(tools({ ...clip('video'), posterAssetId: 'p1' })).toEqual(['Sửa lại hình in']); // its first frame
 });
 
 const sample: Clip = {

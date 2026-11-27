@@ -349,6 +349,22 @@ export const APPS: AppConfig[] = [
     slots: [],
   },
   {
+    // Ours too (owner pick 2026-11-27): a result whose print came out garbled or wrong, redone with the seller's own design file, the rest of the photo kept. History and the Library open it
+    // on an image result or a clip's first frame (ImageToolButtons). The note is appended to the fixed instruction (FEATURE_PROMPTS.print_fix).
+    slug: 'print-fix',
+    added: '2026-11-27',
+    feature: 'print_fix',
+    name: 'Sửa lại hình in',
+    description: 'Hình in trên ảnh bị méo, sai chữ hay sai mẫu? Thay lại bằng đúng file design gốc, giữ nguyên người mẫu, sản phẩm, nền và khung hình.',
+    keywords: 'print fix, fix print, design, hình in, sửa chữ, POD',
+    category: 'photo',
+    slots: [
+      { label: 'Ảnh cần sửa', inputLabel: 'Ảnh cần sửa hình in', empty: 'Thêm 1 ảnh có hình in bị sai cần sửa' },
+      { label: 'File design gốc', inputLabel: 'Ảnh design gốc', empty: 'Thêm file design gốc, tốt nhất là PNG nền trong' },
+    ],
+    prompt: 'optional',
+  },
+  {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
     // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
     slug: 'smart-remake',
