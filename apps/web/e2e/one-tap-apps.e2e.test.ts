@@ -65,6 +65,7 @@ test('a member runs a published custom app: its card, its page with no prompt, a
   await expect(member.getByText(/^Cài sẵn: Mock E2E · 9:16 · 5 giây$/)).toBeVisible();
   await expect(reason).toHaveText('Tải lên ảnh: Ảnh sản phẩm.');
   expect(await member.content()).not.toContain(PROMPT);
+  expect(await (await member.request.get(`/apps/${appId}`)).text()).not.toContain(PROMPT); // the server HTML with its inline flight data, not only the DOM
   await expect(member.getByRole('tab', { name: 'Lịch sử' })).toHaveCount(0);
 
   await member.locator('input[type=file][aria-label="Ảnh sản phẩm"]').setInputFiles({ name: 'mine.png', mimeType: 'image/png', buffer: png() });

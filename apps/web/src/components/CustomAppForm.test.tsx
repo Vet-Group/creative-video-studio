@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, test, vi } from 'vitest';
+import { ApiError } from '@/lib/api';
 import { toAppConfig } from '@/lib/custom-apps';
 import type { AppPrice } from '@/lib/use-app-price';
-import { CustomAppForm } from './CustomAppForm';
+import { CustomAppForm, runErrorText } from './CustomAppForm';
 import { JobsProvider } from './jobs';
 
 const state = vi.hoisted(() => ({ price: { loading: false, failed: false, row: { label: 'Mock E2E', usd: '0.7000' } } as AppPrice }));
@@ -50,4 +51,9 @@ test('an image app shows its resolution instead of seconds', () => {
     </JobsProvider>,
   );
   expect(html).toContain('Cài sẵn: Mock E2E · 9:16 · 2K');
+});
+
+test('a refused Run shows the run route’s own Vietnamese text, and any other error the usual one', () => {
+  expect(runErrorText(new ApiError(404, 'Không tìm thấy ứng dụng này.', null, 'custom_app'))).toBe('Không tìm thấy ứng dụng này.');
+  expect(runErrorText(new ApiError(400, 'assetIds must be strings'))).toBe('Không gửi được lượt tạo, hãy thử lại.');
 });

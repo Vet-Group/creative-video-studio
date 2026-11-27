@@ -15,6 +15,9 @@ import { useJobs } from './jobs';
 /** The photos each app was last sent with in this page load, so the same ones again ask first, as run-guard.ts's sendRun does. */
 const lastRuns = new Map<string, string>();
 
+/** What a refused Run says: the run route's own Vietnamese refusal (`custom_app`), else the usual error text. */
+export const runErrorText = (e: unknown): string => (e instanceof ApiError && e.code === CUSTOM_APP_CODE ? e.message : errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
+
 export function CustomAppForm({ app }: { app: CustomAppConfig }) {
   const { refresh, loading } = useJobs();
   const narrow = useMediaQuery(NARROW);
@@ -70,7 +73,7 @@ export function CustomAppForm({ app }: { app: CustomAppConfig }) {
       setNotice('Đã gửi lượt tạo. Theo dõi trong khay Lượt tạo của tôi.');
       await refresh();
     } catch (e) {
-      setError(e instanceof ApiError && e.code === CUSTOM_APP_CODE ? e.message : errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
+      setError(runErrorText(e));
     } finally {
       setBusy(false);
     }
@@ -130,7 +133,7 @@ export function CustomAppForm({ app }: { app: CustomAppConfig }) {
           </div>
         </div>
 
-        <div className="side" id={`app-panel-${shown === 'create' ? 'about' : shown}`} role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? `app-tab-${shown === 'create' ? 'about' : shown}` : undefined} hidden={narrow && shown === 'create'}>
+        <div className="side" id="app-panel-about" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'app-tab-about' : undefined} hidden={narrow && shown === 'create'}>
           <AppArt app={app} page />
           <article className="about about-long">
             <h2>{app.name}</h2>
