@@ -2,6 +2,7 @@
 // The video edit app: one of the member's clips (an upload or a History clip, as Motion Control takes its video) changed by one instruction, a quick edit that writes its
 // English prompt (lib/apps.ts videoEditPrompt) or the member's own words, which Enhance turns into one English edit instruction. The cost follows the clip's length.
 // Laid out like the other app pages (the form card beside History, Examples and About).
+import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { type AppConfig, EDIT_BACKGROUNDS, type EditKind, RECOLOR_COLORS, videoEditPrompt, videoEditReason } from '@/lib/apps';
@@ -54,7 +55,7 @@ function Choice({ label, name, items, value, onChange }: { label: string; name: 
   );
 }
 
-export function VideoEditApp({ app, reuse }: { app: AppConfig; reuse?: string }) {
+export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; reuse?: string; remake?: boolean }) {
   const { refresh, loading } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [video, setVideo] = useState<RefVideo | null>(null);
@@ -180,6 +181,12 @@ export function VideoEditApp({ app, reuse }: { app: AppConfig; reuse?: string })
           <div className="card form-card" id="app-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'app-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
             <div className="form-scroll">
               <AppHeader app={app} />
+              {/* Owners mixed it up with Smart Remake (2026-11-27): each form points to the other; this one only while Smart Remake's flags are on. */}
+              {remake && (
+                <p className="help">
+                  Muốn đặt đúng sản phẩm của bạn, kể cả hình in, vào video? Dùng <Link href="/apps/smart-remake">Smart Remake</Link>.
+                </p>
+              )}
               <ReferenceVideoSlot
                 label="Video cần sửa"
                 optional={false}

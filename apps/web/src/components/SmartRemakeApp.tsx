@@ -5,6 +5,7 @@
 // Or the member picks a reference video an Admin shared (SharedVideos), whose analysis is already done.
 import { ANALYZE_COST_USD } from '@cvs/core/analysis/breakdown';
 import { REMAKE_MAX_SHOTS } from '@cvs/core/analysis/remake';
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import type { AppConfig } from '@/lib/apps';
@@ -229,6 +230,9 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
           <div className="form-scroll">
             <AppHeader app={app} />
             <p className="help">Chỉ cần một video mẫu và một ảnh sản phẩm. AI phân tích video, chọn sẵn các cảnh có sản phẩm giống của bạn, rồi bạn bấm một nút để tạo video.</p>
+            <p className="help">
+              Chỉ cần đổi màu áo hoặc nền? Dùng <Link href="/apps/video-edit">Sửa video</Link>: rẻ hơn và giữ âm thanh gốc.
+            </p>
             {/* The shared shelf first: a seller without a reference video of their own starts there (owner, 2026-11-16). */}
             <SharedVideos busy={locked} currentId={analysis?.id} onPick={takeShared} />
             <ReferenceVideoSlot

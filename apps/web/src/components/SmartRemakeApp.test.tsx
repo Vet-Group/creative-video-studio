@@ -22,6 +22,11 @@ test('the app asks for two things only, a reference video and one product image,
   expect(html).toContain('Giới thiệu'); // the About tab beside the form
 });
 
+test('the form sends a member who only wants a new colour or backdrop to Sửa video', () => {
+  const html = renderToStaticMarkup(<SmartRemakeApp app={appBySlug('smart-remake')!} />);
+  expect(html).toContain('Chỉ cần đổi màu áo hoặc nền? Dùng <a href="/apps/video-edit">Sửa video</a>: rẻ hơn và giữ âm thanh gốc.');
+});
+
 test('a scene pick becomes stored shots in the answer order, drops numbers the video does not have and keeps at most the cap', () => {
   const first = [1, 3, 6, 9];
   expect(scenePicks(first, ['2', '4'], 6)).toEqual([3, 9]);
