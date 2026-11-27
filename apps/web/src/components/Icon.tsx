@@ -5,6 +5,7 @@ const PATHS = {
   image: 'M2 3h12v10H2z M2 11.5l3.5-3.5 3 3 2-2 3.5 3 M10.5 5.6h.01',
   megaphone: 'M2 6.5v3h2.5l5 3v-9l-5 3z M12 6a2.5 2.5 0 0 1 0 4 M4.5 9.5l1 4h1.5l-.7-3.5',
   apps: 'M2.5 2.5h3v3h-3z M6.5 2.5h3v3h-3z M10.5 2.5h3v3h-3z M2.5 6.5h3v3h-3z M6.5 6.5h3v3h-3z M10.5 6.5h3v3h-3z M2.5 10.5h3v3h-3z M6.5 10.5h3v3h-3z M10.5 10.5h3v3h-3z',
+  appmake: 'M2.5 2.5h4.5v4.5h-4.5z M9 2.5h4.5v4.5H9z M2.5 9h4.5v4.5h-4.5z M11.25 9.25v4 M9.25 11.25h4', // three tiles and a plus: an app the Admin makes
   library: 'M2 2h5v5H2z M9 2h5v5H9z M2 9h5v5H2z M9 9h5v5H9z',
   admin: 'M8 1.5l5.5 2v4c0 3.2-2.3 5.6-5.5 7-3.2-1.4-5.5-3.8-5.5-7v-4z',
   gear: 'M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z M8 1v2 M8 13v2 M1 8h2 M13 8h2 M3.05 3.05l1.4 1.4 M11.55 11.55l1.4 1.4 M3.05 12.95l1.4-1.4 M11.55 4.45l1.4-1.4',

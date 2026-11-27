@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useId, useState } from 'react';
+import { confirmDialog } from '@/components/Confirm';
 import { api, sendJson, thumbUrl } from '@/lib/api';
 import { useAction } from '@/lib/admin-ui';
 import { CATEGORIES } from '@/lib/apps';
@@ -63,6 +64,9 @@ function EditorForm({ jobId, source, app }: { jobId: string; source: AppSource; 
   );
   const change = (n: number, patch: Partial<Row>) => setRows((cur) => cur.map((r, i) => (i === n ? { ...r, ...patch } : r)));
   const fields: AppFields = { name, description, category, prompt, inputs: rows.map((r) => (r.fixed ? { fixed: true } : { slot: { label: r.label, hint: r.hint } })) };
+  // What the form held when it opened, so «Huỷ» asks before it drops an edit.
+  const [opened] = useState(() => JSON.stringify({ fields, published }));
+  const dirty = JSON.stringify({ fields, published }) !== opened;
   const live = (n: number) => source.images.some((i) => i.id === source.inputIds[n]);
   // An edit sends only the fields that differ from the saved app, so it never overwrites another Admin's change to the rest (nor audits an unchanged save).
   const clean = cleanApp(fields);
@@ -83,6 +87,10 @@ function EditorForm({ jobId, source, app }: { jobId: string; source: AppSource; 
       () => (app ? api(`/api/admin/apps/${app.id}`, sendJson('PATCH', patch)) : api('/api/admin/apps', sendJson('POST', { ...fields, jobId, publish: published }))),
       'Không lưu được ứng dụng.',
     );
+  }
+
+  async function leave() {
+    if (await confirmDialog({ title: 'Bỏ các thay đổi chưa lưu?', body: 'Những gì vừa nhập trong biểu mẫu sẽ mất.', confirmLabel: 'Bỏ thay đổi', danger: true })) router.push('/admin/apps');
   }
 
   return (
@@ -176,7 +184,15 @@ function EditorForm({ jobId, source, app }: { jobId: string; source: AppSource; 
         <button type="submit" className="primary" disabled={pending || reason !== null} aria-describedby={`${id}-reason`}>
           Lưu
         </button>
-        <Link href="/admin/apps" className="button">
+        <Link
+          href="/admin/apps"
+          className="button"
+          onClick={(e) => {
+            if (!dirty) return;
+            e.preventDefault();
+            void leave();
+          }}
+        >
           Huỷ
         </Link>
       </div>

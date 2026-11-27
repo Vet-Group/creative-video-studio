@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
 import { confirmDialog } from '@/components/Confirm';
 import { api, sendJson } from '@/lib/api';
 import { useAction } from '@/lib/admin-ui';
@@ -14,17 +15,33 @@ const chip = (r: AdminAppRow) => (!r.sourceLive ? 'Kết quả gốc đã bị x
 export function AdminApps({ rows }: { rows: AdminAppRow[] }) {
   const router = useRouter();
   const { problem, pending, run } = useAction(() => router.refresh());
-  const head = <PageHead id="apps-title" title="Ứng dụng tự tạo" lead="Ứng dụng một chạm làm từ một kết quả trong Thư viện: thành viên chỉ tải ảnh lên rồi bấm Chạy, mô tả và cài đặt do Admin đặt sẵn." />;
+  const title = useRef<HTMLHeadingElement>(null);
+  const [done, setDone] = useState('');
+  // A row action disables its button and may remove the row, which drops keyboard focus to the page: it goes to the title, and the line below says what happened.
+  async function act(change: () => Promise<unknown>, fallback: string, message: string) {
+    setDone('');
+    if (await run(change, fallback)) {
+      setDone(message);
+      title.current?.focus();
+    }
+  }
+  const status = (
+    <p className="muted" role="status">
+      {done}
+    </p>
+  );
+  const head = <PageHead id="apps-title" headRef={title} title="Ứng dụng tự tạo" lead="Ứng dụng một chạm làm từ một kết quả trong Thư viện: thành viên chỉ tải ảnh lên rồi bấm Chạy, mô tả và cài đặt do Admin đặt sẵn." />;
 
   async function remove(r: AdminAppRow) {
     if (!(await confirmDialog({ title: `Xoá ứng dụng «${r.name}»?`, body: 'Ứng dụng biến mất khỏi trang Ứng dụng. Clip gốc và các lượt đã chạy vẫn còn.', confirmLabel: 'Xoá ứng dụng', danger: true }))) return;
-    void run(() => api(`/api/admin/apps/${r.id}`, { method: 'DELETE' }), 'Không xoá được ứng dụng.');
+    void act(() => api(`/api/admin/apps/${r.id}`, { method: 'DELETE' }), 'Không xoá được ứng dụng.', `Đã xoá ứng dụng «${r.name}».`);
   }
 
   if (rows.length === 0) {
     return (
       <section aria-labelledby="apps-title">
         {head}
+        {status}
         <Empty title="Chưa có ứng dụng nào.">Mở một kết quả trong Thư viện rồi bấm Biến thành ứng dụng.</Empty>
       </section>
     );
@@ -32,6 +49,7 @@ export function AdminApps({ rows }: { rows: AdminAppRow[] }) {
   return (
     <section aria-labelledby="apps-title">
       {head}
+      {status}
       {problem && (
         <p className="error" role="alert">
           {problem}
@@ -63,7 +81,7 @@ export function AdminApps({ rows }: { rows: AdminAppRow[] }) {
                       </Link>
                     )}
                     {(r.sourceLive || r.published) && (
-                      <button type="button" disabled={pending} aria-label={`${r.published ? 'Gỡ khỏi trang Ứng dụng' : 'Đăng lên trang Ứng dụng'}: ${r.name}`} onClick={() => void run(() => api(`/api/admin/apps/${r.id}`, sendJson('PATCH', { published: !r.published })), r.published ? 'Không gỡ được ứng dụng.' : 'Không đăng được ứng dụng.')}>
+                      <button type="button" disabled={pending} aria-label={`${r.published ? 'Gỡ khỏi trang Ứng dụng' : 'Đăng lên trang Ứng dụng'}: ${r.name}`} onClick={() => void act(() => api(`/api/admin/apps/${r.id}`, sendJson('PATCH', { published: !r.published })), r.published ? 'Không gỡ được ứng dụng.' : 'Không đăng được ứng dụng.', r.published ? `Đã gỡ «${r.name}» khỏi trang Ứng dụng.` : `Đã đăng «${r.name}» lên trang Ứng dụng.`)}>
                         {r.published ? 'Gỡ khỏi trang Ứng dụng' : 'Đăng lên trang Ứng dụng'}
                       </button>
                     )}
