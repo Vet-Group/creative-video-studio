@@ -105,16 +105,16 @@ describe('fal', () => {
     expect(calls).toHaveLength(withEnd.length);
   });
 
-  test('a padded Run reads both frames padded to the ratio (the H3 reference images stay as they are) and sends the prompt unchanged', async () => {
+  test('a padded Run reads both frames padded to the ratio (the H3 reference images keep their shape, put on white) and sends the prompt unchanged', async () => {
     const reads: Record<string, string[]> = {};
     const prompt = 'A closed kraft gift box sits alone. The product from Image 1 holds still, exactly as in Image 1.';
     const { fn, calls } = fakeFetch([200, { request_id: 'r' }], [200, { request_id: 'r' }], [200, { request_id: 'r' }]);
     for (const [endpoint, start] of [['minimax/h3-max-turbo/image-to-video', 'asset://start'], ['minimax/h3-max/reference-to-video', 'asset://ref']] as const) {
-      const read = async (url: string, opts?: { ratio?: string; pad?: boolean }) => ((reads[endpoint] ??= []).push(`${url} ${opts?.ratio ?? 'as is'}${opts?.pad ? ' pad' : ''}`), readImage(url));
+      const read = async (url: string, opts?: { ratio?: string; pad?: boolean; flatten?: boolean }) => ((reads[endpoint] ??= []).push(`${url} ${opts?.ratio ?? 'as is'}${opts?.pad ? ' pad' : ''}${opts?.flatten ? ' flatten' : ''}`), readImage(url));
       await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...req, prompt, pad: true, imageUrls: [start], endImageUrl: 'asset://end', model: { ...kling, endpoint } });
     }
     expect(reads['minimax/h3-max-turbo/image-to-video']).toEqual(['asset://start 9:16 pad', 'asset://end 9:16 pad']);
-    expect(reads['minimax/h3-max/reference-to-video']).toEqual(['asset://ref as is', 'asset://end 9:16 pad']);
+    expect(reads['minimax/h3-max/reference-to-video']).toEqual(['asset://ref as is flatten', 'asset://end 9:16 pad']);
     expect(calls[1]!.body).toMatchObject({ prompt });
     // Without pad the same Run crops, as before.
     const crops: string[] = [];
