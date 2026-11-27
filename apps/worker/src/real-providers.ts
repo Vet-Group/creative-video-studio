@@ -81,6 +81,10 @@ export const assetReader =
     if (!rows[0]) throw new Error('asset not found');
     const bytes = await read(rows[0].s3_key);
     if (rows[0].mime.startsWith('video/') || rows[0].mime.startsWith('audio/')) return { bytes, contentType: rows[0].mime };
+    // A cutout's transparent backdrop is put on white, as padToRatio does for the end frame; the providers' handling of alpha is untested.
+    if (!opts?.ratio && opts?.flatten && (await sharp(bytes).metadata()).hasAlpha) {
+      return fitForInline(new Uint8Array(await sharp(bytes).rotate().flatten({ background: '#ffffff' }).jpeg({ quality: 92, mozjpeg: true }).toBuffer()), 'image/jpeg');
+    }
     if (!opts?.ratio) return fitForInline(bytes, rows[0].mime);
     const fitted = await (opts.pad ? padToRatio : cropToRatio)(bytes, opts.ratio);
     return fitForInline(fitted.bytes, fitted.contentType);

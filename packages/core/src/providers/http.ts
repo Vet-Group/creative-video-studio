@@ -30,7 +30,8 @@ export const isFundingRefusal = (e: unknown): boolean =>
 export type Fetch = typeof fetch;
 
 /** Reads the bytes behind a non-https image URL (the worker's `asset://<id>`); with `ratio` ('9:16') the image is centre-cropped to it first, or padded to it with `pad`. */
-export type ReadImage = (url: string, opts?: { ratio?: string; pad?: boolean }) => Promise<{ bytes: Uint8Array; contentType: string }>;
+/** `flatten`: an image with transparency is put on white first (a padded Run's references, which are read as they are). */
+export type ReadImage = (url: string, opts?: { ratio?: string; pad?: boolean; flatten?: boolean }) => Promise<{ bytes: Uint8Array; contentType: string }>;
 
 /** Every request after submit gets a bounded wait, so a stuck provider cannot hang a poll. */
 export const timeout = (ms = 30_000): AbortSignal => AbortSignal.timeout(ms);
@@ -70,7 +71,7 @@ export async function sendJson(f: Fetch, what: string, url: string, init: Reques
  */
 export const MAX_INLINE_CHARS = 3_600_000;
 
-export async function resolveImages(urls: string[], readImage?: ReadImage, opts?: { ratio?: string; pad?: boolean; maxChars?: number }): Promise<string[]> {
+export async function resolveImages(urls: string[], readImage?: ReadImage, opts?: { ratio?: string; pad?: boolean; flatten?: boolean; maxChars?: number }): Promise<string[]> {
   const out = await Promise.all(
     urls.map(async (url) => {
       if (url.startsWith('https:')) return url;
