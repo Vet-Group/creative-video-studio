@@ -6,7 +6,7 @@ import { type ReactNode, useEffect, useId, useState } from 'react';
 import { api, errorText } from '@/lib/api';
 import { cardSample } from '@/lib/examples';
 import { MAX_ENDING, MAX_HOOK, type ParamFormat } from '@/lib/marketing';
-import type { PromptTemplate } from '@/lib/prompt-starters';
+import { MOTION_KINDS, type PromptTemplate, suits } from '@/lib/prompt-starters';
 import { useHydrated } from '@/lib/use-hydrated';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { reloadSamples, useSamples, versionedSample } from '@/lib/use-samples';
@@ -69,6 +69,8 @@ interface Props {
   /** The page has the end text box, which the Ending rule points to for words on the picture. */
   endText?: boolean;
   templates: PromptTemplate[];
+  /** A product type (PRODUCT_TYPES key) the page is filtered by: the dialog opens on the type chip holding it. */
+  productType?: string;
   /** Fills the sections (in free writing, the one box) from a template; `filled` says whether that replaces words, which the member confirms first. */
   onTemplate: (template: PromptTemplate) => void;
   filled: boolean;
@@ -80,11 +82,16 @@ interface Props {
 /** How many recent hooks, and as many endings, the templates dialog lists. */
 const RECENT_MAX = 3;
 
-export function PromptSections({ feature, format, mode, onMode, hook, ending, endText, templates, onTemplate, filled, onRun, children }: Props) {
+export function PromptSections({ feature, format, mode, onMode, hook, ending, endText, templates, productType, onTemplate, filled, onRun, children }: Props) {
   const name = useId();
   const hookId = useId();
   const endingId = useId();
   const [open, setOpen] = useState(false);
+  /** The type chips (Create's motion packs): the groups some template is tagged for, and the chosen one (-1: all). */
+  const kinds = MOTION_KINDS.filter((k) => templates.some((t) => t.types && suits(t, k.types)));
+  const [kind, setKind] = useState(-1);
+  const chip = kinds[kind];
+  const shown = chip ? templates.filter((t) => suits(t, chip.types)) : templates;
   /** The member's own last hooks and endings (GET /api/recent-prompts?field=), fetched each time the dialog opens; empty when there are none or the fetch fails. */
   const [recent, setRecent] = useState<{ hook: string[]; ending: string[] }>({ hook: [], ending: [] });
   const narrow = useMediaQuery(NARROW);
@@ -127,8 +134,17 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
     <>
       <h2>Khung prompt</h2>
       <p className="modal-sub">Điền sẵn Hook · Diễn biến · Cảnh kết để bạn sửa tiếp.</p>
+      {kinds.length > 0 && (
+        <div className="kinds kinds-wrap" role="group" aria-label="Lọc theo loại hàng">
+          {[{ label: 'Tất cả' }, ...kinds].map((k, i) => (
+            <button key={k.label} type="button" aria-pressed={kind === i - 1} onClick={() => setKind(i - 1)}>
+              {k.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="choice-grid prompt-template-grid" role="group" aria-label="Khung prompt">
-        {templates.map((t) => {
+        {shown.map((t) => {
           const clip = cardSample(have, `template-${t.id}`);
           return (
             <div key={t.id} className="prompt-template">
@@ -178,7 +194,7 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
             </label>
           ))}
         </div>
-        <button type="button" className="link-button" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        <button type="button" className="link-button" aria-haspopup="dialog" onClick={() => (setKind(kinds.findIndex((k) => productType !== undefined && k.types.includes(productType))), setOpen(true))}>
           <Icon name="preset" size={12} />
           Khung prompt
         </button>

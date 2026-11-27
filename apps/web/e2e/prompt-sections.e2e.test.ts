@@ -396,3 +396,34 @@ test('Khung prompt: a seeded template clip shows on its card, a needs note shows
     await admin.close();
   }
 });
+
+test('Create: the templates dialog filters by product type (motion packs), and Marketing Studio has no type chips', async ({ page }) => {
+  await signIn(page, 'secta');
+  await page.goto('/create');
+  const dialog = await openPromptTemplates(page);
+  const kinds = dialog.getByRole('group', { name: 'Lọc theo loại hàng' });
+  const group = dialog.getByRole('group', { name: 'Khung prompt' });
+  const tile = (name: string) => group.getByRole('button', { name: new RegExp(`^${name}`) });
+  await expect(kinds.getByRole('button', { name: 'Tất cả' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(group.getByRole('button')).toHaveCount(PROMPT_TEMPLATES.video.length);
+  // A mug chip: the mug motions and the ones for any product, none of the garment ones.
+  await kinds.getByRole('button', { name: 'Cốc, tumbler' }).click();
+  await expect(kinds.getByRole('button', { name: 'Cốc, tumbler' })).toHaveAttribute('aria-pressed', 'true');
+  const mugs = PROMPT_TEMPLATES.video.filter((t) => !t.types || t.types.includes('mug') || t.types.includes('tumbler'));
+  await expect(group.getByRole('button')).toHaveCount(mugs.length);
+  await expect(tile('Cốc bốc hơi')).toBeVisible();
+  await expect(tile('Xoay 360°')).toBeVisible();
+  await expect(tile('Treo móc')).toHaveCount(0);
+  // Each opening starts on all again; a template from a chip fills the sections as before.
+  await page.keyboard.press('Escape');
+  const again = await openPromptTemplates(page);
+  await expect(again.getByRole('group', { name: 'Lọc theo loại hàng' }).getByRole('button', { name: 'Tất cả' })).toHaveAttribute('aria-pressed', 'true');
+  await again.getByRole('group', { name: 'Lọc theo loại hàng' }).getByRole('button', { name: 'Ornament' }).click();
+  await again.getByRole('group', { name: 'Khung prompt' }).getByRole('button', { name: /^Ornament trên cây thông/ }).click();
+  await expect(again).toHaveCount(0);
+  await expect(hookBox(page)).toHaveValue(PROMPT_TEMPLATES.video.find((t) => t.id === 'ornament-cay-thong')!.hook);
+  await page.goto('/marketing-studio');
+  const market = await openPromptTemplates(page);
+  await expect(market.getByRole('group', { name: 'Khung prompt' })).toBeVisible();
+  await expect(market.getByRole('group', { name: 'Lọc theo loại hàng' })).toHaveCount(0);
+});
