@@ -4,6 +4,7 @@ import { FashionModelApp } from '@/components/FashionModelApp';
 import { HookEffectsApp } from '@/components/HookEffectsApp';
 import { MediaOptimizer } from '@/components/MediaOptimizer';
 import { SmartRemakeApp } from '@/components/SmartRemakeApp';
+import { VideoEditApp } from '@/components/VideoEditApp';
 import { appBySlug, isBatchId } from '@/lib/apps';
 import { pool } from '@/lib/auth';
 import { currentUser } from '@/lib/current-user';
@@ -38,6 +39,10 @@ export default async function AppRoute({ params, searchParams }: { params: Promi
   if (app.slug === 'hook-effects') {
     const from = refillFrom(q); // History's or the Library's Dùng lại: the job's photo and effect back on the form
     return <HookEffectsApp key={from} app={app} reuse={from} />;
+  }
+  if (app.slug === 'video-edit') {
+    const from = refillFrom(q) ?? exampleFrom(q); // History's, the Library's or an example's Dùng lại: the job's clip and edit back on the form
+    return <VideoEditApp key={from} app={app} reuse={from} />;
   }
   const from = refillFrom(q) ?? exampleFrom(q);
   // A photo for the first slot (History's Background Remover and Image Upscale buttons copy a result into a new input first): only the member's own image input in the active workspace.

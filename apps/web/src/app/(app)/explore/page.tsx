@@ -94,7 +94,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     dailyClips(pool, user?.id ?? ''),
     // What the member made today, by kind: a video-output feature is a clip, every other one an image (the daily clip cap counts only video and marketing, in dailyClips).
     pool.query<{ clips: number; images: number }>(
-      `select (count(*) filter (where feature in ('video', 'marketing', 'motion_control', 'hook_effect')))::int as clips, (count(*) filter (where feature not in ('video', 'marketing', 'motion_control', 'hook_effect')))::int as images
+      `select (count(*) filter (where feature in ('video', 'marketing', 'motion_control', 'hook_effect', 'video_edit')))::int as clips, (count(*) filter (where feature not in ('video', 'marketing', 'motion_control', 'hook_effect', 'video_edit')))::int as images
          from jobs where user_id = $1 and workspace_id = $2 and deleted_at is null and status in ('queued', 'submitting', 'running', 'succeeded')
           and (created_at at time zone 'Asia/Ho_Chi_Minh')::date = (now() at time zone 'Asia/Ho_Chi_Minh')::date`,
       [user?.id, workspaceId],

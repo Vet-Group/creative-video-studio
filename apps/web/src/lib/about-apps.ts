@@ -1303,6 +1303,56 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'video-edit': {
+    title: 'Sửa một video có sẵn bằng một câu lệnh',
+    sections: [
+      {
+        title: 'Sửa video là gì?',
+        blocks: [
+          'Bạn chọn một video có sẵn và nói điều cần đổi: màu áo, nền phía sau, hoặc tự mô tả thay đổi bằng lời. AI, chạy trên Kling O3 Edit, trả về chính video đó với đúng thay đổi ấy; người, chuyển động, khung hình và âm thanh gốc được giữ nguyên.',
+          `Video kết quả dài bằng video gốc. Chi phí tính theo số giây của video gốc, làm tròn lên. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Sửa video trong 3 bước',
+        lead: 'Chọn video, chọn kiểu sửa, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Chọn video', text: 'Tải lên một video MP4 hoặc MOV dài 3 đến 15 giây, mỗi cạnh từ 720 px trở lên, tối đa 20 MB, hoặc chọn một video trong Lịch sử của bạn.' },
+              { title: 'Chọn kiểu sửa', text: 'Đổi màu áo theo bảng màu có sẵn, đổi nền sang studio trắng hoặc lifestyle, hoặc chọn Tự mô tả và viết thay đổi bạn muốn.' },
+              { title: 'Chạy', text: 'Bấm Chạy và xem video trong tab Lịch sử. Muốn thử màu hay nền khác, chọn lại rồi chạy tiếp với cùng video.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Mẹo để có kết quả đẹp',
+        blocks: [
+          {
+            list: [
+              'Mỗi lần chạy chỉ sửa một thứ; muốn đổi cả màu áo lẫn nền, chạy hai lần, lần sau dùng video vừa sửa.',
+              'Khi tự mô tả, nói rõ cần đổi gì; Cải thiện (bật sẵn) dịch lời của bạn sang tiếng Anh thành một câu lệnh ngắn trước khi gửi cho mô hình.',
+              'Chưa thêm được chữ vào video: mô hình không viết chữ chính xác. Hãy chèn chữ khi dựng video.',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Một lần chạy tốn bao nhiêu?', `${APP_COST} Với giá hiện tại, mỗi giây video khoảng $0.14, nên video 10 giây khoảng $1.40. Chi phí thật nằm trên video trong Thư viện.`],
+              ['Hình in và chữ trên áo có giữ được không?', 'Câu lệnh đổi màu dặn giữ nguyên hình in và chữ, nhưng chữ nhỏ có thể bị nhoè ở vài khung hình. Hãy xem lại video trước khi đăng.'],
+              ['Âm thanh của video gốc có còn không?', 'Còn: video sửa xong giữ âm thanh của video gốc.'],
+              ['Vì sao video của tôi bị từ chối?', 'Mô hình chỉ nhận video dài 3 đến 15 giây, mỗi cạnh 720 đến 3840 px, 23 đến 60 khung hình mỗi giây. Video ngắn hơn, dài hơn hoặc nhỏ hơn cần được cắt hoặc xuất lại trước.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'smart-remake': {
     title: 'Làm lại video mẫu với sản phẩm của bạn',
     sections: [

@@ -16,6 +16,7 @@ vi.mock('@/components/FashionModelApp', () => ({ FashionModelApp: () => null }))
 vi.mock('@/components/HookEffectsApp', () => ({ HookEffectsApp: () => null }));
 vi.mock('@/components/MediaOptimizer', () => ({ MediaOptimizer: () => null }));
 vi.mock('@/components/SmartRemakeApp', () => ({ SmartRemakeApp: () => null }));
+vi.mock('@/components/VideoEditApp', () => ({ VideoEditApp: () => null }));
 
 const { auth, pool } = await import('@/lib/auth');
 const { currentUser } = await import('@/lib/current-user');

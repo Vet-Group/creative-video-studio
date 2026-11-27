@@ -22,3 +22,10 @@ test("the hook effects app's effect is kept only when it is one of the effects",
   expect(templateData({ images: ['p'], effect: 'drop' })).toMatchObject({ effect: 'drop' });
   expect(templateData({ images: ['p'], effect: 'confetti' })).toBe('data.effect must be one of the hook effects');
 });
+
+test("the video edit's colour and backdrop are kept only when they are a recolor swatch and one of its backdrops", () => {
+  expect(templateData({ images: ['v'], color: '#C8102E' })).toMatchObject({ color: '#C8102E' });
+  expect(templateData({ images: ['v'], color: '#123456' })).toBe('data.color must be one of the recolor swatches');
+  expect(templateData({ images: ['v'], background: 'lifestyle' })).toMatchObject({ background: 'lifestyle' });
+  expect(templateData({ images: ['v'], background: 'keep' })).toBe('data.background must be one of the video edit backdrops');
+});

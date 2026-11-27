@@ -621,6 +621,28 @@ describe('Motion Control reference length', () => {
   });
 });
 
+describe('Video edit', () => {
+  test("its clip goes as the job's one input, its own words are rewritten as an edit instruction, and a clip that plays past its stored length is refused before submit", async () => {
+    const asked: string[] = [];
+    const requests: SubmitRequest[] = [];
+    const provider = counting(300, (inner) => ({ ...inner, submit: async (req) => (requests.push(req), inner.submit(req)) }));
+    workers.push(await startWorker({ pool, connectionString: testDb.url, providers: { mock: provider }, enhance: async (p, kind) => (asked.push(kind), { prompt: `Edit [Video1]: ${p}`, costUsd: null, provider: 'fal', model: 'm' }), options: FAST }));
+    await storeClip('edit-ok', 4, 4000);
+    await storeClip('edit-long', 8, 4000); // its header says 4 s
+    const ok = await newJob('u1', { prompt: 'đổi áo sang màu đỏ' });
+    const long = await newJob('u2', { prompt: 'edit-long' });
+    await pool.query(`update jobs set feature = 'video_edit', enhance = true, input_asset_ids = '{edit-ok}' where id = $1`, [ok]);
+    await pool.query(`update jobs set feature = 'video_edit', input_asset_ids = '{edit-long}' where id = $1`, [long]);
+    await send(ok, 'u1');
+    await send(long, 'u2');
+    await waitFor('both jobs to finish', async () => (await status(ok)) === 'succeeded' && (await status(long)) === 'failed');
+    expect(asked).toEqual(['edit']);
+    expect(requests.map((r) => [r.prompt, r.imageUrls])).toEqual([['Edit [Video1]: đổi áo sang màu đỏ', ['asset://edit-ok']]]);
+    expect((await job(long)).error).toMatch(/^the reference video plays 8\.0 s, but its file header says 4\.0 s/);
+    expect(await total(long)).toEqual({ usd: '0.0000', is_final: true });
+  });
+});
+
 describe('Marketing Studio reference video price', () => {
   test('the submit and the status that settles the job both see the rate that includes the clip: $0.222 x (5 s out + 5 s reference) / 5 s on Seedance 2.0 Reference', async () => {
     const rates: [string, number][] = [];

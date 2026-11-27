@@ -213,6 +213,9 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'fal-ai/minimax/hailuo-2.3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images) }) },
   'fal-ai/kling-video/v3/pro/motion-control': { upload: true, build: (req, inputs) => motion(req, inputs) },
   'fal-ai/kling-video/v3/standard/motion-control': { upload: true, build: (req, inputs) => motion(req, inputs) },
+  // The video edit app's one row (schema read 2026-11-27): the member's clip is the job's one input, uploaded as Motion Control's is, and `video` holds that clip's limits for the
+  // jobs API (videoInputs, videoRefProblem): MP4 or MOV, 3 to 15 s (the schema says 15.05), 720 to 3840 px a side, 23 to 60 fps, at most 200 MB. No ratio or duration field: the clip sets both.
+  'fal-ai/kling-video/o3/standard/video-to-video/edit': { upload: true, video: { field: 'video_url', single: true, minSec: 3, maxSec: 15, maxMb: 200, dims: { minSide: 720, maxSide: 3840 }, fps: [23, 60], name: atVideo }, build: (req, inputs) => videoEdit(req, inputs) },
   // The text twins (`text` above), each from its own schema (read 2026-10-30): the same resolution and audio switch as the image endpoint it stands in for.
   'fal-ai/kling-video/o3/pro/text-to-video': { build: (req) => words(req, seconds(req), { generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v3/pro/text-to-video': { build: (req) => words(req, seconds(req), { generate_audio: req.audio === true }) },
@@ -290,6 +293,16 @@ function remakeEdit(req: SubmitRequest, [reference_image_url, video_url, ...rest
 function motion(req: SubmitRequest, [image_url, video_url, ...rest]: string[]): Record<string, unknown> {
   if (!image_url || !video_url || rest.length > 0) throw new ImageReadError('motion control needs the character image and the reference video');
   return { image_url, video_url, character_orientation: req.orientation ?? 'video', keep_original_sound: false, ...(req.prompt.trim() && { prompt: req.prompt }) };
+}
+
+/**
+ * The video edit: the member's clip (the one input) changed as the prompt says, which names the clip [Video1] (the endpoint's @Video1). Own words that do not name it
+ * (Enhance off, or Enhance failed) are led by `Edit [Video1]: ` so the model still edits that clip. An edit keeps the clip's own sound.
+ */
+function videoEdit(req: SubmitRequest, [video_url, ...rest]: string[]): Record<string, unknown> {
+  if (!video_url || rest.length > 0) throw new ImageReadError('the video edit needs exactly one clip');
+  const prompt = req.prompt.includes('[Video1]') ? req.prompt : `Edit [Video1]: ${req.prompt}`;
+  return { prompt: videoTokens(prompt, atVideo), video_url, keep_audio: true };
 }
 
 /**

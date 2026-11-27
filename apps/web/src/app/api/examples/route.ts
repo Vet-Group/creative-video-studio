@@ -9,7 +9,7 @@ import { guard } from '@/lib/session';
 const MAX = 500;
 const badFeature = () => Response.json({ error: `feature must be one of ${Object.keys(GALLERY_SAMPLES).join(', ')}` }, { status: 400 });
 
-/** The results on one page's Examples tab (`?feature=video|image|try_on|marketing|jewelry_try_on|lingerie_try_on|pose_generator|product_recolor|listing_set|motion_control`) of the active workspace in the tab's order, for an Admin to reorder. */
+/** The results on one page's Examples tab (`?feature=video|image|try_on|marketing|jewelry_try_on|lingerie_try_on|pose_generator|product_recolor|listing_set|motion_control|video_edit`) of the active workspace in the tab's order, for an Admin to reorder. */
 export async function GET(request: Request) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;

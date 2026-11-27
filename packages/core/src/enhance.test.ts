@@ -26,6 +26,16 @@ test('uses the image system prompt for an image job, cuts a long answer to the m
   expect(r).toEqual({ prompt: 'x'.repeat(2500), costUsd: null, provider: 'fal', model: ENHANCE_MODEL });
 });
 
+test('a video edit gets its own short edit instruction prompt, which names the clip [Video1] and translates, never the motion brief', async () => {
+  let sent = '';
+  const enhance = createFalEnhancer({ apiKey: 'k', fetch: (_u, init) => ((sent = String(init!.body)), answer({ output: 'Make the shirt in [Video1] red; keep everything else.' })) });
+  await enhance('đổi áo sang màu đỏ', 'edit', 2500);
+  expect(JSON.parse(sent).system_prompt).toBe(SYSTEM_PROMPTS.edit);
+  expect(SYSTEM_PROMPTS.edit).toContain('[Video1]');
+  expect(SYSTEM_PROMPTS.edit).toContain('translated to English if the request is not in English; only quoted text stays exactly as written');
+  expect(SYSTEM_PROMPTS.edit).not.toContain('camera movement');
+});
+
 test('an empty answer, an error field or an HTTP error throws, so the caller keeps the member’s prompt', async () => {
   await expect(createFalEnhancer({ apiKey: 'k', fetch: () => answer({ output: '  ' }) })('a', 'video', 2000)).rejects.toThrow('empty answer');
   await expect(createFalEnhancer({ apiKey: 'k', fetch: () => answer({ output: 'b', error: 'rate limited' }) })('a', 'video', 2000)).rejects.toThrow('rate limited');

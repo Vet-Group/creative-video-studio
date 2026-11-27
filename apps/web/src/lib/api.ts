@@ -135,9 +135,11 @@ export interface TrayJob {
   poseRef: string | null;
   /** A pose generator result's face likeness to its model photo, set by the worker (the cosine of two faces, 2 decimals), or why there is none; null for any other job and while it is not scored. */
   faceMatch: { score: number } | { noFace: 'model' | 'result' } | null;
-  /** A product recolor job's colour (#RRGGBB) and a listing set job's shot (an id of LISTING_SHOTS); null for any other job. */
+  /** A product recolor or video edit job's colour (#RRGGBB) and a listing set job's shot (an id of LISTING_SHOTS); null for any other job. */
   color: string | null;
   shot: string | null;
+  /** A video edit job's backdrop (a value of EDIT_BACKGROUNDS); null for any other job. */
+  background: string | null;
   /** The id every job of one Run of a batch app shares (BATCH_FEATURES); null for any other job. */
   batch: string | null;
   favorite: boolean;

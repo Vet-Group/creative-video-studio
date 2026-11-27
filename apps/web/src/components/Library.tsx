@@ -747,7 +747,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
             <p>{sent}</p>
           </details>
         )}
-        {job && job.images.length > 0 && clip.feature !== 'motion_control' && (
+        {job && job.images.length > 0 && clip.feature !== 'motion_control' && clip.feature !== 'video_edit' && (
           <div className="recipe-text">
             <h3>Ảnh đầu vào</h3>
             <ul ref={inputs} className="job-inputs" aria-label="Ảnh đầu vào">

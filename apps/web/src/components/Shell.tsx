@@ -292,8 +292,8 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
           )
         ) : WAITING.includes(job.status) ? (
           <span className="job-media-empty job-media-wait" style={{ aspectRatio: ratioBox(job.ratio) }}>
-            {/* The first input photo, blurred, behind the wait; a Motion Control input is a clip, which has no thumbnail. */}
-            {job.inputAssetIds[0] && job.feature !== 'motion_control' && <img className="job-wait-input" src={thumbUrl(job.inputAssetIds[0])} alt="" onError={(e) => (e.currentTarget.hidden = true)} />}
+            {/* The first input photo, blurred, behind the wait; a Motion Control or video edit input is a clip, which has no thumbnail. */}
+            {job.inputAssetIds[0] && job.feature !== 'motion_control' && job.feature !== 'video_edit' && <img className="job-wait-input" src={thumbUrl(job.inputAssetIds[0])} alt="" onError={(e) => (e.currentTarget.hidden = true)} />}
             <span className="job-wait-status">
               <span>{statusText(job)}</span>
               <WaitProgress job={job} />
@@ -354,7 +354,8 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
             </p>
           </div>
         )}
-        {job.inputAssetIds.length > 0 && job.feature !== 'motion_control' && (
+        {/* A video edit's one input is its clip, which goes back through Dùng lại. */}
+        {job.inputAssetIds.length > 0 && job.feature !== 'motion_control' && job.feature !== 'video_edit' && (
           <ul className="job-inputs" aria-label="Ảnh đầu vào">
             {job.inputAssetIds.map((id, n) => (
               <InputThumb key={id} photo={{ asset: id }} n={n} role={roleOf(job.feature, n, { garments: job.garments, format: job.format, roles: job.roles })} thumb={thumbUrl(id)} full={content(id)} />

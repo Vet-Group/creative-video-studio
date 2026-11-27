@@ -23,7 +23,7 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * unless every supported model scores the same; for Create Video (`?feature=video` or none) and Marketing Studio (`?feature=marketing`) while the active Vertex account runs on credits alone (vertexOnCredits), the best
  * supported Vertex model is pre-selected and flagged `recommended` instead, whatever the others score. Pass rate = (seed passes + marked passes) / (seed total + marked total) over every marked clip, deleted or
  * purged ones included; null while nothing is counted. The score also weighs how often real jobs of the model end well (lib/model-scores.ts).
- * `?feature=video`, `marketing`, `motion_control` or `hook_effect` keeps the models whose `features` lists it (`hook_effect` also needs `?effect=`, and lists only that effect's endpoint) (Marketing Studio also accepts ratio 16:9, Motion Control takes only `auto`); without it every enabled video model is listed.
+ * `?feature=video`, `marketing`, `motion_control`, `hook_effect` or `video_edit` keeps the models whose `features` lists it (`hook_effect` also needs `?effect=`, and lists only that effect's endpoint) (Marketing Studio also accepts ratio 16:9, Motion Control and the video edit take only `auto`); without it every enabled video model is listed.
  * `audioEstimateUsd` is the estimate with native audio on, null for a model that cannot make audio; `alwaysAudio` is true for one that cannot be silent (ALWAYS_AUDIO). `endFrame` is true for a model that takes an end frame, `textOnly` for one that runs from the prompt alone, and `audioClips` the reference audio it takes ({ max, seconds }, or null; videoInputs).
  * `videoRefs` is the reference video it takes ({ max, minSec, maxSec, maxMb, maxImages }, or null; videoInputs), and `?videoSec=` the length of the one chosen, which the estimates of the models that bill it then include.
  * `isNew` is true for a model added in the last 14 days (the picker's badge).
@@ -44,12 +44,12 @@ export async function GET(request: Request) {
   const ratio = q.get('ratio');
   const durationSec = q.get('durationSec') ? Number(q.get('durationSec')) : NaN;
   const feature = q.get('feature');
-  if (feature !== null && !['video', 'marketing', 'motion_control', 'hook_effect'].includes(feature)) return Response.json({ error: 'feature must be video, marketing, motion_control or hook_effect' }, { status: 400 });
+  if (feature !== null && !['video', 'marketing', 'motion_control', 'hook_effect', 'video_edit'].includes(feature)) return Response.json({ error: 'feature must be video, marketing, motion_control, hook_effect or video_edit' }, { status: 400 });
   // A hook effect runs only on its own endpoint: its rows are the only ones listed, before a duplicate pair is thinned and the default is chosen.
   const effect = feature === 'hook_effect' ? hookEffect(q.get('effect') ?? '') : undefined;
   if (feature === 'hook_effect' && !effect) return Response.json({ error: 'effect must be one of the hook effects' }, { status: 400 });
-  // Motion Control's output follows the reference video, so its only ratio is 'auto'. Create Video offers each ratio some video schema takes (0037, 0094); `auto` follows the input image, so a model serves it only for a Run with an image.
-  const ratios: readonly (string | null)[] = feature === 'marketing' ? [...ASPECTS, '16:9'] : feature === 'motion_control' ? ['auto'] : [...ASPECTS, '16:9', '4:3', '3:4', '21:9', 'auto'];
+  // Motion Control's output follows the reference video and the video edit's its clip, so their only ratio is 'auto'. Create Video offers each ratio some video schema takes (0037, 0094); `auto` follows the input image, so a model serves it only for a Run with an image.
+  const ratios: readonly (string | null)[] = feature === 'marketing' ? [...ASPECTS, '16:9'] : feature === 'motion_control' || feature === 'video_edit' ? ['auto'] : [...ASPECTS, '16:9', '4:3', '3:4', '21:9', 'auto'];
   if (!ratios.includes(ratio) || !Number.isInteger(durationSec)) {
     return Response.json({ error: 'ratio and durationSec (a whole number) are required' }, { status: 400 });
   }
