@@ -4,15 +4,22 @@ import { FashionModelApp } from '@/components/FashionModelApp';
 import { HookEffectsApp } from '@/components/HookEffectsApp';
 import { MediaOptimizer } from '@/components/MediaOptimizer';
 import { SmartRemakeApp } from '@/components/SmartRemakeApp';
-import { appBySlug } from '@/lib/apps';
+import { appBySlug, isBatchId } from '@/lib/apps';
 import { pool } from '@/lib/auth';
 import { currentUser } from '@/lib/current-user';
+import { customApp } from '@/lib/custom-apps-db';
 import { smartRemakeAppEnabled } from '@/lib/remake';
 import { exampleFrom, refillFrom } from '@/lib/reuse';
 
 export default async function AppRoute({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ reuse?: string; template?: string; example?: string; analysis?: string | string[]; product?: string | string[]; image?: string | string[] }> }) {
-  const app = appBySlug((await params).slug);
+  const { slug } = await params;
+  let app = appBySlug(slug);
+  if (!app && isBatchId(slug)) {
+    const user = await currentUser(); // a custom app of the active workspace; a draft only for an Admin
+    app = user?.workspaceId ? ((await customApp(slug, user.workspaceId, user.role === 'admin')) ?? undefined) : undefined;
+  }
   if (!app) notFound();
+  if (app.custom) return <AppPage key={app.slug} app={app} />;
   if (app.slug === 'smart-remake') {
     if (!smartRemakeAppEnabled()) notFound(); // off unless both REA flags are on
     // An analysis and a product image to open again: id-shaped values only, which the APIs still check belong to the member. The key starts the app afresh for others.

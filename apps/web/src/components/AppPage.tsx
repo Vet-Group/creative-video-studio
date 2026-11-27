@@ -5,7 +5,8 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, colorLabel, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseHexColor, parseNames, PET_STYLES, POSE_BACKGROUNDS, POSE_PHOTOS, RECOLOR_COLORS, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appMedia, appReason, jobImages, type AppCategory, BATCH_FEATURES, type BatchItem, cleanName, colorLabel, DEFAULT_VIEWS, DOG_BREEDS, itemLabel, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, motionReason, OWN_POSE, parseHexColor, parseNames, PET_STYLES, POSE_BACKGROUNDS, POSE_PHOTOS, RECOLOR_COLORS, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from '@/lib/apps';
+import type { CustomAppConfig } from '@/lib/custom-apps';
 import { waitLabel } from '@/lib/explore';
 import { parseFashionTraits } from '@/lib/fashion-model';
 import { usable } from '@/lib/fashion-models';
@@ -17,9 +18,10 @@ import { useFashionModels } from '@/lib/use-fashion-models';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
-import { cardSample, GALLERY_SAMPLES } from '@/lib/examples';
+import { GALLERY_SAMPLES } from '@/lib/examples';
 import { sampleThumb, samplesPending, useSamples } from '@/lib/use-samples';
 import { About } from './About';
+import { CustomAppForm } from './CustomAppForm';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { CsvNames } from './CsvNames';
 import { Icon, type IconName } from './Icon';
@@ -72,7 +74,7 @@ function ItemChecks({ label, items, picked, onChange, single, children }: { labe
 
 /** The picture of an app on a card and in the page header: its sample loop or still, else a tinted tile with the icon of its category. The loop plays under reduced motion too, as on the reference site's Apps pages. */
 export function AppArt({ app, page, lazy }: { app: AppConfig; page?: boolean; lazy?: boolean }) {
-  const media = cardSample(useSamples(), `app-${app.slug}`);
+  const media = appMedia(app, useSamples());
   const has = Boolean(media.video || media.poster);
   // On its own page an app with no art shows nothing rather than a bare tile; while the sample list loads, the empty box keeps the art's place, so the About text below does not jump down when the art arrives.
   if (page && !has && !samplesPending()) return null;
@@ -85,7 +87,7 @@ export function AppArt({ app, page, lazy }: { app: AppConfig; page?: boolean; la
 
 /** Puts the app's art in the empty History of the page below it, in place of the generic picture; an app with no art keeps that picture. */
 export function AppHistoryArt({ app, children }: { app: AppConfig; children: ReactNode }) {
-  const media = cardSample(useSamples(), `app-${app.slug}`);
+  const media = appMedia(app, useSamples());
   return <HistoryArtContext.Provider value={media.video || media.poster ? <AppArt app={app} page /> : null}>{children}</HistoryArtContext.Provider>;
 }
 
@@ -922,6 +924,7 @@ function Soon({ app, text }: { app: AppConfig; text: string }) {
 
 export function AppPage({ app, reuse, image }: { app: AppConfig; reuse?: string; image?: Img }) {
   if (app.soon) return <Soon app={app} text={app.soon} />;
+  if (app.custom) return <CustomAppForm app={app as CustomAppConfig} />;
   return <AppHistoryArt app={app}>{app.feature === 'motion_control' ? <MotionForm app={app} reuse={reuse} /> : <AppForm app={app} reuse={reuse} image={image} />}</AppHistoryArt>;
 }
 

@@ -107,21 +107,22 @@ export function composeAssetIds(inputs: CustomAppInput[], slotIds: string[]): st
 
 export const hasDuplicate = (ids: string[]): boolean => new Set(ids).size !== ids.length;
 
-/** The Apps card and run page of an app: an AppConfig plus what the run page needs. It carries no prompt. */
-export type CustomAppConfig = AppConfig & {
-  custom: {
-    /** The ids of the app's pair of duplicate models (lib/model-twins.ts): the page prices the row of the model list among them. */
-    modelIds: string[];
-    ratio: string;
-    durationSec: number;
-    inputCount: number;
-    audio?: string;
-    resolution?: string;
-    thinking?: string;
-    /** The source result, as a card shows it. */
-    art: { video: string | null; poster: string | null };
-  };
-};
+/** What the run page needs of an app beyond its card. It carries no prompt. */
+export interface CustomAppSettings {
+  /** The ids of the app's pair of duplicate models (lib/model-twins.ts): the page prices the row of the model list among them. */
+  modelIds: string[];
+  ratio: string;
+  durationSec: number;
+  inputCount: number;
+  audio?: string;
+  resolution?: string;
+  thinking?: string;
+  /** The source result, as a card shows it. */
+  art: { video: string | null; poster: string | null };
+}
+
+/** The Apps card and run page of an app: an AppConfig plus its settings. */
+export type CustomAppConfig = AppConfig & { custom: CustomAppSettings };
 
 export interface CustomAppRow {
   id: string;
