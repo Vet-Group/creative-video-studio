@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-27T10:00:00+07:00',
+  at: '2026-11-27T08:30:00+07:00',
   kind: 'new',
   title: 'Làm nháp rẻ trước, ưng rồi mới làm bản HD',
   details: [
