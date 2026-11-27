@@ -1667,7 +1667,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .segmented.preset-chips button { width: auto; padding: 0 12px; color: var(--text-2); font-size: 13px; line-height: 18px; font-weight: 500; } /* text-subtle read 3.8:1 on the track, as the labels' did */
 .segmented.preset-chips button:hover { color: var(--ink); }
 /* An app's multi-pick chips (views, breeds, styles, products): a picked one carries a check, as the raised fill alone read like an unpicked chip at a glance. */
-.app-page .angle-choice label:has(:checked)::before { content: '\2713'; font-weight: 700; }
+.app-page .angle-choice label:has(input[type='checkbox']:checked)::before { content: '\2713'; font-weight: 700; }
 .pick-count { color: var(--text-muted); font-size: 13px; line-height: 18px; white-space: nowrap; }
 .pick-count .link-button { font-size: 13px; }
 @media (pointer: coarse) { .pick-count .link-button { min-height: 44px; } }
