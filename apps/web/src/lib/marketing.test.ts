@@ -309,7 +309,7 @@ describe('format helpers', () => {
 });
 
 describe('the hook x ratio matrix', () => {
-  it('makes each hook in every ratio, hook by hook with the primary ratio first', () => {
+  it('makes each hook in every ratio, hook by hook in the order of the ratios', () => {
     expect(clipMatrix(['a', 'b'], ['9:16', '1:1'])).toEqual([
       { hook: 'a', ratio: '9:16' },
       { hook: 'a', ratio: '1:1' },

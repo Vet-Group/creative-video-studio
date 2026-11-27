@@ -79,7 +79,7 @@ interface VideoModel {
 
 const VIDEO_ERROR = 'Không tải được video. Hãy thử lại.';
 
-/** The most hook variants one Run makes, one clip each. */
+/** The most hook variants one Run makes, one clip in each of its ratios. */
 const MAX_VARIANTS = 3;
 /** The most ratios a Run adds to the primary one, each hook once more in each (within MAX_CLIPS clips). */
 const MAX_EXTRA_RATIOS = 2;
@@ -289,8 +289,8 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   // The request a Run with a video makes may take no end frame (Kling O3): the slot is replaced by a note and the frame is not sent.
   const endAllowed = chosen?.endFrame === true && !(advanced && video !== null && chosen.videoRefs !== null && !chosen.videoRefs.endFrame);
   const endAssetId = endAllowed ? endFrame?.id : undefined;
-  /** The clips of a Run: each hook variant in each ratio. */
-  const matrix = clipMatrix(variants, shapes);
+  /** The clips of a Run: each hook variant in each ratio, the primary ratio last, as the next visit's settings come from the newest job (/api/recall). */
+  const matrix = clipMatrix(variants, [...extras, ratio]);
   /** What the brief may take: the chosen model's limit less what the page adds around it, for the longest clip (the frame words differ by ratio). */
   const room = chosen && Math.min(...matrix.map((c) => briefRoom((b) => branded(composeFor(c.hook, b, c.ratio)), chosen.maxPromptChars)));
   /** What a Run sends for each clip, in order. */
@@ -303,7 +303,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   /** The estimate of the whole Run, at the estimate's own precision. */
   const total = cost === undefined || costs.includes(undefined) ? undefined : (variants.length * costs.reduce((s, c) => s + Number(c), 0)).toFixed(cost.split('.')[1]?.length ?? 2);
   /** The Run's shape, said when it makes more than one ratio. */
-  const shape = shapes.length > 1 ? ` (${variants.length} hook × ${shapes.length} tỉ lệ)` : '';
+  const shape = shapes.length < 2 ? '' : variants.length > 1 ? ` (${variants.length} hook × ${shapes.length} tỉ lệ)` : ` (${shapes.length} tỉ lệ)`;
   /** How many hooks fit beside the ratios, and whether another ratio fits beside the hooks, within MAX_CLIPS. */
   const maxHooks = Math.min(MAX_VARIANTS, clipRoom(shapes.length));
   const ratiosFull = shapes.length >= Math.min(1 + MAX_EXTRA_RATIOS, clipRoom(variants.length));
@@ -473,8 +473,11 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
       : product.length === 0
         ? 'Tải lên ảnh sản phẩm.'
         : null;
-  /** An extra ratio the chosen model does not make at this length. */
-  const unmade = extras.find((_, i) => !extraModels[i]?.supported);
+  /** An extra ratio the chosen model does not make with these choices: the row that serves it may lack the end frame, the sound or the video the Run sends. */
+  const unmade = extras.find((_, i) => {
+    const m = extraModels[i];
+    return !m?.supported || (endAssetId !== undefined && !m.endFrame) || (audioOn && m.audioEstimateUsd == null) || (advanced && video !== null && videoReason(video, m.videoRefs, refs.length) !== null);
+  });
   // The first thing that stops Run, in the order the form is filled; null when it can go. The prompt's length comes last.
   const formReason =
     !recall.answered
@@ -490,7 +493,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
               : !chosen!.supported
                 ? 'Mô hình này không có tỉ lệ hoặc thời lượng đã chọn. Chọn mô hình khác, hoặc đổi tỉ lệ hoặc thời lượng.'
                 : unmade
-                  ? `Mô hình này không làm được tỉ lệ ${unmade} với thời lượng đã chọn. Bỏ tỉ lệ đó hoặc đổi thời lượng.`
+                  ? `Mô hình này không làm được tỉ lệ ${unmade} với các lựa chọn hiện tại (thời lượng, âm thanh, khung cuối hoặc video tham chiếu). Bỏ tỉ lệ đó hoặc đổi lựa chọn.`
                   : photoReason ??
                     (pf && images.length > chosen!.maxImages
                       ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
@@ -501,7 +504,12 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
                           : null);
   const reason = formReason ?? promptTooLong(chosen, Math.max(...sent.map((s) => branded(s).length)));
   /** Hook variants and ratios beyond the clips left today are refused before anything is sent. */
-  const short = n > 1 && clips !== null && clips.today + n > clips.cap ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook${shape ? ' hoặc tỉ lệ' : ''}.` : null;
+  const short =
+    n > 1 && clips !== null && clips.today + n > clips.cap
+      ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook${shape ? ' hoặc tỉ lệ' : ''}.`
+      : n > 1 && total !== undefined && chosen?.creditUsd != null && Number(total) > Number(chosen.creditUsd)
+        ? `Ngân sách của mô hình này không đủ cho cả ${n} clip; bỏ bớt biến thể hook${shape ? ' hoặc tỉ lệ' : ''}.` // the picker locks a model only on one clip's price
+        : null;
   const canRun = reason === null && short === null && !busy;
   // The wizard's four steps and whether each may be left: photos present, then the words the format needs, then the Run gate. Off, every block shows at once (atStep).
   const STEPS = ['Định dạng', 'Ảnh', 'Nội dung', 'Cài đặt'];
@@ -641,7 +649,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
     if (sentOk.length > 0) {
       clearFreeDraft();
       clearBodyDraft();
-      setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} biến thể: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
+      setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} ${shape ? 'clip' : 'biến thể'}: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
     }
     if (refused.length > 0) setError(n > 1 ? `Không gửi được ${refused.join('; ')}` : refused[0]!);
@@ -841,7 +849,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
                   </div>
                   {ratiosFull && extraRatios.some((r) => !extras.includes(r)) && (
                     <p id={`${extraId}-full`} className="help">
-                      Tối đa {MAX_CLIPS} clip mỗi lượt ({variants.length} hook × {shapes.length} tỉ lệ): bỏ bớt hook để thêm tỉ lệ.
+                      {clipRoom(variants.length) <= MAX_EXTRA_RATIOS ? `Tối đa ${MAX_CLIPS} clip mỗi lượt (${variants.length} hook × ${shapes.length} tỉ lệ): bỏ bớt hook để thêm tỉ lệ.` : `Thêm được tối đa ${MAX_EXTRA_RATIOS} tỉ lệ.`}
                     </p>
                   )}
                 </div>

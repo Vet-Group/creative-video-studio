@@ -476,7 +476,8 @@ test('the hook x ratio matrix: 2 hooks in 9:16 and 1:1 send 4 clips, each with i
 
   await runButton(page).click();
   await page.getByRole('dialog', { name: 'Tạo 4 clip (2 hook × 2 tỉ lệ), tổng $0.00?' }).getByRole('button', { name: 'Tiếp tục', exact: true }).click();
-  await expect(page.getByText(`Đã gửi 4/4 biến thể: ${picks[0]!.name} · 9:16, ${picks[0]!.name} · 1:1, ${picks[1]!.name} · 9:16, ${picks[1]!.name} · 1:1.`)).toBeVisible();
+  // The primary ratio goes last in each hook, so the newest job (what the next visit recalls) is in 9:16.
+  await expect(page.getByText(`Đã gửi 4/4 clip: ${picks[0]!.name} · 1:1, ${picks[0]!.name} · 9:16, ${picks[1]!.name} · 1:1, ${picks[1]!.name} · 9:16.`)).toBeVisible();
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] };
   expect(jobs.jobs).toHaveLength(4);
   const sent = await Promise.all(jobs.jobs.map(async (j) => ({ id: j.id, ...((await (await page.request.get(`/api/jobs/${j.id}`)).json()) as { hook: string; ratio: string; prompt: string }) })));
@@ -486,13 +487,20 @@ test('the hook x ratio matrix: 2 hooks in 9:16 and 1:1 send 4 clips, each with i
     expect(j.prompt).toContain(picks.find((h) => h.id === j.hook)!.phrase);
   }
 
-  // Dùng lại on one clip brings back its one ratio and hook, with no extra ratio.
+  // Dùng lại in Lịch sử refills the form in place from one clip: its one ratio and hook, the extra ratio gone.
   const square = sent.find((j) => j.ratio === '1:1')!;
-  await page.goto(`/marketing-studio?reuse=${square.id}`);
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  await page.locator(`button[data-from="/api/jobs/${square.id}"]`).first().click({ timeout: 60_000 });
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(picks.find((h) => h.id === square.hook)!.name);
   await expect(extra.getByRole('button', { name: '9:16 (dọc)' })).toHaveAttribute('aria-pressed', 'false');
   await expect(runButton(page)).not.toContainText('clip');
+
+  // The next visit opens on the primary ratio, not on the last extra one.
+  const recalled = page.waitForResponse((r) => r.url().includes('/api/recall'));
+  await page.goto('/marketing-studio');
+  expect(((await (await recalled).json()) as { settings: { ratio: string } | null }).settings?.ratio).toBe('9:16');
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '9:16');
 });
 
 test('as on Fash, in Viết tự do the Cài đặt video block sits 16 px under the prompt box with the ratio row right under its title, and the sent-prompt disclosure folds under the model picker', async ({ page }) => {
