@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-27T12:00:00+07:00',
+  at: '2026-11-27T11:45:00+07:00',
   kind: 'new',
   title: 'Ứng dụng mới: Sửa video',
   details: [
