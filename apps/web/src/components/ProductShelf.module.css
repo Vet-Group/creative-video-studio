@@ -14,7 +14,7 @@
 .form { display: grid; gap: 12px; }
 .form > h2 { margin: 0; }
 .form :global(.field) { margin: 0; }
-/* Phones: 44 px taps; the card actions wrap, so each row's hit area ends where the next begins. */
-@media (max-width: 480px) {
+/* Phones and touch screens: 44 px taps; the card actions wrap, so each row's hit area ends where the next begins. */
+@media (max-width: 480px), (pointer: coarse) {
   .actions :is(button, a) { display: inline-flex; align-items: center; min-height: 44px; }
 }

@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, test } from '@playwright/test';
-import { openTab, runViaApi, signIn } from './support.test';
+import { openTab, png, runViaApi, signIn } from './support.test';
 import { USERS } from './users';
 
 // The main pages, in both themes, carry no serious or critical axe violation (the 2026-11-04 accessibility pass).
@@ -124,47 +124,71 @@ test('the tool hint link, the prompt tools, the select boxes, "Chỉ của tôi"
 // On a touch phone every control on the member pages takes a tap across 44 x 44 px, drawn that tall or through an invisible ::after, and no
 // control's hit area reaches over another's edge. Links and buttons inside a sentence are exempt (WCAG 2.5.8's inline exception), as is the skip link,
 // which sits off screen until focused. The Library's filters stay on one scrolling row.
+const tapMisses = (page: import('@playwright/test').Page) =>
+  page.evaluate(async () => {
+    const CONTROLS = 'a[href], button, summary, select, input:not([type=hidden]), [role=button]';
+    const controls = [...document.querySelectorAll<HTMLElement>(CONTROLS)]
+      .map((el) => (el.matches('input, select') && el.closest('label')) || el)
+      .filter((el, i, all) => all.indexOf(el) === i && !el.matches('.skip-link') && !el.closest('[inert]'))
+      .filter((el) => !el.closest('p')) // a link or button in a sentence
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && getComputedStyle(el).visibility !== 'hidden'; });
+    const found: string[] = [];
+    for (const el of controls) {
+      el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+      await new Promise(requestAnimationFrame);
+      // The part on screen: a scrolling strip or the viewport may cut a card at its end.
+      const r = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+      for (let a: Element | null = el; a; a = a.parentElement) {
+        const b = a.getBoundingClientRect(), cs = getComputedStyle(a);
+        if (a !== el && cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+        r.left = Math.max(r.left, b.left); r.top = Math.max(r.top, b.top); r.right = Math.min(r.right, b.right); r.bottom = Math.min(r.bottom, b.bottom);
+      }
+      const width = r.right - r.left, height = r.bottom - r.top;
+      const x = r.left + width / 2, y = r.top + height / 2;
+      // A tap is the control's own, or lands on another control drawn over it there (the slot's corner link): an overlay, not a hit area reaching over.
+      const own = (dx: number, dy: number) => {
+        const t = document.elementFromPoint(x + dx, y + dy);
+        if (el.contains(t)) return true;
+        const b = t?.getBoundingClientRect();
+        return !!t && !!b && t.closest(CONTROLS) !== null && x + dx >= b.left && x + dx <= b.right && y + dy >= b.top && y + dy <= b.bottom;
+      };
+      // How far the control answers from its middle in one direction, up to 30 px: two side-by-side buttons may split their gap unevenly.
+      const reach = (sx: number, sy: number) => { let n = 0; while (n < 30 && own(sx * (n + 1), sy * (n + 1))) n++; return n; };
+      const name = `${el.tagName.toLowerCase()}.${[...el.classList].join('.')} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30)}"`;
+      const edgeX = Math.max(width / 2 - 2, 0), edgeY = Math.max(height / 2 - 2, 0);
+      const taken = ([[0, 0], [0, -edgeY], [0, edgeY], [-edgeX, 0], [edgeX, 0]] as const).find(([dx, dy]) => !own(dx, dy));
+      if (taken) { const t = document.elementFromPoint(x + taken[0]!, y + taken[1]!); found.push(`${name}: ${t?.tagName.toLowerCase()}.${[...(t?.classList ?? [])].join('.')} takes a tap at ${taken.join(',')} from its middle`); }
+      else if (reach(0, -1) + reach(0, 1) + 1 < 43 || reach(-1, 0) + reach(1, 0) + 1 < 43) found.push(`${name}: ${Math.round(width)}x${Math.round(height)} takes ${reach(-1, 0) + reach(1, 0) + 1}x${reach(0, -1) + reach(0, 1) + 1}`);
+    }
+    return found;
+  });
+
+/** A finished picture with an input photo in `who`'s History: every control on the card (actions, prompt tools, picture tools, input zoom) takes a 44 px tap.
+ * No member page has a card of its own, so the page scans above never reached them (on prod the card's buttons drew 32 and 36 px). */
+async function historyCardMisses(page: import('@playwright/test').Page, who: keyof typeof USERS): Promise<string[]> {
+  await signIn(page, who);
+  const up = await page.request.post('/api/assets', { multipart: { file: { name: 'ref.png', mimeType: 'image/png', buffer: png() } } });
+  expect(up.status()).toBe(201);
+  const input = ((await up.json()) as { assets: { id: string }[] }).assets[0]!.id;
+  const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [input], ratio: '3:4', prompt: 'a card to tap', enhance: false, params: { resolution: '1K' } } });
+  expect(res.status()).toBe(201);
+  const { id } = (await res.json()) as { id: string };
+  try {
+    await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+    await page.goto('/image-generation');
+    await openTab(page, 'Lịch sử');
+    await expect(page.locator('.job-card').first().getByRole('button', { name: 'Toàn màn hình' })).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    // The finished job's toast floats over the page for a few seconds by design: its own link and button are measured, a control it covers is not.
+    return (await tapMisses(page)).filter((miss) => !miss.includes(': div.toast takes a tap'));
+  } finally {
+    await page.request.delete(`/api/jobs/${id}`);
+  }
+}
+
 test.describe('touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  const tapMisses = (page: import('@playwright/test').Page) =>
-    page.evaluate(async () => {
-      const CONTROLS = 'a[href], button, summary, select, input:not([type=hidden]), [role=button]';
-      const controls = [...document.querySelectorAll<HTMLElement>(CONTROLS)]
-        .map((el) => (el.matches('input, select') && el.closest('label')) || el)
-        .filter((el, i, all) => all.indexOf(el) === i && !el.matches('.skip-link') && !el.closest('[inert]'))
-        .filter((el) => !el.closest('p')) // a link or button in a sentence
-        .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && getComputedStyle(el).visibility !== 'hidden'; });
-      const found: string[] = [];
-      for (const el of controls) {
-        el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
-        await new Promise(requestAnimationFrame);
-        // The part on screen: a scrolling strip or the viewport may cut a card at its end.
-        const r = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
-        for (let a: Element | null = el; a; a = a.parentElement) {
-          const b = a.getBoundingClientRect(), cs = getComputedStyle(a);
-          if (a !== el && cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
-          r.left = Math.max(r.left, b.left); r.top = Math.max(r.top, b.top); r.right = Math.min(r.right, b.right); r.bottom = Math.min(r.bottom, b.bottom);
-        }
-        const width = r.right - r.left, height = r.bottom - r.top;
-        const x = r.left + width / 2, y = r.top + height / 2;
-        // A tap is the control's own, or lands on another control drawn over it there (the slot's corner link): an overlay, not a hit area reaching over.
-        const own = (dx: number, dy: number) => {
-          const t = document.elementFromPoint(x + dx, y + dy);
-          if (el.contains(t)) return true;
-          const b = t?.getBoundingClientRect();
-          return !!t && !!b && t.closest(CONTROLS) !== null && x + dx >= b.left && x + dx <= b.right && y + dy >= b.top && y + dy <= b.bottom;
-        };
-        // How far the control answers from its middle in one direction, up to 30 px: two side-by-side buttons may split their gap unevenly.
-        const reach = (sx: number, sy: number) => { let n = 0; while (n < 30 && own(sx * (n + 1), sy * (n + 1))) n++; return n; };
-        const name = `${el.tagName.toLowerCase()}.${[...el.classList].join('.')} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30)}"`;
-        const edgeX = Math.max(width / 2 - 2, 0), edgeY = Math.max(height / 2 - 2, 0);
-        const taken = ([[0, 0], [0, -edgeY], [0, edgeY], [-edgeX, 0], [edgeX, 0]] as const).find(([dx, dy]) => !own(dx, dy));
-        if (taken) { const t = document.elementFromPoint(x + taken[0]!, y + taken[1]!); found.push(`${name}: ${t?.tagName.toLowerCase()}.${[...(t?.classList ?? [])].join('.')} takes a tap at ${taken.join(',')} from its middle`); }
-        else if (reach(0, -1) + reach(0, 1) + 1 < 43 || reach(-1, 0) + reach(1, 0) + 1 < 43) found.push(`${name}: ${Math.round(width)}x${Math.round(height)} takes ${reach(-1, 0) + reach(1, 0) + 1}x${reach(0, -1) + reach(0, 1) + 1}`);
-      }
-      return found;
-    });
 
   test('every control on the member pages takes a 44 px tap and none covers another', async ({ page }) => {
     test.setTimeout(300_000);
@@ -228,6 +252,28 @@ test.describe('touch phone', () => {
     expect.soft(await tapMisses(page), 'the item').toEqual([]);
     await page.getByRole('button', { name: 'Xem trước' }).click();
     expect.soft(await tapMisses(page), 'the reply preview').toEqual([]);
+  });
+  test('a History card takes a 44 px tap on every control', async ({ page }) => {
+    expect(await historyCardMisses(page, 'touchcardp')).toEqual([]);
+  });
+});
+
+// An iPad-sized touch screen gets the phone's 44 px taps too (the rules key on a coarse pointer, not only on a phone's width): the member pages and a History card.
+test.describe('touch tablet', () => {
+  test.use({ viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true });
+
+  test('every control on the member pages takes a 44 px tap and none covers another', async ({ page }) => {
+    test.setTimeout(300_000);
+    await signIn(page, 'member8');
+    for (const path of MEMBER_PAGES) {
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      expect.soft(await tapMisses(page), path).toEqual([]);
+    }
+  });
+
+  test('a History card takes a 44 px tap on every control', async ({ page }) => {
+    expect(await historyCardMisses(page, 'touchcardt')).toEqual([]);
   });
 });
 

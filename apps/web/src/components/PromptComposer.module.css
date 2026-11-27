@@ -96,9 +96,9 @@
   :global(.imagebar) .composer:not(:focus-within, dialog *) .input { max-height: calc(3 * 21px + 16px); }
   :global(.imagebar) .popover:not(dialog *) { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 40; max-height: max(160px, min(480px, 60vh, calc(100dvh - var(--imagebar-h, 0px) - var(--impersonation-h, 0px) - 24px))); overflow-y: auto; margin: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(var(--shade) / .16); }
 }
-/* Phones: the tools and the starter pills take a 44 px tap through an invisible ::after. The toolbar's padding and the strip's padding hold it,
+/* Phones and touch screens: the tools and the starter pills take a 44 px tap through an invisible ::after. The toolbar's padding and the strip's padding hold it,
    so it neither reaches another control (a wrapped toolbar row keeps 12 px apart) nor is clipped by the folded strip. */
-@media (max-width: 480px) {
+@media (max-width: 480px), (pointer: coarse) {
   .tool, .starter, .ref { position: relative; }
   .tool::after, .starter::after, .ref::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
   .iconTool { width: 44px; }
