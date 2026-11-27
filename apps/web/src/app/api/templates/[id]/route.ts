@@ -73,7 +73,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     // A deleted upload has no copy: '' matches none of the images, so its slot stays empty without naming the author's id.
     id: t.id, name: t.name, isCompany: t.is_company, feature: t.feature, images, inputCount: data.images.filter((i) => i !== '').length, inputIds: copies ? data.images.map((i) => copies.get(i) ?? '') : data.images, endFrame: endFrame[0] ?? null, videoRef: videoRef[0] ?? null, clips,
     prompt: data.prompt ?? null, brief: data.brief ?? null, script: data.script ?? null, hookText: data.hookText ?? null, ending: data.ending ?? null, endText: data.endText ?? null, endTextPos: data.endTextPos ?? null,
-    hook: data.hook ?? null, location: data.location ?? null,
+    hook: data.hook ?? null, location: data.location ?? null, effect: data.effect ?? null,
     format: data.format ?? null, roles: data.roles ?? null, highlights: data.highlights ?? null, promptMode: data.promptMode ?? null, audio: data.audio ?? null, orientation: data.orientation ?? null, enhance: data.enhance ?? null, garments: data.garments ?? null, pose: data.pose ?? null, durationSec: data.durationSec ?? null,
     ratio: data.ratio ?? null, resolution: data.resolution ?? null, modelId: data.modelId ?? null, presetId: data.presetId ?? null, storeId: data.storeId ?? null,
   });
