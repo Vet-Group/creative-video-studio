@@ -9,6 +9,21 @@ import { type AppDraft, type CustomAppConfig, draftFromJob, toAppConfig } from '
 /** A source job as the editor and POST /api/admin/apps need it: what an app can be made of it (`draft`, or the Vietnamese reason it cannot) and what the checks read. */
 export interface AppSource {
   draft: AppDraft | string;
+  /** The clip's own settings, also when `draft` is a refusal, so the editor can still show its preview and the read-only line. */
+  feature: string;
+  prompt: string;
+  enhancedPrompt: string | null;
+  presetId: string | null;
+  ratio: string;
+  durationS: number;
+  audio?: string;
+  resolution?: string;
+  thinking?: string;
+  /** What `draftFromJob` refuses for: a brand kit, an end frame, reference audio and a reference video. */
+  brand: boolean;
+  endFrame: boolean;
+  refAudio: boolean;
+  refVideo: boolean;
   /** The cheaper row of the model's pair of duplicates (migration 0075), the app's model, and its label. */
   pairModel: string;
   modelLabel: string;
@@ -33,6 +48,19 @@ export async function appSource(q: Queryable, jobId: string, workspaceId: string
   const images = await q.query('select id, filename from assets where id = any($1::text[]) and workspace_id = $2 and deleted_at is null order by array_position($1::text[], id)', [j.input_asset_ids, workspaceId]);
   return {
     draft: draftFromJob({ feature: j.feature, presetId: j.preset_id, prompt: j.prompt, enhancedPrompt: j.enhanced_prompt, ratio: j.aspect, durationSec: j.duration_s, params: j.params, inputCount: j.input_asset_ids.length }),
+    feature: j.feature,
+    prompt: j.prompt,
+    enhancedPrompt: j.enhanced_prompt,
+    presetId: j.preset_id,
+    ratio: j.aspect,
+    durationS: j.duration_s,
+    audio: j.params.audio,
+    resolution: j.params.resolution,
+    thinking: j.params.thinking,
+    brand: j.params.brand === 'on',
+    endFrame: j.params.endAssetId !== undefined,
+    refAudio: j.params.audioAssetIds !== undefined,
+    refVideo: j.params.videoAssetId !== undefined,
     pairModel: j.pair_model,
     modelLabel: j.label,
     maxPromptChars: promptLimit(j.max_prompt_chars),

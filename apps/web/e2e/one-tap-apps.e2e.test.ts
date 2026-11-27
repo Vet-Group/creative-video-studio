@@ -97,3 +97,89 @@ test('a member runs a published custom app: its card, its page with no prompt, a
   await other.goto('/apps');
   await expect(other.getByRole('list', { name: 'Danh sách ứng dụng' }).getByRole('link').filter({ hasText: NAME })).toHaveCount(0);
 });
+
+// The Admin's side: Library > Biến thành ứng dụng > the editor > Admin > Ứng dụng, with the source clip held by its app and a member shut out of the Admin pages.
+test('an Admin makes an app of a Library clip, publishes and takes it down, and the clip is held until the app is deleted', async ({ browser }) => {
+  const PROMPT2 = 'Spin the bottle on a marble table';
+  const NAME2 = 'Xoay chai thử Admin';
+  const context = await browser.newContext();
+  const admin = await context.newPage();
+  await signIn(admin, 'tapadm');
+  await context.addCookies([{ name: 'cvs_ws', value: 'ws_onetap', url: admin.url() }]);
+  const up = await admin.request.post('/api/assets', { multipart: { file: { name: 'bottle.png', mimeType: 'image/png', buffer: png() } } });
+  const asset = ((await up.json()) as { assets: { id: string }[] }).assets[0]!.id;
+  const run = await admin.request.post('/api/jobs', { data: { assetIds: [asset], modelId: 'mock-e2e', prompt: PROMPT2, ratio: '9:16', durationSec: 5 } });
+  expect(run.status()).toBe(201);
+  const jobId = ((await run.json()) as { id: string }).id;
+  await expect.poll(async () => ((await (await admin.request.get(`/api/jobs/${jobId}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+
+  // The newest clip of the Library offers the link (an Admin, on the Library page), and the link opens the editor for that clip.
+  await admin.goto('/library');
+  await admin.getByRole('button', { name: 'Xem chi tiết' }).first().click();
+  const link = admin.getByRole('dialog').getByRole('link', { name: 'Biến thành ứng dụng' });
+  await expect(link).toHaveAttribute('href', `/admin/apps/new?job=${jobId}`);
+  await link.click();
+  await expect(admin.getByRole('heading', { name: 'Biến thành ứng dụng', level: 1 })).toBeVisible();
+  await expect(admin.getByText('Mock E2E · 9:16 · 5 giây')).toBeVisible();
+  await expect(admin.getByText('Mô hình, tỉ lệ và thời lượng giữ như lượt gốc.')).toBeVisible();
+
+  // Lưu waits for a name; the prompt starts as the clip's own.
+  const save = admin.getByRole('button', { name: 'Lưu' });
+  await expect(save).toBeDisabled();
+  await expect(admin.getByRole('textbox', { name: /^Mô tả gửi cho mô hình/ })).toHaveValue(PROMPT2);
+  await admin.getByRole('textbox', { name: 'Tên ô' }).fill('Ảnh sản phẩm');
+  await admin.getByRole('textbox', { name: 'Tên ứng dụng' }).fill(NAME2);
+  await admin.getByRole('combobox', { name: 'Danh mục' }).selectOption('video');
+  await admin.getByRole('checkbox', { name: 'Đăng lên trang Ứng dụng ngay' }).check();
+  await expect(save).toBeEnabled();
+  expect((await new AxeBuilder({ page: admin }).exclude('nextjs-portal').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
+  await save.click();
+  await expect(admin).toHaveURL(/\/admin\/apps$/);
+  const row = admin.getByRole('row').filter({ hasText: NAME2 });
+  await expect(row.getByText('Đã đăng')).toBeVisible();
+  const appId = ((await row.getByRole('link', { name: /^Mở/ }).getAttribute('href')) ?? '').replace('/apps/', '');
+
+  // The clip is held: the Library card shows the 409 text that names the app.
+  await admin.goto('/library');
+  await admin.getByRole('button', { name: 'Xoá', exact: true }).first().click();
+  await expect(admin.getByText(`Clip này đang là nguồn của ứng dụng «${NAME2}». Hãy xoá ứng dụng trước.`)).toBeVisible();
+
+  // A member gets none of the Admin pages' data.
+  const member = await (await browser.newContext()).newPage();
+  await signIn(member, 'tapmem');
+  for (const path of ['/admin/apps', `/admin/apps/${appId}`, `/admin/apps/new?job=${jobId}`]) {
+    const html = await (await member.request.get(path)).text();
+    expect(html).not.toContain(PROMPT2);
+    expect(html).not.toContain(NAME2);
+  }
+  await member.goto(`/admin/apps/${appId}`);
+  await expect(member.getByRole('heading', { name: 'Sửa ứng dụng' })).toHaveCount(0);
+
+  // Gỡ khỏi trang Ứng dụng: the card and the page go for the member.
+  await admin.goto('/admin/apps');
+  await row.getByRole('button', { name: /^Gỡ khỏi trang Ứng dụng/ }).click();
+  await expect(row.getByText('Nháp')).toBeVisible();
+  await member.goto('/apps');
+  await expect(member.getByRole('list', { name: 'Danh sách ứng dụng' }).getByRole('link').filter({ hasText: NAME2 })).toHaveCount(0);
+  expect((await member.goto(`/apps/${appId}`))!.status()).toBe(404);
+
+  // Xoá ứng dụng: the clip deletes again.
+  await row.getByRole('button', { name: /^Xoá ứng dụng/ }).click();
+  await admin.getByRole('dialog', { name: `Xoá ứng dụng «${NAME2}»?` }).getByRole('button', { name: 'Xoá ứng dụng' }).click();
+  await expect(row).toHaveCount(0);
+  expect((await admin.request.delete(`/api/jobs/${jobId}`)).status()).toBe(200);
+});
+
+test('Admin > Ứng dụng shows all 11 tabs of the Admin bar at 1024 and 1440 px without hidden overflow', async ({ page }, testInfo) => {
+  await signIn(page, 'tapadm');
+  for (const width of [1024, 1440]) {
+    await page.setViewportSize({ width, height: 768 });
+    await page.goto('/admin/apps');
+    const nav = page.getByRole('navigation', { name: 'Các trang quản trị' });
+    await expect(nav.getByRole('link')).toHaveCount(11);
+    await expect(nav.getByRole('link', { name: 'Ứng dụng' })).toHaveAttribute('aria-current', 'page');
+    const size = await nav.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(size.scroll, `${width} px`).toBeLessThanOrEqual(size.client);
+    await nav.screenshot({ path: testInfo.outputPath(`admin-nav-${width}.png`) });
+  }
+});

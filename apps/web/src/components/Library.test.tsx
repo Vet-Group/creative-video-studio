@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest';
 import type { Clip } from '@/lib/api';
 import LibraryPage from '@/app/(app)/library/page';
 import { filtersFromSearch } from '@/lib/library-view';
-import { ClipCard, ClipDetail, clipLabel, emptyNoun, gridStep, Library, RecipeText, RepeatTiles } from './Library';
+import { ClipCard, ClipDetail, clipLabel, emptyNoun, gridStep, Library, MakeAppLink, RecipeText, RepeatTiles } from './Library';
 import { UndoNotice } from './UndoNotice';
 
 test('the empty Library names photos under a photo filter, clips under a video one, and results under a mixed one', () => {
@@ -236,4 +236,19 @@ test('a delete shows a Hoàn tác notice inside a live region that is there befo
   const card = renderToStaticMarkup(<ClipCard clip={{ ...clip('video'), canEdit: true }} view="grid" onChange={() => undefined} onDeleted={() => undefined} onOpen={() => undefined} />);
   expect(card).toContain('aria-label="Xoá"');
   expect(card).not.toContain('alertdialog');
+});
+
+test('Biến thành ứng dụng is a link to the editor for an eligible result, and nothing for one with a preset, a brand, no input or another feature', () => {
+  const ok = { inputCount: 2, presetId: null, brand: false };
+  const html = renderToStaticMarkup(<MakeAppLink clip={clip('video')} job={ok} />);
+  expect(html).toMatch(/<a [^>]*href="\/admin\/apps\/new\?job=c1"[^>]*>Biến thành ứng dụng<\/a>/);
+  expect(renderToStaticMarkup(<MakeAppLink clip={{ ...clip('image'), feature: 'image' }} job={ok} />)).toContain('Biến thành ứng dụng');
+  for (const job of [{ ...ok, presetId: 'p1' }, { ...ok, brand: true }, { ...ok, inputCount: 0 }]) expect(renderToStaticMarkup(<MakeAppLink clip={clip('video')} job={job} />)).toBe('');
+  expect(renderToStaticMarkup(<MakeAppLink clip={{ ...clip('video'), feature: 'try_on' }} job={ok} />)).toBe('');
+});
+
+test('the clip detail has no Biến thành ứng dụng unless the page asks for it, and then only once the job is read', () => {
+  expect(detail(clip('video'))).not.toContain('Biến thành ứng dụng');
+  const asked = renderToStaticMarkup(<ClipDetail clips={[clip('video')]} index={0} admin makeApp onIndex={() => undefined} onChange={() => undefined} />);
+  expect(asked).not.toContain('Biến thành ứng dụng'); // the job has not been read in a static render
 });

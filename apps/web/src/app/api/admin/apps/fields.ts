@@ -26,5 +26,11 @@ export function parseInputs(v: unknown): AppInputBody[] | undefined {
 export const fixedInputs = (inputs: AppInputBody[], sourceInputIds: string[]): CustomAppInput[] =>
   inputs.map((i, n) => ('slot' in i ? { slot: i.slot } : { fixed: sourceInputIds[n]! }));
 
+/** The refusal when an input kept fixed is a photo of the clip that has been deleted since (a Run would then fail for every member). */
+export const LOST_FIXED = 'Ảnh cố định của lượt gốc đã bị xoá: hãy để người dùng tải lên ô đó.';
+
+/** Whether an input kept fixed points at a photo of the clip that is no longer live (`live`: the ids of the clip's live input photos). */
+export const lostFixed = (inputs: AppInputBody[], sourceInputIds: string[], live: Set<string>) => inputs.some((i, n) => 'fixed' in i && !live.has(sourceInputIds[n]!));
+
 /** Whether `body` has no key outside `keys`. */
 export const onlyKeys = (body: Record<string, unknown>, keys: string[]) => Object.keys(body).every((k) => keys.includes(k));

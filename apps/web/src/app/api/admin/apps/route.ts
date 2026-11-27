@@ -5,7 +5,7 @@ import { pool } from '@/lib/auth';
 import { appInputProblem, cleanApp } from '@/lib/custom-apps';
 import { appSource } from '@/lib/custom-apps-db';
 import { guard } from '@/lib/session';
-import { fixedInputs, onlyKeys, parseInputs } from './fields';
+import { fixedInputs, LOST_FIXED, lostFixed, onlyKeys, parseInputs } from './fields';
 
 /**
  * Admin: make an app of a live clip of the active workspace, `{ jobId, name, description?, category, prompt, inputs, publish? }`: `inputs` has one `{ slot: { label, hint } }` (the
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     if (typeof source.draft === 'string') return bad(source.draft);
     const problem = appInputProblem(fields, source.inputIds.length, source.maxPromptChars);
     if (problem) return bad(problem);
+    if (lostFixed(fields.inputs, source.inputIds, new Set(source.images.map((i) => i.id)))) return bad(LOST_FIXED);
     const id = crypto.randomUUID();
     const { draft } = source;
     await tx.query(
