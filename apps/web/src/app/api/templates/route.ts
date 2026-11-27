@@ -51,8 +51,9 @@ async function jobData(jobId: string, userId: string, workspaceId: string): Prom
   ).rows[0];
   if (!j) return null;
   const p = j.params as Record<string, string>;
-  // The member's own prompt: a free prompt on Create video, Image Generation and Motion Control; elsewhere (and beside an image style) the prompt is composed, so the kept brief.
-  const ownPrompt = ((j.feature === 'video' || j.feature === 'image') && !j.preset_id) || j.feature === 'motion_control';
+  // The member's own prompt: a free prompt on Create video, Image Generation, Motion Control and the video edit's own words; elsewhere (and beside an image style or a quick edit) the prompt is composed, so the kept brief.
+  const edit = j.feature === 'video_edit';
+  const ownPrompt = ((j.feature === 'video' || j.feature === 'image') && !j.preset_id) || j.feature === 'motion_control' || (edit && !p.color && !p.background);
   const data = {
     images: j.images ?? [],
     endFrame: j.end_frame, videoRef: j.video_ref, clips: j.clips,
@@ -61,8 +62,9 @@ async function jobData(jobId: string, userId: string, workspaceId: string): Prom
     garments: p.garments ? Number(p.garments) : undefined,
     pose: p.pose,
     effect: p.effect,
+    color: edit ? p.color : undefined, background: edit ? p.background : undefined, // the video edit's only: no other page refills a colour or a backdrop from a template
     orientation: p.orientation,
-    enhance: ['video', 'image'].includes(j.feature) ? j.enhance : undefined,
+    enhance: ['video', 'image', 'video_edit'].includes(j.feature) ? j.enhance : undefined,
     ratio: j.aspect, resolution: p.resolution, modelId: j.model, presetId: j.preset_id, storeId: j.store_id,
     durationSec: ['video', 'marketing'].includes(j.feature) ? j.duration_s : undefined,
   };

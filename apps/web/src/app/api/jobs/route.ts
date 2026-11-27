@@ -13,14 +13,14 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
-import { BATCH_FEATURES, cleanName, DOG_BREEDS, HOOK_RATIO, HOOK_SECONDS, hookEffect, isBatchId, isHexColor, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_MODELS, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS, RECOLOR_COLORS, EDIT_BACKGROUNDS } from '@/lib/apps';
+import { BATCH_FEATURES, cleanName, DOG_BREEDS, EDIT_BACKGROUNDS, HOOK_RATIO, HOOK_SECONDS, hookEffect, isBatchId, isHexColor, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_MODELS, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS, RECOLOR_COLORS } from '@/lib/apps';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
-import { getObject } from '@/lib/storage';
+import { getRange } from '@/lib/storage';
 import { garmentCap, poseOf, POSES } from '@/lib/try-on-stock';
 
 /** Create Video takes up to 9 images (the most a fal reference schema allows, as Fash offers); the model's max_images is checked under the lock. */
@@ -51,12 +51,32 @@ type Spec = {
 const ITEM: Record<string, string> = { breed_swap: 'breed', pet_portrait: 'style', mockup_pack: 'product', name_swap: 'name', pose_generator: 'pose', product_recolor: 'color', listing_set: 'shot', hook_effect: 'effect', video_edit: 'quick edit' };
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 
-/** Why a clip does not fit the picture size and frame rate `endpoint` takes (videoRefProblem), read from its file's header; null when it fits, when the endpoint takes no clip,
- * or when the file or its header cannot be read (as for a frame rate the header does not give): fal then decides. */
-async function clipProblem(endpoint: string | undefined, s3Key: string): Promise<string | null> {
+/** The most of an MP4's `moov` box clipProblem reads: a clip's header is a few hundred KB, so a bigger one is left to fal. */
+const MAX_MOOV_BYTES = 8 * 1024 * 1024;
+
+/** An MP4's `moov` box, found by reading only the top-level box headers before it (a few ranged reads, wherever the encoder put it), so a 200 MB clip is never held whole. */
+async function moovOf(s3Key: string, size: number): Promise<Uint8Array | undefined> {
+  for (let at = 0, boxes = 0; at + 8 <= size && boxes < 32; boxes++) {
+    const h = await getRange(s3Key, `bytes=${at}-${Math.min(at + 15, size - 1)}`);
+    if (h.length < 8) return undefined;
+    const v = new DataView(h.buffer, h.byteOffset, h.byteLength);
+    const short = v.getUint32(0);
+    const length = short === 1 && h.length >= 16 ? Number(v.getBigUint64(8)) : short === 0 ? size - at : short;
+    if (length < 8) return undefined;
+    if (String.fromCharCode(...h.subarray(4, 8)) === 'moov') return length > MAX_MOOV_BYTES ? undefined : getRange(s3Key, `bytes=${at}-${at + length - 1}`);
+    at += length;
+  }
+  return undefined;
+}
+
+/** Why a clip of `size` bytes does not fit the picture size and frame rate the enabled model `modelId` takes (videoRefProblem), read from its file's header; null when it fits,
+ * when the model takes no clip, or when the file or its header cannot be read (as for a frame rate the header does not give): fal then decides. */
+async function clipProblem(modelId: string, s3Key: string, size: number): Promise<string | null> {
+  const endpoint: string | undefined = (await pool.query('select endpoint from model_configs where id = $1 and enabled', [modelId])).rows[0]?.endpoint;
   if (!endpoint || !videoInputs(endpoint).videoRefs) return null;
   try {
-    const info = mp4VideoInfo(new Uint8Array(await new Response(await getObject(s3Key)).arrayBuffer()));
+    const moov = await moovOf(s3Key, size);
+    const info = moov && mp4VideoInfo(moov);
     return info ? videoRefProblem(endpoint, info) : null;
   } catch {
     return null;
@@ -325,7 +345,7 @@ export async function POST(request: Request) {
     const prompt = basePrompt(feature, written) ?? (motion ? '' : null);
     if (prompt !== null && ((prompt === '' && !motion) || prompt.length > PROMPT_CEILING)) return bad(`the prompt must have 1 to ${PROMPT_CEILING} characters`);
     const usable = await pool.query(
-      `select a.id, a.mime, a.duration_ms, a.s3_key from assets a
+      `select a.id, a.mime, a.duration_ms, a.s3_key, a.bytes from assets a
         where a.id = any($1::text[]) and a.workspace_id = $3 and a.deleted_at is null and a.kind = 'input'
           and (a.owner_id = $2
                or exists (select 1 from jobs j where j.input_asset_ids @> array[a.id] and j.workspace_id = $3 and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null)
@@ -333,14 +353,15 @@ export async function POST(request: Request) {
       [assetIds, userId, g.workspaceId],
     );
     if (usable.rowCount !== assetIds.length) return bad('one or more assets do not exist or cannot be used');
-    const byId = new Map(usable.rows.map((r: { id: string; mime: string; duration_ms: number | null; s3_key: string }) => [r.id, r]));
+    const byId = new Map(usable.rows.map((r: { id: string; mime: string; duration_ms: number | null; s3_key: string; bytes: number }) => [r.id, r]));
     const isVideo = (i: number) => byId.get(assetIds[i] as string)!.mime.startsWith('video/');
     if (motion ? isVideo(0) || !isVideo(1) : edit ? !isVideo(0) : assetIds.some((_, i) => isVideo(i))) {
       return bad(motion ? 'Motion Control needs the character image first, then the reference video' : edit ? 'the video edit takes a video: the clip to edit' : 'only Motion Control and the video edit take a video input');
     }
     // The clip's picture size and frame rate against the model's limits, as a reference video's are below.
     if (edit) {
-      const problem = await clipProblem((await pool.query('select endpoint from model_configs where id = $1', [modelId])).rows[0]?.endpoint, byId.get(assetIds[0] as string)!.s3_key);
+      const clip = byId.get(assetIds[0] as string)!;
+      const problem = await clipProblem(modelId as string, clip.s3_key, clip.bytes);
       if (problem) return bad(problem);
     }
     if (usable.rows.some((r: { mime: string }) => r.mime.startsWith('audio/'))) return bad('an audio clip goes in params.audioAssetIds, not assetIds');
@@ -359,7 +380,7 @@ export async function POST(request: Request) {
     // The reference video is the caller's own MP4 or MOV clip, on Advanced only (whether the model takes one, and its length and size, are checked with the model below).
     if (given.videoAssetId !== undefined) {
       if (!advanced) return bad('params.videoAssetId is for Advanced only');
-      const clip = await pool.query(`select mime, s3_key from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [
+      const clip = await pool.query(`select mime, s3_key, bytes from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [
         given.videoAssetId,
         userId,
         g.workspaceId,
@@ -367,7 +388,7 @@ export async function POST(request: Request) {
       if (!clip.rows[0]?.mime.startsWith('video/')) return bad('params.videoAssetId must be one of your own videos');
       // Its picture size and frame rate (clipProblem, read here, outside the lock) on the row of a duplicate pair the job will run on (servingRow), which takes the video where the named row may not.
       const runsOn = await servingRow(pool, modelId, feature, jobNeed({ aspect: ratio as string, duration_s: durationSec as number, input_asset_ids: assetIds as string[], params: given }));
-      const problem = await clipProblem((await pool.query('select endpoint from model_configs where id = $1', [runsOn])).rows[0]?.endpoint, clip.rows[0].s3_key);
+      const problem = await clipProblem(runsOn, clip.rows[0].s3_key, clip.rows[0].bytes);
       if (problem) return bad(problem);
     }
     // The end frame is the caller's own image, or one of the Run's images (a clip that loops), which the check above already allowed: a company example's

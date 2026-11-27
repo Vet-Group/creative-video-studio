@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import type { Enhancer } from '@cvs/core/enhance';
 import { bookLlm, close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
 import { type ImageModelConfig, imagePricesFor, type ModelConfig, MOTION_IMAGE_MAX_SEC, promptLimit, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
+import { videoInputs } from '@cvs/core/providers/fal';
 import { ImageReadError, ProviderHttpError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, type AnalyzeJobData, COMPRESS_QUEUE, COMPRESS_QUEUE_OPTIONS, type CompressJobData, PURGE_CRON, PURGE_QUEUE, REFRAME_QUEUE, REFRAME_QUEUE_OPTIONS, type ReframeJobData, REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS, type RemakeJobData, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, TURNTABLE_QUEUE, TURNTABLE_QUEUE_OPTIONS, type TurntableJobData, turntableKey, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
@@ -177,9 +178,9 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   /**
    * Refuses a reference video (params.videoAssetId) that plays more than 1 s longer than the length stored at upload (assets.duration_ms, read from the
    * MP4 header, which the uploader writes). That length priced the job, and models that bill input seconds charge for the real ones (issue #349).
-   * With `maxSec` (Motion Control: its orientation's limit) it also refuses a clip that plays longer than that, whatever its header said, as fal would reject it after billing.
+   * With `maxSec` (Motion Control: its orientation's limit; the video edit: its endpoint's) it also refuses a clip that plays more than `slack` seconds longer than that, whatever its header said, as fal would reject it after billing.
    */
-  async function checkReferenceLength(id: string, maxSec?: number): Promise<void> {
+  async function checkReferenceLength(id: string, maxSec?: number, slack = 0.5): Promise<void> {
     const stored: number | null = (await pool.query('select duration_ms from assets where id = $1', [id])).rows[0]?.duration_ms ?? null;
     const dir = await mkdtemp(join(tmpdir(), 'cvs-ref-'));
     try {
@@ -190,7 +191,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       if (stored == null || seconds > stored / 1000 + 1) {
         throw new Error(`the reference video plays ${seconds.toFixed(1)} s, but its file header says ${stored == null ? 'nothing' : `${(stored / 1000).toFixed(1)} s`}`);
       }
-      if (maxSec !== undefined && seconds > maxSec + 0.5) throw new Error(`the reference video plays ${seconds.toFixed(1)} s, but this job takes at most ${maxSec} s`);
+      if (maxSec !== undefined && seconds > maxSec + slack) throw new Error(`the reference video plays ${seconds.toFixed(1)} s, but this job takes at most ${maxSec} s`);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -288,8 +289,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         const model = await loadModel(job.model, job.params.audio, { videoAssetId: job.params.videoAssetId, durationSec: job.duration_s });
         // Motion Control's reference is its second input: 'image' orientation takes 10 s, 'video' the model's longest (the half second is the encoder's rounding).
         if (job.feature === 'motion_control') await checkReferenceLength(job.input_asset_ids[1], job.params.orientation === 'image' ? MOTION_IMAGE_MAX_SEC : Math.max(...model.durationsSec));
-        // The video edit's clip is its one input: it plays as long as its stored length that priced the job, and no longer than the model's longest.
-        if (job.feature === 'video_edit') await checkReferenceLength(job.input_asset_ids[0], Math.max(...model.durationsSec));
+        // The video edit's clip is its one input: it plays as long as its stored length that priced the job, and no longer than its endpoint takes (fal allows 0.05 s over).
+        if (job.feature === 'video_edit') await checkReferenceLength(job.input_asset_ids[0], videoInputs(model.endpoint).videoRefs?.maxSec ?? Math.max(...model.durationsSec), 0.05);
         const request: SubmitRequest = {
           model, prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s, audio: job.params.audio === 'on',
           ...(job.params.endAssetId && { endImageUrl: `asset://${job.params.endAssetId}` }),

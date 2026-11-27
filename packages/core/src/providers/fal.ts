@@ -295,10 +295,14 @@ function motion(req: SubmitRequest, [image_url, video_url, ...rest]: string[]): 
   return { image_url, video_url, character_orientation: req.orientation ?? 'video', keep_original_sound: false, ...(req.prompt.trim() && { prompt: req.prompt }) };
 }
 
-/** The video edit: the member's clip (the one input) changed as the prompt says, which names the clip [Video1] (the endpoint's @Video1). An edit keeps the clip's own sound. */
+/**
+ * The video edit: the member's clip (the one input) changed as the prompt says, which names the clip [Video1] (the endpoint's @Video1). Own words that do not name it
+ * (Enhance off, or Enhance failed) are led by `Edit [Video1]: ` so the model still edits that clip. An edit keeps the clip's own sound.
+ */
 function videoEdit(req: SubmitRequest, [video_url, ...rest]: string[]): Record<string, unknown> {
   if (!video_url || rest.length > 0) throw new ImageReadError('the video edit needs exactly one clip');
-  return { prompt: videoTokens(req.prompt, atVideo), video_url, keep_audio: true };
+  const prompt = req.prompt.includes('[Video1]') ? req.prompt : `Edit [Video1]: ${req.prompt}`;
+  return { prompt: videoTokens(prompt, atVideo), video_url, keep_audio: true };
 }
 
 /**

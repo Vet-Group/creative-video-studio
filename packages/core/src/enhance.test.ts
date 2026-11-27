@@ -32,7 +32,7 @@ test('a video edit gets its own short edit instruction prompt, which names the c
   await enhance('đổi áo sang màu đỏ', 'edit', 2500);
   expect(JSON.parse(sent).system_prompt).toBe(SYSTEM_PROMPTS.edit);
   expect(SYSTEM_PROMPTS.edit).toContain('[Video1]');
-  expect(SYSTEM_PROMPTS.edit).toContain('translate it');
+  expect(SYSTEM_PROMPTS.edit).toContain('translated to English if the request is not in English; only quoted text stays exactly as written');
   expect(SYSTEM_PROMPTS.edit).not.toContain('camera movement');
 });
 

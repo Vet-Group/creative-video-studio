@@ -67,7 +67,7 @@ export function VideoEditApp({ app, reuse }: { app: AppConfig; reuse?: string })
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [list, setList] = useState<{ models: EditModel[]; best: string | null; failed: boolean } | null>(null);
+  const [answer, setAnswer] = useState<{ seconds: number; models: EditModel[]; best: string | null; failed: boolean } | null>(null);
   const names = useId();
   const promptId = useId();
   const reasonId = useId();
@@ -76,13 +76,15 @@ export function VideoEditApp({ app, reuse }: { app: AppConfig; reuse?: string })
   useEffect(() => {
     let live = true;
     api<{ models: EditModel[]; defaultModelId: string | null }>(`/api/models?feature=${app.feature}&ratio=auto&durationSec=${seconds}&images=1`).then(
-      (r) => live && setList({ models: r.models, best: r.defaultModelId, failed: false }),
-      () => live && setList({ models: [], best: null, failed: true }),
+      (r) => live && setAnswer({ seconds, models: r.models, best: r.defaultModelId, failed: false }),
+      () => live && setAnswer({ seconds, models: [], best: null, failed: true }),
     );
     return () => {
       live = false;
     };
   }, [seconds]);
+  // An answer for another length is still loading: its estimate would skip the price confirm of a longer clip.
+  const list = answer?.seconds === seconds ? answer : null;
 
   // Dùng lại: the clip and the edit (the swatch, the backdrop, or the member's own words and Enhance).
   const recreate = useReuse(

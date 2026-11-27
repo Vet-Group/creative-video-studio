@@ -597,6 +597,12 @@ describe('fal video edit', () => {
     expect(calls.at(-1)!.body).toEqual({ prompt: 'Change the color of the shirt in @Video1 to red.', video_url: 'https://v3b.fal.media/files/video-quicktime', keep_audio: true });
   });
 
+  test('own words that do not name the clip are led by an edit of @Video1', async () => {
+    const { fn, calls } = falFake();
+    await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, model: editModel, prompt: 'đổi cốc sang màu xanh', imageUrls: ['asset://clip'], ratio: 'auto', durationSec: 8 });
+    expect(calls.at(-1)!.body).toMatchObject({ prompt: 'Edit @Video1: đổi cốc sang màu xanh' });
+  });
+
   test('its picture size and frame rate limits come from the schema, and a Run without exactly one clip or with a failed upload submits nothing', async () => {
     const at = (width: number, height: number, fps: number | null = 30) => videoRefProblem(endpoint, { width, height, fps });
     expect([at(720, 1280), at(1080, 1920), at(3840, 2160), at(1280, 720, 23), at(1280, 720, 60)]).toEqual([null, null, null, null, null]);

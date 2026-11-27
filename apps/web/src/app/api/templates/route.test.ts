@@ -324,6 +324,14 @@ describe('/api/templates', () => {
       const hookId = ((await hookRes.clone().json()) as { id: string }).id;
       expect((await saved(hookRes)).data).toMatchObject({ images: [u.asset], effect: 'drop' }); // the hook effect is kept, so the page refills it
       expect(await (await one(req(u, `/api/templates/${hookId}`), ctx(hookId))).json()).toMatchObject({ feature: 'hook_effect', effect: 'drop' }); // ?template= refills from this answer
+      // The video edit keeps its quick colour or backdrop (not the composed prompt), or the member's own words with Enhance, and GET returns them.
+      const recolor = await job(u, { feature: 'video_edit', model: 'kling-o3-edit-standard', aspect: 'auto', duration: 6, params: { color: '#C8102E' }, inputs: [`${u.id}-v`] });
+      expect((await saved(await fromJob(u, recolor))).data).toEqual({ images: [`${u.id}-v`], color: '#C8102E', enhance: false, ratio: 'auto', modelId: 'kling-o3-edit-standard' });
+      const backdrop = await job(u, { feature: 'video_edit', model: 'kling-o3-edit-standard', aspect: 'auto', duration: 6, params: { background: 'white' }, inputs: [`${u.id}-v`] });
+      const { id: backdropId } = (await (await fromJob(u, backdrop)).json()) as { id: string };
+      expect(await (await one(req(u, `/api/templates/${backdropId}`), ctx(backdropId))).json()).toMatchObject({ background: 'white', color: null, prompt: null });
+      const own = await job(u, { feature: 'video_edit', model: 'kling-o3-edit-standard', prompt: 'make the mug green', enhance: true, aspect: 'auto', duration: 6, inputs: [`${u.id}-v`] });
+      expect((await saved(await fromJob(u, own))).data).toEqual({ images: [`${u.id}-v`], prompt: 'make the mug green', enhance: true, ratio: 'auto', modelId: 'kling-o3-edit-standard' });
       const mkt = await job(u, { feature: 'marketing', model: 'kling-o3-pro', duration: 10, params: { format: 'advanced', audio: 'on', hook: `${u.id}-hook`, location: 'kitchen', brief: 'b', script: 's' }, inputs: [u.asset] });
       expect(await saved(await fromJob(u, mkt))).toEqual({
         feature: 'marketing', data: { images: [u.asset], brief: 'b', script: 's', hook: `${u.id}-hook`, location: 'kitchen', format: 'advanced', audio: 'on', ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 10 },

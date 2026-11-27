@@ -62,6 +62,14 @@ beforeAll(async () => {
   // Files whose headers give a picture size and a frame rate; the other clips have no object, so their headers cannot be read and pass.
   await ensureBucket();
   for (const [key, w, h, fps] of [['small', 540, 960, 30], ['slow', 1280, 720, 15], ['ok720', 720, 1280, 30]] as const) await putObject(key, mp4Fixture({ ms: 5000, width: w, height: h, fps }), 'video/mp4');
+  // The 15 fps header again, after 1.5 MB of picture data as an encoder without fast start writes it: found by its box headers, not by reading the file whole.
+  const slow = mp4Fixture({ ms: 5000, width: 1280, height: 720, fps: 15 });
+  const mdat = new Uint8Array(1_500_000);
+  new DataView(mdat.buffer).setUint32(0, mdat.length);
+  mdat.set(new TextEncoder().encode('mdat'), 4);
+  const tail = Buffer.concat([slow.subarray(0, 16), mdat, slow.subarray(16)]); // ftyp is the fixture's first 16 bytes
+  await putObject('slow-tail', tail, 'video/mp4');
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ('slow-tail', $1, 'input', 'slow-tail', 'tail.mp4', 'video/mp4', $2, 5000, 'ws_vet')`, [user.id, tail.length]);
   await pool.query(`update model_configs set enabled = true where id = $1`, [MODEL]);
   await pool.query(`update model_configs set enabled = true where id = 'kling-o3-pro'`);
   await pool.query('update settings set member_daily_clip_cap = 1000, member_daily_usd_cap = 1000 where id = 1');
@@ -131,6 +139,7 @@ describe('POST /api/jobs for a video edit', () => {
       ['a clip over 200 MB', edit({ assetIds: ['big'] }), 'the clip may be at most 200 MB on this model'],
       ['a 540x960 clip', edit({ assetIds: ['small'] }), 'the reference video is 540x960, a size this model does not take'],
       ['a 15 fps clip', edit({ assetIds: ['slow'] }), 'the reference video runs at 15 fps, outside the 23 to 60 this model takes'],
+      ['a 15 fps clip whose header comes last', edit({ assetIds: ['slow-tail'] }), 'the reference video runs at 15 fps, outside the 23 to 60 this model takes'],
       ['a model that does not list the feature', edit({ modelId: 'kling-o3-pro' })],
     ];
     for (const [what, body, message] of bad) {
