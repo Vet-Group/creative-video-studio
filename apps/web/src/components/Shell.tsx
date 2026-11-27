@@ -37,7 +37,7 @@ import { InlineRating, RatingPrompt } from './Rating';
 import { Select } from './Select';
 import { useSmartRemakeEnabled } from './SmartRemakeGate';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
-import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, InputThumb, JobPrompt, JobsProvider, photoDrag, Recreate, resultHref, roleOf, toggleFullscreen, useForm, useJobs } from './jobs';
+import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, ImageViewer, InputThumb, JobPrompt, JobsProvider, photoDrag, Recreate, resultHref, roleOf, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import type { Account, Section } from './Settings';
@@ -205,11 +205,9 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
   // Try On's first input is the person: the original its result is compared with.
   const original = job.feature === 'try_on' && image ? job.inputAssetIds[0] : undefined;
   const content = (id: string) => `/api/assets/${id}/content`;
-  // An image card shows its preview; full screen (or its new-tab fallback) loads the original first.
-  const enlarge = () => {
-    if (image && out && media.current) media.current.src = content(out);
-    toggleFullscreen(media.current);
-  };
+  // An image card shows its preview; the viewer shows the original.
+  const [viewing, setViewing] = useState(false);
+  const enlarge = () => (image ? setViewing(true) : toggleFullscreen(media.current));
 
   async function act(what: () => Promise<unknown>, fail: string) {
     setProblem('');
@@ -323,6 +321,7 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
             )}
           </div>
         )}
+        {viewing && out && <ImageViewer src={content(out)} alt={cardTitle(job)} placeholder={content(job.posterAssetId ?? out)} onClose={() => setViewing(false)} />}
         {out && original && (
           <Modal open={comparing} onClose={() => setComparing(false)} label={`So sánh trước/sau: ${cardTitle(job)}`} className="compare-modal">
             <CompareSlider before={content(original)} after={content(out)} beforeAlt="Ảnh người mẫu gốc" afterAlt={cardTitle(job)} />

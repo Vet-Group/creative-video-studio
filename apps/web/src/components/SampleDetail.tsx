@@ -10,7 +10,7 @@ import { BACKGROUNDS } from '@/lib/try-on-stock';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon } from './Icon';
 import { useImageModels } from './image-tools';
-import { InputThumb, JobPrompt, Recreate, roleOf, useForm } from './jobs';
+import { ImageViewer, InputThumb, JobPrompt, Recreate, roleOf, toggleFullscreen, useForm } from './jobs';
 import { Modal } from './Modal';
 
 /** A sample's details file, in the shape its page refills from (`?example=`): Marketing's format and duration, or Try On's model, resolution and background. */
@@ -62,6 +62,7 @@ export function SampleDetail({ names, index, onIndex, hasDetails = () => true }:
   const base = name.replace(/\.(mp4|jpg)$/, '');
   const [details, setDetails] = useState<SampleDetails | null>(null);
   const [note, setNote] = useState('');
+  const [viewing, setViewing] = useState(false);
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const narrow = useMediaQuery(NARROW);
   const form = useForm();
@@ -130,7 +131,7 @@ export function SampleDetail({ names, index, onIndex, hasDetails = () => true }:
           <a className="icon-button" href={`/api/samples/${name}`} download={name} aria-label="Tải xuống" title="Tải xuống">
             <Icon name="download" />
           </a>
-          <button type="button" className="icon-button" onClick={() => void media.current?.requestFullscreen?.()} aria-label="Toàn màn hình" title="Toàn màn hình">
+          <button type="button" className="icon-button" onClick={() => (video ? toggleFullscreen(media.current) : setViewing(true))} aria-label="Toàn màn hình" title="Toàn màn hình">
             <Icon name="expand" />
           </button>
           <a className="icon-button" href={`/api/samples/${name}`} target="_blank" rel="noreferrer" aria-label="Mở bản gốc trong tab mới" title="Mở bản gốc trong tab mới">
@@ -177,6 +178,7 @@ export function SampleDetail({ names, index, onIndex, hasDetails = () => true }:
           <Icon name="right" size={20} />
         </button>
       )}
+      {viewing && <ImageViewer src={`/api/samples/${name}`} alt="Ảnh mẫu" onClose={() => setViewing(false)} />}
     </Modal>
   );
 }

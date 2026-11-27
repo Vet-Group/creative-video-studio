@@ -120,9 +120,13 @@ test('an image result opens full screen from the picture in History, and an imag
       const picture = page.locator(`.job-media img[src="/api/assets/${preview}/content"]`);
       await expect(picture).toBeVisible();
       await page.mouse.click(...(await at(picture)));
-      await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName ?? null)).toBe('IMG');
-      expect(await page.evaluate(() => document.fullscreenElement?.getAttribute('src'))).toBe(`/api/assets/${out}/content`);
-      await page.evaluate(() => document.exitFullscreen());
+      // An in-page viewer, not element full screen: an iPad gives a full-screen picture no way out (2026-11-27).
+      const viewer = page.locator('dialog.image-viewer');
+      await expect(viewer.locator('img')).toHaveAttribute('src', `/api/assets/${out}/content`);
+      expect(await page.evaluate(() => document.fullscreenElement)).toBeNull();
+      expect(await viewer.getByRole('button', { name: 'Đóng' }).evaluate((b) => b.getBoundingClientRect().width)).toBe(44); // a finger-sized way out
+      await viewer.getByRole('button', { name: 'Đóng' }).click();
+      await expect(viewer).toHaveCount(0);
 
       await page.getByRole('tab', { name: 'Ví dụ' }).click();
       const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
