@@ -1,5 +1,6 @@
 // Saved forms (user_templates): the inputs of one page in the shape the reuse link reads from a job, so a template refills a form the same way.
 import { PROMPT_CEILING } from '@cvs/core/models';
+import { hookEffect } from './apps';
 import { END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from './marketing';
 import { MOST_GARMENTS, poseOf } from './try-on-stock';
 
@@ -41,6 +42,8 @@ export type TemplateData = {
   garments?: number;
   /** Try On's pose (lib/try-on-stock.ts). */
   pose?: string;
+  /** The hook effects app's effect (lib/apps.ts HOOK_EFFECTS). */
+  effect?: string;
   durationSec?: number;
   ratio?: string;
   resolution?: string;
@@ -51,7 +54,7 @@ export type TemplateData = {
 
 const TEXT = ['prompt', 'brief', 'script'] as const;
 const SHORT = ['ratio', 'resolution', 'modelId', 'presetId', 'storeId', 'endFrame', 'videoRef'] as const;
-const FIELDS = new Set<string>(['images', 'clips', ...TEXT, ...SHORT, 'hookText', 'ending', 'promptMode', 'endText', 'endTextPos', 'hook', 'location', 'format', 'roles', 'highlights', 'audio', 'orientation', 'enhance', 'garments', 'pose', 'durationSec']);
+const FIELDS = new Set<string>(['images', 'clips', ...TEXT, ...SHORT, 'hookText', 'ending', 'promptMode', 'endText', 'endTextPos', 'hook', 'location', 'format', 'roles', 'highlights', 'audio', 'orientation', 'enhance', 'garments', 'pose', 'effect', 'durationSec']);
 const whole = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
 
 /** The checked data of a template, or the reason it is refused. Unknown keys, wrong types and over-long text are refused; the route checks the hook and the location. */
@@ -95,6 +98,7 @@ export function templateData(raw: unknown): TemplateData | string {
   if (d.enhance !== undefined && typeof d.enhance !== 'boolean') return 'data.enhance must be true or false';
   if (d.garments !== undefined && !whole(d.garments, 1, MOST_GARMENTS)) return `data.garments must be 1 to ${MOST_GARMENTS}`;
   if (d.pose !== undefined && !poseOf(d.pose as string)) return 'data.pose must be one of the Try On poses';
+  if (d.effect !== undefined && !hookEffect(d.effect as string)) return 'data.effect must be one of the hook effects';
   if (d.durationSec !== undefined && !whole(d.durationSec, 1, 60)) return 'data.durationSec must be 1 to 60';
   return { ...(d as TemplateData), images: images as string[] };
 }

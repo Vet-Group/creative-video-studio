@@ -487,7 +487,8 @@ export async function POST(request: Request) {
     if (params.thinking !== undefined && !model.thinking_levels.includes(params.thinking)) {
       return bad(model.thinking_levels.length > 0 ? `params.thinking must be one of ${model.thinking_levels.join(', ')} on this model` : 'the model has no thinking level');
     }
-    let prompt = original?.prompt ?? freePrompt;
+    // A hook effect's retry or rerun sends the effect's prompt as it is now, so an effect reworded since never reruns the old text.
+    let prompt = effect?.prompt ?? original?.prompt ?? freePrompt;
     if (!original) {
       if (presetId !== null) {
         // A Create preset on Create video, an Image Generation style on an image job: never the other page's.

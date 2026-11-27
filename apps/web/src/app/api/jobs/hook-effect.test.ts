@@ -1,4 +1,4 @@
-// The hook effects app on the two 480p MiniMax H3 rows migration 0121 lists it on (enabled here, as they are on prod), against a disposable database on the compose Postgres.
+// The hook effects app on the two 480p MiniMax H3 rows migration 0123 lists it on (enabled here, as they are on prod), against a disposable database on the compose Postgres.
 // POST only queues a job: no key is set, so nothing reaches fal.
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
@@ -113,9 +113,19 @@ describe('POST /api/jobs for a hook effect', () => {
       ['the other effect\'s model', hook('squish', { modelId: REFERENCE })],
       ['the other effect\'s model, reversed', hook('box-burst', { modelId: TURBO })],
     ];
+    // The hook checks' own words, so a case cannot pass on an unrelated 400.
+    const said: Record<string, string> = {
+      'an unknown effect': 'params.effect must be one of the hook effects',
+      'no effect': 'params.effect must be one of the hook effects',
+      'no end frame': 'params.endAssetId must be the product image: the clip ends on it',
+      'another end frame': 'params.endAssetId must be the product image: the clip ends on it',
+      "the other effect's model": 'the effect runs on its own model',
+      "the other effect's model, reversed": 'the effect runs on its own model',
+    };
     for (const [what, body] of bad) {
       const res = await run(body);
       expect(res.status, what).toBe(400);
+      if (said[what]) expect(await errorOf(res), what).toBe(said[what]);
     }
     expect(await errorOf(await run(hook('squish', { modelId: REFERENCE })))).toBe('the effect runs on its own model');
     expect((await pool.query(`select count(*)::int as n from jobs where feature = 'hook_effect' and prompt = 'make it fly'`)).rows[0].n).toBe(0);
@@ -135,6 +145,18 @@ describe('retry, rerun and read-back', () => {
     expect(list.jobs.find((j) => j.id === id)?.effect).toBe('melt');
     expect(list.jobs.find((j) => j.id === 'plain-job')?.effect).toBeNull();
     expect((await jobOf('plain-job')).effect).toBeNull();
+  });
+
+  test('a rerun of a hook job made before its effect was reworded sends the effect\'s prompt as it is now', async () => {
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, params, feature, workspace_id, output_asset_id)
+       values ('old-words', $1, 'team-unassigned', $2, 'fal', 'old prompt', '9:16', 5, '{img}', 'succeeded', '{"effect":"drop","endAssetId":"img"}', 'hook_effect', 'ws_vet', 'img')`,
+      [userId, TURBO],
+    );
+    const res = await run({ rerunOf: 'old-words', maxUsd: 10 });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await jobOf(id)).prompt).toBe(hookEffectPrompt('drop'));
   });
 
   test('a retry or a rerun of a job whose effect is no longer offered is refused with 409, not 500', async () => {

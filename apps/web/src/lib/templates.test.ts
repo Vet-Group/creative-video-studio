@@ -17,3 +17,8 @@ test("Try On's garment count goes up to 13 (Nano Banana 2.1's cap), with its per
   expect(templateData({ images: ['p', 'g'], garments: 14 })).toBe('data.garments must be 1 to 13');
   expect(templateData({ images: ['p', 'g'], garments: 0 })).toBe('data.garments must be 1 to 13');
 });
+
+test("the hook effects app's effect is kept only when it is one of the effects", () => {
+  expect(templateData({ images: ['p'], effect: 'drop' })).toMatchObject({ effect: 'drop' });
+  expect(templateData({ images: ['p'], effect: 'confetti' })).toBe('data.effect must be one of the hook effects');
+});
