@@ -219,7 +219,6 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
   /** Said when the form changed a setting itself; it shows only while the form still has the values it set. */
   const [adjusted, setAdjusted] = useState<{ text: string; ratio: string; durationSec: number; modelId?: string } | null>(null);
   const wanted = useRef(model); // the Explore choice, honoured once: the form takes its ratio and duration rather than dropping it
-  const hdPick = useRef(reuse ? model || undefined : undefined); // Làm bản HD (`?reuse=` with `?model=`): the first refill only, so a later in-place Dùng lại keeps its clip's own model
   const endWanted = useRef(end !== undefined); // the two pictures from History: once the models are listed with the end frame, the form moves to one that takes it
   const left = useRef<{ modelLabel: string | null; lost: number; store: boolean } | null>(null); // what a refill left out; the models fetch that follows tells it with the model, once
   const [storeId, setStoreId] = useState('');
@@ -227,6 +226,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [ready, setReady] = useState(!reuse);
   const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place. `recipe`: a company example, which fills everything but the store
+  const firstSource = useRef(source); // Làm bản HD (`?reuse=` with `?model=`): only the link's own refill takes the HD model; a later in-place Dùng lại keeps its clip's model
   const [refetch, setRefetch] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -365,8 +365,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
         if (stale) return;
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
-        const hd = hdPick.current;
-        hdPick.current = undefined;
+        const hd = source === firstSource.current ? model || undefined : undefined;
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         if (nothingRefilled({ ...j, prompt: j.prompt ?? j.hookText ?? j.ending })) {
           notify(nothingNote(lostInputs(j), reuse)); // nothing to bring back: the form stays as it is
