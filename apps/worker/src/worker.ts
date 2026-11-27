@@ -255,7 +255,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       // Enhance once per job (a resubmit reuses the saved brief). Mock models are tests and never spend on it. Any failure keeps the member's prompt.
       if (job.enhance && !job.enhanced_prompt && deps.enhance && !job.is_mock) {
         try {
-          const r = await abortable(deps.enhance(job.prompt, job.kind === 'image' ? 'image' : 'video', promptLimit(job.max_prompt_chars)), signal);
+          const r = await abortable(deps.enhance(job.prompt, job.feature === 'video_edit' ? 'edit' : job.kind === 'image' ? 'image' : 'video', promptLimit(job.max_prompt_chars)), signal);
           await withTransaction(pool, async (tx) => {
             await tx.query('update jobs set enhanced_prompt = $2, enhance_cost_usd = $3 where id = $1', [jobId, r.prompt, r.costUsd]);
             await bookLlm(tx, { enhance: jobId }, r);
@@ -288,6 +288,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         const model = await loadModel(job.model, job.params.audio, { videoAssetId: job.params.videoAssetId, durationSec: job.duration_s });
         // Motion Control's reference is its second input: 'image' orientation takes 10 s, 'video' the model's longest (the half second is the encoder's rounding).
         if (job.feature === 'motion_control') await checkReferenceLength(job.input_asset_ids[1], job.params.orientation === 'image' ? MOTION_IMAGE_MAX_SEC : Math.max(...model.durationsSec));
+        // The video edit's clip is its one input: it plays as long as its stored length that priced the job, and no longer than the model's longest.
+        if (job.feature === 'video_edit') await checkReferenceLength(job.input_asset_ids[0], Math.max(...model.durationsSec));
         const request: SubmitRequest = {
           model, prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s, audio: job.params.audio === 'on',
           ...(job.params.endAssetId && { endImageUrl: `asset://${job.params.endAssetId}` }),
@@ -423,10 +425,10 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       });
       const { width, height } = await probeSize(video);
       const seconds = await probeSeconds(video);
-      // Motion Control's clip is as long as the member's own video, whose header can understate it, so a clip that came back longer is billed for its own length. A shorter one is not
+      // Motion Control's and the video edit's clip is as long as the member's own video, whose header can understate it, so a clip that came back longer is billed for its own length. A shorter one is not
       // scaled down here: settle() never books less than the estimate, so a lower cost would change nothing (backfill-durations.ts books the difference for the clips already made).
       // shortcut: a late bill (lateBill) is not scaled; measure it if it matters. A reference video's input seconds are checked before submit (checkReferenceLength).
-      if (job.feature === 'motion_control' && job.duration_s && seconds > job.duration_s + 1) costUsd = (costUsd * Math.ceil(seconds)) / job.duration_s;
+      if ((job.feature === 'motion_control' || job.feature === 'video_edit') && job.duration_s && seconds > job.duration_s + 1) costUsd = (costUsd * Math.ceil(seconds)) / job.duration_s;
       // A tier keeps one pixel area for every ratio, so a shape much wider than 16:9 has a shorter short side (21:9 at 720p is 1470x630); its floor shrinks with it, 3% less for
       // sizes rounded to a multiple of 16 (1456x624). Shapes up to 2:1 keep the exact floor, which is what catches 704 px where 720 was asked.
       const aspect = Math.max(width, height) / Math.min(width, height);

@@ -90,6 +90,12 @@ await pool.query(
      ('mock-hook-i2v-e2e', 'mock', 'minimax/h3-max-turbo/image-to-video', 'Mock hook I2V E2E', 'video', '{hook_effect}', '{9:16}', '{5}', 1, '720p', 0.025, '{}', true),
      ('mock-hook-reveal-e2e', 'mock', 'minimax/h3-max/reference-to-video', 'Mock hook reveal E2E', 'video', '{hook_effect}', '{9:16}', '{5}', 1, '720p', 0.05, '{}', true)`,
 );
+// The video edit app's model, on the mock provider with the real endpoint, whose clip limits the jobs API holds the upload to (3 to 15 s, 720 px a side, 23 to 60 fps).
+// A mock job books 0 USD; the real row's price is checked in api/jobs/video-edit.test.ts.
+await pool.query(
+  `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values
+     ('mock-video-edit-e2e', 'mock', 'fal-ai/kling-video/o3/standard/video-to-video/edit', 'Mock video edit E2E', 'video', '{video_edit}', '{auto}', '{3,4,5,6,7,8,9,10,11,12,13,14,15}', 1, '720p', 0.14, '{}', true)`,
+);
 // A store the Create picker offers, for the specs that tag a clip with one.
 await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-e2e', 'E2E Shop', 'E2E-SEED', 'ws_vet')`);
 // A store whose brand kit store-brand.e2e fills, so no other spec's store gets one.

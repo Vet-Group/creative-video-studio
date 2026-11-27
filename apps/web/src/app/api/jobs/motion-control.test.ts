@@ -109,6 +109,6 @@ describe('POST /api/jobs for Motion Control', () => {
 
   test('no other feature takes a video input', async () => {
     const res = await POST(call('/api/jobs', 'POST', { feature: 'video', modelId: 'kling-o3-pro', assetIds: ['img', 'vid'], presetId: 'gentle-push-in', ratio: '9:16', durationSec: 8 }));
-    expect(await errorOf(res)).toBe('only Motion Control takes a video input');
+    expect(await errorOf(res)).toBe('only Motion Control and the video edit take a video input');
   });
 });

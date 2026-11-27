@@ -6,7 +6,7 @@ import { sendJson, timeout, type Fetch } from './providers/http';
 
 export const ENHANCE_URL = 'https://fal.run/openrouter/router';
 export const ENHANCE_MODEL = 'google/gemini-2.5-flash';
-export type EnhanceKind = 'video' | 'image';
+export type EnhanceKind = 'video' | 'image' | 'edit';
 /** `maxChars`: the job's model prompt limit (promptLimit in models.ts), which the rewrite is cut to. */
 /** `provider` and `model`: who answered and with what, for the call's ledger row. */
 export type Enhancer = (prompt: string, kind: EnhanceKind, maxChars: number) => Promise<{ prompt: string; costUsd: number | null; provider: string; model: string }>;
@@ -30,6 +30,13 @@ export const SYSTEM_PROMPTS: Record<EnhanceKind, string> = {
     'composition and framing, the lighting, the lens and camera feel, the background and the mood. Keep the products and people of the references ' +
     'as they are. ' +
     KEEP,
+  // The video edit app: the member's own words become one short edit instruction, since a motion brief would ask the edit for changes nobody wanted.
+  edit:
+    'You turn a short request into a precise instruction for a video editing model that changes an existing clip, called [Video1]. You cannot see the clip. ' +
+    'State only the change the user asked for, then that everything else stays exactly as in [Video1]: the people, their faces and movements, the products, ' +
+    'any printed text, the setting, the light and the camera. Never invent details the user did not give; keep every concrete detail they gave (colours, ' +
+    'objects, quoted text) exactly as written. If the request is not in English, translate it; only quoted text keeps its language. Write in English, as ' +
+    'one plain paragraph of 20 to 80 words, with no title, list, quotes or comments around it. Reply with the instruction only.',
 };
 
 /** The rewrite, trimmed and cut to the model's prompt limit; an empty or failed answer throws, and the caller keeps the member's prompt. */

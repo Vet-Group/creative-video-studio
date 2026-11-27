@@ -336,6 +336,17 @@ export const APPS: AppConfig[] = [
     slots: [],
   },
   {
+    // Ours too (owner pick 2026-11-27): one of the member's clips changed by one instruction, a quick edit or their own words, the rest kept. Its own page, components/VideoEditApp.tsx.
+    slug: 'video-edit',
+    added: '2026-11-27',
+    feature: 'video_edit',
+    name: 'Sửa video',
+    description: 'Sửa một video có sẵn bằng lời: đổi màu áo, thay nền hoặc tự mô tả thay đổi, phần còn lại giữ nguyên.',
+    keywords: 'video edit, edit video, chỉnh video, recolor',
+    category: 'video',
+    slots: [],
+  },
+  {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
     // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
     slug: 'smart-remake',
@@ -808,6 +819,58 @@ export function hookReason(d: HookDraft): string | null {
   return null;
 }
 
+/** The video edit app's quick edits besides the member's own words: the colour of the top (a swatch of product recolor's RECOLOR_COLORS) or the backdrop (a scene of the pose
+ * generator's POSE_BACKGROUNDS). Added text is left out: a video model does not spell it reliably (Marketing Studio burns its end text in instead). */
+export const EDIT_BACKGROUNDS = POSE_BACKGROUNDS.filter((b) => b.scene !== null);
+
+/** The English instruction of a quick edit, which POST /api/jobs holds the job to (`params.color` or `params.background`); undefined for the member's own words. [Video1] is the clip. */
+export function videoEditPrompt(p: { color?: string | null; background?: string | null }): string | undefined {
+  const swatch = RECOLOR_COLORS.find((c) => c.hex === p.color);
+  if (swatch) {
+    return (
+      `Change the color of the shirt, T-shirt, hoodie or jacket in [Video1] to ${swatch.name} (hex ${swatch.hex}): an even, realistic color with the same folds, shading and fabric texture. ` +
+      'Keep any print, graphic or text on it exactly as it is. Keep everything else exactly as in [Video1]: any person, their face, hair, body and every movement, the rest of the outfit, ' +
+      'the background, the light and the camera. Do not add any text, logos or watermarks.'
+    );
+  }
+  const scene = EDIT_BACKGROUNDS.find((b) => b.value === p.background)?.scene;
+  if (scene) {
+    return (
+      `Replace the background of [Video1] with ${scene}, lit to match. Keep every person and product exactly as in [Video1]: the face, hair, body, outfit, any print or text, ` +
+      'and every movement, with the same framing and camera. Do not add any text, logos or watermarks.'
+    );
+  }
+  return undefined;
+}
+
+/** The video edit page's kinds of edit: a swatch, a backdrop, or the member's own words. */
+export type EditKind = 'color' | 'background' | 'own';
+
+/** What the video edit page has: the model (null while the list loads), the clip's length (null until one is chosen) and the edit. */
+export interface EditDraft {
+  model: { durationsSec: number[] } | null | undefined;
+  failed: boolean;
+  videoMs: number | null;
+  kind: EditKind;
+  /** A swatch or a backdrop is picked, for those kinds. */
+  picked: boolean;
+  text: string;
+}
+
+/** The first thing that stops a video edit Run, in the order the form is filled; null when it can go. The clip lasts the model's shortest to longest whole seconds. */
+export function videoEditReason(d: EditDraft): string | null {
+  if (d.model === null) return 'Đang tải danh sách mô hình...';
+  if (d.failed) return 'Không tải được danh sách mô hình.';
+  if (!d.model) return 'Ứng dụng này chưa được Admin bật';
+  if (d.videoMs === null) return 'Tải lên video cần sửa.';
+  const allowed = d.model.durationsSec;
+  if (d.videoMs < allowed[0]! * 1000 || !allowed.includes(Math.ceil(d.videoMs / 1000))) return `Video cần sửa phải dài từ ${allowed[0]} đến ${allowed.at(-1)} giây.`;
+  if (d.kind === 'color' && !d.picked) return 'Chọn màu áo mới.';
+  if (d.kind === 'background' && !d.picked) return 'Chọn nền mới.';
+  if (d.kind === 'own' && !d.text.trim()) return 'Mô tả thay đổi bạn muốn.';
+  return null;
+}
+
 /** One job of a batch app, as its params keep it: the view, breed, style, product, name, pose (one of POSES, or the member's own words), colour or shot it made. */
 export interface BatchItem {
   view?: string | null;
@@ -838,7 +901,7 @@ export function unsentPicks(runs: BatchItem[], done: number): Record<'view' | 'b
   return { view: all('view'), breed: all('breed'), style: all('style'), product: all('product'), name: all('name'), pose: all('pose'), poseText: all('poseText'), poseRef: all('poseRef'), color: all('color'), shot: all('shot'), left: rest.filter((r) => !kept.includes(r)) };
 }
 
-/** What one job of a batch app made, for its History card's title: the view's, style's, product's, pose's, shot's or effect's label (OWN_POSE for the member's own words, REF_POSE for a pose photo),
+/** What one job of a batch app made, for its History card's title: the view's, style's, product's, pose's, shot's, effect's or backdrop's label (OWN_POSE for the member's own words, REF_POSE for a pose photo),
  * the colour's (colorLabel), the name (with its breed) or the breed; null for any other job. */
 export const itemLabel = (p: BatchItem): string | null =>
   (p.view && VIEW_LABELS[p.view]) ||
@@ -850,11 +913,12 @@ export const itemLabel = (p: BatchItem): string | null =>
   (p.color && isHexColor(p.color) && colorLabel(p.color)) ||
   (p.shot && LISTING_SHOTS.find((s) => s.id === p.shot)?.label) ||
   (p.effect && hookEffect(p.effect)?.label) || // a removed effect names nothing
+  (p.background && EDIT_BACKGROUNDS.find((b) => b.value === p.background)?.label) || // a video edit's backdrop (a pose job names its pose first)
   (p.name && [p.name, p.breed].filter(Boolean).join(' · ')) ||
   p.breed ||
   null;
 
-/** The prompt of one job of an app that writes its own (breed swap, pet portrait, mockup pack, name swap, pose generator, product recolor, listing set, hook effect), which POST /api/jobs holds the job to; undefined for any other app.
+/** The prompt of one job of an app that writes its own (breed swap, pet portrait, mockup pack, name swap, pose generator, product recolor, listing set, hook effect, a video edit's quick edit), which POST /api/jobs holds the job to; undefined for any other app.
  * `blank`: the mockup pack's job has the member's blank product photo. */
 export function itemPrompt(feature: string, p: BatchItem, blank = false): string | undefined {
   if (feature === 'breed_swap') return breedSwapPrompt(p.breed!);
@@ -865,5 +929,6 @@ export function itemPrompt(feature: string, p: BatchItem, blank = false): string
   if (feature === 'product_recolor') return recolorPrompt(p.color!);
   if (feature === 'listing_set') return listingShotPrompt(p.shot!);
   if (feature === 'hook_effect') return hookEffectPrompt(p.effect ?? '');
+  if (feature === 'video_edit') return videoEditPrompt(p);
   return undefined;
 }

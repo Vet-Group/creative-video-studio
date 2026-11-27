@@ -13,7 +13,7 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
-import { BATCH_FEATURES, cleanName, DOG_BREEDS, HOOK_RATIO, HOOK_SECONDS, hookEffect, isBatchId, isHexColor, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_MODELS, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS } from '@/lib/apps';
+import { BATCH_FEATURES, cleanName, DOG_BREEDS, HOOK_RATIO, HOOK_SECONDS, hookEffect, isBatchId, isHexColor, itemPrompt, LISTING_SHOTS, MAX_BATCH, MAX_MODELS, MAX_NAME, MAX_PICTURES, MAX_POSE_TEXT, MAX_POSES, MOCKUP_PRODUCTS, nameOk, PET_STYLES, POSE_BACKGROUNDS, RECOLOR_COLORS, EDIT_BACKGROUNDS } from '@/lib/apps';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
@@ -30,9 +30,9 @@ const MAX_ADVANCED_IMAGES = 7;
 /** An image job may name more inputs; the model's own max_images is checked under the lock. */
 const MAX_IMAGE_INPUTS = 16;
 /** The features that run on a video model; every other feature runs on an image model. */
-const VIDEO_FEATURES = ['video', 'marketing', 'motion_control', 'hook_effect'];
-/** The features that offer Enhance, as on Fash: Create Videos and Image Generation. */
-const ENHANCE_FEATURES = ['video', 'image'];
+const VIDEO_FEATURES = ['video', 'marketing', 'motion_control', 'hook_effect', 'video_edit'];
+/** The features that offer Enhance, as on Fash: Create Videos and Image Generation; and the video edit, whose own words it turns into one English edit instruction. */
+const ENHANCE_FEATURES = ['video', 'image', 'video_edit'];
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /** The shortest reference audio clip, as on Fash. */
 const MIN_AUDIO_MS = 2000;
@@ -42,14 +42,26 @@ const MIN_INPUTS: Record<string, number> = { character_swap: 2, model_swap: 2, f
 type Spec = {
   assetIds: string[]; modelId: string; presetId: string | null; prompt: string | null; ratio: string; durationSec: number; storeId: string | null;
   feature: string; params: Record<string, string>;
-  /** Enhance: the worker has an LLM rewrite the member's own prompt first (Create video and Image Generation only). */
+  /** Enhance: the worker has an LLM rewrite the member's own prompt first (Create video, Image Generation and the video edit's own words only). */
   enhance: boolean;
   /** Add the chosen store's brand kit to the prompt (Marketing Studio and Image Generation only, lib/brand.ts). */
   useBrand: boolean;
 };
 /** What the item of each app that writes its own prompt is called, in the refusal of another prompt. */
-const ITEM: Record<string, string> = { breed_swap: 'breed', pet_portrait: 'style', mockup_pack: 'product', name_swap: 'name', pose_generator: 'pose', product_recolor: 'color', listing_set: 'shot', hook_effect: 'effect' };
+const ITEM: Record<string, string> = { breed_swap: 'breed', pet_portrait: 'style', mockup_pack: 'product', name_swap: 'name', pose_generator: 'pose', product_recolor: 'color', listing_set: 'shot', hook_effect: 'effect', video_edit: 'quick edit' };
 const bad = (error: string) => Response.json({ error }, { status: 400 });
+
+/** Why a clip does not fit the picture size and frame rate `endpoint` takes (videoRefProblem), read from its file's header; null when it fits, when the endpoint takes no clip,
+ * or when the file or its header cannot be read (as for a frame rate the header does not give): fal then decides. */
+async function clipProblem(endpoint: string | undefined, s3Key: string): Promise<string | null> {
+  if (!endpoint || !videoInputs(endpoint).videoRefs) return null;
+  try {
+    const info = mp4VideoInfo(new Uint8Array(await new Response(await getObject(s3Key)).arrayBuffer()));
+    return info ? videoRefProblem(endpoint, info) : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, whether the worker is offline
@@ -96,12 +108,12 @@ export async function GET(request: Request) {
     jobs: jobs.rows.map((r) => ({
       id: r.id, status: r.status, error: r.error, failureReason: providerRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
       retried: r.retried, twin: twins.get(r.id) ?? null, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, providerQueue: r.provider_queue_position,
-      // For the History card: the member's own words (a free prompt on Create video and Image Generation, the pose generator's own pose; elsewhere the prompt is composed, so the kept brief),
+      // For the History card: the member's own words (a free prompt on Create video, Image Generation and a video edit, the pose generator's own pose; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite; `traits` is a Fashion Model Generator job's own traits (JSON), which its save dialog starts from.
-      text: r.params.brief ?? r.params.poseText ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
+      text: r.params.brief ?? r.params.poseText ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' || (r.feature === 'video_edit' && !r.params.color && !r.params.background) ? r.prompt : null), inputAssetIds: r.input_asset_ids,
       traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, style: r.params.style ?? null, product: r.params.product ?? null, name: r.params.name ?? null,
       // The pose generator's pose (Try On keeps its own pose too, which its card does not name) or its own words.
-      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, poseRef: r.params.poseRef ?? null, faceMatch: r.face_match, color: r.params.color ?? null, shot: r.params.shot ?? null, effect: r.params.effect ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
+      pose: r.feature === 'pose_generator' ? (r.params.pose ?? null) : null, poseText: r.params.poseText ?? null, poseRef: r.params.poseRef ?? null, faceMatch: r.face_match, color: r.params.color ?? null, shot: r.params.shot ?? null, effect: r.params.effect ?? null, background: r.feature === 'video_edit' ? (r.params.background ?? null) : null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
     })),
   });
 }
@@ -124,6 +136,9 @@ export async function GET(request: Request) {
  * estimate), an optional `params.quality` and an optional `params.thinking` (one of the model's `thinking_levels`; its `thinking_prices` set the estimate, the first level's when none is named). `durationSec` is not read and the job stores 0.
  * `motion_control` takes a video model that lists it, exactly 2 inputs (the character image, then an MP4/MOV reference video), ratio `auto`, no preset and
  * an optional prompt; its duration is the reference video's length rounded up (the body's `durationSec` is not read), which the model must allow.
+ * `video_edit` takes a video model that lists it, exactly 1 input (an MP4/MOV clip within the length, size, picture size and frame rate its endpoint takes: videoInputs, videoRefProblem), ratio `auto`,
+ * no preset, and a quick edit, `params.color` (a swatch of RECOLOR_COLORS) or `params.background` (a scene of EDIT_BACKGROUNDS), with exactly the prompt it makes (videoEditPrompt), or else the
+ * member's own words, which Enhance may rewrite; its duration is the clip's length rounded up (the body's `durationSec` is not read), which the model must allow.
  * `fashion_model` (the AI model generator) takes no input image, a text-to-image model that lists it, and `params.traits` (JSON, parseFashionTraits) with the prompt those traits make.
  * `multi_angle` (the multi-angle app) takes `params.view`, the id of one of PRODUCT_VIEWS: one job per view, the page sends one per view picked.
  * `breed_swap` (the breed swap app) takes `params.breed`, one of DOG_BREEDS, and exactly the prompt breedSwapPrompt makes of it: one job per breed, the page sends one per breed picked.
@@ -163,6 +178,7 @@ export async function POST(request: Request) {
     if (typeof feature !== 'string' || !(FEATURES as readonly string[]).includes(feature)) return bad(`feature must be one of ${FEATURES.join(', ')}`);
     const isImage = !VIDEO_FEATURES.includes(feature);
     const motion = feature === 'motion_control';
+    const edit = feature === 'video_edit';
     // An app's empty prompt box means "no prompt", so its default applies (Motion Control has none: it sends no prompt).
     const freePrompt = (isImage || motion) && typeof rawPrompt === 'string' && rawPrompt.trim() === '' ? null : rawPrompt;
     const given = (rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams) ? rawParams : {}) as Record<string, string>;
@@ -181,14 +197,14 @@ export async function POST(request: Request) {
     if (feature === 'marketing' && (presetId !== null || typeof freePrompt !== 'string' || freePrompt.trim() === '')) return bad('Marketing Studio takes a prompt and no preset');
     if (assetIds.length < (MIN_INPUTS[feature] ?? fewest)) return bad(`${feature} needs ${MIN_INPUTS[feature]} images`);
     if (motion && (assetIds.length !== 2 || presetId !== null)) return bad('Motion Control needs exactly 2 inputs (the character image, then the reference video) and no preset');
-    if (typeof modelId !== 'string' || (presetId !== null && typeof presetId !== 'string') || (freePrompt !== null && typeof freePrompt !== 'string') || typeof ratio !== 'string' || (!isImage && !motion && !Number.isInteger(durationSec)) || (storeId !== null && typeof storeId !== 'string')) {
+    if (typeof modelId !== 'string' || (presetId !== null && typeof presetId !== 'string') || (freePrompt !== null && typeof freePrompt !== 'string') || typeof ratio !== 'string' || (!isImage && !motion && !edit && !Number.isInteger(durationSec)) || (storeId !== null && typeof storeId !== 'string')) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced', 'unboxing' or 'review'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText', 'poseRef', 'background'] : feature === 'product_recolor' ? ['color'] : feature === 'listing_set' ? ['shot'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : feature === 'hook_effect' ? ['effect', 'endAssetId'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : feature === 'pose_generator' ? ['pose', 'poseText', 'poseRef', 'background'] : feature === 'product_recolor' ? ['color'] : feature === 'listing_set' ? ['shot'] : []), ...(BATCH_FEATURES.includes(feature) || feature === 'image' ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : feature === 'hook_effect' ? ['effect', 'endAssetId'] : edit ? ['color', 'background'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -223,6 +239,13 @@ export async function POST(request: Request) {
       if (!hookEffect(given.effect ?? '')) return bad('params.effect must be one of the hook effects');
       if (ratio !== HOOK_RATIO || durationSec !== HOOK_SECONDS) return bad(`a hook effect clip is ${HOOK_RATIO} and ${HOOK_SECONDS} seconds`);
       if (given.endAssetId !== assetIds[0]) return bad('params.endAssetId must be the product image: the clip ends on it');
+    }
+    // One clip in (checked to be a video below), changed by one quick edit, a swatch or a backdrop (whose prompt is checked next), or by the member's own words.
+    if (edit) {
+      if (assetIds.length !== 1 || presetId !== null) return bad('the video edit takes exactly one input, the clip to edit, and no preset');
+      if (given.color !== undefined && given.background !== undefined) return bad('the video edit takes params.color or params.background, not both');
+      if (given.color !== undefined && !RECOLOR_COLORS.some((c) => c.hex === given.color)) return bad(`params.color must be one of ${RECOLOR_COLORS.map((c) => c.hex).join(', ')}`);
+      if (given.background !== undefined && !EDIT_BACKGROUNDS.some((b) => b.value === given.background)) return bad(`params.background must be one of ${EDIT_BACKGROUNDS.map((b) => b.value).join(', ')}`);
     }
     // The apps that write their own prompt per item take exactly that one (with the mockup pack's blank as the second image).
     const own = itemPrompt(feature, given, assetIds.length > 1);
@@ -294,14 +317,15 @@ export async function POST(request: Request) {
     // Background Changer takes a prompt (one image) or a reference image (two images), the schema says not both.
     if (feature === 'background_changer' && (assetIds.length > 1) === (freePrompt !== null)) return bad('Background Changer takes a prompt or a reference image (the second image), not both and not neither');
     if (typeof enhance !== 'boolean') return bad('enhance must be true or false');
-    if (enhance && (!ENHANCE_FEATURES.includes(feature) || (presetId !== null && !isImage))) return bad('Enhance rewrites your own prompt in Create video and Image Generation only');
+    if (enhance && (!ENHANCE_FEATURES.includes(feature) || (presetId !== null && !isImage))) return bad('Enhance rewrites your own prompt in Create video, Image Generation and the video edit only');
+    if (enhance && edit && own !== undefined) return bad('Enhance rewrites your own words, not a quick edit');
     if (typeof useBrand !== 'boolean') return bad('useBrand must be true or false');
     if (useBrand && !BRAND_FEATURES.includes(feature)) return bad('the brand kit is for Marketing Studio and Image Generation only');
     const written = freePrompt?.trim();
     const prompt = basePrompt(feature, written) ?? (motion ? '' : null);
     if (prompt !== null && ((prompt === '' && !motion) || prompt.length > PROMPT_CEILING)) return bad(`the prompt must have 1 to ${PROMPT_CEILING} characters`);
     const usable = await pool.query(
-      `select a.id, a.mime, a.duration_ms from assets a
+      `select a.id, a.mime, a.duration_ms, a.s3_key from assets a
         where a.id = any($1::text[]) and a.workspace_id = $3 and a.deleted_at is null and a.kind = 'input'
           and (a.owner_id = $2
                or exists (select 1 from jobs j where j.input_asset_ids @> array[a.id] and j.workspace_id = $3 and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null)
@@ -309,10 +333,15 @@ export async function POST(request: Request) {
       [assetIds, userId, g.workspaceId],
     );
     if (usable.rowCount !== assetIds.length) return bad('one or more assets do not exist or cannot be used');
-    const byId = new Map(usable.rows.map((r: { id: string; mime: string; duration_ms: number | null }) => [r.id, r]));
+    const byId = new Map(usable.rows.map((r: { id: string; mime: string; duration_ms: number | null; s3_key: string }) => [r.id, r]));
     const isVideo = (i: number) => byId.get(assetIds[i] as string)!.mime.startsWith('video/');
-    if (motion ? isVideo(0) || !isVideo(1) : assetIds.some((_, i) => isVideo(i))) {
-      return bad(motion ? 'Motion Control needs the character image first, then the reference video' : 'only Motion Control takes a video input');
+    if (motion ? isVideo(0) || !isVideo(1) : edit ? !isVideo(0) : assetIds.some((_, i) => isVideo(i))) {
+      return bad(motion ? 'Motion Control needs the character image first, then the reference video' : edit ? 'the video edit takes a video: the clip to edit' : 'only Motion Control and the video edit take a video input');
+    }
+    // The clip's picture size and frame rate against the model's limits, as a reference video's are below.
+    if (edit) {
+      const problem = await clipProblem((await pool.query('select endpoint from model_configs where id = $1', [modelId])).rows[0]?.endpoint, byId.get(assetIds[0] as string)!.s3_key);
+      if (problem) return bad(problem);
     }
     if (usable.rows.some((r: { mime: string }) => r.mime.startsWith('audio/'))) return bad('an audio clip goes in params.audioAssetIds, not assetIds');
     // Reference audio: the caller's own MP3 or WAV clips, comma-separated, each at least 2 s as on Fash (fal's floor is 1.8 or 2 s); the model's count and
@@ -336,22 +365,10 @@ export async function POST(request: Request) {
         g.workspaceId,
       ]);
       if (!clip.rows[0]?.mime.startsWith('video/')) return bad('params.videoAssetId must be one of your own videos');
-      // Its picture size and frame rate against the model's limits (videoRefProblem), read from the file's header here, outside the lock. A file or a header that cannot
-      // be read passes (as does a frame rate the header does not give): fal then decides.
-      // On the row of a duplicate pair the job will run on (servingRow), which takes the video where the named row may not.
+      // Its picture size and frame rate (clipProblem, read here, outside the lock) on the row of a duplicate pair the job will run on (servingRow), which takes the video where the named row may not.
       const runsOn = await servingRow(pool, modelId, feature, jobNeed({ aspect: ratio as string, duration_s: durationSec as number, input_asset_ids: assetIds as string[], params: given }));
-      const endpoint = (await pool.query('select endpoint from model_configs where id = $1', [runsOn])).rows[0]?.endpoint as string | undefined;
-      if (endpoint && videoInputs(endpoint).videoRefs) {
-        const info = await (async () => {
-          try {
-            return mp4VideoInfo(new Uint8Array(await new Response(await getObject(clip.rows[0].s3_key)).arrayBuffer()));
-          } catch {
-            return undefined;
-          }
-        })();
-        const problem = info && videoRefProblem(endpoint, info);
-        if (problem) return bad(problem);
-      }
+      const problem = await clipProblem((await pool.query('select endpoint from model_configs where id = $1', [runsOn])).rows[0]?.endpoint, clip.rows[0].s3_key);
+      if (problem) return bad(problem);
     }
     // The end frame is the caller's own image, or one of the Run's images (a clip that loops), which the check above already allowed: a company example's
     // photo is not the member's own (whether the model takes one is checked with the model below).
@@ -361,7 +378,8 @@ export async function POST(request: Request) {
         : (await pool.query(`select mime from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null`, [given.endAssetId, userId, g.workspaceId])).rows[0]?.mime;
       if (!mime?.startsWith('image/')) return bad('params.endAssetId must be one of your own images');
     }
-    const length = motion ? Math.ceil(byId.get(assetIds[1] as string)!.duration_ms! / 1000) : (durationSec as number);
+    const clipId = motion ? assetIds[1] : edit ? assetIds[0] : undefined;
+    const length = clipId !== undefined ? Math.ceil(byId.get(clipId as string)!.duration_ms! / 1000) : (durationSec as number);
     // A style's prompt joins the member's under the lock below; their own words stay the brief, as History and Reuse read them.
     if (given.orientation !== undefined && given.orientation !== 'video' && given.orientation !== 'image') return bad('params.orientation must be video or image');
     if (given.orientation === 'image' && length > MOTION_IMAGE_MAX_SEC) return bad(`with the orientation of the image the reference video may last at most ${MOTION_IMAGE_MAX_SEC} seconds`);
@@ -475,6 +493,14 @@ export async function POST(request: Request) {
       if (takes.maxMb !== null && clip.bytes > takes.maxMb * 1024 * 1024) return bad(`the reference video may be at most ${takes.maxMb} MB on this model`);
       if (takes.maxImages !== null && assetIds.length > takes.maxImages) return bad(`the model takes at most ${takes.maxImages} images with a reference video`);
       refSec = Math.ceil(clip.duration_ms / 1000);
+    }
+    // The video edit's clip within the length and size its endpoint takes; its seconds, rounded up, are the job's duration, which the row must allow (below).
+    if (feature === 'video_edit') {
+      const takes = videoInputs(model.endpoint).videoRefs;
+      if (!takes) return bad('the model does not edit a clip');
+      const clip = (await tx.query('select duration_ms, bytes from assets where id = $1 and workspace_id = $2', [assetIds[0], g.workspaceId])).rows[0] as { duration_ms: number | null; bytes: number };
+      if (clip.duration_ms === null || clip.duration_ms < takes.minSec * 1000 || clip.duration_ms > takes.maxSec * 1000) return bad(`the clip must last ${takes.minSec} to ${takes.maxSec} seconds on this model`);
+      if (takes.maxMb !== null && clip.bytes > takes.maxMb * 1024 * 1024) return bad(`the clip may be at most ${takes.maxMb} MB on this model`);
     }
     // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
     const prices = isImage ? imagePricesFor(model, params.thinking) : {};

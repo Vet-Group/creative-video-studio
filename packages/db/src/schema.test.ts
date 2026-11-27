@@ -191,7 +191,7 @@ describe('migration 0028 prompt limits', () => {
 describe('migration 0015 Fash video models', () => {
   test('adds 22 fal video models, disabled and complete, each with a request builder and its sources', async () => {
     const { rows } = await pool.query(
-      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and (not enabled or id = 'veo-3.1') and id !~ '^minimax-h3-max.*-(480|1080)p$' and id <> 'seedance-2.5-image-1080p' and id !~ '^(veo-3.1-(lite|fast)|minimax-h3-max-turbo.*)$' order by id`, // 0036's and 0094's resolution rows have their own tests; 0075 switches Veo 3.1 on
+      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not features && ARRAY['motion_control', 'video_edit'] and (not enabled or id = 'veo-3.1') and id !~ '^minimax-h3-max.*-(480|1080)p$' and id <> 'seedance-2.5-image-1080p' and id !~ '^(veo-3.1-(lite|fast)|minimax-h3-max-turbo.*)$' order by id`, // 0036's and 0094's resolution rows have their own tests; 0075 switches Veo 3.1 on
     );
     expect(rows).toHaveLength(22);
     for (const r of rows) {
@@ -244,7 +244,7 @@ describe('migration 0016 video models at 1080p', () => {
 
 describe('migration 0094 1080p Seedance and the ratios 21:9 and auto', () => {
   test('gives 21:9 to the rows whose provider schema takes it and auto only to the image-to-video rows that follow the input image, and no other row', async () => {
-    const { rows } = await pool.query(`select id, ratios from model_configs where kind = 'video' and ('21:9' = any(ratios) or 'auto' = any(ratios)) and not 'motion_control' = any(features) order by id`);
+    const { rows } = await pool.query(`select id, ratios from model_configs where kind = 'video' and ('21:9' = any(ratios) or 'auto' = any(ratios)) and not features && ARRAY['motion_control', 'video_edit'] order by id`); // their auto follows the clip
     const ultrawide = ['flux-3', 'flux-3-reference', 'minimax-h3-max-reference', 'minimax-h3-max-reference-1080p', 'minimax-h3-max-reference-480p', 'seedance-1.0-pro', 'seedance-1.0-pro-byteplus', 'seedance-1.0-pro-fast-byteplus', 'seedance-1.5-pro', 'seedance-2.0', 'seedance-2.0-byteplus', 'seedance-2.0-fast-byteplus', 'seedance-2.0-mini-byteplus', 'seedance-2.0-reference', 'seedance-2.5-byteplus', 'seedance-2.5-reference'];
     const auto = ['flux-3', 'flux-3-reference', 'seedance-1.0-pro', 'seedance-1.5-pro', 'seedance-2.0', 'seedance-2.5-image', 'seedance-2.5-image-1080p'];
     expect(rows.filter((r) => r.ratios.includes('21:9')).map((r) => r.id)).toEqual(ultrawide.sort());
@@ -1322,5 +1322,25 @@ describe('migration 0124 custom apps', () => {
     await pool.query(`update custom_apps set created_by = $1 where id = 'ca-draft'`, [user]);
     await pool.query(`delete from users where id = $1`, [user]);
     expect((await pool.query(`select created_by from custom_apps where id = 'ca-draft'`)).rows[0].created_by).toBeNull();
+  });
+});
+
+describe('migration 0125 video edit', () => {
+  test('adds the Kling O3 Standard Edit row disabled (ratio auto, 3 to 15 s, the one clip, $0.14 a second, its sources), a 30 USD soft cap, and accepts the feature on a job', async () => {
+    const { rows } = await pool.query(
+      `select id, provider, endpoint, kind, features, ratios, durations_sec, max_images, max_prompt_chars, output_resolution, usd_per_second::text as usd, enabled, twin_of, sources from model_configs where 'video_edit' = any(features)`,
+    );
+    expect(rows).toHaveLength(1);
+    const [r] = rows;
+    expect(r).toMatchObject({ id: 'kling-o3-edit-standard', provider: 'fal', endpoint: 'fal-ai/kling-video/o3/standard/video-to-video/edit', kind: 'video', features: ['video_edit'], ratios: ['auto'], max_images: 1, max_prompt_chars: 2500, output_resolution: '720p', usd: '0.1400', enabled: false, twin_of: null });
+    expect(r.durations_sec).toEqual(Array.from({ length: 13 }, (_, i) => i + 3));
+    expect(Object.keys(r.sources).sort()).toEqual(['durationsSec', 'maxImages', 'maxPromptChars', 'outputResolution', 'ratios', 'usdPerSecond']);
+    expect(VIDEO_BODIES[r.endpoint]).toMatchObject({ upload: true });
+    expect((await pool.query(`select monthly_usd::int as usd from feature_caps where feature = 'video_edit'`)).rows[0].usd).toBe(30);
+    await pool.query(`update model_configs set enabled = true where id = 'kling-o3-edit-standard'`); // complete enough for the enable check
+    await pool.query(`update model_configs set enabled = false where id = 'kling-o3-edit-standard'`);
+    const id = await insertJob(userId);
+    await pool.query(`update jobs set feature = 'video_edit' where id = $1`, [id]);
+    await expect(pool.query(`update jobs set feature = 'edit' where id = $1`, [id])).rejects.toThrow(/jobs_feature_check/);
   });
 });

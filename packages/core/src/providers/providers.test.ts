@@ -446,6 +446,7 @@ describe('fal reference video', () => {
       ['bytedance/seedance-2.5/us/reference-to-video', { max: 1, minSec: 1.8, maxSec: 30.2, maxMb: 200, maxImages: null, endFrame: false, silent: false }],
       ['bytedance/seedance-2.0/us/reference-to-video', { max: 1, minSec: 2, maxSec: 15, maxMb: 50, maxImages: null, endFrame: false, silent: false }],
       ['google/gemini-omni-flash/v1.2/reference-to-video', { max: 1, minSec: 0, maxSec: 15, maxMb: null, maxImages: null, endFrame: false, silent: false }],
+      ['fal-ai/kling-video/o3/standard/video-to-video/edit', { max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: null, endFrame: false, silent: false }], // the video edit's own clip (2026-11-27)
     ]);
     // Left out: MiniMax (video tokens unpriced), Wan, Grok, Veo, Kling O1, (the O3 row reaches the sibling).
     expect(videoInputs('minimax/h3-max/reference-to-video').videoRefs).toBeNull();
@@ -579,6 +580,35 @@ describe('fal Motion Control', () => {
     const one = falFake();
     await expect(createFalProvider({ apiKey: 'k', fetch: one.fn, readImage: read }).submit({ ...base, model: motionModel, imageUrls: ['asset://img'], ratio: 'auto' })).rejects.toThrow(ImageReadError);
     expect(one.calls.some((c) => c.url.startsWith('https://queue.fal.run'))).toBe(false);
+  });
+});
+
+describe('fal video edit', () => {
+  const endpoint = 'fal-ai/kling-video/o3/standard/video-to-video/edit';
+  const editModel = { ...kling, id: 'kling-o3-edit-standard', endpoint, usdPerSecond: 0.14 };
+  const read = async () => ({ bytes: new Uint8Array([9, 9]), contentType: 'video/quicktime' });
+
+  test('uploads the clip to fal storage and sends exactly the schema fields: video_url, the prompt with [Video1] as @Video1, and keep_audio', async () => {
+    const { fn, calls } = falFake();
+    const out = await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, model: editModel, prompt: 'Change the color of the shirt in [Video1] to red.', imageUrls: ['asset://clip'], ratio: 'auto', durationSec: 8 });
+    expect(out.providerJobId).toBe('8:m1');
+    expect(calls.filter((c) => c.url.includes('/storage/upload/initiate')).map((c) => c.body)).toEqual([{ content_type: 'video/quicktime', file_name: 'input.mov' }]);
+    expect(calls.at(-1)!.url).toBe(`https://queue.fal.run/${endpoint}`);
+    expect(calls.at(-1)!.body).toEqual({ prompt: 'Change the color of the shirt in @Video1 to red.', video_url: 'https://v3b.fal.media/files/video-quicktime', keep_audio: true });
+  });
+
+  test('its picture size and frame rate limits come from the schema, and a Run without exactly one clip or with a failed upload submits nothing', async () => {
+    const at = (width: number, height: number, fps: number | null = 30) => videoRefProblem(endpoint, { width, height, fps });
+    expect([at(720, 1280), at(1080, 1920), at(3840, 2160), at(1280, 720, 23), at(1280, 720, 60)]).toEqual([null, null, null, null, null]);
+    expect([at(540, 960), at(3841, 2160), at(1280, 720, 15), at(1280, 720, 120)].map((r) => r !== null)).toEqual([true, true, true, true]);
+    for (const imageUrls of [[], ['asset://a', 'asset://b']]) {
+      const none = falFake();
+      await expect(createFalProvider({ apiKey: 'k', fetch: none.fn, readImage: read }).submit({ ...base, model: editModel, imageUrls, ratio: 'auto' })).rejects.toThrow(ImageReadError);
+      expect(none.calls.some((c) => c.url.startsWith('https://queue.fal.run'))).toBe(false);
+    }
+    const broken = falFake(500);
+    await expect(createFalProvider({ apiKey: 'k', fetch: broken.fn, readImage: read }).submit({ ...base, model: editModel, imageUrls: ['asset://clip'], ratio: 'auto' })).rejects.toThrow(ImageReadError);
+    expect(broken.calls.some((c) => c.url.startsWith('https://queue.fal.run'))).toBe(false);
   });
 });
 

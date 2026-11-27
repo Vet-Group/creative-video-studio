@@ -3,19 +3,19 @@ import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-apps';
 import { GARMENT_PRESETS, POSE_PRESETS, POSES } from './try-on-stock';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, HOOK_EFFECTS, hookEffect, hookEffectPrompt, hookReason, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, JOB_APPS, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, relatedApps, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, EDIT_BACKGROUNDS, HOOK_EFFECTS, hookEffect, hookEffectPrompt, hookReason, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, JOB_APPS, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, relatedApps, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, videoEditPrompt, videoEditReason, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has twenty-two apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
-    expect(APPS).toHaveLength(22);
-    expect(new Set(APPS.map((a) => a.slug)).size).toBe(22);
+  it('has twenty-three apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
+    expect(APPS).toHaveLength(23);
+    expect(new Set(APPS.map((a) => a.slug)).size).toBe(23);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
-      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && !['breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set', 'hook_effect'].includes(a.feature) && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
+      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && !['breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap', 'pose_generator', 'product_recolor', 'listing_set', 'hook_effect', 'video_edit'].includes(a.feature) && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
     }
   });
 
@@ -23,14 +23,14 @@ describe('the app list', () => {
     expect(appBySlug('smart-remake')).toMatchObject({ slots: [], feature: 'video', category: 'video' });
   });
 
-  it('offers Smart Remake only when its flags are on: the first twenty-one apps keep their places and it comes last', () => {
-    expect(visibleApps(false)).toHaveLength(21);
+  it('offers Smart Remake only when its flags are on: the first twenty-two apps keep their places and it comes last', () => {
+    expect(visibleApps(false)).toHaveLength(22);
     expect(visibleApps(false).map((a) => a.slug)).not.toContain('smart-remake');
     expect(visibleApps(true).at(-1)!.slug).toBe('smart-remake');
-    expect(filterApps('all', '')).toHaveLength(21); // off unless asked for
-    expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control', 'hook-effects']);
-    expect(filterApps('all', '', true)).toHaveLength(22);
-    expect(filterApps('video', '', true).map((a) => a.slug)).toEqual(['motion-control', 'hook-effects', 'smart-remake']);
+    expect(filterApps('all', '')).toHaveLength(22); // off unless asked for
+    expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control', 'hook-effects', 'video-edit']);
+    expect(filterApps('all', '', true)).toHaveLength(23);
+    expect(filterApps('video', '', true).map((a) => a.slug)).toEqual(['motion-control', 'hook-effects', 'video-edit', 'smart-remake']);
     expect(filterApps('all', 'remake', true).map((a) => a.slug)).toEqual(['smart-remake']);
     expect(filterApps('all', 'remake')).toEqual([]);
   });
@@ -129,10 +129,10 @@ describe('relatedApps', () => {
 
 describe('filterApps', () => {
   it('filters by category and by name or description, ignoring accents and case', () => {
-    expect(filterApps('all', '')).toHaveLength(21);
-    expect(filterApps('all', '').at(-1)!.slug).toBe('hook-effects'); // ours comes after the live apps, which keep their order
+    expect(filterApps('all', '')).toHaveLength(22);
+    expect(filterApps('all', '').at(-1)!.slug).toBe('video-edit'); // ours comes after the live apps, which keep their order
     expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on', 'lingerie-try-on', 'ai-fashion-model', 'pose-generator']);
-    expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control', 'hook-effects']);
+    expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control', 'hook-effects', 'video-edit']);
     expect(filterApps('all', 'DOI NEN').map((a) => a.slug)).toEqual(['background-changer']);
     expect(filterApps('all', 'xoá nền').map((a) => a.slug)).toContain('background-remover');
     expect(filterApps('photo', 'khuôn mặt')).toHaveLength(0);
@@ -727,10 +727,10 @@ describe('isNewApp', () => {
 describe('the hook effects app', () => {
   const END = 'From two seconds on, the product holds still, sharp and undistorted, exactly as in the image: same shape, proportions, colors, print and text, on the same background, with a steady camera. No added text or watermarks.';
 
-  it('sits after the listing set and before Smart Remake, as a video app on its own feature, and is a job app', () => {
+  it('sits after the listing set and before the video edit, as a video app on its own feature, and is a job app', () => {
     const slugs = APPS.map((a) => a.slug);
     expect(slugs.indexOf('hook-effects')).toBe(slugs.indexOf('listing-set') + 1);
-    expect(slugs.indexOf('smart-remake')).toBe(slugs.indexOf('hook-effects') + 1);
+    expect(slugs.indexOf('video-edit')).toBe(slugs.indexOf('hook-effects') + 1);
     expect(appBySlug('hook-effects')).toMatchObject({ feature: 'hook_effect', category: 'video', name: 'Hiệu ứng mở đầu', slots: [] });
     expect(JOB_APPS.map((a) => a.slug)).toContain('hook-effects');
   });
@@ -763,5 +763,53 @@ describe('the hook effects app', () => {
     expect(hookReason({ models: models(1, null), photo: false })).toBe('Hiệu ứng này tạm thời không chạy được.');
     expect(hookReason({ models: models(1, 'm'), photo: false })).toBe('Tải lên ảnh: Sản phẩm.');
     expect(hookReason({ models: models(1, 'm'), photo: true })).toBeNull();
+  });
+});
+
+describe('the video edit app', () => {
+  const draft = (over: Partial<Parameters<typeof videoEditReason>[0]> = {}) => videoEditReason({ model: { durationsSec: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] }, failed: false, videoMs: 5400, kind: 'color', picked: true, text: '', ...over });
+
+  it('sits after the hook effects and before Smart Remake, as a video app on its own feature, and is a job app', () => {
+    const slugs = APPS.map((a) => a.slug);
+    expect(slugs.indexOf('smart-remake')).toBe(slugs.indexOf('video-edit') + 1);
+    expect(appBySlug('video-edit')).toMatchObject({ feature: 'video_edit', category: 'video', name: 'Sửa video', slots: [] });
+    expect(JOB_APPS.map((a) => a.slug)).toContain('video-edit');
+  });
+
+  it('writes the quick edits from the recolor swatches and the pose generator scenes, names the clip [Video1], and leaves the own words to the member', () => {
+    expect(EDIT_BACKGROUNDS.map((b) => b.value)).toEqual(['white', 'lifestyle']);
+    const red = RECOLOR_COLORS.find((c) => c.label === 'Đỏ')!;
+    expect(videoEditPrompt({ color: red.hex })).toBe(
+      'Change the color of the shirt, T-shirt, hoodie or jacket in [Video1] to red (hex #C8102E): an even, realistic color with the same folds, shading and fabric texture. ' +
+        'Keep any print, graphic or text on it exactly as it is. Keep everything else exactly as in [Video1]: any person, their face, hair, body and every movement, the rest of the outfit, ' +
+        'the background, the light and the camera. Do not add any text, logos or watermarks.',
+    );
+    expect(videoEditPrompt({ background: 'white' })).toBe(
+      `Replace the background of [Video1] with ${EDIT_BACKGROUNDS[0]!.scene}, lit to match. Keep every person and product exactly as in [Video1]: the face, hair, body, outfit, any print or text, ` +
+        'and every movement, with the same framing and camera. Do not add any text, logos or watermarks.',
+    );
+    for (const p of [{}, { color: '#123456' }, { background: 'keep' }, { background: 'beach' }]) expect(videoEditPrompt(p)).toBeUndefined();
+    expect(itemPrompt('video_edit', { color: red.hex })).toBe(videoEditPrompt({ color: red.hex }));
+    expect(itemPrompt('video_edit', {})).toBeUndefined(); // the member's own words: any prompt
+  });
+
+  it("titles a History card by its colour or backdrop, and a pose job still by its pose", () => {
+    expect(itemLabel({ color: '#C8102E' })).toBe('Đỏ');
+    expect(itemLabel({ background: 'lifestyle' })).toBe('Lifestyle');
+    expect(itemLabel({ background: 'keep' })).toBeNull();
+    expect(itemLabel({ pose: POSES[0]!.value, background: 'white' })).toBe(itemLabel({ pose: POSES[0]!.value }));
+  });
+
+  it('says what stops a Run in the order the form is filled; the clip lasts 3 to 15 s', () => {
+    expect(draft({ model: null })).toBe('Đang tải danh sách mô hình...');
+    expect(draft({ failed: true, model: undefined })).toBe('Không tải được danh sách mô hình.');
+    expect(draft({ model: undefined })).toBe('Ứng dụng này chưa được Admin bật');
+    expect(draft({ videoMs: null })).toBe('Tải lên video cần sửa.');
+    for (const videoMs of [2500, 15001]) expect(draft({ videoMs })).toBe('Video cần sửa phải dài từ 3 đến 15 giây.');
+    for (const videoMs of [3000, 15000]) expect(draft({ videoMs })).toBeNull();
+    expect(draft({ picked: false })).toBe('Chọn màu áo mới.');
+    expect(draft({ kind: 'background', picked: false })).toBe('Chọn nền mới.');
+    expect(draft({ kind: 'own', picked: false, text: '  ' })).toBe('Mô tả thay đổi bạn muốn.');
+    expect(draft({ kind: 'own', picked: false, text: 'đổi cốc sang màu xanh' })).toBeNull();
   });
 });

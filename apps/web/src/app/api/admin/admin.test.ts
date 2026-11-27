@@ -432,7 +432,8 @@ describe('settings', () => {
     expect(before.featureCaps.find((c) => c.feature === 'pose_generator')).toEqual({ feature: 'pose_generator', monthlyUsd: '50.0000' }); // 0112
     for (const feature of ['product_recolor', 'listing_set']) expect(before.featureCaps.find((c) => c.feature === feature)).toEqual({ feature, monthlyUsd: '50.0000' }); // 0117
     expect(before.featureCaps.find((c) => c.feature === 'hook_effect')).toEqual({ feature: 'hook_effect', monthlyUsd: '50.0000' }); // 0123
-    expect(before.featureCaps).toHaveLength(22);
+    expect(before.featureCaps.find((c) => c.feature === 'video_edit')).toEqual({ feature: 'video_edit', monthlyUsd: '30.0000' }); // 0125
+    expect(before.featureCaps).toHaveLength(23);
 
     expect((await put({ featuresMonthlyCapUsd: '310', memberDailyUsdCap: '12.5', featureCaps: [{ feature: 'image', monthlyUsd: '150' }, { feature: 'reframe', monthlyUsd: '5' }] })).status).toBe(200);
     const after = (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as typeof before;
