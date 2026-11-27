@@ -123,6 +123,9 @@ test.describe('touch tablet', () => {
       const [a, b] = [(await actions.nth(0).boundingBox())!, (await actions.nth(1).boundingBox())!];
       expect(Math.abs(a.y - b.y), 'two actions to a row').toBeLessThan(2);
       expect(b.x, 'the second action beside the first').toBeGreaterThan(a.x + a.width);
+      const cap = 0.6 * page.viewportSize()!.height; // the picture stops at 60vh so the actions are near
+      expect(media.height, 'picture no taller than 60vh').toBeLessThanOrEqual(cap + 1);
+      for (const sel of ['.job-media', '.job-media img']) expect(parseFloat(await card.locator(sel).first().evaluate((e) => getComputedStyle(e).maxHeight)), `${sel} capped at 60vh`).toBeCloseTo(cap, 0);
 
       await page.setViewportSize({ width: 1280, height: 900 });
       const wide = { media: (await card.locator('.job-media').boundingBox())!, body: (await card.locator('.job-body').boundingBox())! };

@@ -599,10 +599,11 @@ button.job-reuse, button.lightbox-reuse, button.gallery-use { border: 0; font-fa
   .job-media-wait { height: auto; width: 100%; max-height: 70vh; }
   .job-card .job-body { border-left: 0; border-top: 1px solid var(--border); }
 }
-/* A stacked card on a tablet has the width for its actions in two columns; a note among them keeps the full row. */
+/* A stacked card on a tablet has the width for its actions in two columns; a note among them keeps the full row. Its picture stops at 60% of the screen so the actions show without much scrolling. */
 @media (min-width: 600px) and (max-width: 1023.98px) {
   .job-card .job-main { grid-template-columns: 1fr 1fr; }
   .job-card .job-main > :not(.job-reuse) { grid-column: 1 / -1; }
+  .job-media, .job-media img, .job-media video, .job-media-wait { max-height: 60vh; }
 }
 .side .tray { padding: 0; border: 0; background: transparent; }
 .side .tray .muted { font-size: 14px; line-height: 21px; color: var(--text-muted); }
