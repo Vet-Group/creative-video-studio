@@ -8,6 +8,6 @@ export default {
     'Khi mở ô Mô hình, bạn chỉ thấy mô hình đang chọn và mô hình đề xuất. Muốn xem các mô hình khác, bấm Nâng cao hoặc gõ tên vào ô tìm.',
     'Ngay trên nút Tạo có dòng cho biết team bạn còn bao nhiêu USD miễn phí tháng này. Giá của lượt tạo vẫn hiện trên nút như trước.',
   ],
-  prs: [],
+  prs: [703],
   audience: 'all',
 } satisfies ChangeEntry;
