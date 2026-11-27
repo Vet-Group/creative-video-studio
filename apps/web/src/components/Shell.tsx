@@ -28,6 +28,7 @@ import { CommandPalette } from './CommandPalette';
 import { CompareSlider } from './CompareSlider';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { FalLowNotice } from './FalLowNotice';
+import { ImageViewer } from './ImageViewer';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { EmptyArt } from './EmptyArt';
 import { Icon, type IconName } from './Icon';
@@ -39,7 +40,7 @@ import { useSmartRemakeEnabled } from './SmartRemakeGate';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
 import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, InputThumb, JobPrompt, JobsProvider, photoDrag, Recreate, resultHref, roleOf, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
-import { ImageViewer, Modal } from './Modal';
+import { Modal } from './Modal';
 import type { Account, Section } from './Settings';
 import { TemplateBlanksHost } from './TemplateBlanks';
 import { TurntableBlock } from './TurntableBlock';
@@ -321,7 +322,7 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
             )}
           </div>
         )}
-        {viewing && out && <ImageViewer src={content(out)} alt={cardTitle(job)} placeholder={content(job.posterAssetId ?? out)} onClose={() => setViewing(false)} />}
+        {viewing && out && <ImageViewer src={content(out)} alt={cardTitle(job)} placeholder={content(job.posterAssetId ?? out)} downloadId={out} onClose={() => setViewing(false)} />}
         {out && original && (
           <Modal open={comparing} onClose={() => setComparing(false)} label={`So sánh trước/sau: ${cardTitle(job)}`} className="compare-modal">
             <CompareSlider before={content(original)} after={content(out)} beforeAlt="Ảnh người mẫu gốc" afterAlt={cardTitle(job)} />

@@ -22,13 +22,14 @@ import { CompareButton } from './CompareItems';
 import { CompareSlider } from './CompareSlider';
 import { EmptyArt } from './EmptyArt';
 import { Icon } from './Icon';
+import { ImageViewer } from './ImageViewer';
 import { uploadImages } from './image-tools';
 import { ImageToolButtons } from './ImageToolButtons';
 import { toggleFullscreen, useFreshResults, useJobs } from './jobs';
 import { BoardsModal, BoardTools, type LibraryBoards, useLibraryBoards } from './LibraryBoards';
 import boardStyles from './LibraryBoards.module.css';
 import { LoadError } from './LoadError';
-import { ImageViewer, Modal } from './Modal';
+import { Modal } from './Modal';
 import { ProductShelf } from './ProductShelf';
 import { UndoNotice, type UndoNote } from './UndoNotice';
 import { VerdictGuide } from './VerdictGuide';
@@ -519,6 +520,14 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
     box.current.style.transform = dx ? `translateX(${dx}px)` : '';
   };
   const content = (id: string) => `/api/assets/${id}/content`;
+  // The viewer over the result steps to the nearest picture either side (a video in between is skipped); over an input photo it does not.
+  const imageAt = (dir: 1 | -1) => {
+    for (let i = index + dir; i >= 0 && i < clips.length; i += dir) if (clips[i]!.mediaType === 'image') return i;
+    return -1;
+  };
+  const prevImage = shown ? -1 : imageAt(-1);
+  const nextImage = shown ? -1 : imageAt(1);
+  const stepTo = (i: number) => (onIndex(i), setFull(clips[i]!.videoAssetId));
   const resultSrc = thumbUrl(clip.videoAssetId, PREVIEW_W);
   useEffect(() => {
     setJob(null);
@@ -902,7 +911,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
           <Icon name="right" size={20} />
         </button>
       )}
-      {full && <ImageViewer src={content(full)} alt={shown ? `Ảnh đầu vào ${shown.filename}` : clip.downloadName} placeholder={thumbUrl(full, PREVIEW_W)} onClose={() => setFull(null)} />}
+      {full && <ImageViewer src={content(full)} alt={shown ? `Ảnh đầu vào ${shown.filename}` : clip.downloadName} placeholder={thumbUrl(full, PREVIEW_W)} downloadId={full} onPrev={prevImage >= 0 ? () => stepTo(prevImage) : undefined} onNext={nextImage >= 0 ? () => stepTo(nextImage) : undefined} onClose={() => setFull(null)} />}
     </Modal>
   );
 }

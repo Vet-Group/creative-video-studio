@@ -9,8 +9,8 @@ import { ApiError, api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { COMMENT_MAX, type FeedbackComment, feedbackMarkdown, feedbackTime, KIND_LABEL, type ListedFeedback, NOTE_MAX, STATUS_LABEL } from '@/lib/feedback';
 import { avatarColor, initials } from '@/lib/profile';
 import { Icon } from './Icon';
+import { ImageViewer } from './ImageViewer';
 import { LoadError } from './LoadError';
-import { ImageViewer } from './Modal';
 import { RichText } from './RichText';
 
 /** How a reply can be written; the same words sit under the Admin's reply box. */
@@ -135,7 +135,7 @@ export function FeedbackDetail({ id, isAdmin, shipped = [] }: { id: string; isAd
             ))}
           </ul>
         )}
-        {viewing !== null && item.imageAssetIds[viewing] && <ImageViewer src={`/api/assets/${item.imageAssetIds[viewing]}/content`} alt={`Ảnh ${viewing + 1}`} placeholder={thumbUrl(item.imageAssetIds[viewing]!)} onClose={() => setViewing(null)} />}
+        {viewing !== null && item.imageAssetIds[viewing] && <ImageViewer src={`/api/assets/${item.imageAssetIds[viewing]}/content`} alt={`Ảnh ${viewing + 1}`} placeholder={thumbUrl(item.imageAssetIds[viewing]!)} downloadId={item.imageAssetIds[viewing]} onPrev={viewing > 0 ? () => setViewing(viewing - 1) : undefined} onNext={viewing < item.imageAssetIds.length - 1 ? () => setViewing(viewing + 1) : undefined} onClose={() => setViewing(null)} />}
       </article>
 
       {item.adminNote && (

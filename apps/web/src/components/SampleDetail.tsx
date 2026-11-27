@@ -9,9 +9,10 @@ import { exampleFrom } from '@/lib/reuse';
 import { BACKGROUNDS } from '@/lib/try-on-stock';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon } from './Icon';
+import { ImageViewer } from './ImageViewer';
 import { useImageModels } from './image-tools';
 import { InputThumb, JobPrompt, Recreate, roleOf, toggleFullscreen, useForm } from './jobs';
-import { ImageViewer, Modal } from './Modal';
+import { Modal } from './Modal';
 
 /** A sample's details file, in the shape its page refills from (`?example=`): Marketing's format and duration, or Try On's model, resolution and background. */
 interface SampleDetails {
