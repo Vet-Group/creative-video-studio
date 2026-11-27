@@ -11,8 +11,9 @@ import { COPY_HOURLY_LIMIT } from '../samples/route';
  * Copies a finished result (`{ assetId }`, the output of a job) into a new input asset of the caller's on the server: an output is not an input, so a job cannot name it.
  * The result is the caller's own (from History) or a live Library clip of the active workspace (LIVE_CLIP, the rule that lets every member read it, owner decision
  * 2026-11-20); an Admin gets no more than that. The asset and its job are in the active workspace either way. An MP4 clip (Advanced's reference video; its length comes from the
- * file's header, else from the job's duration) or a JPEG, PNG or WebP image (the "Use result" button and the photo tools), of at most 50 MB. A clip's poster, its first frame,
- * counts as its result too (the print fix opens a clip on it); an image job's poster is only a small preview, so it does not. 429 beyond
+ * file's header, else from the job's duration) or a JPEG, PNG or WebP image (the "Use result" button and the photo tools), of at most 50 MB. A clip's poster, its first frame
+ * (at most 480 px wide, apps/worker/src/media.ts extractPoster), counts as its result too: the print fix opens a clip on it. An image job's poster does not: it is a
+ * downscaled tile preview (imagePreview, at most 1024 px) of a picture the tools copy whole. 429 beyond
  * COPY_HOURLY_LIMIT new inputs an hour, as the sample copy.
  */
 export async function POST(request: Request) {

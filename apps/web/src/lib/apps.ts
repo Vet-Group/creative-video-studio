@@ -45,6 +45,8 @@ export interface AppConfig {
   slots: AppSlot[];
   /** A prompt box. `background` (Background Changer) excludes the reference image; `optional` (the two swaps) adds the member's text to the fixed instruction. The other apps send their fixed prompt. */
   prompt?: 'background' | 'optional';
+  /** The `optional` prompt box's own placeholder, where the generic one would mislead (the print fix's note says where the print is). */
+  notePlaceholder?: string;
   /** Shows the ratio field (Reframe); the options are the model's own ratios. */
   ratio?: boolean;
   /** Shows the resolution field (Upscale); the options are the keys of the model's prices. */
@@ -363,6 +365,7 @@ export const APPS: AppConfig[] = [
       { label: 'File design gốc', inputLabel: 'Ảnh design gốc', empty: 'Thêm file design gốc, tốt nhất là PNG nền trong' },
     ],
     prompt: 'optional',
+    notePlaceholder: 'Ví dụ: hình in ở lưng áo, hoặc chỉ sửa dòng chữ trên ngực',
   },
   {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend

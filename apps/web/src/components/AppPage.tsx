@@ -835,7 +835,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                 maxLength={room}
                 onRun={() => canRun && void run()}
                 disabled={reference}
-                placeholder={reference ? 'Đang dùng ảnh tham chiếu' : app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'}
+                placeholder={reference ? 'Đang dùng ảnh tham chiếu' : app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : (app.notePlaceholder ?? 'Mô tả điều bạn muốn thêm...')}
                 ask={chosen ? () => ({ field: 'prompt', feature: app.feature, text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
               />
             )}

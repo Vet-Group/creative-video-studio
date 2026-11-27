@@ -102,6 +102,7 @@ test("an image's detail opens the picture in the image tools (Xoá nền, Tăng 
   expect(tools({ ...own, feature: 'pose_generator' })).toEqual(['Xoá nền', 'Tăng độ phân giải', 'Đổi nền', 'Đổi khung hình', 'Sửa lại hình in']);
   expect(tools({ ...clip('video'), mine: true })).toEqual([]); // no poster yet
   expect(tools({ ...clip('video'), posterAssetId: 'p1' })).toEqual(['Sửa lại hình in']); // its first frame
+  expect(detail({ ...clip('video'), feature: 'hook_effect', posterAssetId: 'p1' })).not.toContain('lightbox-tools'); // a hook effect's first frame is the effect's start: no tool, no empty row
 });
 
 const sample: Clip = {

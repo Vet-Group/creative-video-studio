@@ -17,8 +17,9 @@ const IMAGE_TOOLS = (
     { slug: 'reframe', icon: 'ratio' },
     // A person's result, an AI model's or a Try On's, in other poses.
     { slug: 'pose-generator', icon: 'model', label: 'Đổi tư thế', from: ['fashion_model', 'try_on'] },
-    // Any result that may show the seller's printed product, a clip's first frame too; not a cutout or an upscale (its print is the source's), nor an AI model, a pet portrait (a design itself), jewelry or lingerie.
-    { slug: 'print-fix', icon: 'edit', not: ['background_remover', 'image_upscale', 'fashion_model', 'pet_portrait', 'jewelry_try_on', 'lingerie_try_on'], video: true },
+    // Any result that may show the seller's printed product, a clip's first frame too; not a cutout or an upscale (its print is the source's), nor an AI model, a pet portrait (a design itself),
+    // jewelry or lingerie, nor a hook effect, whose first frame is the start of the effect and whose remake would lose it.
+    { slug: 'print-fix', icon: 'edit', not: ['background_remover', 'image_upscale', 'fashion_model', 'pet_portrait', 'jewelry_try_on', 'lingerie_try_on', 'hook_effect'], video: true },
   ] as Tool[]
 ).flatMap(({ slug, ...tool }) => {
   const app = appBySlug(slug);

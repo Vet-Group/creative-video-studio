@@ -819,7 +819,8 @@ describe('Sửa lại hình in', () => {
   it('sits after the video edit and before Smart Remake, as a photo app on its own feature, new from 2026-11-27, with the photo to fix first and the design second', () => {
     const slugs = APPS.map((a) => a.slug);
     expect(slugs.indexOf('smart-remake')).toBe(slugs.indexOf('print-fix') + 1);
-    expect(app).toMatchObject({ feature: 'print_fix', category: 'photo', name: 'Sửa lại hình in', prompt: 'optional', added: '2026-11-27' });
+    expect(app).toMatchObject({ feature: 'print_fix', category: 'photo', name: 'Sửa lại hình in', prompt: 'optional', added: '2026-11-27', notePlaceholder: 'Ví dụ: hình in ở lưng áo, hoặc chỉ sửa dòng chữ trên ngực' });
+    expect(APPS.filter((a) => a.notePlaceholder).map((a) => a.slug)).toEqual(['print-fix']); // the other note boxes keep the generic placeholder
     expect(app.slots.map((s) => [s.label, s.inputLabel, !!s.optional, !!s.many])).toEqual([['Ảnh cần sửa', 'Ảnh cần sửa hình in', false, false], ['File design gốc', 'Ảnh design gốc', false, false]]);
     expect(JOB_APPS.map((a) => a.slug)).toContain('print-fix');
     expect(BATCH_FEATURES).not.toContain('print_fix'); // one job per Run

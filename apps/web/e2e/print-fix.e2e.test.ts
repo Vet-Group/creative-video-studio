@@ -40,6 +40,7 @@ test('print fix: both slots, Run waits for the photo and then the design, and a 
   await expect(runButton(page)).toBeEnabled();
 
   const note = 'hình in ở lưng áo';
+  await expect(page.getByLabel('Mô tả (tuỳ chọn)')).toHaveAttribute('placeholder', 'Ví dụ: hình in ở lưng áo, hoặc chỉ sửa dòng chữ trên ngực');
   await page.getByLabel('Mô tả (tuỳ chọn)').fill(note);
   const sent = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname === '/api/jobs');
   await runButton(page).click();
