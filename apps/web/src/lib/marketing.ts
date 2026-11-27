@@ -210,6 +210,12 @@ export const ADVANCED_MAX_SCRIPT = 300;
  * (instruction, hook, location, script and sound rule). It changes with the model and the choices; nothing else holds the brief.
  */
 export const briefRoom = (compose: (brief: string) => string, limit: number): number => Math.max(0, limit - (compose('x').length - 1));
+/** The most clips one Marketing Studio Run makes: its hook variants times its ratios. */
+export const MAX_CLIPS = 6;
+/** The clips of one Run in the order they are sent: each hook in every ratio, the primary ratio first. */
+export const clipMatrix = <H>(hooks: readonly H[], ratios: readonly string[]): { hook: H; ratio: string }[] => hooks.flatMap((hook) => ratios.map((ratio) => ({ hook, ratio })));
+/** How many hooks fit beside `other` ratios, or ratios beside `other` hooks, within MAX_CLIPS. */
+export const clipRoom = (other: number): number => Math.floor(MAX_CLIPS / Math.max(1, other));
 /** Suggestion runs one member may ask for per day (Asia/Ho_Chi_Minh), each one LLM call of about 0.0004 USD. */
 export const SUGGEST_DAILY_LIMIT = 20;
 

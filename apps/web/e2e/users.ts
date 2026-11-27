@@ -38,6 +38,7 @@ export const USERS = {
   mktw: { email: 'mktw@e2e.test', name: 'E2E Mkt W', role: 'member' }, // marketing-video.e2e: the example hook
   mktx: { email: 'mktx@e2e.test', name: 'E2E Mkt X', role: 'member' }, // marketing-video.e2e: the reference video from History
   mkth: { email: 'mkth@e2e.test', name: 'E2E Mkt H', role: 'member' }, // marketing-end.e2e: the end frame, the end scene and the end text
+  mktm: { email: 'mktm@e2e.test', name: 'E2E Mkt M', role: 'member' }, // marketing.e2e: the hook x ratio matrix
   reusea: { email: 'reusea@e2e.test', name: 'E2E Reuse A', role: 'member' },
   tpla: { email: 'tpla@e2e.test', name: 'E2E Templates A', role: 'member' },
   tplb: { email: 'tplb@e2e.test', name: 'E2E Templates B', role: 'member' },

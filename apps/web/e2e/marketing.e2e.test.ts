@@ -451,6 +451,50 @@ test('hook variants beyond the clips left today are refused before anything is s
   await expect(runButton(page)).toBeEnabled();
 });
 
+test('the hook x ratio matrix: 2 hooks in 9:16 and 1:1 send 4 clips, each with its own ratio and a prompt framed for it, and Dùng lại brings back one clip', async ({ page }) => {
+  const picks = HOOKS.slice(0, 2);
+  await signIn(page, 'mktm');
+  await page.goto('/marketing-studio');
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
+  await expect(modelButton(page)).toContainText('Mock E2E');
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '9:16');
+  await page.getByRole('button', { name: /^Hook/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Chọn hook' });
+  await dialog.getByLabel(/^Tạo nhiều biến thể/).check();
+  for (const h of picks) await dialog.getByRole('option', { name: h.name, exact: true }).click();
+  await dialog.getByRole('button', { name: 'Xong (2/3)' }).click();
+
+  // Mock E2E makes 9:16 and 1:1, so 1:1 is the one ratio offered beside the primary 9:16.
+  const extra = page.getByRole('group', { name: 'Thêm tỉ lệ' });
+  await expect(extra.getByRole('button')).toHaveText(['1:1 (vuông)']);
+  await extra.getByRole('button', { name: '1:1 (vuông)' }).click();
+  await expect(extra.getByRole('button', { name: '1:1 (vuông)' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(runButton(page)).toContainText('4 clip');
+  await expect(page.locator('.variants-usage')).toContainText(/4 clip \(2 hook × 2 tỉ lệ\), tổng \$0\.0000: dùng 4 trong/);
+  await expect(page.locator('.prompt-preview p')).toHaveCount(2); // the preview keeps the primary ratio's prompts, one per hook
+
+  await runButton(page).click();
+  await page.getByRole('dialog', { name: 'Tạo 4 clip (2 hook × 2 tỉ lệ), tổng $0.00?' }).getByRole('button', { name: 'Tiếp tục', exact: true }).click();
+  await expect(page.getByText(`Đã gửi 4/4 biến thể: ${picks[0]!.name} · 9:16, ${picks[0]!.name} · 1:1, ${picks[1]!.name} · 9:16, ${picks[1]!.name} · 1:1.`)).toBeVisible();
+  const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] };
+  expect(jobs.jobs).toHaveLength(4);
+  const sent = await Promise.all(jobs.jobs.map(async (j) => ({ id: j.id, ...((await (await page.request.get(`/api/jobs/${j.id}`)).json()) as { hook: string; ratio: string; prompt: string }) })));
+  expect(sent.map((j) => `${j.hook} ${j.ratio}`).sort()).toEqual(picks.flatMap((h) => [`${h.id} 9:16`, `${h.id} 1:1`]).sort());
+  for (const j of sent) {
+    expect(j.prompt).toContain(j.ratio === '1:1' ? 'square 1:1 frame' : 'vertical 9:16 frame');
+    expect(j.prompt).toContain(picks.find((h) => h.id === j.hook)!.phrase);
+  }
+
+  // Dùng lại on one clip brings back its one ratio and hook, with no extra ratio.
+  const square = sent.find((j) => j.ratio === '1:1')!;
+  await page.goto(`/marketing-studio?reuse=${square.id}`);
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
+  await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(picks.find((h) => h.id === square.hook)!.name);
+  await expect(extra.getByRole('button', { name: '9:16 (dọc)' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(runButton(page)).not.toContainText('clip');
+});
+
 test('as on Fash, in Viết tự do the Cài đặt video block sits 16 px under the prompt box with the ratio row right under its title, and the sent-prompt disclosure folds under the model picker', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'mktb');
