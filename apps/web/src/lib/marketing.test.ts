@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, ENDINGS, endingLine, highlightLines, hrefOfFormat, HOOKS, LOCATIONS, marketingPrompt, reviewPrompt, sectionBody, sectionPrompt, unboxingPrompt, unboxingRoles, UNBOXING_ROLES } from './marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, clipMatrix, clipRoom, ENDINGS, endingLine, highlightLines, hrefOfFormat, HOOKS, LOCATIONS, marketingPrompt, MAX_CLIPS, reviewPrompt, sectionBody, sectionPrompt, unboxingPrompt, unboxingRoles, UNBOXING_ROLES } from './marketing';
 
 describe('HOOKS and LOCATIONS', () => {
   it.each([['HOOKS', HOOKS], ['LOCATIONS', LOCATIONS]])('%s has 6 to 12 unique choices with a Vietnamese name and description and an English phrase', (_, list) => {
@@ -305,5 +305,25 @@ describe('format helpers', () => {
 
   it('maps a job format to its page, UGC for none', () => {
     expect([null, 'advanced', 'unboxing', 'review', 'other'].map(hrefOfFormat)).toEqual(['/marketing-studio', '/marketing-studio/advanced', '/marketing-studio/unboxing', '/marketing-studio/review', '/marketing-studio']);
+  });
+});
+
+describe('the hook x ratio matrix', () => {
+  it('makes each hook in every ratio, hook by hook in the order of the ratios', () => {
+    expect(clipMatrix(['a', 'b'], ['9:16', '1:1'])).toEqual([
+      { hook: 'a', ratio: '9:16' },
+      { hook: 'a', ratio: '1:1' },
+      { hook: 'b', ratio: '9:16' },
+      { hook: 'b', ratio: '1:1' },
+    ]);
+    expect(clipMatrix([''], ['9:16'])).toEqual([{ hook: '', ratio: '9:16' }]);
+  });
+
+  it('caps the clips of a Run at MAX_CLIPS: the room left for one side beside the other', () => {
+    expect(MAX_CLIPS).toBe(6);
+    expect([0, 1, 2, 3, 4, 6, 7].map(clipRoom)).toEqual([6, 6, 3, 2, 1, 1, 0]);
+    // 3 hooks leave room for 2 ratios, 3 ratios for 2 hooks: never more than MAX_CLIPS clips.
+    for (let hooks = 1; hooks <= 3; hooks++) expect(hooks * clipRoom(hooks)).toBeLessThanOrEqual(MAX_CLIPS);
+    expect(clipMatrix(['a', 'b', 'c'], ['9:16', '1:1', '16:9'].slice(0, clipRoom(3)))).toHaveLength(6);
   });
 });

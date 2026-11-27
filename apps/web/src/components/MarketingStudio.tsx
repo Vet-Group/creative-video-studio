@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useId, useState } from 'react';
 import { NO_CAP } from '@/lib/caps';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
-import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, cardTitleOfFormat, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, cardTitleOfFormat, clipMatrix, clipRoom, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, MAX_CLIPS, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { WIZARD_KEY } from '@/lib/onboarding';
 import { type BrandKit, withBrand } from '@/lib/brand';
@@ -79,8 +79,10 @@ interface VideoModel {
 
 const VIDEO_ERROR = 'Không tải được video. Hãy thử lại.';
 
-/** The most hook variants one Run makes, one clip each. */
+/** The most hook variants one Run makes, one clip in each of its ratios. */
 const MAX_VARIANTS = 3;
+/** The most ratios a Run adds to the primary one, each hook once more in each (within MAX_CLIPS clips). */
+const MAX_EXTRA_RATIOS = 2;
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
@@ -183,6 +185,8 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   const [prompt, setPrompt, clearBodyDraft] = useDraftState(`${pf ? `marketing-${pf}` : 'marketing'}.body`, reuse !== undefined);
   const [modelId, setModelId] = useState('');
   const [ratio, setRatio] = useState('9:16');
+  /** The other ratios the Run also makes (the same ad in more frame shapes); the primary `ratio` still drives the model list and the price per clip. */
+  const [extras, setExtras] = useState<string[]>([]);
   const [durationSec, setDurationSec] = useState(10);
   const [storeId, setStoreId] = useState('');
   const [useBrand, setUseBrand] = useState(false); // the chosen store's brand kit, added to the prompt on the server
@@ -204,11 +208,12 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   );
   const apply = useApplier((s) => {
     recall.touch();
-    if (s.ratio) setRatio(s.ratio);
+    if (s.ratio) takeRatio(s.ratio);
     if (s.durationSec) setDurationSec(s.durationSec);
   });
   const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse, recipe } : null); // what the form refills from; Recreate sets a new one in place. `recipe`: a company example, its photos marked as the example's (asExample)
-  const [list, setList] = useState<{ key: string; models: VideoModel[]; defaultId: string | null } | null>(null);
+  /** `extra`: the list of each extra ratio, in the order of `extras`. */
+  const [list, setList] = useState<{ key: string; models: VideoModel[]; defaultId: string | null; extra: VideoModel[][] } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else Examples)
@@ -219,6 +224,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   const promptId = useId();
   const scriptId = useId();
   const reasonId = useId();
+  const extraId = useId();
   // The guided wizard walks a Seller through format → photos → content → settings, one step at a time; off is the full form below, unchanged. Default from the team (wizardDefault), then the member's own remembered choice.
   const [wizard, setWizard] = useState(wizardDefault);
   const [step, setStep] = useState(0);
@@ -244,7 +250,9 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   const durations = [...new Set(models?.flatMap((m) => m.durationsSec))].sort((a, b) => a - b);
   // A reference video's billed seconds change some estimates, so the list follows its length.
   const videoSec = advanced && video ? Math.ceil(video.durationMs / 1000) : 0;
-  const key = `${ratio}/${durationSec}/${videoSec}`;
+  /** The ratios a Run makes, the primary first: each hook is made once in each. */
+  const shapes = [ratio, ...extras];
+  const key = `${shapes.join(',')}/${durationSec}/${videoSec}`;
   const fresh = list !== null && list.key === key;
   // Advanced: the slot takes up to the chosen model's reference cap (7 at most); a model that takes fewer images than are chosen cannot be picked.
   const maxRefs = Math.min(ADVANCED_MAX_IMAGES, chosen?.maxImages ?? ADVANCED_MAX_IMAGES);
@@ -264,8 +272,8 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   const parts = { hookText: sec ? hookText : '', ending: sec ? ending : '' };
   /** The photos a Run sends, in the order the prompt names them [Image1]..: Unboxing's model is left out for POV and its packaging comes last. */
   const images = advanced ? refs : unboxing ? [...person, ...product, ...packaging] : [...person, ...product];
-  const composeFor = (hook: string, brief: string) => {
-    const shared = { hook, location, prompt: brief, ...parts, audio: audioOn, ratio };
+  const composeFor = (hook: string, brief: string, r = ratio) => {
+    const shared = { hook, location, prompt: brief, ...parts, audio: audioOn, ratio: r };
     return advanced
       ? advancedPrompt({ brief, images: refs.length, video: video !== null, hook, location, script, ...parts, audio: audioOn }, own)
       : unboxing
@@ -276,18 +284,31 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   };
   /** A sent prompt as the provider gets it: the server adds the brand kit after it, so the preview and the limit count it too. */
   const branded = (text: string) => (kit ? withBrand(text, kit, 'marketing') : text);
-  const compose = (hook: string) => composeFor(hook, brief);
+  const compose = (hook: string, r = ratio) => composeFor(hook, brief, r);
   const line = (text: string) => text.replace(/\s+/g, ' ').trim();
   // The request a Run with a video makes may take no end frame (Kling O3): the slot is replaced by a note and the frame is not sent.
   const endAllowed = chosen?.endFrame === true && !(advanced && video !== null && chosen.videoRefs !== null && !chosen.videoRefs.endFrame);
   const endAssetId = endAllowed ? endFrame?.id : undefined;
-  /** What the brief may take: the chosen model's limit less what the page adds around it, for the longest variant. */
-  const room = chosen && Math.min(...variants.map((h) => briefRoom((b) => branded(composeFor(h, b)), chosen.maxPromptChars)));
-  /** What a Run sends for each variant, in order. */
-  const sent = variants.map(compose);
-  const n = variants.length;
+  /** The clips of a Run: each hook variant in each ratio, the primary ratio last, as the next visit's settings come from the newest job (/api/recall). */
+  const matrix = clipMatrix(variants, [...extras, ratio]);
+  /** What the brief may take: the chosen model's limit less what the page adds around it, for the longest clip (the frame words differ by ratio). */
+  const room = chosen && Math.min(...matrix.map((c) => briefRoom((b) => branded(composeFor(c.hook, b, c.ratio)), chosen.maxPromptChars)));
+  /** What a Run sends for each clip, in order. */
+  const sent = matrix.map((c) => compose(c.hook, c.ratio));
+  const n = matrix.length;
+  /** The chosen model in each extra ratio's list: a duplicate pair may make another ratio on another row (servingRow), at its price, or not at this length. */
+  const extraModels = extras.map((_, i) => (fresh ? list.extra[i] : undefined)?.find((m) => m.id === chosen?.id));
+  /** The estimate per clip in each ratio of the Run, the primary first. */
+  const costs = [cost, ...extraModels.map((m) => m && (audioOn && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd))];
   /** The estimate of the whole Run, at the estimate's own precision. */
-  const total = cost === undefined ? undefined : (Number(cost) * n).toFixed(cost.split('.')[1]?.length ?? 2);
+  const total = cost === undefined || costs.includes(undefined) ? undefined : (variants.length * costs.reduce((s, c) => s + Number(c), 0)).toFixed(cost.split('.')[1]?.length ?? 2);
+  /** The Run's shape, said when it makes more than one ratio. */
+  const shape = shapes.length < 2 ? '' : variants.length > 1 ? ` (${variants.length} hook × ${shapes.length} tỉ lệ)` : ` (${shapes.length} tỉ lệ)`;
+  /** How many hooks fit beside the ratios, and whether another ratio fits beside the hooks, within MAX_CLIPS. */
+  const maxHooks = Math.min(MAX_VARIANTS, clipRoom(shapes.length));
+  const ratiosFull = shapes.length >= Math.min(1 + MAX_EXTRA_RATIOS, clipRoom(variants.length));
+  /** The extra ratios offered: the chosen model's own, in the menu's order, but the primary one. */
+  const extraRatios = Object.keys(RATIO_LABEL).filter((r) => r !== ratio && chosen?.ratios.includes(r));
   const hookName = (id: string) => hookList.find((c) => c.id === id)?.name ?? id;
   const name = FORMAT_NAME[format];
   const sample = FORMATS.find((f) => f.id === format)!.sample;
@@ -301,16 +322,25 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   function pickModel(m: VideoModel) {
     setModelId(m.id);
     const own = Object.keys(RATIO_LABEL).filter((r) => m.ratios.includes(r));
-    if (own.length > 0 && !own.includes(ratio)) setRatio(own[0]!);
+    const next = own.length > 0 && !own.includes(ratio) ? own[0]! : ratio;
+    if (next !== ratio) setRatio(next);
+    setExtras((cur) => cur.filter((r) => r !== next && m.ratios.includes(r))); // the extra ratios the new model does not make are dropped
     const ownDurations = [...m.durationsSec].sort((a, b) => a - b);
     if (ownDurations.length > 0 && !ownDurations.includes(durationSec)) setDurationSec(ownDurations[0]!);
   }
+  /** A new primary ratio leaves the extra ratios. */
+  function takeRatio(r: string) {
+    setRatio(r);
+    setExtras((cur) => cur.filter((x) => x !== r));
+  }
 
-  // The list (with the estimate for this duration) is fetched again when the ratio or the duration changes, or when the member retries after a failure.
+  // The lists (with the estimate for this duration) are fetched again when a ratio or the duration changes, or when the member retries after a failure.
+  // Each extra ratio has its own list: only it says what the chosen model costs in that ratio and whether it makes it at this length.
   useEffect(() => {
     let stale = false;
-    api<{ models: VideoModel[]; defaultModelId: string | null }>(`/api/models?feature=marketing&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}${videoSec > 0 ? `&videoSec=${videoSec}` : ''}`).then(
-      (r) => !stale && (setList({ key, models: r.models, defaultId: r.defaultModelId }), setFailed(false)),
+    const get = (r: string) => api<{ models: VideoModel[]; defaultModelId: string | null }>(`/api/models?feature=marketing&ratio=${encodeURIComponent(r)}&durationSec=${durationSec}${videoSec > 0 ? `&videoSec=${videoSec}` : ''}`);
+    Promise.all(shapes.map(get)).then(
+      ([r, ...more]) => !stale && (setList({ key, models: r!.models, defaultId: r!.defaultModelId, extra: more.map((m) => m.models) }), setFailed(false)),
       () => !stale && setFailed(true),
     );
     return () => {
@@ -378,7 +408,8 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
           setUseBrand(on);
           if (on) setStoreId(j.storeId ?? '');
         }
-        // A saved template may leave these out; the form's defaults stay.
+        // A saved template may leave these out; the form's defaults stay. One job's clip is made again: its one ratio, no extra ones.
+        setExtras([]);
         if (j.ratio) setRatio(j.ratio);
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
@@ -411,7 +442,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
     if (kind === 'hook') pickHook(c.id);
     else (setLocation(c.id), setPicker(null));
   }
-  const pickHook = (id: string) => (many && id ? setHooks((cur) => (cur.includes(id) ? cur.filter((h) => h !== id) : cur.length < MAX_VARIANTS ? [...cur, id] : cur)) : (setHooks(id ? [id] : []), setPicker(null)));
+  const pickHook = (id: string) => (many && id ? setHooks((cur) => (cur.includes(id) ? cur.filter((h) => h !== id) : cur.length < maxHooks ? [...cur, id] : cur)) : (setHooks(id ? [id] : []), setPicker(null)));
 
   // My products: loaded once; a failure just leaves the plain upload slot.
   useEffect(() => {
@@ -442,6 +473,11 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
       : product.length === 0
         ? 'Tải lên ảnh sản phẩm.'
         : null;
+  /** An extra ratio the chosen model does not make with these choices: the row that serves it may lack the end frame, the sound or the video the Run sends. */
+  const unmade = extras.find((_, i) => {
+    const m = extraModels[i];
+    return !m?.supported || (endAssetId !== undefined && !m.endFrame) || (audioOn && m.audioEstimateUsd == null) || (advanced && video !== null && videoReason(video, m.videoRefs, refs.length) !== null);
+  });
   // The first thing that stops Run, in the order the form is filled; null when it can go. The prompt's length comes last.
   const formReason =
     !recall.answered
@@ -456,17 +492,24 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
               ? 'Các mô hình này không có tỉ lệ hoặc thời lượng dùng được cho Marketing Studio.'
               : !chosen!.supported
                 ? 'Mô hình này không có tỉ lệ hoặc thời lượng đã chọn. Chọn mô hình khác, hoặc đổi tỉ lệ hoặc thời lượng.'
-                : photoReason ??
-                  (pf && images.length > chosen!.maxImages
-                    ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
-                    : advanced
-                      ? (videoReason(video, chosen!.videoRefs, refs.length) ?? (brief.trim() === '' ? 'Viết mô tả video bạn muốn.' : null))
-                      : review && highlightLines(highlights).length === 0
-                        ? 'Nhập ít nhất 1 điểm nổi bật.'
-                        : null);
+                : unmade
+                  ? `Mô hình này không làm được tỉ lệ ${unmade} với các lựa chọn hiện tại (thời lượng, âm thanh, khung cuối hoặc video tham chiếu). Bỏ tỉ lệ đó hoặc đổi lựa chọn.`
+                  : photoReason ??
+                    (pf && images.length > chosen!.maxImages
+                      ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
+                      : advanced
+                        ? (videoReason(video, chosen!.videoRefs, refs.length) ?? (brief.trim() === '' ? 'Viết mô tả video bạn muốn.' : null))
+                        : review && highlightLines(highlights).length === 0
+                          ? 'Nhập ít nhất 1 điểm nổi bật.'
+                          : null);
   const reason = formReason ?? promptTooLong(chosen, Math.max(...sent.map((s) => branded(s).length)));
-  /** Hook variants beyond the clips left today are refused before anything is sent. */
-  const short = n > 1 && clips !== null && clips.today + n > clips.cap ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook.` : null;
+  /** Hook variants and ratios beyond the clips left today are refused before anything is sent. */
+  const short =
+    n > 1 && clips !== null && clips.today + n > clips.cap
+      ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook${shape ? ' hoặc tỉ lệ' : ''}.`
+      : n > 1 && total !== undefined && chosen?.creditUsd != null && Number(total) > Number(chosen.creditUsd)
+        ? `Ngân sách của mô hình này không đủ cho cả ${n} clip; bỏ bớt biến thể hook${shape ? ' hoặc tỉ lệ' : ''}.` // the picker locks a model only on one clip's price
+        : null;
   const canRun = reason === null && short === null && !busy;
   // The wizard's four steps and whether each may be left: photos present, then the words the format needs, then the Run gate. Off, every block shows at once (atStep).
   const STEPS = ['Định dạng', 'Ảnh', 'Nội dung', 'Cài đặt'];
@@ -567,16 +610,18 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
   const roles = unboxingRoles({ model: person.length > 0, packaging: packaging.length > 0 });
   const formInputs = unboxing ? { roles } : review ? { highlights: highlightLines(highlights).join('\n') } : {};
 
-  /** One job per hook variant, sent one after another (the API takes one job per POST); a refused variant does not stop the rest. */
+  /** One job per clip (each hook variant in each ratio), sent one after another (the API takes one job per POST); a refused clip does not stop the rest. */
   async function run() {
     // One question: the variants one when there are several, else the price one from 1 USD.
-    if (!(await (n > 1 ? confirmDialog({ title: `Tạo ${n} clip, mỗi hook một clip, tổng ${usd(total ?? 0)}?`, confirmLabel: 'Tiếp tục' }) : confirmRun(total)))) return;
+    if (!(await (n > 1 ? confirmDialog({ title: `Tạo ${n} clip${shape || ', mỗi hook một clip'}, tổng ${usd(total ?? 0)}?`, confirmLabel: 'Tiếp tục' }) : confirmRun(total)))) return;
     setBusy(true);
     setError('');
     setNotice('');
     const sentOk: string[] = [];
     const refused: string[] = [];
-    for (const [i, hook] of variants.entries()) {
+    for (const [i, { hook, ratio: r }] of matrix.entries()) {
+      // A clip is named by its hook, and by its ratio when the Run makes several: "Mua ngay · 1:1".
+      const label = [hook && hookName(hook), shape && r].filter(Boolean).join(' · ');
       // The form's own inputs ride along in params so History can refill the form (reuse); the worker never reads them.
       // The end frame and the end text are the worker's (the end text is burned in after the provider), so they go too.
       // The own hook only where the prompt has it: no hook chosen for this variant.
@@ -586,7 +631,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         assetIds: images.map((r) => r.id),
         modelId: chosen!.id,
         prompt: sent[i],
-        ratio,
+        ratio: r,
         durationSec,
         storeId: storeId || null,
         useBrand,
@@ -596,15 +641,15 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         // The first variant stands for the batch: a batch the same as the last one asks before anything is sent.
         if (i > 0) await api('/api/jobs', sendJson('POST', body));
         else if (!(await sendRun(body))) return setBusy(false);
-        sentOk.push(hookName(hook));
+        sentOk.push(label);
       } catch (e) {
-        refused.push(n > 1 ? `${hookName(hook)}: ${errorText(e, 'không gửi được')}` : errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
+        refused.push(n > 1 ? `${label}: ${errorText(e, 'không gửi được')}` : errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
       }
     }
     if (sentOk.length > 0) {
       clearFreeDraft();
       clearBodyDraft();
-      setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} biến thể: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
+      setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} ${shape ? 'clip' : 'biến thể'}: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
     }
     if (refused.length > 0) setError(n > 1 ? `Không gửi được ${refused.join('; ')}` : refused[0]!);
@@ -780,17 +825,40 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
             <VideoSettings>
               <div className="field-row">
                 {models && ratios.length > 0 && (
-                  <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]!, short: r }))} onChange={setRatio} />
+                  <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]!, short: r }))} onChange={takeRatio} />
                 )}
                 {models && durations.length > 0 && (
                   <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
                 )}
               </div>
+              {/* The same ad in more frame shapes, one clip per hook in each; only the ratios the chosen model makes, and a pick that would pass MAX_CLIPS is disabled with the reason. */}
+              {extraRatios.length > 0 && (
+                <div className="field">
+                  <span id={extraId} className="field-label">
+                    Thêm tỉ lệ (tuỳ chọn)
+                  </span>
+                  <div className="kinds kinds-wrap" role="group" aria-labelledby={extraId}>
+                    {extraRatios.map((r) => {
+                      const on = extras.includes(r);
+                      return (
+                        <button key={r} type="button" aria-pressed={on} disabled={!on && ratiosFull} aria-describedby={!on && ratiosFull ? `${extraId}-full` : undefined} onClick={() => setExtras((cur) => (on ? cur.filter((x) => x !== r) : [...cur, r]))}>
+                          {RATIO_LABEL[r]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {ratiosFull && extraRatios.some((r) => !extras.includes(r)) && (
+                    <p id={`${extraId}-full`} className="help">
+                      {clipRoom(variants.length) <= MAX_EXTRA_RATIOS ? `Tối đa ${MAX_CLIPS} clip mỗi lượt (${variants.length} hook × ${shapes.length} tỉ lệ): bỏ bớt hook để thêm tỉ lệ.` : `Thêm được tối đa ${MAX_EXTRA_RATIOS} tỉ lệ.`}
+                    </p>
+                  )}
+                </div>
+              )}
               <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} reason={silentWithVideo ? 'Mô hình này không tạo âm thanh khi có video tham chiếu, nên lời thoại cũng không có tác dụng.' : undefined} onChange={setAudio} />
               {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !pf || (m.maxImages >= images.length && (!advanced || videoReason(video, m.videoRefs, refs.length) === null)), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             </VideoSettings>
             {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}
-            <PromptPreview feature="marketing" prompts={sent.map(branded)} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} check={chosen ? { model: chosen.id, audio, seconds: durationSec, ...(pf && { format: pf }) } : undefined} />
+            <PromptPreview feature="marketing" prompts={variants.map((h) => branded(compose(h)))} labels={variants.length > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} check={chosen ? { model: chosen.id, audio, seconds: durationSec, ...(pf && { format: pf }) } : undefined} />
             {/* In the sections they sit in ③ Ending; in free writing, under the prompt preview. */}
             {!sec && endExtras}
             <BrandPicker storeId={storeId} onStore={setStoreId} on={useBrand} onToggle={setUseBrand} onKit={setKit} />
@@ -844,13 +912,13 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
             )}
             {n > 1 && clips && (
               <p className="help variants-usage">
-                {n} biến thể, tổng ${total}: {clips.cap >= NO_CAP ? `dùng ${n} clip (hôm nay đã dùng ${clips.today})` : `dùng ${n} trong ${clips.cap} clip mỗi ngày của bạn (hôm nay đã dùng ${clips.today})`}.
+                {shape ? `${n} clip${shape}` : `${n} biến thể`}, tổng {total === undefined ? '…' : `$${total}`}: {clips.cap >= NO_CAP ? `dùng ${n} clip (hôm nay đã dùng ${clips.today})` : `dùng ${n} trong ${clips.cap} clip mỗi ngày của bạn (hôm nay đã dùng ${clips.today})`}.
               </p>
             )}
             <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
-            <RunSummary items={[chosen?.label, ratio, `${durationSec} giây`, audioOn && 'có âm thanh']} />
+            <RunSummary items={[chosen?.label, shapes.join(' + '), `${durationSec} giây`, audioOn && 'có âm thanh']} />
             {wizard && step > 0 && (
               <button type="button" onClick={() => setStep((s) => s - 1)}>
                 Quay lại
@@ -956,11 +1024,12 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
             </label>
             {many && (
               <button type="button" className="primary" onClick={() => setPicker(null)}>
-                Xong ({hooks.length}/{MAX_VARIANTS})
+                Xong ({hooks.length}/{maxHooks})
               </button>
             )}
+            {many && maxHooks < MAX_VARIANTS && hooks.length >= maxHooks && <p className="help">Tối đa {MAX_CLIPS} clip mỗi lượt: với {shapes.length} tỉ lệ chỉ chọn được {maxHooks} hook.</p>}
             <span className="sr-only" aria-live="polite">
-              {many ? `Đã chọn ${hooks.length}/${MAX_VARIANTS} hook` : ''}
+              {many ? `Đã chọn ${hooks.length}/${maxHooks} hook` : ''}
             </span>
           </div>
         }
