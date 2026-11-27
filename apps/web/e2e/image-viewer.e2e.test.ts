@@ -22,6 +22,8 @@ test.describe('image viewer gestures', () => {
   }
 
   const scaleOf = (img: Locator) => img.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a);
+  /** `none` means the picture is centred at its own size, not just at scale 1. */
+  const transformOf = (img: Locator) => img.evaluate((el) => getComputedStyle(el).transform);
   const centre = async (el: Locator) => {
     const b = (await el.boundingBox())!;
     return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
@@ -49,8 +51,9 @@ test.describe('image viewer gestures', () => {
       const viewer = page.locator('dialog.image-viewer');
       const img = viewer.locator('img');
       await expect(img).toBeVisible();
-      expect(await scaleOf(img)).toBe(1);
-      // A card holds one picture: no arrows.
+      expect(await transformOf(img)).toBe('none');
+      // A lone picture has no neighbour: no arrows.
+
       await expect(viewer.getByRole('button', { name: 'Ảnh sau' })).toHaveCount(0);
 
       // Double tap zooms about the point, and a second double tap puts it back.
@@ -60,7 +63,7 @@ test.describe('image viewer gestures', () => {
       await expect.poll(() => scaleOf(img)).toBeGreaterThan(1);
       await page.touchscreen.tap(at.x, at.y);
       await page.touchscreen.tap(at.x, at.y);
-      await expect.poll(() => scaleOf(img)).toBe(1);
+      await expect.poll(() => transformOf(img)).toBe('none');
 
       // Download: beside the close button, finger-sized, and it asks for the original's file.
       const close = await fingerSized(viewer.getByRole('button', { name: 'Đóng' }));
@@ -90,12 +93,13 @@ test.describe('image viewer gestures', () => {
     const next = viewer.getByRole('button', { name: 'Ảnh sau' });
     const prev = viewer.getByRole('button', { name: 'Ảnh trước' });
     await expect(img).toHaveAttribute('src', `/api/assets/${a}/content`);
-    await expect(prev).toHaveCount(0); // the first photo has nothing before it
+    await expect(prev).toBeDisabled(); // the first photo has nothing before it, and the arrow stays so focus is not lost
 
     await fingerSized(next);
     await next.tap();
     await expect(img).toHaveAttribute('src', `/api/assets/${b}/content`);
-    await expect(next).toHaveCount(0);
+    await expect(next).toBeDisabled();
+    await expect(prev).toBeEnabled();
     await fingerSized(prev);
 
     await page.keyboard.press('ArrowLeft');
@@ -107,9 +111,38 @@ test.describe('image viewer gestures', () => {
     const at = await centre(img);
     await swipe(page, { x: at.x - 150, y: at.y }, { x: at.x + 150, y: at.y });
     await expect(img).toHaveAttribute('src', `/api/assets/${a}/content`);
-    expect(await scaleOf(img)).toBe(1);
+    expect(await transformOf(img)).toBe('none');
     await viewer.getByRole('button', { name: 'Đóng' }).tap();
     await expect(viewer).toHaveCount(0);
+  });
+
+  test('History steps between finished pictures with the arrow and the key', async ({ page }) => {
+    await signIn(page, 'viewerhist');
+    const ids: string[] = [];
+    try {
+      const outs: string[] = [];
+      for (const prompt of ['the older picture', 'the newer picture']) {
+        const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [await upload(page)], ratio: '3:4', prompt, enhance: false, params: { resolution: '1K' } } });
+        expect(res.status()).toBe(201);
+        const { id } = (await res.json()) as { id: string };
+        ids.push(id);
+        await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+        outs.push(((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; outputAssetId: string }[] }).jobs.find((j) => j.id === id)!.outputAssetId);
+      }
+      await page.goto('/image-generation');
+      await openTab(page, 'Lịch sử');
+      await page.locator('.job-card').first().getByRole('button', { name: 'Toàn màn hình' }).tap(); // the newest card
+      const viewer = page.locator('dialog.image-viewer');
+      const img = viewer.locator('img');
+      await expect(img).toHaveAttribute('src', `/api/assets/${outs[1]}/content`);
+      await expect(viewer.getByRole('button', { name: 'Ảnh trước' })).toBeDisabled();
+      await viewer.getByRole('button', { name: 'Ảnh sau' }).tap();
+      await expect(img).toHaveAttribute('src', `/api/assets/${outs[0]}/content`);
+      await page.keyboard.press('ArrowLeft');
+      await expect(img).toHaveAttribute('src', `/api/assets/${outs[1]}/content`);
+    } finally {
+      for (const id of ids) await page.request.delete(`/api/jobs/${id}`);
+    }
   });
 
   test('at phone width the close, download and arrow buttons stay clear of each other', async ({ page }) => {
@@ -117,11 +150,12 @@ test.describe('image viewer gestures', () => {
     await signIn(page, 'viewergest');
     const [a, b] = [await upload(page), await upload(page)];
     const post = await page.request.post('/api/feedback', { data: { kind: 'bug', title: 'Ảnh trên điện thoại', body: 'Các nút của ảnh.', assetIds: [a, b] } });
+    expect(post.ok()).toBe(true);
     await page.goto(`/feedback/${((await post.json()) as { id: string }).id}`);
     await page.getByRole('button', { name: 'Xem lớn ảnh 2' }).tap();
     const viewer = page.locator('dialog.image-viewer');
     const boxes = [];
-    for (const name of ['Đóng', 'Tải xuống', 'Ảnh trước']) boxes.push(await fingerSized(viewer.getByRole('button', { name })));
+    for (const name of ['Đóng', 'Tải xuống', 'Ảnh trước', 'Ảnh sau']) boxes.push(await fingerSized(viewer.getByRole('button', { name })));
     for (const [i, p] of boxes.entries())
       for (const q of boxes.slice(i + 1)) expect(p.x + p.width <= q.x || q.x + q.width <= p.x || p.y + p.height <= q.y || q.y + q.height <= p.y, 'buttons overlap').toBe(true);
     for (const p of boxes) expect(p.x >= 0 && p.x + p.width <= 390).toBe(true);

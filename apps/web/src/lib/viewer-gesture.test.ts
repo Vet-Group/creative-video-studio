@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { clampView, fitted, MAX_SCALE, swipeOutcome, zoomAt } from './viewer-gesture';
+import { clampView, fitted, MAX_SCALE, onPicture, swipeOutcome, zoomAt } from './viewer-gesture';
 
 const box = { w: 800, h: 1000 };
 
@@ -25,6 +25,14 @@ test('zooming keeps the tapped point under the finger', () => {
   expect(zoomAt({ s: 1, x: 0, y: 0 }, 2, { x: -400, y: -500 }, box, shown)).toEqual({ s: 2, x: 400, y: 500 });
   // Zooming out to 1 re-centres.
   expect(zoomAt({ s: 2, x: -200, y: 0 }, 1, { x: 0, y: 0 }, box, shown).x).toBeCloseTo(0);
+});
+
+test('only a point on the drawn picture counts as on it', () => {
+  const shown = { w: 800, h: 500 };
+  expect(onPicture({ x: 0, y: 200 }, { s: 1, x: 0, y: 0 }, shown)).toBe(true);
+  expect(onPicture({ x: 0, y: 300 }, { s: 1, x: 0, y: 0 }, shown)).toBe(false); // the dark band above and below
+  expect(onPicture({ x: 0, y: 300 }, { s: 2, x: 0, y: 0 }, shown)).toBe(true); // zoomed in, it reaches there
+  expect(onPicture({ x: 0, y: 300 }, { s: 2, x: 0, y: -250 }, shown)).toBe(false); // unless it was panned away
 });
 
 test('a swipe closes downwards, steps sideways towards a neighbour, and otherwise snaps back', () => {

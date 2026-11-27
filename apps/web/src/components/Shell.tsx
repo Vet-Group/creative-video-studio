@@ -183,7 +183,7 @@ const cardTitle = (job: TrayJob): string => {
  * One job in a page's History tab, laid out as Fash's History card: the result on the left; on the right the title, the member's own words,
  * the inputs, the ratio and length chips, the status and date, the icon actions and Dùng lại (Fash's Recreate, without the run).
  */
-function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAdmin: boolean; select?: ReactNode; selectBatch?: () => void }) {
+function HistoryCard({ job, isAdmin, select, selectBatch, onView }: { job: TrayJob; isAdmin: boolean; select?: ReactNode; selectBatch?: () => void; onView: () => void }) {
   const form = useForm();
   const apply = form?.apply;
   const takes = (k: 'durationSec' | 'ratio' | 'resolution') => !!apply && (!form?.settings || form.settings.includes(k));
@@ -206,9 +206,8 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
   // Try On's first input is the person: the original its result is compared with.
   const original = job.feature === 'try_on' && image ? job.inputAssetIds[0] : undefined;
   const content = (id: string) => `/api/assets/${id}/content`;
-  // An image card shows its preview; the viewer shows the original.
-  const [viewing, setViewing] = useState(false);
-  const enlarge = () => (image ? setViewing(true) : toggleFullscreen(media.current));
+  // An image card shows its preview; the History list's viewer shows the original, stepping to the cards beside it.
+  const enlarge = () => (image ? onView() : toggleFullscreen(media.current));
 
   async function act(what: () => Promise<unknown>, fail: string) {
     setProblem('');
@@ -322,7 +321,6 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
             )}
           </div>
         )}
-        {viewing && out && <ImageViewer src={content(out)} alt={cardTitle(job)} placeholder={content(job.posterAssetId ?? out)} downloadId={out} onClose={() => setViewing(false)} />}
         {out && original && (
           <Modal open={comparing} onClose={() => setComparing(false)} label={`So sánh trước/sau: ${cardTitle(job)}`} className="compare-modal">
             <CompareSlider before={content(original)} after={content(out)} beforeAlt="Ảnh người mẫu gốc" afterAlt={cardTitle(job)} />
@@ -563,6 +561,11 @@ export function Tray({ feature, format }: { feature?: string; format?: string })
   const all = useJobs();
   const { workerOffline, loaded, failed, refresh, queue } = all;
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature && (format === undefined || (j.format ?? 'ugc') === format)) : all.jobs;
+  // The picture shown full screen, and the finished pictures its arrows step through.
+  const [viewing, setViewing] = useState<string | null>(null);
+  const shown = jobs.filter((j) => j.status === 'succeeded' && j.outputAssetId && j.resolution !== null);
+  const at = shown.findIndex((j) => j.id === viewing);
+  const viewed = shown[at];
   // A page of pictures (an image job has no duration) can also lay 2 to 4 picked ones out as one lookbook.
   const pictures = jobs.some((j) => j.durationSec === 0 && j.outputAssetId);
   // Exactly two picked pictures can also start a video: the first picked is its start frame, the second its end frame (Create video, never run from here).
@@ -617,7 +620,7 @@ export function Tray({ feature, format }: { feature?: string; format?: string })
         {jobs.map((j) =>
           feature ? (
             <Fragment key={j.id}>
-              <HistoryCard job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} selectBatch={inBatch(j) ? () => void selectBatch(j) : undefined} />
+              <HistoryCard job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} selectBatch={inBatch(j) ? () => void selectBatch(j) : undefined} onView={() => setViewing(j.id)} />
               {turntables.get(j.id) && <TurntableBlock run={turntables.get(j.id)!} />}
             </Fragment>
           ) : (
@@ -625,6 +628,17 @@ export function Tray({ feature, format }: { feature?: string; format?: string })
           ),
         )}
       </ul>
+      {viewed && (
+        <ImageViewer
+          src={`/api/assets/${viewed.outputAssetId}/content`}
+          alt={cardTitle(viewed)}
+          placeholder={`/api/assets/${viewed.posterAssetId ?? viewed.outputAssetId}/content`}
+          downloadId={viewed.outputAssetId!}
+          onPrev={at > 0 ? () => setViewing(shown[at - 1]!.id) : undefined}
+          onNext={at < shown.length - 1 ? () => setViewing(shown[at + 1]!.id) : undefined}
+          onClose={() => setViewing(null)}
+        />
+      )}
       {/* Under the cards, so turning History into a tool row does not move them. */}
       {feature && jobs.some((j) => j.status === 'succeeded' && j.outputAssetId) && (
         <div className="zip-tools">

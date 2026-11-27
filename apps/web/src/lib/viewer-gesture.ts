@@ -34,6 +34,11 @@ export function zoomAt(v: View, s: number, focal: Point, box: Size, shown: Size)
   return clampView({ s: v.s * k, x: focal.x - (focal.x - v.x) * k, y: focal.y - (focal.y - v.y) * k }, box, shown);
 }
 
+/** Whether `p` (px from the box centre) is on the picture itself, as drawn under the view. */
+export function onPicture(p: Point, v: View, shown: Size): boolean {
+  return Math.abs(p.x - v.x) <= (shown.w * v.s) / 2 && Math.abs(p.y - v.y) <= (shown.h * v.s) / 2;
+}
+
 /** What a finished one-finger drag at scale 1 does: down closes, sideways steps (only towards a neighbour that exists), else the picture snaps back. */
 export function swipeOutcome(dx: number, dy: number, ms: number, has: { prev: boolean; next: boolean }): Swipe {
   const fast = (d: number) => Math.abs(d) / Math.max(ms, 1) >= FLICK_SPEED;
