@@ -72,9 +72,9 @@ test('Explore starts from what you need, and the drawer on a phone lists the too
   await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'toolg');
   await page.goto('/explore');
-  const start = page.getByRole('list', { name: 'Bắt đầu từ đâu' });
-  await expect(start.getByRole('link')).toHaveCount(6);
-  await expect(start.getByRole('link', { name: /^Có ảnh quần áo, cần ảnh người mẫu mặc nó/ })).toHaveAttribute('href', '/try-on');
+  const start = page.getByRole('list', { name: 'Bắt đầu theo việc' });
+  await expect(start.getByRole('link', { name: /^Ảnh người mẫu mặc sản phẩm/ })).toHaveAttribute('href', '/try-on');
+  await expect(page.getByRole('button', { name: 'So sánh các công cụ' })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Công cụ' }).getByRole('link', { name: /^Tạo ảnh Ảnh mới từ một câu mô tả/ })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
