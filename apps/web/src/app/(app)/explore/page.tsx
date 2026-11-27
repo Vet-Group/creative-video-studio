@@ -269,7 +269,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
       <div className="explore-start-head" id="models">
         <h2>{allModels ? 'Tất cả mô hình' : 'Mô hình nổi bật'}</h2>
         {scored.length > shown.length || allModels ? (
-          <Link href={allModels ? '/explore#models' : '/explore?models=all#models'} className="link-button" scroll={false}>
+          <Link href={`/explore${popular ? (allModels ? '?sort=popular' : '?models=all&sort=popular') : allModels ? '' : '?models=all'}#models`} className="link-button" scroll={false}>
             {allModels ? 'Chỉ xem nổi bật' : `Xem tất cả ${scored.length} mô hình`}
           </Link>
         ) : null}

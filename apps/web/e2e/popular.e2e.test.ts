@@ -65,8 +65,13 @@ test("an Apps card shows the week's Runs of the member's workspace from three, n
   await signIn(page, 'popv');
   await page.goto('/apps');
   await expect(card(page, 'Tối ưu media')).toBeVisible();
-  await expect(card(page, 'Tối ưu media').locator('.app-card-uses')).toHaveCount(0);
-  await expect(card(page, 'Đổi khung hình').locator('.app-card-uses')).toHaveCount(0);
+  // The company workspace shows its own week (earlier specs make Runs there in the shared e2e database), never popw's 3 and 7.
+  for (const [name, feature] of [['Tối ưu media', 'media_optimizer'], ['Đổi khung hình', 'reframe']] as const) {
+    const { n } = (await db.query(`select count(distinct coalesce(params->>'batch', id))::int as n from jobs where workspace_id = 'ws_vet' and feature = $1 and created_at > now() - interval '7 days' and retry_of is null`, [feature])).rows[0];
+    const line = card(page, name).locator('.app-card-uses');
+    if (n >= 3) await expect(line).toHaveText(`${n} lượt dùng tuần này`);
+    else await expect(line).toHaveCount(0);
+  }
 });
 
 test("Explore's sort switch puts the most used tools and motion presets first, keeps the choice in the address, and ties keep the curated order", async ({ page }) => {
@@ -94,6 +99,8 @@ test("Explore's sort switch puts the most used tools and motion presets first, k
   await expect(tile(hot)).toHaveAccessibleName(/, 4 lượt dùng tuần này$/);
   await expect(tile(hot).locator('.explore-prompt-uses')).toHaveText('4 lượt dùng tuần này');
   await expect(tile(warm).locator('.explore-prompt-uses')).toHaveCount(0); // two Runs: nothing
+
+  await expect(page.getByRole('link', { name: /^Xem tất cả \d+ mô hình$/ })).toHaveAttribute('href', '/explore?models=all&sort=popular#models'); // the models link keeps the sort
 
   await page.reload();
   await expect(popular).toHaveAttribute('aria-pressed', 'true');

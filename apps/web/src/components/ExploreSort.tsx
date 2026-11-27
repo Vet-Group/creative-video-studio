@@ -14,7 +14,8 @@ export function ExploreSort({ sort }: { sort: (typeof OPTIONS)[number]['id'] }) 
     const next = new URLSearchParams(search);
     if (id === 'popular') next.set('sort', id);
     else next.delete('sort');
-    router.replace(next.size > 0 ? `/explore?${next}` : '/explore', { scroll: false });
+    const qs = next.toString(); // not next.size: Safari before 17 has no URLSearchParams.size
+    router.replace(qs ? `/explore?${qs}` : '/explore', { scroll: false });
   };
   return (
     <div className="kinds kinds-wrap explore-sort" role="group" aria-label="Sắp xếp công cụ và mẫu chuyển động">
