@@ -90,10 +90,8 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
   /** The type chips (Create's motion packs): the groups some template is tagged for, and the chosen one (-1: all). */
   const kinds = MOTION_KINDS.filter((k) => templates.some((t) => t.types && suits(t, k.types)));
   const [kind, setKind] = useState(-1);
-  useEffect(() => {
-    if (open) setKind(kinds.findIndex((k) => productType !== undefined && k.types.includes(productType)));
-  }, [open]); // each opening starts on the page's type
-  const shown = kind < 0 ? templates : templates.filter((t) => suits(t, kinds[kind]!.types));
+  const chip = kinds[kind];
+  const shown = chip ? templates.filter((t) => suits(t, chip.types)) : templates;
   /** The member's own last hooks and endings (GET /api/recent-prompts?field=), fetched each time the dialog opens; empty when there are none or the fetch fails. */
   const [recent, setRecent] = useState<{ hook: string[]; ending: string[] }>({ hook: [], ending: [] });
   const narrow = useMediaQuery(NARROW);
@@ -196,7 +194,7 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
             </label>
           ))}
         </div>
-        <button type="button" className="link-button" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        <button type="button" className="link-button" aria-haspopup="dialog" onClick={() => (setKind(kinds.findIndex((k) => productType !== undefined && k.types.includes(productType))), setOpen(true))}>
           <Icon name="preset" size={12} />
           Khung prompt
         </button>

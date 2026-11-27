@@ -71,7 +71,6 @@ describe('PROMPT_TEMPLATES across pages', () => {
   });
 });
 
-
 describe('motion packs (Create templates by product type)', () => {
   const video = PROMPT_TEMPLATES.video;
   it('tags only Create templates, with real product types, each covered by a type chip', () => {
