@@ -20,6 +20,7 @@ import { useDraftState } from '@/lib/use-draft';
 import { reloadSamples, samplesFailed, samplesPending, useSamples, versionedSample } from '@/lib/use-samples';
 import { asExample, dropRefillQuery, exampleFrom, lostInputs, nothingNote, nothingRefilled, refillFrom, skippedNote } from '@/lib/reuse';
 import { About } from './About';
+import { FreeLeft } from './AllowanceBar';
 import { AudioSwitch } from './AudioSwitch';
 import { CameraTiles } from './CameraTiles';
 import { CardMedia } from './CardMedia';
@@ -1088,6 +1089,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
           )}
           <div className="runbar">
             <RunSummary items={[chosen?.label, ratio, `${durationSec} giây`, audioOn && 'có âm thanh']} />
+            <FreeLeft />
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? (reason.near ? fieldIds[reason.near] : reasonId) : undefined} onClick={() => void run()}>
               {busy ? (
                 'Đang gửi…'

@@ -9,6 +9,7 @@ import { cardSample } from '@/lib/examples';
 import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
+import { FreeLeft } from './AllowanceBar';
 import { AppAbout, AppHeader, AppHistoryArt, TAB_LABEL, type Tab } from './AppPage';
 import { CardMedia } from './CardMedia';
 import s from './HookEffectsApp.module.css';
@@ -165,6 +166,7 @@ export function HookEffectsApp({ app, reuse }: { app: AppConfig; reuse?: string 
             <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
+            <FreeLeft />
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
               {busy ? <span className="run-cost">· Đang gửi…</span> : chosen && <span className="run-cost">· {usd(chosen.estimateUsd)}</span>}

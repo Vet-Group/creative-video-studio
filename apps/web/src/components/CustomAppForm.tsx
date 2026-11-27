@@ -7,6 +7,7 @@ import { hasDuplicate, type CustomAppConfig, CUSTOM_APP_CODE } from '@/lib/custo
 import { confirmRun, usd } from '@/lib/run-guard';
 import { useAppPrice } from '@/lib/use-app-price';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { FreeLeft } from './AllowanceBar';
 import { AppArt, AppHeader, TAB_LABEL, type Tab } from './AppPage';
 import { confirmDialog } from './Confirm';
 import { FormNotice, type Img, RATIO_LABEL, Slot, uploadError, uploadImages, WorkTabs } from './image-tools';
@@ -126,6 +127,7 @@ export function CustomAppForm({ app }: { app: CustomAppConfig }) {
             <FormNotice text={notice} />
           </div>
           <div className="runbar">
+            <FreeLeft />
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
               {busy ? <span className="run-cost">· Đang gửi…</span> : price.row && <span className="run-cost">· {usd(price.row.usd)}</span>}

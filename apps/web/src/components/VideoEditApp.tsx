@@ -11,6 +11,7 @@ import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { useDraftState } from '@/lib/use-draft';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { FreeLeft } from './AllowanceBar';
 import { AppAbout, AppHeader, AppHistoryArt, TAB_LABEL, type Tab } from './AppPage';
 import { EnhanceToggle } from './EnhanceToggle';
 import { copyError, FormNotice, Gallery, type Img, uploadError, uploadImages, useReuse, WorkTabs } from './image-tools';
@@ -237,6 +238,7 @@ export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; r
               <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
             </div>
             <div className="runbar">
+              <FreeLeft />
               <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
                 Chạy
                 {/* Before a clip the price is per second (the 5 s estimate over 5), then the clip's total. */}

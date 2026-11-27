@@ -1,11 +1,12 @@
 'use client';
 // The model picker: a button that opens a floating panel beside it with a search box and the models.
+// The panel opens on the chosen and the recommended model only; the Advanced button under them shows every model (a search always does).
 // A long list opens on the featured models and one row per family (lib/model-families.ts), as Fash does: a family's models open in a flyout beside
 // the panel, or under the family's row when there is no room beside it (a phone). A search, or a list short enough to be all featured, is flat.
 // Focus moves to the search box, which drives the list through aria-activedescendant; Escape returns focus to the button.
 import { type CSSProperties, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { firstEnabled, moveActive } from '@/lib/listbox';
-import { byFamily, FEATURED, type Family, featured } from '@/lib/model-families';
+import { byFamily, FEATURED, type Family, featured, shortList } from '@/lib/model-families';
 import { MIN_MARKS } from '@/lib/model-marks';
 import { Icon } from './Icon';
 
@@ -56,8 +57,10 @@ type Row = { model: ModelOption; family?: undefined; models?: undefined } | { mo
 /** The open family: `style` places it beside the panel (none: under its row), and `inside` is true while the active option is one of its models. */
 type Fly = { key: string; style?: CSSProperties; inside: boolean };
 
-/** Supported models first, then the ones the current settings rule out. A search or a short list shows them flat; otherwise the featured ones, then the families. */
-const rowsFor = (models: ModelOption[], query: string): Row[] => {
+/** Supported models first, then the ones the current settings rule out. A search or a short list shows them flat; otherwise the featured ones, then the families.
+ * `folded` (lib/model-families.ts shortList) is what the panel shows until the Advanced button opens the rest. */
+const rowsFor = (models: ModelOption[], query: string, folded?: ModelOption[] | null): Row[] => {
+  if (folded) return folded.map((model) => ({ model }));
   const q = query.trim().toLowerCase();
   const sorted = [...models.filter((m) => m.supported), ...models.filter((m) => !m.supported)];
   if (q || models.length <= FEATURED) return sorted.filter((m) => m.label.toLowerCase().includes(q)).map((model) => ({ model }));
@@ -88,10 +91,13 @@ export function ModelPicker({ models: given, value, onChange, id }: { models: Mo
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [fly, setFly] = useState<Fly | null>(null);
+  const [more, setMore] = useState(false); // Advanced pressed: the whole list until the panel closes
   // Where the list last scrolled itself to show the active row: its scroll event comes a frame later and must not close a flyout opened since.
   const selfScrolled = useRef<number | null>(null);
   const open = place !== null;
-  const rows = rowsFor(models, query);
+  const foldedFor = (q: string) => (more || q.trim() ? null : shortList(models, value)); // a search always looks through every model
+  const folded = foldedFor(query);
+  const rows = rowsFor(models, query, folded);
   const flyAt = fly ? rows.findIndex((r) => r.family?.key === fly.key) : -1;
   const flyModels = rows[flyAt]?.models ?? [];
   const inside = fly?.inside === true;
@@ -146,14 +152,25 @@ export function ModelPicker({ models: given, value, onChange, id }: { models: Mo
     const above = r.top - PANEL.gap - 3;
     if (!beside && h - top - PANEL.gap < 240 && above > h - top - PANEL.gap) setPlace({ left, bottom: h - r.top + 3, width, maxHeight: Math.min(PANEL.height, above) });
     else setPlace({ left, top, width, maxHeight: Math.min(PANEL.height, h - top - PANEL.gap) });
-    // On the chosen model, or the family that holds it.
-    const at = rows.findIndex((r) => (r.model ? r.model.id === value && r.model.supported : r.models.some((m) => m.id === value)));
-    setActive(at >= 0 ? at : Math.max(0, firstEnabled(flags)));
+    setActive(startAt(rows));
+  }
+  /** On the chosen model, or the family that holds it. */
+  function startAt(list: Row[]) {
+    const at = list.findIndex((r) => (r.model ? r.model.id === value && r.model.supported : r.models.some((m) => m.id === value)));
+    return at >= 0 ? at : Math.max(0, firstEnabled(list.map((r) => r.model?.supported === false)));
+  }
+  function showMore() {
+    setMore(true);
+    setFly(null);
+    setActive(startAt(rowsFor(models, query)));
+    // The button goes away, so the focus moves to where the panel keeps it.
+    (window.matchMedia('(pointer: fine)').matches ? search.current : panel.current)?.focus({ preventScroll: true });
   }
   function close(returnFocus: boolean) {
     setPlace(null);
     setQuery('');
     setFly(null);
+    setMore(false);
     if (returnFocus) trigger.current?.focus();
   }
   function choose(m: ModelOption | undefined) {
@@ -381,7 +398,7 @@ export function ModelPicker({ models: given, value, onChange, id }: { models: Mo
                 onChange={(e) => {
                   setQuery(e.target.value);
                   setFly(null);
-                  setActive(Math.max(0, firstEnabled(rowsFor(models, e.target.value).map((r) => r.model?.supported === false))));
+                  setActive(Math.max(0, firstEnabled(rowsFor(models, e.target.value, foldedFor(e.target.value)).map((r) => r.model?.supported === false))));
                 }}
                 onKeyDown={onKeyDown}
               />
@@ -408,6 +425,15 @@ export function ModelPicker({ models: given, value, onChange, id }: { models: Mo
               )}
               {rows.length === 0 && <p className="model-empty">Không có mô hình nào khớp.</p>}
             </div>
+            {folded && (
+              <button type="button" className="model-more" aria-expanded="false" onClick={showMore}>
+                <span className="model-row-text">
+                  <span className="model-name">Nâng cao</span>
+                  <span className="model-sub">Xem tất cả {models.length} mô hình</span>
+                </span>
+                <Icon name="down" />
+              </button>
+            )}
           </div>
         )}
       </div>

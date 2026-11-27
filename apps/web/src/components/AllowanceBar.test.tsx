@@ -1,7 +1,7 @@
 // The allowance bar's forecast line (docs/BILLING.md): the month's end at the pace so far and what it would bill, labelled an estimate.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { AllowanceBar } from './AllowanceBar';
+import { AllowanceBar, freeLeftText } from './AllowanceBar';
 import { closeMailText } from './admin/AdminBilling';
 
 const forecast = (html: string) => html.match(/<p class="allowance-forecast"[^>]*>(.*?)<\/p>/)?.[1]?.replaceAll('<!-- -->', '');
@@ -19,6 +19,14 @@ test('a forecast past the allowance also says what it would bill the team', () =
 test('no forecast line without a forecast or for a month with no cost yet', () => {
   expect(renderToStaticMarkup(<AllowanceBar totalUsd="6.0000" freeUsd="20.0000" label="Sales A" />)).not.toContain('allowance-forecast');
   expect(renderToStaticMarkup(<AllowanceBar totalUsd="0.0000" freeUsd="20.0000" label="Sales A" forecastUsd="0.0000" />)).not.toContain('allowance-forecast');
+});
+
+test('the line over Run says what the free allowance still holds, that it is used up, or nothing without one', () => {
+  expect(freeLeftText({ monthUsd: '7.6000', freeUsd: '20.0000' })).toBe('Team bạn còn $12.40 miễn phí tháng này');
+  expect(freeLeftText({ monthUsd: '0.0000', freeUsd: '20.0000' })).toBe('Team bạn còn $20.00 miễn phí tháng này');
+  expect(freeLeftText({ monthUsd: '20.0000', freeUsd: '20.0000' })).toBe('Team bạn đã dùng hết $20.00 miễn phí tháng này; phần vượt tính cho team');
+  expect(freeLeftText({ monthUsd: '31.5000', freeUsd: '20.0000' })).toBe('Team bạn đã dùng hết $20.00 miễn phí tháng này; phần vượt tính cho team');
+  expect(freeLeftText({ monthUsd: '3.0000', freeUsd: '0.0000' })).toBeNull();
 });
 
 test('the close notice tells the Admin who was reached, or that the CSV must be sent by hand', () => {

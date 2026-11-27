@@ -1,4 +1,4 @@
-// The model picker on a long list, as Fash shows it: the featured models, then one row per family whose models open in a flyout
+// The model picker on a long list, as Fash shows it once the Advanced button opens the whole list: the featured models, then one row per family whose models open in a flyout
 // (beside the panel on a desktop, under the family's row at 390 px); a search shows a flat list. The list is the API's shape with
 // real-looking ids, served by a route, so no real model is enabled or run.
 import AxeBuilder from '@axe-core/playwright';
@@ -30,6 +30,10 @@ async function open(page: Page, width: number): Promise<{ panel: Locator; list: 
   await expect(modelButton(page)).toContainText('Seedance 2.0');
   await modelButton(page).click();
   const panel = page.getByRole('dialog', { name: 'Chọn mô hình' });
+  // The panel opens on the chosen model, here the recommended one, alone; the Advanced button shows every model (seller survey 2026-11-27).
+  await expect(panel.getByRole('option')).toHaveText([/^Seedance 2\.0Có âm thanhĐề xuất/]);
+  await panel.getByRole('button', { name: /^Nâng cao/ }).click();
+  await expect(panel.getByRole('button', { name: /^Nâng cao/ })).toHaveCount(0);
   const heading = panel.locator('.model-group').first();
   await expect(heading.locator('.icon')).toHaveCSS('display', 'inline-block');
   expect((await heading.boundingBox())!.height).toBe(28); // one 16px label line plus 8px/4px padding
@@ -83,6 +87,13 @@ test('the picker opens on the featured models and the families; a family opens b
   await page.keyboard.press('Enter');
   const search = panel.getByRole('combobox', { name: 'Tìm mô hình' });
   const activeIs = async (option: Locator) => expect(search).toHaveAttribute('aria-activedescendant', (await option.getAttribute('id'))!);
+  // It reopens on the chosen model beside the recommended one; Tab reaches the Advanced button, which opens every model on the family that holds the chosen one.
+  await expect(list.getByRole('option')).toHaveText([/^Kling 2\.6/, /^Seedance 2\.0/]);
+  await activeIs(list.getByRole('option', { name: /Kling 2\.6/ }));
+  await page.keyboard.press('Tab');
+  await expect(panel.getByRole('button', { name: /^Nâng cao/ })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(search).toBeFocused();
   await activeIs(families.filter({ hasText: /^Kling/ }));
   await page.keyboard.press('ArrowRight');
   await activeIs(kling.getByRole('option', { name: /Kling 2\.6/ }));

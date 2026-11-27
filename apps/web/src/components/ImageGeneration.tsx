@@ -11,6 +11,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { About } from './About';
+import { FreeLeft } from './AllowanceBar';
 import { BrandPicker } from './BrandKit';
 import { copyError, FormNotice, Gallery, type Img, LockedFields, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
@@ -295,6 +296,7 @@ ${style.prompt}` : prompt.trim();
             </p>
           )}
           {style && <p className="help">Phong cách: {style.label} · thêm vào cuối mô tả của bạn</p>}
+          <FreeLeft className="help" />
           <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
         </div>
 
