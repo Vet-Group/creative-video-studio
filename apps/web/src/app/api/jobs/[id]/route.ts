@@ -4,6 +4,7 @@ import { type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { storeAllowed } from '@/lib/billing';
 import { LIVE_CLIP } from '@/lib/clips';
+import { APP_SOURCE_CODE } from '@/lib/custom-apps';
 import { guard } from '@/lib/session';
 
 const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
@@ -70,7 +71,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   });
 }
 
-/** Soft-deletes a Library clip (and its video and poster assets; the purge removes them after 30 days). The creator may, and so may an Admin, whose deletion of another user's clip is audited. */
+/** Soft-deletes a Library clip (and its video and poster assets; the purge removes them after 30 days). The creator may, and so may an Admin, whose deletion of another user's clip is audited. A clip that is the source of a custom app (draft or published) is refused with 409 `app_source` until the app is deleted (/api/admin/apps/[id]). */
 export async function DELETE(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
@@ -80,6 +81,9 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     const job = (await tx.query(`select j.user_id, j.output_asset_id, j.poster_asset_id from jobs j where j.id = $1 and j.workspace_id = $2 and ${LIVE_CLIP} for update of j`, [id, g.workspaceId])).rows[0];
     if (!job) return notFound();
     if (job.user_id !== userId && role !== 'admin') return Response.json({ error: 'forbidden' }, { status: 403 });
+    // After the 403, so a member who may not delete the clip never learns an app's name. An app made of the clip (draft or published) needs it (docs/WORKSPACES.md §2).
+    const app = (await tx.query('select name from custom_apps where source_job_id = $1 and workspace_id = $2 order by created_at limit 1', [id, g.workspaceId])).rows[0];
+    if (app) return Response.json({ error: `Clip này đang là nguồn của ứng dụng «${app.name}». ${role === 'admin' ? 'Hãy xoá ứng dụng trước.' : 'Hãy báo Admin xoá ứng dụng trước.'}`, code: APP_SOURCE_CODE }, { status: 409 });
     await tx.query('update jobs set deleted_at = now() where id = $1', [id]);
     await tx.query('update assets set deleted_at = now() where id = any($1::text[]) and workspace_id = $2', [[job.output_asset_id, job.poster_asset_id].filter(Boolean), g.workspaceId]);
     if (job.user_id !== userId) await audit(tx, { actorId: userId, action: 'clip.delete', target: `job:${id}`, oldValue: { ownerId: job.user_id, deleted: false }, newValue: { ownerId: job.user_id, deleted: true } });

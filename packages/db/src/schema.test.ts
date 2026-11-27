@@ -1268,3 +1268,59 @@ describe('migration 0123 hook effects', () => {
     await expect(pool.query(`update jobs set feature = 'hook' where id = $1`, [id])).rejects.toThrow(/jobs_feature_check/);
   });
 });
+
+describe('migration 0124 custom apps', () => {
+  let owner = '';
+  let job = '';
+  const make = (id: string, over: Record<string, unknown> = {}) => {
+    const r = { workspace: 'ws_vet', job, feature: 'video', name: 'App', description: '', category: 'video', model: 'kling-o3-pro', prompt: 'p', aspect: '9:16', ...over };
+    return pool.query(
+      `insert into custom_apps (id, workspace_id, source_job_id, feature, name, description, category, model, prompt, aspect, duration_s, inputs)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 5, '[]')`,
+      [id, r.workspace, r.job, r.feature, r.name, r.description, r.category, r.model, r.prompt, r.aspect],
+    );
+  };
+
+  beforeAll(async () => {
+    owner = await insertUser();
+    job = await insertJob(owner);
+    await pool.query(`insert into workspaces (id, name) values ('ws_0124', 'Partner 0124')`);
+  });
+
+  test('has no default workspace and keeps a draft and its defaults: no published_at, an empty description, empty params', async () => {
+    await expect(pool.query(`insert into custom_apps (id, source_job_id, feature, name, category, model, prompt, aspect, duration_s, inputs) values ('ca-nows', $1, 'video', 'A', 'video', 'kling-o3-pro', 'p', '9:16', 5, '[]')`, [job])).rejects.toThrow(/workspace_id/);
+    await make('ca-draft');
+    expect((await pool.query(`select published_at, description, params from custom_apps where id = 'ca-draft'`)).rows[0]).toEqual({ published_at: null, description: '', params: {} });
+  });
+
+  test('refuses another feature, category or ratio', async () => {
+    await expect(make('ca-f', { feature: 'try_on' })).rejects.toThrow(/custom_apps_feature_check/);
+    await expect(make('ca-c', { category: 'misc' })).rejects.toThrow(/custom_apps_category_check/);
+    await expect(make('ca-a', { aspect: '7:3' })).rejects.toThrow(/custom_apps_aspect_check/);
+  });
+
+  test('keeps the name to 1 to 60 characters, the description to 200 and the prompt to 1 to 5000', async () => {
+    await expect(make('ca-n0', { name: '' })).rejects.toThrow(/custom_apps_name_check/);
+    await expect(make('ca-n61', { name: 'x'.repeat(61) })).rejects.toThrow(/custom_apps_name_check/);
+    await make('ca-n60', { name: 'x'.repeat(60) });
+    await expect(make('ca-d201', { description: 'x'.repeat(201) })).rejects.toThrow(/custom_apps_description_check/);
+    await make('ca-d200', { description: 'x'.repeat(200) });
+    await expect(make('ca-p0', { prompt: '' })).rejects.toThrow(/custom_apps_prompt_check/);
+    await expect(make('ca-p5001', { prompt: 'x'.repeat(5001) })).rejects.toThrow(/custom_apps_prompt_check/);
+    await make('ca-p5000', { prompt: 'x'.repeat(5000) });
+  });
+
+  test('restricts the workspace, the source job and the model, and clears created_by with its user', async () => {
+    await make('ca-ws', { workspace: 'ws_0124' });
+    await expect(pool.query(`delete from workspaces where id = 'ws_0124'`)).rejects.toThrow(/custom_apps_workspace_id_workspaces_id_fk/);
+    await expect(pool.query(`delete from jobs where id = $1`, [job])).rejects.toThrow(/custom_apps_source_job_id_jobs_id_fk/);
+    await pool.query(`insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('ca-model', 'fal', 'x', 'CA', '{9:16}', '{5}', 2, '720p', 0.2, '{}', true)`);
+    await make('ca-model-app', { model: 'ca-model' });
+    await expect(pool.query(`delete from model_configs where id = 'ca-model'`)).rejects.toThrow(/custom_apps_model_model_configs_id_fk/);
+    await expect(make('ca-nojob', { job: 'no-such-job' })).rejects.toThrow(/custom_apps_source_job_id_jobs_id_fk/);
+    const user = await insertUser();
+    await pool.query(`update custom_apps set created_by = $1 where id = 'ca-draft'`, [user]);
+    await pool.query(`delete from users where id = $1`, [user]);
+    expect((await pool.query(`select created_by from custom_apps where id = 'ca-draft'`)).rows[0].created_by).toBeNull();
+  });
+});
