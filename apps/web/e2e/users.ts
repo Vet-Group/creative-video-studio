@@ -257,6 +257,9 @@ export const USERS = {
   noteb: { email: 'noteb@e2e.test', name: 'E2E Notes B', role: 'member' },
   // hook-effects.e2e: the hook effects app, its History, Reuse and Library chip.
   hooka: { email: 'hooka@e2e.test', name: 'E2E Hook A', role: 'member' },
+  // one-tap-apps.e2e: the Admin who makes a custom app in the workspace ws_onetap, and the member of that workspace who runs it.
+  tapadm: { email: 'tapadm@e2e.test', name: 'E2E Tap Admin', role: 'admin' },
+  tapmem: { email: 'tapmem@e2e.test', name: 'E2E Tap Member', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;

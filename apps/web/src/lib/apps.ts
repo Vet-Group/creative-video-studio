@@ -3,6 +3,8 @@
 
 import { MOTION_IMAGE_MAX_SEC } from '@cvs/core/models';
 import { TURNTABLE_VIEWS } from '@cvs/core/turntable';
+import type { CustomAppSettings } from './custom-apps';
+import { cardSample } from './examples';
 import { poseOf, POSES } from './try-on-stock';
 
 export type AppCategory = 'fashion' | 'photo' | 'video' | 'utility';
@@ -70,6 +72,8 @@ export interface AppConfig {
   soon?: string;
   /** The day it went live (ICT, as its changelog entry says): its Apps card shows the New badge for NEW_DAYS days from then. */
   added?: string;
+  /** Set on an Admin's one-tap app (lib/custom-apps.ts toAppConfig): what its run page needs (its model pair, ratio, duration, settings) and its card's art, the source result. It carries no prompt. */
+  custom?: CustomAppSettings;
 }
 
 /** The template photos of Jewelry Try-On's wearer slot (samples `jewelry-template-<group>-NN.jpg`), in the reference site's order. */
@@ -370,10 +374,16 @@ export const isNewApp = (app: Pick<AppConfig, 'added'>, now = Date.now()): boole
 /** Lower case without accents or stroked d, so a search typed without diacritics still matches. */
 export const fold = (s: string): string => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd');
 
-/** The apps of one category (or all) whose name, description or keywords contain the search text. */
-export function filterApps(category: AppCategory | 'all', search: string, smartRemake = false): AppConfig[] {
+/** The apps of one category (or all) whose name, description or keywords contain the search text: the built-in apps, then `extra` (the workspace's custom apps, newest first). */
+export function filterApps(category: AppCategory | 'all', search: string, smartRemake = false, extra: AppConfig[] = []): AppConfig[] {
   const q = fold(search.trim());
-  return visibleApps(smartRemake).filter((a) => (category === 'all' || a.category === category) && fold(`${a.name} ${a.description} ${a.keywords ?? ''}`).includes(q));
+  return [...visibleApps(smartRemake), ...extra].filter((a) => (category === 'all' || a.category === category) && fold(`${a.name} ${a.description} ${a.keywords ?? ''}`).includes(q));
+}
+
+/** The picture of an app's card and page: its uploaded samples, else, for a custom app, its source result. */
+export function appMedia(app: AppConfig, have: ReadonlySet<string>): { video: string | null; poster: string | null } {
+  const sample = cardSample(have, `app-${app.slug}`);
+  return sample.video || sample.poster ? sample : (app.custom?.art ?? sample);
 }
 
 /** What a page has chosen, as the Run needs it: the images of each slot (in the order of `slots`), the prompt text and the model. */
