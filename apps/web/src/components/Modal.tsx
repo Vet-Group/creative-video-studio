@@ -27,3 +27,12 @@ export function Modal({ open, onClose, label, className, children }: { open: boo
     </dialog>
   );
 }
+
+/** A picture over the whole screen with a close button. Element full screen on a picture has no way out on an iPad, and an iPhone opened a new tab. `placeholder`, already loaded, stands in while `src` comes. */
+export function ImageViewer({ src, alt, placeholder, onClose }: { src: string; alt: string; placeholder?: string; onClose: () => void }) {
+  return (
+    <Modal open onClose={onClose} label={alt} className="input-viewer image-viewer">
+      <img src={src} alt={alt} onClick={onClose} style={placeholder ? { background: `center / contain no-repeat url("${placeholder}")` } : undefined} />
+    </Modal>
+  );
+}
