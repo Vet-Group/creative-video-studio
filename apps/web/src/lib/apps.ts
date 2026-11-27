@@ -29,7 +29,7 @@ export interface AppSlot {
   stock?: { title: string; groups: { label?: string; prefix: string }[] };
   /** Its tile also offers the saved AI models the member may use (the AI model group of Try On's model picker), when there are any. */
   aiModels?: boolean;
-  /** False for a slot no product photo goes in (the person or pet put into the result) whose label maps to no upload slot; a 'Người mẫu' slot is already left out. */
+  /** False for a slot no product photo goes in (the person or pet put into the result) whose label maps to no upload slot; a slot whose label maps to the model slot is already left out. */
   shelf?: false;
 }
 
