@@ -120,7 +120,8 @@ test('the sort switch keeps another query (?models=all), and on a touch phone it
     await sort.getByRole('button', { name: 'Đang được dùng nhiều' }).tap();
     await expect(page).toHaveURL(/\/explore\?(models=all&sort=popular|sort=popular&models=all)$/);
     await expect(page.getByRole('link', { name: 'Chỉ xem nổi bật' })).toHaveAttribute('href', '/explore?sort=popular#models'); // the models link keeps the sort
-    for (const button of await sort.getByRole('button').all()) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    // offsetHeight, not boundingBox: the tapped button can still be :active, drawn at scale .97 (globals.css's press feedback).
+    for (const button of await sort.getByRole('button').all()) expect(await button.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   } finally {
     await context.close();
