@@ -346,14 +346,22 @@ export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void })
   );
 }
 
-/** Full screen for a result, and out again on a second press. iPhone Safari has no element full screen: a video takes its own player, a picture opens in a new tab. */
+/** Full screen for a video, and out again on a second press. iPhone Safari has no element full screen, so a video takes its own player. A picture uses ImageViewer instead. */
 export function toggleFullscreen(el: HTMLElement | null): void {
   if (!el) return;
   if (document.fullscreenElement) return void document.exitFullscreen().catch(() => undefined);
   if (el.requestFullscreen) return void el.requestFullscreen().catch(() => undefined);
   const video = el as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
-  if (video.webkitEnterFullscreen) return video.webkitEnterFullscreen();
-  if (el instanceof HTMLImageElement) window.open(el.src, '_blank', 'noreferrer');
+  if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+}
+
+/** A picture over the whole screen with a close button. Element full screen on a picture has no way out on an iPad, and an iPhone opened a new tab. `placeholder`, already loaded, stands in while `src` comes. */
+export function ImageViewer({ src, alt, placeholder, onClose }: { src: string; alt: string; placeholder?: string; onClose: () => void }) {
+  return (
+    <Modal open onClose={onClose} label={alt} className="input-viewer image-viewer">
+      <img src={src} alt={alt} onClick={onClose} style={placeholder ? { background: `center / contain no-repeat url("${placeholder}")` } : undefined} />
+    </Modal>
+  );
 }
 
 export const FormContext = createContext<FormActions | null>(null);

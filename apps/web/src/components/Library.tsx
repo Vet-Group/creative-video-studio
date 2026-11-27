@@ -24,7 +24,7 @@ import { EmptyArt } from './EmptyArt';
 import { Icon } from './Icon';
 import { uploadImages } from './image-tools';
 import { ImageToolButtons } from './ImageToolButtons';
-import { useFreshResults, useJobs } from './jobs';
+import { ImageViewer, toggleFullscreen, useFreshResults, useJobs } from './jobs';
 import { BoardsModal, BoardTools, type LibraryBoards, useLibraryBoards } from './LibraryBoards';
 import boardStyles from './LibraryBoards.module.css';
 import { LoadError } from './LoadError';
@@ -503,7 +503,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
   const [boardsFor, setBoardsFor] = useState<string | null>(null); // the item whose boards dialog is open; it belongs to that item, so stepping to another closes it
   const [rerunning, setRerunning] = useState(false);
   const [shown, setShown] = useState<{ id: string; filename: string } | null>(null); // an input photo shown large in the result's place, instead of a new tab
-  const [full, setFull] = useState<string | null>(null); // the picture full screen loaded at its own size (the box shows a 1600 px preview)
+  const [full, setFull] = useState<string | null>(null); // the picture in ImageViewer at its own size (the box shows a 1600 px preview)
   const [tile, setTile] = useState(1); // Xem lặp: the picture tiled tile × tile, to check that an all-over print's edges meet; kept while stepping, as the size slider is
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const side = useRef<HTMLDivElement>(null);
@@ -519,7 +519,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
     box.current.style.transform = dx ? `translateX(${dx}px)` : '';
   };
   const content = (id: string) => `/api/assets/${id}/content`;
-  const resultSrc = full === clip.videoAssetId ? content(clip.videoAssetId) : thumbUrl(clip.videoAssetId, PREVIEW_W);
+  const resultSrc = thumbUrl(clip.videoAssetId, PREVIEW_W);
   useEffect(() => {
     setJob(null);
     setNote('');
@@ -543,7 +543,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
   }, [clips, index]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      if (full || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return; // the viewer over the item keeps it
       const next = index + (e.key === 'ArrowLeft' ? -1 : 1);
       if (next < 0 || next >= clips.length) return;
       e.preventDefault();
@@ -551,7 +551,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [index, clips.length, onIndex]);
+  }, [index, clips.length, onIndex, full]);
 
   // The creator's own words: a free prompt on Create video and Image Generation (a brief with an image style); Marketing keeps a brief and a script; the other features compose theirs.
   const own = job && ((clip.feature === 'video' || clip.feature === 'image') && !job.presetId ? job.prompt : null);
@@ -696,7 +696,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
       >
         {shown ? (
           <>
-            <img ref={media} src={full === shown.id ? content(shown.id) : thumbUrl(shown.id, PREVIEW_W)} alt={`Ảnh đầu vào ${shown.filename}`} />
+            <img ref={media} src={thumbUrl(shown.id, PREVIEW_W)} alt={`Ảnh đầu vào ${shown.filename}`} />
             <button type="button" className="lightbox-back" onClick={() => (inputs.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus(), setShown(null))}>
               <Icon name="left" />
               Về kết quả
@@ -807,7 +807,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
           <button type="button" className="icon-button" disabled={compressing} aria-busy={compressing} onClick={() => void compress()} aria-label="Nén & tải về" title="Nén & tải về">
             <Icon name="compress" />
           </button>
-          <button type="button" className="icon-button" onClick={() => (setFull(shown?.id ?? clip.videoAssetId), void media.current?.requestFullscreen?.())} aria-label="Toàn màn hình" title="Toàn màn hình">
+          <button type="button" className="icon-button" onClick={() => (media.current instanceof HTMLVideoElement ? toggleFullscreen(media.current) : setFull(shown?.id ?? clip.videoAssetId))} aria-label="Toàn màn hình" title="Toàn màn hình">
             <Icon name="expand" />
           </button>
           {/* The file itself: its own size and a link to copy (Fash keeps it beside download). */}
@@ -902,6 +902,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
           <Icon name="right" size={20} />
         </button>
       )}
+      {full && <ImageViewer src={content(full)} alt={shown ? `Ảnh đầu vào ${shown.filename}` : clip.downloadName} placeholder={thumbUrl(full, PREVIEW_W)} onClose={() => setFull(null)} />}
     </Modal>
   );
 }
