@@ -95,6 +95,7 @@ export function appInputProblem(fields: AppFields, sourceInputCount: number, max
   const slots = a.inputs.flatMap((i) => ('slot' in i ? [i.slot] : []));
   if (slots.length === 0) return 'Cần ít nhất một ô để người dùng tải ảnh lên.';
   if (slots.some((s) => s.label === '' || length(s.label) > MAX_SLOT_LABEL || !oneLine(s.label))) return `Tên ô phải có 1 đến ${MAX_SLOT_LABEL} ký tự, một dòng.`;
+  if (new Set(slots.map((s) => s.label.toLowerCase())).size < slots.length) return 'Hai ô không được trùng tên.';
   if (slots.some((s) => length(s.hint) > MAX_SLOT_HINT || !oneLine(s.hint))) return `Gợi ý trong ô tối đa ${MAX_SLOT_HINT} ký tự, một dòng.`;
   return null;
 }

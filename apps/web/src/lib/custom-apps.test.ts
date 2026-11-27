@@ -100,6 +100,12 @@ describe('appInputProblem', () => {
     expect(problem({ inputs: [{ slot: { label: 'x'.repeat(40), hint: 'y'.repeat(100) } }, { fixed: true }] })).toBeNull();
     expect(problem({ inputs: [{ slot: { label: 'a', hint: 'y'.repeat(101) } }, { fixed: true }] })).toMatch(/Gợi ý/);
   });
+
+  test('refuses two slots with the same label, after trimming and ignoring case', () => {
+    const two = (a: string, b: string) => ({ inputs: [{ slot: { label: a, hint: '' } }, { slot: { label: b, hint: '' } }] });
+    expect(problem(two(' Ảnh ', 'ảnh'))).toBe('Hai ô không được trùng tên.');
+    expect(problem(two('Ảnh 1', 'Ảnh 2'))).toBeNull();
+  });
 });
 
 test('cleanApp trims the text and leaves a fixed input as it is', () => {

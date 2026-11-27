@@ -458,8 +458,49 @@ describe('the loaders', () => {
     expect(await appSource(pool, s.id, 'ws_vet')).toMatchObject({
       draft: { feature: 'video', prompt: 'spin the product', aspect: '9:16', durationS: 5 }, pairModel: 'tw-cheap', modelLabel: 'Twin cheap', maxPromptChars: 2000, inputIds: s.inputIds,
       images: s.inputIds.map((id) => ({ id, filename: id })), outputAssetId: `${s.id}-out`, posterAssetId: `${s.id}-poster`,
+      feature: 'video', prompt: '  spin the product  ', enhancedPrompt: null, presetId: null, ratio: '9:16', durationS: 5, brand: false, endFrame: false, refAudio: false, refVideo: false,
     });
+  });
+
+  test('appSource still gives a refused clip’s settings and the flags the refusal reasons use', async () => {
+    const s = await source({ owner: admin.id, preset: 'gentle-push-in', enhanced: 'better', params: { audio: 'on', brand: 'on', endAssetId: 'e1', audioAssetIds: 'a1', videoAssetId: 'v1' } });
+    const src = (await appSource(pool, s.id, 'ws_vet'))!;
+    expect(typeof src.draft).toBe('string');
+    expect(src).toMatchObject({ feature: 'video', enhancedPrompt: 'better', presetId: 'gentle-push-in', ratio: '9:16', durationS: 5, audio: 'on', brand: true, endFrame: true, refAudio: true, refVideo: true });
+    const img = await source({ owner: admin.id, feature: 'image', model: 'app-img', params: { resolution: '2K', thinking: 'high' }, inputs: 1 });
+    expect(await appSource(pool, img.id, 'ws_vet')).toMatchObject({ feature: 'image', durationS: 0, resolution: '2K', thinking: 'high' });
     expect(await appSource(pool, s.id, 'ws_other')).toBeNull();
     expect(await appSource(pool, 'no-such-job', 'ws_vet')).toBeNull();
+  });
+});
+
+describe('the source-guard lock', () => {
+  test('a clip DELETE waits for appSource(…, lock) in another transaction, then answers 409 once the app row is committed', async () => {
+    const s = await source({ owner: admin.id });
+    const tx = await pool.connect();
+    try {
+      await tx.query('begin');
+      expect(await appSource(tx, s.id, 'ws_vet', true)).not.toBeNull(); // `for share` on the job row
+      let answered = false;
+      const deleting = delClip(admin, s.id).then((res) => ((answered = true), res));
+      for (let i = 0; i < 100; i++) {
+        // the DELETE's `for update` is queued behind our share lock, on its own connection
+        if ((await pool.query(`select 1 from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query like '%for update of j%'`)).rowCount) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(answered).toBe(false);
+      await tx.query(
+        `insert into custom_apps (id, workspace_id, source_job_id, feature, name, category, model, prompt, aspect, duration_s, inputs) values ($1, 'ws_vet', $2, 'video', 'Giữ khoá', 'video', 'app-fal', 'p', '9:16', 5, $3::jsonb)`,
+        [crypto.randomUUID(), s.id, JSON.stringify([{ slot: { label: 'Ảnh', hint: '' } }, { fixed: s.inputIds[1] }])],
+      );
+      await tx.query('commit');
+      const res = await deleting;
+      expect(res.status).toBe(409);
+      expect(await json(res)).toMatchObject({ code: 'app_source', error: expect.stringContaining('«Giữ khoá»') });
+      expect((await pool.query('select deleted_at from jobs where id = $1', [s.id])).rows[0].deleted_at).toBeNull();
+    } finally {
+      await tx.query('rollback').catch(() => undefined);
+      tx.release();
+    }
   });
 });

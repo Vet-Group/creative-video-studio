@@ -813,7 +813,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* On a phone half the tabs are past the edge: the faded end says the bar scrolls, and the padding lets the last tab clear the fade. */
 @media (max-width: 639.98px) { .admin-nav { padding-right: 28px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 28px), transparent); } }
 /* Icons only while the whole bar still fits on one row. */
-@container (max-width: 900px) { .admin-nav .icon { display: none; } }
+@container (max-width: 1200px) { .admin-nav .icon { display: none; } } @container (min-width: 640px) { .admin-nav { flex-wrap: wrap; } }
 /* The page head ends on a dashed rule, like the perforation of a film strip. */
 .admin-head { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: flex-end; justify-content: space-between; margin: 0 0 24px; padding: 0 0 20px; background: repeating-linear-gradient(90deg, var(--border-strong) 0 6px, transparent 6px 12px) left bottom / 100% 1px no-repeat; }
 .admin-head h1 { margin: 0 0 4px; font-size: 24px; line-height: 32px; font-weight: 650; letter-spacing: -.01em; }

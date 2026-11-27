@@ -1,0 +1,16 @@
+.original { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin: 0 0 20px; }
+.preview { flex: none; width: min(100%, 220px); margin: 0; }
+.preview img, .preview video { display: block; width: 100%; max-height: 360px; border-radius: 10px; background: var(--fill); object-fit: contain; }
+.preview figcaption { margin-top: 6px; color: var(--text-sub); font-size: 13px; line-height: 18px; }
+.facts { flex: 1 1 16rem; min-width: 0; margin: 0; }
+.facts p { margin: 0 0 4px; }
+.inputs { display: grid; gap: 12px; margin: 0 0 20px; padding: 0; list-style: none; }
+.input { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; }
+.input legend { padding: 0 6px; font-weight: 600; }
+.thumb { flex: none; width: 72px; height: 72px; border-radius: 8px; background: var(--fill); object-fit: cover; }
+.fields { flex: 1 1 14rem; min-width: 0; display: grid; gap: 8px; }
+.choices { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.choices label { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+.counter { display: block; margin-top: 4px; color: var(--text-sub); font-size: 13px; font-variant-numeric: tabular-nums; }
+.form { display: grid; gap: 14px; max-width: 44rem; }
+.form textarea { min-height: 7rem; }

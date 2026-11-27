@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { currentUser } from '@/lib/current-user';
 
-// The server-side gate of every /admin page: a Member sees only this refusal. The data comes from /api/admin routes, which check the role again.
+// The server-side gate of every /admin page: a Member sees only this refusal. The data comes from /api/admin routes, which check the role again; the /admin/apps pages load on the server and check the role themselves, since this layout does not protect a page's own payload.
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const user = await currentUser();
   if (user?.role !== 'admin') {

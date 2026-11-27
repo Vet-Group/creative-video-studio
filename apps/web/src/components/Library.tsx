@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { REFRAME_FILLS, REFRAME_RATIOS, type ReframeFill, type ReframeRatio } from '@cvs/core/queue';
 import { JOB_APPS } from '@/lib/apps';
-import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
+import { api, ApiError, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
+import { APP_SOURCE_CODE, canOfferApp } from '@/lib/custom-apps';
 import { downloadCompressed, downloadCompressedVideo, downloadReframedVideo } from '@/lib/compress-download';
 import { confirmRerun, usd } from '@/lib/run-guard';
 import { FAULTS } from '@/lib/faults';
@@ -237,8 +238,8 @@ export function ClipCard({ clip, view, index, lead = false, select, selecting = 
     try {
       await api(`/api/jobs/${clip.id}`, { method: 'DELETE' });
       onDeleted(clip.id);
-    } catch {
-      setProblem(`Không xoá được ${noun}.`);
+    } catch (e) {
+      setProblem(e instanceof ApiError && e.code === APP_SOURCE_CODE ? e.message : `Không xoá được ${noun}.`); // the 409 names the app that needs the clip
     } finally {
       setSaving(false);
     }
@@ -427,8 +428,9 @@ interface ClipInputs {
   images: { id: string; filename: string }[];
   /** The job's input ids in the order sent, a deleted one's too (alignInputs). */
   inputIds: string[];
+  brand: boolean;
 }
-const NO_INPUTS: ClipInputs = { prompt: null, presetId: null, enhance: null, enhancedPrompt: null, audio: null, brief: null, script: null, hookText: null, ending: null, endText: null, format: null, hook: null, location: null, images: [], inputIds: [] };
+const NO_INPUTS: ClipInputs = { prompt: null, presetId: null, enhance: null, enhancedPrompt: null, audio: null, brief: null, script: null, hookText: null, ending: null, endText: null, format: null, hook: null, location: null, images: [], inputIds: [], brand: false };
 
 /** The preset and image style names, read once per page load for the detail view's template row; a failed read is tried again next time. */
 let presetNames: Promise<Map<string, string> | null> | null = null;
@@ -491,7 +493,7 @@ export function RepeatTiles({ src, label, tile, ratio }: { src: string; label: s
  * settings, who made it, when and for how much, the store for an Admin, download / fullscreen / open in a new tab / copy, the marks and Reuse.
  * Arrows and ←/→ step through the loaded items; 1, 2 and 3 mark.
  */
-export function ClipDetail({ clips, index, stores, admin, boards, onIndex, onChange, onUse }: { clips: Clip[]; index: number; stores?: StoreOption[]; admin: boolean; boards?: LibraryBoards; onIndex: (i: number | null) => void; onChange: (c: Clip) => void; onUse?: (c: Clip) => void }) {
+export function ClipDetail({ clips, index, stores, admin, boards, makeApp = false, onIndex, onChange, onUse }: { clips: Clip[]; index: number; stores?: StoreOption[]; admin: boolean; boards?: LibraryBoards; makeApp?: boolean; onIndex: (i: number | null) => void; onChange: (c: Clip) => void; onUse?: (c: Clip) => void }) {
   const clip = clips[index]!;
   const image = clip.mediaType === 'image';
   const [job, setJob] = useState<ClipInputs | null>(null);
@@ -853,6 +855,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, onIndex, onCha
           </div>
         )}
         {admin && <ExampleControl key={`example-${clip.id}`} clip={clip} onChange={onChange} />}
+        {makeApp && job && <MakeAppLink clip={clip} job={{ inputCount: job.inputIds.length, presetId: job.presetId, brand: job.brand }} />}
         {clip.canEdit && <p className="recipe-keys">Phím tắt: 1 Đạt · 2 Nổi bật · 3 Không đạt · ←/→ mục trước, sau</p>}
         {/* As on a History card, on any member's picture: the copy is the viewer's own new input (POST /api/assets/copy takes a Library clip of the workspace). */}
         {image && (
@@ -900,6 +903,18 @@ export function ClipDetail({ clips, index, stores, admin, boards, onIndex, onCha
         </button>
       )}
     </Modal>
+  );
+}
+
+/** An Admin's way from a Library result to the app editor (docs/WORKSPACES.md §2). Shown only when the result can become an app; the server still decides. */
+export function MakeAppLink({ clip, job }: { clip: Clip; job: { inputCount: number; presetId: string | null; brand: boolean } }) {
+  if (!canOfferApp(clip.feature, job)) return null;
+  return (
+    <p>
+      <Link href={`/admin/apps/new?job=${clip.id}`} className="button">
+        Biến thành ứng dụng
+      </Link>
+    </p>
   );
 }
 
@@ -1742,7 +1757,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           );
         })}
       </div>
-      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} admin={isAdmin} boards={boards} onIndex={setDetail} onChange={update} />}
+      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} admin={isAdmin} boards={boards} makeApp={isAdmin} onIndex={setDetail} onChange={update} />}
       {hasMore && (
         <button ref={moreButton} type="button" className="library-more" onClick={() => void loadMore()}>
           Tải thêm
