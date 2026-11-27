@@ -170,13 +170,16 @@ test('an Admin makes an app of a Library clip, publishes and takes it down, and 
   expect((await admin.request.delete(`/api/jobs/${jobId}`)).status()).toBe(200);
 });
 
-test('Admin > Ứng dụng shows all 11 tabs of the Admin bar at 1024 px without hidden overflow', async ({ page }) => {
-  await page.setViewportSize({ width: 1024, height: 768 });
+test('Admin > Ứng dụng shows all 11 tabs of the Admin bar at 1024 and 1440 px without hidden overflow', async ({ page }, testInfo) => {
   await signIn(page, 'tapadm');
-  await page.goto('/admin/apps');
-  const nav = page.getByRole('navigation', { name: 'Các trang quản trị' });
-  await expect(nav.getByRole('link')).toHaveCount(11);
-  await expect(nav.getByRole('link', { name: 'Ứng dụng' })).toHaveAttribute('aria-current', 'page');
-  const size = await nav.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, icons: getComputedStyle(el.querySelector('.icon')!).display }));
-  expect(size.scroll).toBeLessThanOrEqual(size.client);
+  for (const width of [1024, 1440]) {
+    await page.setViewportSize({ width, height: 768 });
+    await page.goto('/admin/apps');
+    const nav = page.getByRole('navigation', { name: 'Các trang quản trị' });
+    await expect(nav.getByRole('link')).toHaveCount(11);
+    await expect(nav.getByRole('link', { name: 'Ứng dụng' })).toHaveAttribute('aria-current', 'page');
+    const size = await nav.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(size.scroll, `${width} px`).toBeLessThanOrEqual(size.client);
+    await nav.screenshot({ path: testInfo.outputPath(`admin-nav-${width}.png`) });
+  }
 });
