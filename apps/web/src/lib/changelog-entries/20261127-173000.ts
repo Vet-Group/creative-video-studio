@@ -10,6 +10,6 @@ export default {
     'Ảnh minh hoạ của Smart Remake giờ là một áo in hình được thay bằng một áo in hình khác, thay cho cảnh đổi màu áo dễ nhầm với Sửa video.',
   ],
   href: '/apps/smart-remake',
-  prs: [],
+  prs: [704],
   audience: 'all',
 } satisfies ChangeEntry;
