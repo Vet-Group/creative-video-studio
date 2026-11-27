@@ -290,6 +290,9 @@ test('Face Swap (two slots): each required slot has its reason, and a mock job t
   await expect(page.getByRole('group', { name: 'Khuôn mặt nguồn' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Ảnh cần đổi khuôn mặt' })).toBeVisible();
   await expect(page.getByText('Thêm 1 ảnh có khuôn mặt cần thay', { exact: true })).toBeVisible(); // each half-width tile says what photo it wants
+  // The product shelf is offered for the photo to change, not for the face put into it.
+  await expect(page.getByRole('button', { name: 'Từ kệ sản phẩm cho Ảnh cần đổi khuôn mặt', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Từ kệ sản phẩm cho Khuôn mặt nguồn', exact: true })).toHaveCount(0);
   await expect(runButton(page)).toBeDisabled();
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Khuôn mặt nguồn.');
 

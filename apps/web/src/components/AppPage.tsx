@@ -498,6 +498,7 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     onRemove={(id) => setImages((cur) => cur.map((list, j) => (j === i ? list.filter((x) => x.id !== id) : list)))}
                     onPick={(img) => setImages((cur) => cur.map((list, j) => (j === i ? (max === 1 ? [img] : [...list, img]) : list)))}
                     onBrowse={templates || offersModels ? () => setPicker(i) : undefined}
+                    shelf={s.shelf}
                   />
                 );
               })}

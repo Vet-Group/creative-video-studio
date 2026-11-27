@@ -74,6 +74,9 @@ test('a slot that takes a pick offers the shelf link beside the uploaded photos,
   const full = [{ id: 'a', filename: 'a.png' }, { id: 'b', filename: 'b.png' }];
   expect(html('Trang phục', { images: full, max: 2 })).not.toContain('Từ kệ sản phẩm');
   expect(html('Nhân vật', { images: [full[0]!], max: 1 })).toContain('Từ kệ sản phẩm cho Nhân vật'); // a one-photo slot swaps its photo
+  const off = renderToStaticMarkup(<Slot label="Khuôn mặt nguồn" empty="Thêm ảnh" inputLabel="Khuôn mặt nguồn" images={[]} max={1} busy={false} onAdd={() => undefined} onRemove={() => undefined} onPick={() => undefined} shelf={false} />);
+  expect(off).toContain('Ảnh đã tải cho Khuôn mặt nguồn');
+  expect(off).not.toContain('Từ kệ sản phẩm');
 });
 
 test('the audio switch reads on when available and on, is off and disabled with a reason when the model cannot make audio, and on and disabled when it always does', () => {
