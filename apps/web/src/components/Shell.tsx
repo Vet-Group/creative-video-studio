@@ -9,6 +9,7 @@ import { appBySlug, isNewApp, itemLabel } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
 import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
+import { hdHref, hdOf } from '@/lib/draft-hd';
 import { typicalLabel, waitProgress } from '@/lib/explore';
 import { faceMatchLabel } from '@/lib/face-match';
 import { featureLabel } from '@/lib/features';
@@ -414,6 +415,11 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
             <Recreate href={reuseHref(job)!} from={refillFrom({ reuse: job.id })!} className={out ? 'job-reuse job-primary' : 'job-reuse'} title="Dùng lại: điền lại form để sửa">
               <Icon name="copy" /> Dùng lại
             </Recreate>
+          )}
+          {hdHref(job) && (
+            <Link href={hdHref(job)!} className="job-reuse" title={`Mở lại form với ${hdOf(job.modelId)!.name}: cùng ảnh và prompt, xem giá rồi mới chạy`}>
+              <Icon name="expand" /> Làm bản {hdOf(job.modelId)!.short}
+            </Link>
           )}
           {out && (
             <button type="button" className="job-reuse" disabled={downloading} aria-busy={downloading} onClick={() => void download()}>
