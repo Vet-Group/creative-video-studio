@@ -1,4 +1,4 @@
-// Agent access ("Kết nối AI"): a personal access token (or, later, an OAuth connection) acts as its creator in one workspace. `guard()` is the only place an
+// Agent access (the "Connect AI" settings section): a personal access token (or, later, an OAuth connection) acts as its creator in one workspace. `guard()` is the only place an
 // agent identity is accepted (lib/session.ts): pages and currentUser never read it. Every agent write needs a single-use confirm token bound to the exact
 // request; a paid create also checks the connection's monthly USD cap under the connection's lock, in the transaction that spends.
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -60,7 +60,7 @@ export async function createPat(i: { userId: string; workspaceId: string; name: 
 export const TOKEN_CREATE_FRESH_MS = 10 * 60 * 1000;
 
 /**
- * The gate of the Settings "Kết nối AI" routes: an Admin's own cookie session (an agent is refused by the deny set below), not one opened with
+ * The gate of the Settings "Connect AI" routes: an Admin's own cookie session (an agent is refused by the deny set below), not one opened with
  * "sign in as", and for a write a request this app's page sent (sameOrigin).
  */
 export async function tokenAdmin(request: Request) {

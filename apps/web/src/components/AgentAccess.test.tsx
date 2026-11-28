@@ -1,4 +1,4 @@
-// Settings > "Kết nối AI": the token list in each state (loading, error, empty, rows, a paused row), the token shown once with its setup text and copy
+// Settings > "Connect AI": the token list in each state (loading, error, empty, rows, a paused row), the token shown once with its setup text and copy
 // note, and the entry that only an Admin sees.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test, vi } from 'vitest';

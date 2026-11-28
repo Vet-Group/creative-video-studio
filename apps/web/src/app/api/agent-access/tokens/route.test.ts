@@ -1,4 +1,4 @@
-// Settings > "Kết nối AI" (app/api/agent-access/tokens): who may list, create, change and revoke agent access tokens, the secret shown once, and the
+// Settings > "Connect AI" (app/api/agent-access/tokens): who may list, create, change and revoke agent access tokens, the secret shown once, and the
 // cookie-only rule, against the real better-auth sign-in and a disposable database on the compose Postgres (`pnpm services:up`).
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';

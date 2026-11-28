@@ -1,4 +1,4 @@
-# Agent access ("Kết nối AI")
+# Agent access
 
 An AI agent (Claude Code, a script, an automation) can call the CVS API as the Admin who created its token. This page covers the first release:
 personal access tokens over REST. Code: `apps/web/src/lib/agent-access.ts`, called only from `guard()` in `apps/web/src/lib/session.ts`.
@@ -17,7 +17,7 @@ personal access tokens over REST. Code: `apps/web/src/lib/agent-access.ts`, call
 
 ## Creating and managing tokens (Admins only)
 
-Settings > "Kết nối AI". The routes behind it (`/api/agent-access/tokens`) take only an Admin's own cookie session: not a token, not a session
+Settings > "Connect AI". The routes behind it (`/api/agent-access/tokens`) take only an Admin's own cookie session: not a token, not a session
 opened with "sign in as", and for a write only a request this app's page sent.
 
 - Creating a token needs a sign-in in the last 10 minutes (403 `reauth_required`; sign out and in again).

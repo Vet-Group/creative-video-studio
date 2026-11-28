@@ -1,4 +1,4 @@
-// Settings > "Kết nối AI" (components/AgentAccess.tsx): an Admin makes a token, copies it, closes the panel (the secret is gone from the page), the
+// Settings > "Connect AI" (components/AgentAccess.tsx): an Admin makes a token, copies it, closes the panel (the secret is gone from the page), the
 // token opens the API, and a revoke with its confirm shuts it at once; a member sees no entry. Each state is checked at 390, 820 and 1280 px in both
 // themes for page-wide horizontal scroll, 44 px taps and serious axe problems. CVS_E2E_SHOTS=<folder> keeps the screenshots there.
 import AxeBuilder from '@axe-core/playwright';

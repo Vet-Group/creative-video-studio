@@ -57,7 +57,7 @@ const workspaceId = () =>
   text('workspace_id')
     .notNull()
     .references((): AnyPgColumn => workspaces.id, { onDelete: 'restrict' });
-// The agent connection (api_tokens) a row was made through; null for a browser session (docs: plan "Kết nối AI", migration 0127).
+// The agent connection (api_tokens) a row was made through; null for a browser session (docs: plan "Connect AI", migration 0127).
 const apiTokenId = () => text('api_token_id').references((): AnyPgColumn => apiTokens.id, { onDelete: 'restrict' });
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 

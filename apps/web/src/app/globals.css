@@ -1769,7 +1769,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .tf-buttons > :not(.pw-submit) { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; text-decoration: none; }
 .tf-buttons > :not(.pw-submit):hover { background: var(--fill); }
 .tf-codes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; margin: 12px 0; padding: 12px 16px 12px 40px; border: 1px solid rgb(var(--tint) / .08); border-radius: 8px; background: var(--surface); font-family: ui-monospace, Consolas, monospace; font-size: 14px; line-height: 22px; }
-/* Settings > Kết nối AI (AgentAccess): the create form, the token shown once with its setup text, and the token rows. Every control here takes a full 44 px
+/* Settings > Connect AI (AgentAccess): the create form, the token shown once with its setup text, and the token rows. Every control here takes a full 44 px
    tap at every width (an Admin may open it on an iPad); the token and the setup text are monospace, as the 2FA key and backup codes are. */
 .agent-access .agent-intro { margin-top: 0; }
 .agent-access :is(.tf-buttons > *, .tf-buttons .pw-submit, .agent-secret-row button, .agent-actions button, .agent-reauth button, .segmented.agent-switch button) { height: 44px; }

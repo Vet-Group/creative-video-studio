@@ -1,5 +1,5 @@
 'use client';
-// Settings > "Kết nối AI" (Admins only): personal access tokens that let an AI tool (Claude Code, OpenMausBot) or a script call the API as the Admin,
+// Settings > "Connect AI" (Admins only): personal access tokens that let an AI tool (Claude Code, OpenMausBot) or a script call the API as the Admin,
 // each with its own expiry and monthly cap (lib/agent-access.ts). The secret is shown once, right after it is made, and is gone when this section closes.
 import { type FormEvent, useCallback, useEffect, useId, useState } from 'react';
 import { ApiError, api, sendJson, startSignOut } from '@/lib/api';

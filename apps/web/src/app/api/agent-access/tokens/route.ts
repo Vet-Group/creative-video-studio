@@ -3,7 +3,7 @@ import { bad, money, readBody } from '@/lib/admin';
 import { createPat, PAT_DAYS, TOKEN_CREATE_FRESH_MS, tokenAdmin } from '@/lib/agent-access';
 import { pool } from '@/lib/auth';
 
-// Settings > "Kết nối AI": an Admin's agent access tokens. Cookie only (the agent deny set refuses a Bearer here); the secret leaves the server once, in
+// Settings > "Connect AI": an Admin's agent access tokens. Cookie only (the agent deny set refuses a Bearer here); the secret leaves the server once, in
 // the answer to its POST, and never in the list.
 
 /**
