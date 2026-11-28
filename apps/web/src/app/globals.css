@@ -1769,6 +1769,39 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .tf-buttons > :not(.pw-submit) { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; text-decoration: none; }
 .tf-buttons > :not(.pw-submit):hover { background: var(--fill); }
 .tf-codes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; margin: 12px 0; padding: 12px 16px 12px 40px; border: 1px solid rgb(var(--tint) / .08); border-radius: 8px; background: var(--surface); font-family: ui-monospace, Consolas, monospace; font-size: 14px; line-height: 22px; }
+/* Settings > Kết nối AI (AgentAccess): the create form, the token shown once with its setup text, and the token rows. Every control here takes a full 44 px
+   tap at every width (an Admin may open it on an iPad); the token and the setup text are monospace, as the 2FA key and backup codes are. */
+.agent-access .agent-intro { margin-top: 0; }
+.agent-access :is(.tf-buttons > *, .tf-buttons .pw-submit, .agent-secret-row button, .agent-actions button, .agent-reauth button, .segmented.agent-switch button) { height: 44px; }
+.agent-access .pw-form > :is(input, select) { height: 44px; }
+.agent-form > select { width: 100%; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
+.agent-form > select:focus-visible { border-color: var(--ink); outline: 1px solid var(--ink); outline-offset: 0; }
+.agent-once { display: grid; gap: 6px; }
+.agent-once .tf-step { margin-bottom: 6px; }
+.agent-label { display: block; margin: 8px 0 0; font-size: 14px; line-height: 21px; font-weight: 500; }
+.agent-secret-row { display: flex; gap: 8px; }
+.agent-secret { flex: 1; min-width: 0; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--fill); color: var(--ink); font-family: ui-monospace, Consolas, monospace; font-size: 14px; }
+.agent-secret:focus-visible { border-color: var(--ink); outline: 1px solid var(--ink); outline-offset: 0; }
+.agent-access :is(.agent-secret-row, .agent-actions, .agent-reauth) button { display: inline-flex; flex: none; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; white-space: nowrap; }
+.agent-access :is(.agent-secret-row, .agent-actions, .agent-reauth) button:hover { background: var(--fill); }
+.agent-copied { min-height: 20px; margin: 0; color: var(--cat-utility-fg); font-size: 13px; line-height: 20px; font-weight: 500; }
+.segmented.agent-switch { flex-wrap: wrap; justify-self: start; max-width: 100%; }
+.segmented.agent-switch button { width: auto; padding: 0 14px; color: var(--text-2); font-size: 13px; font-weight: 500; }
+.segmented.agent-switch button[aria-pressed='true'] { color: var(--ink); }
+.agent-hint { margin-top: 4px; }
+.agent-snippet { margin: 0; padding: 12px 14px; overflow-x: auto; border: 1px solid rgb(var(--tint) / .08); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: ui-monospace, Consolas, monospace; font-size: 13px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.agent-list-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 24px 0 0; }
+.agent-list-head .settings-kicker.settings-sub { margin: 0; }
+.agent-access .acct-rows { margin-top: 12px; }
+.agent-row > :is(.agent-paused, .agent-spend, .agent-actions, .agent-cap) { flex: 1 0 100%; margin: 0; padding-left: 48px; }
+.agent-paused { color: var(--text-2); font-size: 13px; line-height: 20px; }
+.agent-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.agent-access .agent-actions .agent-revoke { color: var(--danger-text); }
+.agent-access .agent-actions .agent-revoke:hover { background: var(--danger-soft); }
+.agent-reauth { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 0; font-size: 14px; line-height: 20px; }
+@media (max-width: 767.98px) {
+  .agent-row > :is(.agent-paused, .agent-spend, .agent-actions, .agent-cap) { justify-self: stretch; padding-left: 0; }
+}
 /* The forced change page: one card in the middle of the screen, nothing else of the app. */
 .forced-pw { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 24px 16px; background: var(--surface-1); }
 .forced-pw-card { width: 100%; max-width: 28rem; padding: 28px; border: 1px solid rgb(var(--tint) / .08); border-radius: 16px; background: var(--surface); box-shadow: 0 24px 64px -16px rgb(var(--shade) / .2); }

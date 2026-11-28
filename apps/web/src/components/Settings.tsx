@@ -10,6 +10,7 @@ import { AVATAR_COLORS, NAME_LENGTH, initials, isEmail, levelOf, nameProblem, pr
 import type { SignInMethod } from '@/lib/sign-in-methods';
 import { useMediaQuery } from '@/lib/use-media-query';
 import { PasswordChange, Sessions, TwoFactor } from './AccountSecurity';
+import { AgentAccess } from './AgentAccess';
 import { AllowanceBar } from './AllowanceBar';
 import { Icon, type IconName } from './Icon';
 import { Modal } from './Modal';
@@ -51,7 +52,7 @@ export interface Usage {
   team?: { name: string; monthUsd: string; freeUsd: string; payableUsd: string; forecastUsd: string; provisional: boolean };
 }
 
-export type Section = 'profile' | 'limits' | 'security' | 'preferences' | 'methods' | 'support';
+export type Section = 'profile' | 'limits' | 'security' | 'preferences' | 'methods' | 'agents' | 'support';
 
 const SECTIONS: readonly (readonly [Section, string, IconName, string])[] = [
   ['profile', 'Hồ sơ', 'user', 'Tên, màu ảnh đại diện, mức bảo vệ'],
@@ -59,6 +60,7 @@ const SECTIONS: readonly (readonly [Section, string, IconName, string])[] = [
   ['security', 'Bảo mật', 'lock', 'Mật khẩu, xác thực 2 lớp, thiết bị'],
   ['preferences', 'Tuỳ chọn', 'sliders', 'Giao diện, thông báo, phím tắt'],
   ['methods', 'Phương thức đăng nhập', 'link', 'Google, Lark và passkey'],
+  ['agents', 'Kết nối AI', 'key', 'Cho Claude Code, OpenMausBot dùng CVS thay bạn'],
   ['support', 'Hỗ trợ', 'help', 'Liên hệ và quyền riêng tư'],
 ];
 
@@ -452,7 +454,9 @@ export function Settings({ open, onClose, userName, account, start = 'profile' }
   const name = saved?.name ?? userName;
   const color = saved?.color ?? userAvatarColor(userName, account.avatarColor);
   const hasPassword = account.methods.some((m) => m.provider === 'credential');
-  const [, title, , lede] = SECTIONS.find(([id]) => id === section)!;
+  // Agent access tokens are for Admins only (lib/agent-access.ts): a member sees no entry.
+  const sections = account.isAdmin ? SECTIONS : SECTIONS.filter(([id]) => id !== 'agents');
+  const [, title, , lede] = sections.find(([id]) => id === section) ?? SECTIONS[0]!;
   return (
     <Modal open={open} onClose={onClose} label="Cài đặt" className="settings">
       <h2 className="settings-title">Cài đặt</h2>
@@ -460,7 +464,7 @@ export function Settings({ open, onClose, userName, account, start = 'profile' }
         <nav ref={nav} className="settings-nav" aria-label="Tài khoản">
           <p className="settings-kicker">Tài khoản</p>
           <div className="settings-nav-list">
-            {SECTIONS.map(([id, text, icon, desc]) => (
+            {sections.map(([id, text, icon, desc]) => (
               <button
                 key={id}
                 type="button"
@@ -641,6 +645,11 @@ export function Settings({ open, onClose, userName, account, start = 'profile' }
             </section>
           )}
           {section === 'methods' && <SignInMethods methods={account.methods} googleEnabled={account.googleEnabled} larkEnabled={account.larkEnabled} embedded />}
+          {section === 'agents' && account.isAdmin && (
+            <section className="agent-access" aria-labelledby="settings-heading">
+              <AgentAccess />
+            </section>
+          )}
           {section === 'support' && (
             <section aria-labelledby="settings-heading">
               <ul className="acct-rows">
