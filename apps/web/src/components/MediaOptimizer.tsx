@@ -8,7 +8,9 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { addHistory } from '@/lib/optimizer-history';
 import { IMAGE_FORMATS, LISTING_SIDE, MAX_LISTING_IMAGES, decodeOptimizerImage, imageFileReason, imageSizeReason, optimizeImage, outputSizeText, resizedDimensions, type ImageFormat } from '@/lib/media-optimizer';
 import { zipBlobs } from '@/lib/zip';
+import { AMAZON_SIDE, MARKETS, MARKET_IDS, amazonMainImage, checkFor, measureImage, type Check, type Market, type Measure } from '@/lib/listing-check';
 import { AppAbout, AppHeader, TAB_LABEL, type Tab } from './AppPage';
+import { Icon } from './Icon';
 import { FormNotice, Slot, WorkTabs } from './image-tools';
 import styles from './MediaOptimizer.module.css';
 import { Select } from './Select';
@@ -26,6 +28,9 @@ export interface OptimizerEntry {
   /** A listing Run of several images: how many listing JPEGs the .zip at `url` holds, and the first one's URL for the card. */
   count?: number;
   preview?: string;
+  /** An Amazon main image: the checks of the result; for a .zip of them, how many passed every check the pixels can tell. */
+  checks?: Check[];
+  passed?: number;
 }
 
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
@@ -33,6 +38,23 @@ const formatName = (f: ImageFormat) => (f === 'image/jpeg' ? 'JPG' : f.slice(6).
 const revoke = (e: OptimizerEntry) => [e.url, e.preview].forEach((u) => u && URL.revokeObjectURL(u));
 /** One of the listing preset's images after the first, with its preview. */
 type More = { file: File; url: string };
+/** The listing presets: Etsy/Shopify pads the whole image on white; Amazon whitens a near-white background and sets the product at 85% of the frame. */
+type Preset = '' | 'listing' | 'amazon';
+const CHECK_ICON = { ok: 'check', warn: 'help', fail: 'x', look: 'eye' } as const;
+
+/** A list of checks, each with its mark: passed, worth a look, failed, or for a person to see. */
+function Checks({ checks, label }: { checks: Check[]; label: string }) {
+  return (
+    <ul className={styles.checks} aria-label={label}>
+      {checks.map((c) => (
+        <li key={c.text} data-level={c.level}>
+          <Icon name={CHECK_ICON[c.level]} />
+          {c.text}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** The History tab: the results made in this browser session, newest first, in the cards of the other apps' History. */
 export function OptimizerHistory({ entries }: { entries: OptimizerEntry[] }) {
@@ -57,7 +79,9 @@ export function OptimizerHistory({ entries }: { entries: OptimizerEntry[] }) {
                 <span>
                   {e.width} × {e.height} px
                 </span>
+                {e.passed !== undefined && <span>{`${e.passed}/${e.count} ảnh đạt chuẩn Amazon`}</span>}
               </p>
+              {e.checks && <Checks checks={e.checks} label={`Kiểm ${e.name} theo Amazon`} />}
               <div className="job-actions">
                 <a className={`job-reuse ${styles.download}`} href={e.url} download={e.name}>
                   {e.count ? 'Tải xuống .zip' : 'Tải xuống'}
@@ -83,7 +107,10 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [preserve, setPreserve] = useState(true);
   const [format, setFormat] = useState<ImageFormat>('image/webp');
-  const [listing, setListing] = useState(false); // the Etsy/Shopify preset: a square JPEG, the image fitted on white
+  const [preset, setPreset] = useState<Preset>('');
+  const listing = preset !== ''; // a square JPEG per image, several images to one .zip
+  const [market, setMarket] = useState<Market>('amazon');
+  const [measured, setMeasured] = useState<Measure | null>(null); // the picked image's pixels, read once for the marketplace checks
   const [more, setMore] = useState<More[]>([]); // the listing preset's images after `file`: a Run of them all makes one .zip
   const moreKept = useRef<More[]>([]); // the same list as `more`, for the unmount cleanup
   const [entries, setEntries] = useState<OptimizerEntry[]>([]);
@@ -94,6 +121,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   const [notice, setNotice] = useState('');
   const sizeId = useId();
   const reasonId = useId();
+  const checkId = useId();
   // Unmount marks the page gone rather than bumping `generation`: React may run this cleanup and the setup again on a live page (StrictMode in dev,
   // Fast Refresh), and a decode or run in flight then must still land and clear `busy`.
   useEffect(() => {
@@ -120,6 +148,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     image.current?.close();
     image.current = null;
     setFile(null);
+    setMeasured(null);
     setError('');
     setNotice('');
     setBusy(false); // a run or decode of the previous image no longer owns the form
@@ -143,6 +172,9 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
       }
       image.current = decoded;
       setFile(next);
+      try {
+        setMeasured(measureImage(decoded));
+      } catch {} // no checks for this image; optimising it still works
       setSize({ width: decoded.width, height: decoded.height });
       setPreserve(true);
     } catch (err) {
@@ -174,9 +206,13 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   }
 
   // What a run makes: the preset's square JPEG, else the size and format picked.
-  const out = listing ? { width: LISTING_SIDE, height: LISTING_SIDE, format: 'image/jpeg' as const } : { ...size, format };
+  const side = preset === 'amazon' ? AMAZON_SIDE : LISTING_SIDE;
+  const out = listing ? { width: side, height: side, format: 'image/jpeg' as const } : { ...size, format };
 
-  const outName = (f: File) => `${f.name.replace(/\.[^.]+$/, '')}-${listing ? 'listing' : 'optimized'}.${out.format === 'image/jpeg' ? 'jpg' : out.format.split('/')[1]}`;
+  const outName = (f: File) => `${f.name.replace(/\.[^.]+$/, '')}-${preset || 'optimized'}.${out.format === 'image/jpeg' ? 'jpg' : out.format.split('/')[1]}`;
+  /** One image of a listing Run: Amazon's main image with its checks, or the Etsy/Shopify square. */
+  const listingImage = async (bitmap: ImageBitmap): Promise<{ blob: Blob; checks?: Check[] }> => (preset === 'amazon' ? amazonMainImage(bitmap) : { blob: await optimizeImage(bitmap, side, side, 'image/jpeg', bitmap) });
+  const passes = (checks?: Check[]) => !!checks && !checks.some((c) => c.level === 'fail');
 
   function keep(entry: OptimizerEntry) {
     const made = addHistory(kept.current, entry);
@@ -196,7 +232,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     try {
       if (many) {
         // One image at a time, so only one decoded image is held; one that cannot be read is left out and named.
-        const made: { name: string; blob: Blob; before: number }[] = [];
+        const made: { name: string; blob: Blob; before: number; ok: boolean }[] = [];
         const skipped: string[] = [];
         const files = [...(file ? [file] : []), ...more.map((m) => m.file)];
         for (const [n, f] of files.entries()) {
@@ -204,7 +240,8 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
           try {
             const bitmap = f === file && image.current ? image.current : await decodeOptimizerImage(f);
             try {
-              made.push({ name: outName(f), blob: await optimizeImage(bitmap, LISTING_SIDE, LISTING_SIDE, 'image/jpeg', bitmap), before: f.size });
+              const one = await listingImage(bitmap);
+              made.push({ name: outName(f), blob: one.blob, before: f.size, ok: passes(one.checks) });
             } finally {
               if (bitmap !== image.current) bitmap.close();
             }
@@ -217,13 +254,14 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
         const zip = await zipBlobs(made);
         if (current !== generation.current || !alive.current) return;
         const before = made.reduce((sum, m) => sum + m.before, 0);
-        keep({ id: nextId.current++, url: URL.createObjectURL(zip), preview: URL.createObjectURL(made[0]!.blob), name: `listing-${made.length}-anh.zip`, before, after: zip.size, ...out, count: made.length });
-        setNotice(`Đã tạo ${made.length} ảnh listing trong một tệp .zip. Tải xuống trong tab "Lịch sử".`);
+        const amazon = preset === 'amazon';
+        keep({ id: nextId.current++, url: URL.createObjectURL(zip), preview: URL.createObjectURL(made[0]!.blob), name: `${preset}-${made.length}-anh.zip`, before, after: zip.size, ...out, count: made.length, passed: amazon ? made.filter((m) => m.ok).length : undefined });
+        setNotice(`Đã tạo ${made.length} ${amazon ? 'ảnh chính Amazon' : 'ảnh listing'} trong một tệp .zip. Tải xuống trong tab "Lịch sử".`);
         if (skipped.length > 0) setError(`Không đọc được ${skipped.length} ảnh nên đã bỏ qua: ${skipped.join(', ')}.`);
       } else {
-        const blob = await optimizeImage(image.current!, out.width, out.height, out.format, listing ? image.current! : undefined);
+        const { blob, checks } = listing ? await listingImage(image.current!) : { blob: await optimizeImage(image.current!, out.width, out.height, out.format), checks: undefined };
         if (current !== generation.current || !alive.current) return;
-        keep({ id: nextId.current++, url: URL.createObjectURL(blob), name: outName(file!), before: file!.size, after: blob.size, ...out });
+        keep({ id: nextId.current++, url: URL.createObjectURL(blob), name: outName(file!), before: file!.size, after: blob.size, ...out, checks });
         setNotice('Đã tối ưu xong. Xem và tải ảnh trong tab "Lịch sử".');
       }
       if (!narrow) setTab('history');
@@ -269,7 +307,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
             <p className="help">Tối đa 20 MB, 8000 px mỗi chiều và 16 triệu điểm ảnh. Ảnh động chỉ xuất một khung hình.</p>
             {count > 1 ? (
               <p className="help">
-                {count} ảnh · {kb((file?.size ?? 0) + more.reduce((sum, m) => sum + m.file.size, 0))} · Chạy để tạo một tệp .zip gồm {count} ảnh listing.
+                {count} ảnh · {kb((file?.size ?? 0) + more.reduce((sum, m) => sum + m.file.size, 0))} · Chạy để tạo một tệp .zip gồm {count} {preset === 'amazon' ? 'ảnh chính Amazon' : 'ảnh listing'}.
               </p>
             ) : (
               file && (
@@ -279,26 +317,49 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
               )
             )}
 
+            {file && measured && more.length === 0 && (
+              <div className="field">
+                <span id={checkId} className="field-label">
+                  Kiểm chuẩn sàn
+                </span>
+                <div className={styles.pills} role="group" aria-labelledby={checkId}>
+                  {MARKET_IDS.map((m) => (
+                    <button key={m} type="button" className="enhance" aria-pressed={market === m} onClick={() => setMarket(m)}>
+                      {MARKETS[m].label}
+                    </button>
+                  ))}
+                </div>
+                <Checks checks={checkFor(market, measured, file)} label={`Kiểm ảnh theo ${MARKETS[market].label}`} />
+                <span className="help">Theo quy định ảnh chính các sàn công bố; sàn có thể đổi, hãy đối chiếu trang của sàn khi cần.{market === 'amazon' && preset !== 'amazon' ? ' Bật "Ảnh chính Amazon" bên dưới để sửa nền và cỡ sản phẩm.' : ''}</span>
+              </div>
+            )}
+
             <div className="field">
               <span className="field-label">Mẫu có sẵn</span>
-              <div>
-                <button
-                  type="button"
-                  className="enhance"
-                  aria-pressed={listing}
-                  disabled={busy}
-                  onClick={() => {
-                    setListing(!listing);
-                    // Without the preset a Run makes one image again, so the others leave the slot.
-                    setNotice(listing && more.length > 0 ? `Đã bỏ ${more.length} ảnh thêm: không dùng mẫu listing thì mỗi lần chạy xử lý một ảnh.` : '');
-                    if (listing) keepMore([]);
-                  }}
-                >
-                  Ảnh listing Etsy/Shopify
-                </button>
+              <div className={styles.pills}>
+                {(['listing', 'amazon'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    className="enhance"
+                    aria-pressed={preset === p}
+                    disabled={busy}
+                    onClick={() => {
+                      const next = preset === p ? '' : p;
+                      setPreset(next);
+                      // Without a preset a Run makes one image again, so the others leave the slot.
+                      setNotice(!next && more.length > 0 ? `Đã bỏ ${more.length} ảnh thêm: không dùng mẫu listing thì mỗi lần chạy xử lý một ảnh.` : '');
+                      if (!next) keepMore([]);
+                    }}
+                  >
+                    {p === 'listing' ? 'Ảnh listing Etsy/Shopify' : 'Ảnh chính Amazon'}
+                  </button>
+                ))}
               </div>
               <span className="help">
-                Ảnh vuông 2048 × 2048 px, JPG: giữ trọn ảnh, thêm nền trắng xung quanh và tô trắng vùng trong suốt (Etsy hiện ảnh PNG trong suốt trên nền đen). Chọn tối đa {MAX_LISTING_IMAGES} ảnh một lần để tải về một tệp .zip.
+                {preset === 'amazon'
+                  ? `Ảnh vuông ${AMAZON_SIDE} × ${AMAZON_SIDE} px, JPG: nền gần trắng được tô thành trắng tinh, sản phẩm được căn giữa và chiếm 85% khung, như Amazon yêu cầu cho ảnh chính. Nền xám hay có màu thì chạy Xoá nền trước. Chọn tối đa ${MAX_LISTING_IMAGES} ảnh một lần để tải về một tệp .zip.`
+                  : `Ảnh vuông 2048 × 2048 px, JPG: giữ trọn ảnh, thêm nền trắng xung quanh và tô trắng vùng trong suốt (Etsy hiện ảnh PNG trong suốt trên nền đen). Chọn tối đa ${MAX_LISTING_IMAGES} ảnh một lần để tải về một tệp .zip.`}
               </span>
             </div>
 
@@ -329,7 +390,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
             </div>
 
             {!listing && <Select label="Định dạng (tuỳ chọn)" icon="preset" heading="Chọn định dạng" value={format} options={IMAGE_FORMATS.map((f) => ({ value: f, label: formatName(f) }))} onChange={(v) => { setFormat(v as ImageFormat); setNotice(''); }} />}
-            {file && <p className="help">JPG dùng nền trắng cho vùng trong suốt. JPG/WEBP dùng chất lượng 82%; dung lượng có thể lớn hơn bản gốc.</p>}
+            {file && <p className="help">{preset === 'amazon' ? 'Ảnh chính Amazon là JPG chất lượng 92%, vùng trong suốt thành nền trắng.' : 'JPG dùng nền trắng cho vùng trong suốt. JPG/WEBP dùng chất lượng 82%; dung lượng có thể lớn hơn bản gốc.'}</p>}
           </div>
 
           <div className="form-message">

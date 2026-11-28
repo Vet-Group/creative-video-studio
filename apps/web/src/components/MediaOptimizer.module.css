@@ -4,3 +4,13 @@
 .size input:not(:disabled):hover { border-color: var(--border-strong); }
 .size span { color: var(--text-muted); }
 .download { flex: 1; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Marketplace checks: one line each, its mark coloured by the verdict and the words in the body colour. */
+.checks { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 18px; color: var(--text-2); }
+:global(.tray.history) .checks { gap: 4px; } /* not the 24 px between History cards */
+.checks li { display: grid; grid-template-columns: 16px 1fr; gap: 6px; align-items: start; overflow-wrap: anywhere; }
+.checks li svg { width: 14px; height: 14px; margin-top: 2px; }
+.checks li[data-level='ok'] svg { color: var(--ok-text); }
+.checks li[data-level='warn'] svg { color: var(--warn-fill); }
+.checks li[data-level='fail'] svg { color: var(--danger-text); }
+.checks li[data-level='look'] svg { color: var(--text-muted); }
