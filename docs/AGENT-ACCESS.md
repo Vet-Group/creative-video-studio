@@ -1,8 +1,10 @@
 # Agent access
 
-An AI agent (Claude Code, OpenMausBot, a script, an automation) can call the CVS API as the Admin who created its token, over REST or over MCP
-(below). Code: `apps/web/src/lib/agent-access.ts`, called only from `guard()` in `apps/web/src/lib/session.ts`; the MCP endpoint is
-`apps/web/src/app/api/mcp/route.ts` with `apps/web/src/lib/mcp/`.
+An AI agent (Claude Code, OpenMausBot, a script, an automation) can call the CVS API as the Admin who created its token, or who approved its
+sign-in ("OAuth" below), over REST or over MCP. Code: `apps/web/src/lib/agent-access.ts`, called only from `guard()` in
+`apps/web/src/lib/session.ts`; the MCP endpoint is `apps/web/src/app/api/mcp/route.ts` with `apps/web/src/lib/mcp/`; the OAuth server is
+`apps/web/src/lib/oauth.ts`. A token and an approved sign-in are both a connection (`api_tokens`), so what follows applies to both unless it
+says otherwise.
 
 ## What a token is
 
@@ -117,7 +119,9 @@ Never a token, secret or hash; the target is `api_token:<id>`.
 | `agent.tool` | every MCP tool call, one row (tool, a 16-hex digest of its arguments, outcome); never the arguments |
 | `agent.read` | every agent GET under `/api/admin/` |
 | `agent.refused` | a request refused before its handler: 400 `bad_path`, 403 `not_allowed_for_agent`, 409 `confirm_invalid` / `confirm_expired` / `confirm_used` (method, path, reason) |
-| `agent.token_create`, `agent.token_update`, `agent.token_revoke` | token lifecycle, by the Admin who did it |
+| `agent.token_create`, `agent.token_update`, `agent.token_revoke` | token lifecycle, by the Admin who did it (an OAuth code reuse revokes with reason `code_reuse`, a client's own RFC 7009 revoke with `oauth_revoke`) |
+| `agent.oauth_consent` | an Admin approved an OAuth client: client id, its self-declared name, the redirect host, workspace, cap |
+| `agent.oauth_refresh_reuse` | a spent refresh token came back after the grace: the connection was revoked |
 
 Log lines (no audit row): `agent.dry_run` for each 428 of a non-paid write (a dry run is the first step of every write, and the confirmed write
 gets its own row; the 30-a-minute limit bounds them), `agent.auth_fail` for a failed sign-in, `agent.cap_refused` for a cap refusal.
@@ -149,14 +153,18 @@ are refused (409 `agent_api_off`) and Settings shows agent access as off. Tokens
   sign-in or sessions), the rate limits, the expiry, the audit rows and revoking. The owner accepted this (Q1). Keep tokens out of chats, logs
   and repositories, give each agent its own token with a short expiry and a low cap, and revoke one at the first doubt.
 - An agent's analyses and suggestions can pass the cap by the calls already running (see "Monthly cap").
-- The idle-refresh theft window applies only to OAuth refresh tokens, which come in a later update; personal access tokens have no refresh.
+- **OAuth idle refresh.** A stolen refresh token can be rotated by the thief while the real client is idle, and the thief keeps a working
+  connection until the real client next refreshes; that refresh then hits reuse detection and revokes the connection
+  (`agent.oauth_refresh_reuse`). Meanwhile the bounds are the connection's cap, the deny list, the audit rows with the last-used IP in Settings,
+  and Disconnect in Settings. Personal access tokens have no refresh.
 
 ## MCP
 
 `POST <host>/api/mcp`, Streamable HTTP, stateless: the 2026-07-28 protocol, and 2025-era clients (`initialize`, then one POST per call) through
 the SDK's stateless fallback (`@modelcontextprotocol/server`). Send the same token as for REST in `Authorization: Bearer`. A request with no
-valid token (a session cookie alone included) is 401 with `WWW-Authenticate: Bearer realm="cvs"` (plus `error="invalid_token"` for a bad
-token; the OAuth update adds `resource_metadata`); `CVS_AGENT_API=0` answers 503. A JSON-RPC batch (an array body) is 400
+valid token (a session cookie alone included) is 401 with
+`WWW-Authenticate: Bearer realm="cvs", resource_metadata="<APP_URL>/.well-known/oauth-protected-resource/api/mcp"` (plus `error="invalid_token"`
+for a bad token), which starts the OAuth sign-in in a client that has no token; `CVS_AGENT_API=0` answers 503. A JSON-RPC batch (an array body) is 400
 `batch_not_supported`: send one message per POST.
 
 The token is checked once per request at `/api/mcp`, as `guard()` checks it, and the request counts one unit of the per-minute limit (its tool
@@ -210,6 +218,64 @@ the first answer (`firstAnswer.jobId`), never a second success: read the state (
 **Downloads**: `job_get` and `remake_get` give `downloadPath` (`/api/assets/<id>/content`); fetch it with the same header:
 `curl -H "Authorization: Bearer $CVS_TOKEN" -o clip.mp4 https://<host>/api/assets/<id>/content`. Humans use the item's `url`.
 
-## OAuth: coming in a later update
+## OAuth
 
-OAuth sign-in for clients that cannot hold a token will come in a later update. Until then, use a personal access token.
+A client that supports MCP sign-in (Claude Code, OpenMausBot) connects without a pasted token: it registers itself, opens the CVS consent page in
+the browser, and an Admin approves it there. The approved client is a connection like a token (same deny list, cap, confirms, audit and revoke), of
+kind `oauth`, and it does not expire while it is used. Settings > "Connect AI" shows the setup text as the first way, sign-in (recommended).
+
+**Claude Code**
+
+```sh
+claude mcp add --scope user --transport http cvs https://<host>/api/mcp
+claude mcp list   # cvs: ... - Needs authentication
+```
+
+Then type `/mcp` in Claude Code, pick `cvs` and choose Authenticate (or run `claude mcp login cvs`). The browser opens `/oauth/authorize`; after
+Allow, Claude Code receives the code at its own `http://localhost:<port>/callback`. Without `--scope user`
+(`claude mcp add --transport http cvs https://<host>/api/mcp`) the server is added to the current project only.
+
+**OpenMausBot**: merge into `mcpServers` in `~/.openmausbot/config.json`, with no `headers`:
+
+```json
+{ "mcpServers": { "cvs": { "type": "http", "url": "https://<host>/api/mcp", "enabled": true } } }
+```
+
+then use the sign-in card OpenMausBot shows for `cvs`. It registers as `OpenMausBot` with the loopback callback
+`http://127.0.0.1:<port>/mcp-oauth/callback`, so sign in from a browser on the same computer as OpenMausBot (a remote browser's https callback is
+refused, see below).
+
+**The consent page** (`/oauth/authorize`, Admins only). A signed-out visitor goes through the login and comes back with the full query. The page
+shows the client's self-declared name and the host it returns to (for example `127.0.0.1:PORT`, "on this computer") on their own lines, the workspace and
+the monthly cap (default 20 USD), then Allow or Deny. Approving needs a sign-in in the last 10 minutes (else a "sign in again" button). An unknown
+client or a redirect it did not register gets an error page and is never redirected to; a member is sent back with `error=access_denied`, as is
+Deny. A user holds at most 10 active connections, tokens and approved clients together; an approved connection whose code was never exchanged
+is revoked (`code_unused`) at the next approval after 10 minutes.
+
+**Endpoints** (the issuer and every URL come from `APP_URL`, never the `Host` header; no CORS headers, both clients are native):
+
+| URL | What |
+|---|---|
+| `/.well-known/oauth-protected-resource/api/mcp`, `/.well-known/oauth-protected-resource` | RFC 9728: `resource` `<APP_URL>/api/mcp`, `authorization_servers` `[APP_URL]` |
+| `/.well-known/oauth-authorization-server` | RFC 8414: PKCE `S256` only, grants `authorization_code` and `refresh_token`, auth method `none`, `iss` on responses (RFC 9207) |
+| `POST /api/oauth/register` | RFC 7591: 1 to 3 redirect URIs, each `http://` on `127.0.0.1`, `localhost` or `[::1]` (any port, RFC 8252), no fragment; https and other hosts are refused in this version. Name at most 80 characters. 10 registrations an hour per address (429). A client nobody approved is deleted after a day; at 200 waiting the oldest is evicted |
+| `POST /api/oauth/authorize` | the consent form (cookie, same origin, Admin, not "sign in as"); not for clients |
+| `POST /api/oauth/token` | `authorization_code` (client, exact redirect and PKCE verifier must match; the code lives 5 minutes and is spent by the first attempt, right or wrong; a second use revokes the connection) and `refresh_token` |
+| `POST /api/oauth/revoke` | RFC 7009: ends the client's own connection; always 200 |
+
+Every `/api/oauth/*` endpoint takes 60 requests a minute per address.
+
+**Tokens.** The access token `cvs_oat_<43>` lives one hour and is sent as `Authorization: Bearer` exactly like a personal access token. The refresh
+token `cvs_ort_<43>` lives 30 days from its issue and is rotated on every use: the same old token sent again by the same client within 30 seconds
+gets the same new pair (a retry after a lost answer); any later use is treated as a stolen copy and revokes the connection. So a connection idle for
+30 days ends, and one in use never does. Only SHA-256 hashes are stored; the grace answer is kept encrypted with a key derived from the old refresh
+token, which the server does not keep. A refresh with another client's `client_id` is `invalid_grant` and does not spend the token. Each refresh
+re-checks the owner as a request does: a banned, demoted or removed owner gets `invalid_grant` without spending the token, so the same token works
+again after a re-promotion.
+
+**Ending a connection.** Disconnect (the button on an app row) in Settings > "Connect AI" (any Admin, for any connection) revokes it: its access token is 401 and its
+refresh token `invalid_grant` on the next request. The client's own revoke, a password change, "sign out everywhere" and the kill switch work as for
+tokens; with `CVS_AGENT_API=0` every `/api/oauth/*` endpoint answers 503.
+
+**Not yet**: https (web) redirect URIs, scopes (a connection has the Admin's full agent rights) and client secrets. Before production, check that
+`APP_URL` equals the public URL byte for byte and that Cloudflare does not challenge `/api/mcp`, `/api/oauth/*` or `/.well-known/*`.
