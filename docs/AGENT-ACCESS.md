@@ -31,6 +31,15 @@ opened with "sign in as", and for a write only a request this app's page sent.
   audited.
 - A user's active tokens are revoked (reason `credentials_reset`, audited) when the user changes the password, signs out every other session,
   deletes a passkey or unlinks a sign-in method, and when an Admin sets a temporary password, turns 2FA off or removes a sign-in method.
+- The section opens on three steps: pick the tool (Claude Code, OpenMausBot or a REST script; the choice is kept in the browser), connect it
+  (sign-in first for the two MCP tools, a token for a script or a tool that cannot open a browser), and check. The check polls every 3 seconds for
+  up to 2 minutes until the new token, or for a sign-in any of the caller's signed-in apps, shows a use; it never needs the secret.
+- `GET /api/agent-access/tokens/<id>/check` (any Admin's connection) says whether the connection would be let in now, without the secret:
+  `ok`, `status` (active, paused, revoked, expired), `reason` (null, revoked, expired, banned, password_change_required, not_admin, workspace or
+  agent_api_off for the kill switch), `lastUsedAt`, `lastUsedIp` and `monthSpendUsd`.
+- `GET /api/agent-access/tokens/<id>/activity?limit=20&before=<cursor>` pages that connection's own `agent.*` audit rows (target
+  `api_token:<id>`), newest first, `limit` 1 to 50. Each item has its time, a short label, the method and path where the row has one, and whether
+  it went through; never a body, an argument digest, a nonce, an IP or a workspace id. `next` is the cursor of the following page, or null.
 
 ## Calling the API
 
