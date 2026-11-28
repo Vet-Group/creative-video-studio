@@ -1,9 +1,9 @@
-// Lingerie Try-On's stock models and Jewelry Try-On's template library. The test server has no samples, so the Admin uploads a few under the real names first
+// Lingerie Try-On's stock models, Jewelry Try-On's template library and Background Changer's stock scenes. The test server has no samples, so the Admin uploads a few under the real names first
 // and removes them afterwards. No job is run: picking a photo only copies the sample into the member's own assets.
 import { expect, type Page, test } from '@playwright/test';
 import { jpg, signIn } from './support.test';
 
-const NAMES = ['lingerie-model-m10.jpg', 'lingerie-model-m11.jpg', 'jewelry-template-ear-01.jpg', 'jewelry-template-ear-02.jpg', 'jewelry-template-neck-01.jpg'];
+const NAMES = ['lingerie-model-m10.jpg', 'lingerie-model-m11.jpg', 'jewelry-template-ear-01.jpg', 'jewelry-template-ear-02.jpg', 'jewelry-template-neck-01.jpg', 'bg-scene-indoor-1.jpg', 'bg-scene-indoor-2.jpg', 'bg-scene-studio-1.jpg'];
 /** The slot's button, once the samples are known (it then opens the photo dialog instead of the file picker). */
 const browse = async (page: Page, slot: string) => {
   const button = page.getByRole('button', { name: `Tải lên ${slot}` });
@@ -12,7 +12,7 @@ const browse = async (page: Page, slot: string) => {
 };
 const reasonOf = (page: Page) => page.locator('.form-message').getByRole('status');
 
-test('the stock models of Lingerie Try-On and the templates of Jewelry Try-On fill their slot without creating a job', async ({ page }) => {
+test('the stock models of Lingerie Try-On, the templates of Jewelry Try-On and the scenes of Background Changer fill their slot without creating a job', async ({ page }) => {
   const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
     await page.context().clearCookies();
     await signIn(page, 'admin');
@@ -60,8 +60,20 @@ test('the stock models of Lingerie Try-On and the templates of Jewelry Try-On fi
     await page.getByRole('button', { name: 'Bỏ ảnh' }).click();
     await browse(page, 'Người đeo');
     await expect(page.getByRole('dialog', { name: 'Chọn mẫu' }).getByText('Tải lên ảnh của bạn')).toBeVisible();
+
+    // Background Changer: the reference slot offers the scenes by group, and a pick fills it.
+    await page.goto('/apps/background-changer');
+    await browse(page, 'Ảnh nền tham chiếu');
+    const scenes = page.getByRole('dialog', { name: 'Chọn nền' });
+    await expect(scenes.getByRole('heading', { level: 3 })).toHaveText(['Trong nhà', 'Phông studio']);
+    await expect(scenes.getByRole('region', { name: 'Trong nhà' }).getByRole('button')).toHaveCount(2);
+    await scenes.getByRole('button', { name: 'Phông studio 1' }).click();
+    await expect(scenes).toHaveCount(0);
+    expect(copies.at(-1)).toBe(JSON.stringify({ names: ['bg-scene-studio-1.jpg'] }));
+    await expect(page.getByRole('group', { name: /^Ảnh nền tham chiếu/ }).locator('img')).toHaveCount(1);
+
     const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string }[] };
-    expect(jobs.jobs.filter((j) => j.feature === 'jewelry_try_on' || j.feature === 'lingerie_try_on')).toEqual([]);
+    expect(jobs.jobs.filter((j) => ['jewelry_try_on', 'lingerie_try_on', 'background_changer'].includes(j.feature))).toEqual([]);
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }

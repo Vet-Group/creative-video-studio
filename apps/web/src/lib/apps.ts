@@ -85,6 +85,11 @@ const JEWELRY_TEMPLATES = [
   ['ear', 'Tai'], ['face', 'Mặt'], ['neck', 'Cổ & ngực'], ['beauty', 'Mặt & tay'], ['hand', 'Tay'], ['portrait', 'Chân dung'], ['lifestyle', 'Đời thường'],
 ].map(([id, label]) => ({ label: label!, prefix: `jewelry-template-${id}-` }));
 
+/** Background Changer's stock scenes, by group: the samples named `bg-scene-<group>-N`. */
+const BACKGROUND_SCENES = [
+  ['indoor', 'Trong nhà'], ['outdoor', 'Ngoài trời'], ['studio', 'Phông studio'],
+].map(([id, label]) => ({ label: label!, prefix: `bg-scene-${id}-` }));
+
 export const APPS: AppConfig[] = [
   {
     slug: 'character-swap',
@@ -121,7 +126,8 @@ export const APPS: AppConfig[] = [
     category: 'photo',
     slots: [
       { label: 'Ảnh', inputLabel: 'Ảnh cần đổi nền', empty: 'Thêm 1 hoặc nhiều ảnh' },
-      { label: 'Ảnh nền tham chiếu (tuỳ chọn)', inputLabel: 'Ảnh nền tham chiếu', empty: 'Thêm 1 ảnh nền nếu muốn', optional: true },
+      // Stock scenes: eye-level, people-free rooms, streets, nature and studio sets from Shisei (github.com/wquguru/shisei, images CC0 1.0), uploaded as samples.
+      { label: 'Ảnh nền tham chiếu (tuỳ chọn)', inputLabel: 'Ảnh nền tham chiếu', empty: 'Thêm 1 ảnh nền nếu muốn', optional: true, stock: { title: 'Chọn nền', groups: BACKGROUND_SCENES } },
     ],
     prompt: 'background',
     bulk: true,
