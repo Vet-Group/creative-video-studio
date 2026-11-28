@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
 import { remakeScene, remakeShotsProblem, remakeShotUsd } from '@cvs/core/analysis/remake';
 import { withTransaction } from '@cvs/core/ledger';
-import { checkCaps } from '@cvs/core/limits';
+import { type CapRefusal, checkCaps } from '@cvs/core/limits';
 import { REMAKE_QUEUE } from '@cvs/core/queue';
+import { agentCharge, agentPrecheck } from '@/lib/agent-access';
 import { readableAsset, readJson } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { storeAllowed } from '@/lib/billing';
@@ -31,6 +32,8 @@ export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const b = (await readJson(request)) as { analysisId?: unknown; productAssetId?: unknown; shots?: unknown } | null;
+  const agent = await agentPrecheck(g, request, b);
+  if (agent instanceof Response) return agent;
   const analysisId = b?.analysisId;
   const productAssetId = b?.productAssetId;
   if (typeof analysisId !== 'string' || typeof productAssetId !== 'string') return bad('analysisId, productAssetId and shots are required');
@@ -63,20 +66,23 @@ export async function POST(request: Request) {
   const id = randomUUID();
   // The clips are joined in shot order, whatever order they were picked in.
   const shots = [...(b!.shots as number[])].sort((x, y) => x - y);
-  const cap = await withTransaction(pool, async (tx) => {
+  const cap = await withTransaction(pool, async (tx): Promise<Response | CapRefusal | null> => {
     // One writer at a time, as for a Run, so two remakes cannot both take the last dollars of the month or of the member's caps.
     await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
     // checkCaps adds what the open remakes have yet to book (their estimate less the calls booked so far); this one's is stored for the next.
     const estimate = shots.reduce((sum, index) => sum + remakeShotUsd(remakeScene(result, index)!), 0);
     const refused = await checkCaps(tx, userId, estimate.toFixed(6), undefined, 'remake');
     if (refused) return refused;
+    const charged = await agentCharge(tx, agent, estimate, { status: 201, body: { id } });
+    if (charged) return charged;
     await tx.query(
-      `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots, estimate_usd, workspace_id)
-         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6, $7, $8)`,
-      [id, userId, analysis.own && analysis.store_ok ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots), estimate.toFixed(4), g.workspaceId],
+      `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots, estimate_usd, workspace_id, api_token_id)
+         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6, $7, $8, $9)`,
+      [id, userId, analysis.own && analysis.store_ok ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots), estimate.toFixed(4), g.workspaceId, agent?.tokenId ?? null],
     );
     return null;
   });
+  if (cap instanceof Response) return cap;
   if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });
   try {
     await (await boss()).send(REMAKE_QUEUE, { remakeId: id });
@@ -84,6 +90,7 @@ export async function POST(request: Request) {
     // A failed send must not leave the row 'queued' for the worker's stale sweep to find hours later: fail it so the caller retries now.
     console.error(`Could not send remake ${id} to the queue:`, e);
     await pool.query(`update remakes set status = 'failed', error = 'could not queue the remake', finished_at = now() where id = $1`, [id]);
+    if (agent?.confirm) await pool.query('delete from agent_confirms where nonce = $1', [agent.confirm.nonce]); // the same confirm may be sent again
     return bad('could not queue the remake; try again', 503);
   }
   return Response.json({ id }, { status: 201 });

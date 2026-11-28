@@ -3,6 +3,7 @@ import { SUGGEST_QUEUE } from '@cvs/core/queue';
 import { PROMPT_CEILING } from '@cvs/core/models';
 import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
 import { modelNote, PROMPT_TASKS, type SuggestInput } from '@cvs/core/suggest';
+import { type AgentCall, agentCharge, agentPrecheck } from '@/lib/agent-access';
 import { frameTime } from '@/lib/analyze';
 import { pool, type Session } from '@/lib/auth';
 import { findChoice } from '@/lib/choices';
@@ -34,10 +35,12 @@ export async function POST(request: Request) {
   const b = (await readJson(request)) as {
     field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown; preset?: unknown; rest?: unknown; analysisId?: unknown; productAssetId?: unknown;
   } | null;
+  const agent = await agentPrecheck(g, request, b);
+  if (agent instanceof Response) return agent;
   if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'ending' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video' && b?.field !== 'scenes' && b?.field !== 'check') {
     return bad('field must be brief, script, hook, location, ending, prompt, translate, video, scenes or check');
   }
-  if (b.field === 'scenes') return scenes(g.session, g.workspaceId, b);
+  if (b.field === 'scenes') return scenes(g.session, g.workspaceId, b, agent);
   if (b.field === 'video') {
     // The prompt-from-video button in the preset edit form: a vision call on the preset's saved clip, for the people who edit presets.
     if (!isEditor(g.session.user, g.workspaceId)) return bad('forbidden', 403);
@@ -45,13 +48,13 @@ export async function POST(request: Request) {
     if (!preset) return bad('preset is not a preset');
     const clip = `preset-${preset.id}.mp4`;
     if (!(await headSample(clip))) return bad('the preset has no clip');
-    return queue(g.session.user.id, g.workspaceId, { field: 'video', text: '', context: '', max: PROMPT_CEILING, clip });
+    return queue(g.session.user.id, g.workspaceId, agent, { field: 'video', text: '', context: '', max: PROMPT_CEILING, clip });
   }
   if (b.field === 'translate') {
     // The Translate button: a Vietnamese reading of an English prompt, for the member to read; it counts as a run like any other.
     const text = typeof b.text === 'string' ? b.text.trim() : '';
     if (!text || text.length > PROMPT_CEILING) return bad(`text must be 1 to ${PROMPT_CEILING} characters`);
-    return queue(g.session.user.id, g.workspaceId, { field: 'translate', text, context: '', max: PROMPT_CEILING * 2 });
+    return queue(g.session.user.id, g.workspaceId, agent, { field: 'translate', text, context: '', max: PROMPT_CEILING * 2 });
   }
   if (b.field === 'prompt') {
     // Any other page's prompt: the tool's task is the server's own text, so the member's words only ever reach the model as their notes.
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
     if (text === null || text.length > PROMPT_CEILING) return bad(`text may be at most ${PROMPT_CEILING} characters`);
     const extra = await modelAndPace(b);
     if (typeof extra === 'string') return bad(extra);
-    return queue(g.session.user.id, g.workspaceId, { field: 'prompt', task, text, context: '', max: Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING), ...extra });
+    return queue(g.session.user.id, g.workspaceId, agent, { field: 'prompt', task, text, context: '', max: Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING), ...extra });
   }
   // Unboxing and Review tell the model what their clip is, so the options fit it.
   const note = b.format === 'unboxing' || b.format === 'review' ? { format: b.format as 'unboxing' | 'review' } : {};
@@ -72,7 +75,7 @@ export async function POST(request: Request) {
     if (!text || text.length > PROMPT_CEILING) return bad(`text must be 1 to ${PROMPT_CEILING} characters`);
     const extra = await modelAndPace(b, false);
     if (typeof extra === 'string') return bad(extra);
-    return queue(g.session.user.id, g.workspaceId, { field: 'check', text, context: '', max: PROMPT_CEILING, ...extra, ...note });
+    return queue(g.session.user.id, g.workspaceId, agent, { field: 'check', text, context: '', max: PROMPT_CEILING, ...extra, ...note });
   }
   if ((b.field === 'hook' || b.field === 'ending') && b.rest !== undefined) {
     // A sectioned prompt's Hook or Ending section: the member's words so far, as long as the section takes, and the other sections as the context.
@@ -82,13 +85,13 @@ export async function POST(request: Request) {
     if (typeof b.rest !== 'string' || b.rest.length > PROMPT_CEILING) return bad(`rest must be text of at most ${PROMPT_CEILING} characters`);
     const extra = await modelAndPace(b);
     if (typeof extra === 'string') return bad(extra);
-    return queue(g.session.user.id, g.workspaceId, { field: b.field, text, context: b.rest.trim(), max, ...extra, ...note });
+    return queue(g.session.user.id, g.workspaceId, agent, { field: b.field, text, context: b.rest.trim(), max, ...extra, ...note });
   }
   if (b.field === 'hook' || b.field === 'location' || b.field === 'ending') {
     // The add form's AI help: the English scene of a new hook, location or ending from its Vietnamese name and description, as long as the field takes.
     const text = typeof b.text === 'string' ? b.text.trim() : '';
     if (!text || text.length > MAX_CHOICE_NAME + MAX_CHOICE_DESC + 3) return bad(`text must be the name and description, 1 to ${MAX_CHOICE_NAME + MAX_CHOICE_DESC + 3} characters`);
-    return queue(g.session.user.id, g.workspaceId, { field: b.field, text, context: '', max: b.field === 'ending' ? MAX_ENDING : MAX_CHOICE_PHRASE });
+    return queue(g.session.user.id, g.workspaceId, agent, { field: b.field, text, context: '', max: b.field === 'ending' ? MAX_ENDING : MAX_CHOICE_PHRASE });
   }
   if (b.format !== undefined && !isParamFormat(b.format)) return bad('format must be advanced, unboxing, review or left out');
   if (b.field === 'script' && b.format !== 'advanced' && b.format !== 'review') return bad('a script is for Advanced and Review only');
@@ -107,11 +110,11 @@ export async function POST(request: Request) {
   if (typeof extra === 'string') return bad(extra);
   const input: SuggestInput = { field: b.field, text, context: [hook?.phrase, location && `Set in ${location.phrase}.`].filter(Boolean).join(' '), max, ...extra, ...note };
 
-  return queue(userId, g.workspaceId, input);
+  return queue(userId, g.workspaceId, agent, input);
 }
 
 /** Smart Remake's scene pick: a vision call on one still per scene of the member's finished analysis (or one shared in their workspace), with their product image. The server chooses every key it sends. */
-async function scenes(session: Session, workspaceId: string, b: { analysisId?: unknown; productAssetId?: unknown }): Promise<Response> {
+async function scenes(session: Session, workspaceId: string, b: { analysisId?: unknown; productAssetId?: unknown }, agent: AgentCall | null): Promise<Response> {
   if (!smartRemakeAppEnabled()) return bad('not found', 404);
   if (typeof b.analysisId !== 'string' || typeof b.productAssetId !== 'string') return bad('analysisId and productAssetId are required');
   const analysis = (
@@ -125,7 +128,7 @@ async function scenes(session: Session, workspaceId: string, b: { analysisId?: u
   if (!found.asset.mime.startsWith('image/')) return bad('productAssetId must be an image');
   const times = mergeShots(analysis.result as Analysis).shots.map((s) => frameTime(s.start, s.end));
   if (times.length === 0 || times.length > MAX_PICK_SCENES) return bad(`the analysis must have 1 to ${MAX_PICK_SCENES} scenes`);
-  return queue(session.user.id, workspaceId, { field: 'scenes', text: '', context: '', max: 0, sourceKey: analysis.source_key, productKey: found.asset.s3Key, times });
+  return queue(session.user.id, workspaceId, agent, { field: 'scenes', text: '', context: '', max: 0, sourceKey: analysis.source_key, productKey: found.asset.s3Key, times });
 }
 
 /**
@@ -142,7 +145,7 @@ async function modelAndPace(b: { model?: unknown; audio?: unknown; seconds?: unk
 }
 
 /** Counts the run against the member's daily limit (one limit across workspaces, as caps are), stores it in the workspace and hands it to the worker. */
-async function queue(userId: string, workspaceId: string, input: SuggestInput): Promise<Response> {
+async function queue(userId: string, workspaceId: string, agent: AgentCall | null, input: SuggestInput): Promise<Response> {
   const id = randomUUID();
   const client = await pool.connect();
   try {
@@ -159,7 +162,12 @@ async function queue(userId: string, workspaceId: string, input: SuggestInput): 
       await client.query('rollback');
       return bad(`Bạn đã dùng hết ${SUGGEST_DAILY_LIMIT} lượt gợi ý hôm nay. Mai hãy thử lại.`, 429); // shown to the member as written
     }
-    await client.query('insert into suggestion_runs (id, user_id, input, workspace_id) values ($1, $2, $3, $4)', [id, userId, JSON.stringify(input), workspaceId]);
+    const charged = await agentCharge(client, agent, null, { status: 202, body: { id, status: 'queued' } });
+    if (charged) {
+      await client.query('rollback');
+      return charged;
+    }
+    await client.query('insert into suggestion_runs (id, user_id, input, workspace_id, api_token_id) values ($1, $2, $3, $4, $5)', [id, userId, JSON.stringify(input), workspaceId, agent?.tokenId ?? null]);
     await client.query('commit');
   } catch (e) {
     await client.query('rollback');
@@ -172,6 +180,7 @@ async function queue(userId: string, workspaceId: string, input: SuggestInput): 
   } catch (e) {
     console.error(`Could not send suggestion run ${id} to the queue:`, e);
     await pool.query('delete from suggestion_runs where id = $1', [id]);
+    if (agent?.confirm) await pool.query('delete from agent_confirms where nonce = $1', [agent.confirm.nonce]); // the same confirm may be sent again
     return bad('suggestions are unavailable right now', 503);
   }
   return Response.json({ id, status: 'queued' }, { status: 202 });
