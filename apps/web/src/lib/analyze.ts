@@ -79,8 +79,16 @@ export const timeRange = (start: number, end: number): string => (end < 60 ? `${
 // The scene merge lives in core, as Smart Remake's API and worker remake a whole scene too.
 export { mergeShots };
 
-/** An analysis' usual run time in seconds, measured on prod 2026-11-14 (median 125 s, slowest 232 s): the wait bar and its "2–4 phút" on /analyze and in Smart Remake. */
-export const ANALYSIS_RUN = { p50: 125, p75: 232 };
+/** A source clip longer than this many seconds takes the long wait (analysisRun). */
+const LONG_CLIP_S = 20;
+
+/**
+ * An analysis' usual run time in seconds for a source clip of `durationS` seconds (null or undefined when unknown), for the wait bar and its caption on /analyze and in
+ * Smart Remake. Measured on prod: 5-15 s clips took 93-146 s (median 125 s, slowest 232 s, 2026-11-14; an 8 s clip 125 s on 2026-11-27), but a 50 s clip took 287 s and a 57.7 s clip 483 s,
+ * so past 20 s it reads "~5–8 phút".
+ */
+export const analysisRun = (durationS: number | null | undefined): { p50: number; p75: number } =>
+  durationS != null && durationS > LONG_CLIP_S ? { p50: 330, p75: 480 } : { p50: 125, p75: 232 };
 
 /** Why an analysis failed, in words a member can act on, from the worker's raw `error` (null on a shared analysis, whose error stays its owner's). */
 export function analysisError(error: string | null | undefined): string {

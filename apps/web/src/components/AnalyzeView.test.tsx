@@ -104,6 +104,8 @@ test('the wait shows the tray bar and its usual-time caption, a failed one its m
   const running = renderToStaticMarkup(<AnalysisPanel row={{ ...base, status: 'queued', result: null, createdAt: new Date().toISOString() }} onClose={() => undefined} />);
   expect(running).toContain('class="job-wait-bar"');
   expect(running).toContain('Thường mất khoảng 2–4 phút · vừa gửi. Bạn có thể xem tab khác');
+  const long = renderToStaticMarkup(<AnalysisPanel row={{ ...base, status: 'queued', result: null, createdAt: new Date().toISOString(), sourceDurationS: 50 }} onClose={() => undefined} />);
+  expect(long).toContain('Thường mất khoảng 5–8 phút · vừa gửi.');
   const failed = { ...base, status: 'failed' as const, result: null, error: 'Command failed: rea-video decompose: Invalid data found when processing input' };
   const html = renderToStaticMarkup(<AnalysisPanel row={failed} onClose={() => undefined} />);
   expect(html).toContain('Không đọc được video này');

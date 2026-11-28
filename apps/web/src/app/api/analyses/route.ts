@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const g = await guard(request, all ? 'admin' : 'member');
   if (g.error) return g.error;
   if (params.get('shared') === '1') return Response.json({ analyses: await sharedVideos(pool, g.workspaceId) });
-  const source = `(select a.id from assets a where a.s3_key = analyses.source_key and a.workspace_id = analyses.workspace_id) as "sourceAssetId"`;
+  const source = `(select a.id from assets a where a.s3_key = analyses.source_key and a.workspace_id = analyses.workspace_id) as "sourceAssetId", (select a.duration_ms::float8 / 1000 from assets a where a.s3_key = analyses.source_key and a.workspace_id = analyses.workspace_id) as "sourceDurationS"`;
   const rows = (
     await pool.query(
       `select id, status, provider, model, result, case when $3 = $4 then cost_usd end as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt", shared_title as "sharedTitle", ${source},
