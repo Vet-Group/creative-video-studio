@@ -7,7 +7,7 @@ import { audit } from '@cvs/core/audit';
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
 import { tokenMonthSpend } from '@cvs/core/limits';
 import { pool } from './auth';
-import { type RequestSession, resolveWorkspace } from './session';
+import { guard, impersonationRefusal, isImpersonated, type RequestSession, resolveWorkspace, sameOrigin } from './session';
 
 export type AgentInfo = { tokenId: string; kind: 'pat' | 'oauth'; clientId: string | null; via: 'bearer' | 'mcp' };
 
@@ -54,6 +54,21 @@ export async function createPat(i: { userId: string; workspaceId: string; name: 
     await audit(tx, { actorId: i.userId, action: 'agent.token_create', target: `api_token:${id}`, newValue: { kind: 'pat', name: i.name, workspaceId: i.workspaceId, expiresAt, capUsd } });
     return { id, token, expiresAt };
   });
+}
+
+/** How recent the sign-in must be to mint a token (POST /api/agent-access/tokens): a stolen long-lived cookie alone cannot. */
+export const TOKEN_CREATE_FRESH_MS = 10 * 60 * 1000;
+
+/**
+ * The gate of the Settings "Kết nối AI" routes: an Admin's own cookie session (an agent is refused by the deny set below), not one opened with
+ * "sign in as", and for a write a request this app's page sent (sameOrigin).
+ */
+export async function tokenAdmin(request: Request) {
+  const g = await guard(request, 'admin');
+  if (g.error) return g;
+  if (isImpersonated(g.session)) return { error: impersonationRefusal() };
+  if (request.method !== 'GET' && !sameOrigin(request)) return { error: fail('forbidden origin', 403) };
+  return g;
 }
 
 // The identity set an agent never touches (users, credentials, sessions, impersonation, tokens), every method; and the writes that change a name or email or create accounts.
