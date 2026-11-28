@@ -135,6 +135,21 @@ describe('confirm tokens', () => {
     expect(readConfirm(dashed, bound)).toMatchObject({ estimate: '-' });
     expect(readConfirm(signConfirm(bound, '-', Date.now() - 11 * 60_000).confirmToken, bound)).toBe('confirm_expired');
   });
+
+  test('are never signed or read with an empty key', () => {
+    const { confirmToken } = signConfirm(bound, '-');
+    const secret = process.env.BETTER_AUTH_SECRET;
+    try {
+      for (const unset of [undefined, '']) {
+        if (unset === undefined) delete process.env.BETTER_AUTH_SECRET;
+        else process.env.BETTER_AUTH_SECRET = unset;
+        expect(() => signConfirm(bound, '-')).toThrow(/BETTER_AUTH_SECRET/);
+        expect(() => readConfirm(confirmToken, bound)).toThrow(/BETTER_AUTH_SECRET/);
+      }
+    } finally {
+      process.env.BETTER_AUTH_SECRET = secret;
+    }
+  });
 });
 
 describe('the in-memory rate limiter', () => {

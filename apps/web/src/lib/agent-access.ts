@@ -129,7 +129,11 @@ export function bodyHash(bytes: Uint8Array): string {
   return sha256(bytes).toString('hex');
 }
 
-const confirmKey = () => createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update('cvs-agent-confirm').digest();
+const confirmKey = () => {
+  const secret = process.env.BETTER_AUTH_SECRET;
+  if (!secret) throw new Error('BETTER_AUTH_SECRET is not set: agent confirm tokens cannot be signed');
+  return createHmac('sha256', secret).update('cvs-agent-confirm').digest();
+};
 type Bound = { tokenId: string; method: string; path: string; hash: string };
 const macOf = (b: Bound, estimate: string, nonce: string, exp: string) =>
   createHmac('sha256', confirmKey()).update([b.tokenId, b.method, b.path, b.hash, estimate, nonce, exp].join('|')).digest();
