@@ -381,6 +381,15 @@ describe('the write confirm', () => {
   });
 });
 
+describe('review fixes', () => {
+  test('failed sign-ins from one IPv6 /64 share one limit', async () => {
+    const wrong = `cvs_pat_${'C'.repeat(12)}_${'D'.repeat(43)}`;
+    for (let i = 0; i < 20; i++) expect((await limits.GET(as(wrong, '/api/me/limits', { headers: { 'cf-connecting-ip': `2001:db8:1:2::${i + 1}` } }))).status).toBe(401);
+    expect((await limits.GET(as(wrong, '/api/me/limits', { headers: { 'cf-connecting-ip': '2001:db8:1:2:ffff::1' } }))).status).toBe(429);
+    expect((await limits.GET(as(wrong, '/api/me/limits', { headers: { 'cf-connecting-ip': '2001:db8:1:3::1' } }))).status).toBe(401);
+  });
+});
+
 test('no token, secret or hash reaches a log line', () => {
   const joined = logged.join('\n');
   expect(joined).not.toMatch(/cvs_(pat|oat|ort)_/);

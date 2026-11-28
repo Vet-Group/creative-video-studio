@@ -155,19 +155,39 @@ export function readConfirm(token: string, b: Bound): { nonce: string; estimate:
 }
 
 // shortcut: in memory, for the single cvs-web process; move to Postgres if the web runs 2+ processes.
-const hits = new Map<string, number[]>();
-/** Seconds to wait when `key` already had `max` hits in the last minute, else 0 (and, with `count`, records this one). */
-function limited(key: string, max: number, count = true): number {
+/** The hits of the last minute per key (exported for tests). Only keys with a hit are kept. */
+export const hits = new Map<string, number[]>();
+/** Past this many keys a key not yet tracked waits: forgetting a tracked key would reset its limit, so a flood of new IPs cannot wash one out. */
+export const MAX_RATE_KEYS = 50_000;
+let swept = 0;
+/** Seconds to wait when `key` already had `max` hits in the last minute (or is new while MAX_RATE_KEYS are tracked), else 0 (and, with `count`, records this one). */
+export function limited(key: string, max: number, count = true): number {
   const now = Date.now();
-  if (hits.size > 10_000) for (const [k, v] of hits) if (v.at(-1)! <= now - 60_000) hits.delete(k);
-  const recent = (hits.get(key) ?? []).filter((t) => t > now - 60_000);
+  // Swept at most every 5 s, so a flood of new keys costs one pass per 5 s, not one per request.
+  if (now - swept >= 5_000) {
+    swept = now;
+    for (const [k, v] of hits) if (!(v.at(-1)! > now - 60_000)) hits.delete(k);
+  }
+  const known = hits.get(key);
+  if (!known && hits.size >= MAX_RATE_KEYS) return 60;
+  const recent = (known ?? []).filter((t) => t > now - 60_000);
   if (recent.length >= max) {
     hits.set(key, recent);
     return Math.max(1, Math.ceil((recent[0]! + 60_000 - now) / 1000));
   }
   if (count) recent.push(now);
-  hits.set(key, recent);
+  if (recent.length) hits.set(key, recent);
+  else hits.delete(key);
   return 0;
+}
+/** The failed-sign-in key of a client IP: an IPv6 address by its /64 (one subscriber holds the whole /64), any other value as is. */
+export function ipKey(ip: string): string {
+  if (!ip.includes(':') || /^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(ip)) return ip.replace(/^::ffff:/i, '');
+  const [head = '', tail] = ip.split('%')[0]!.split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const groups = tail === undefined ? left : [...left, ...Array<string>(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right];
+  return `${groups.slice(0, 4).map((g) => parseInt(g, 16).toString(16)).join(':')}::/64`;
 }
 const tooMany = (seconds: number) => Response.json({ error: 'rate_limited' }, { status: 429, headers: { 'X-Retry-After': String(seconds) } });
 
@@ -189,11 +209,12 @@ export async function agentSession(request: Request): Promise<Resolved> {
   // No CORS headers are sent, so a page of another origin cannot add Authorization; a request with both credentials is refused outright.
   if (SESSION_COOKIE.test(request.headers.get('cookie') ?? '')) return { error: fail('ambiguous_credentials', 400) };
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
-  const waitIp = limited(`fail:${ip}`, 20, false);
+  const failKey = `fail:${ipKey(ip)}`;
+  const waitIp = limited(failKey, 20, false);
   if (waitIp) return { error: tooMany(waitIp) };
   const found = await lookup(token);
   if (typeof found === 'string') {
-    limited(`fail:${ip}`, 20);
+    limited(failKey, 20);
     console.warn(`agent.auth_fail ${JSON.stringify({ reason: found, ip })}`);
     return { error: fail('unauthenticated', 401) };
   }

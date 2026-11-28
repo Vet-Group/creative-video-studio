@@ -2,7 +2,7 @@
 // Postgres), the identity deny matcher, the exact confirm exemptions, canonical JSON and the confirm token.
 import { createHash, randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -10,7 +10,7 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 
 const { pool } = await import('@/lib/auth');
-const { agentDenied, bodyHash, canonicalJSON, confirmExempt, createPat, MAX_ACTIVE_TOKENS, newPat, readConfirm, signConfirm } = await import('./agent-access');
+const { agentDenied, bodyHash, canonicalJSON, confirmExempt, createPat, hits, ipKey, limited, MAX_ACTIVE_TOKENS, MAX_RATE_KEYS, newPat, readConfirm, signConfirm } = await import('./agent-access');
 
 beforeAll(async () => {
   await pool.query(`insert into users (id, email, name, role) values ('u-admin', 'a@example.test', 'A', 'admin')`);
@@ -134,5 +134,57 @@ describe('confirm tokens', () => {
     const dashed = signConfirm(bound, '-').confirmToken;
     expect(readConfirm(dashed, bound)).toMatchObject({ estimate: '-' });
     expect(readConfirm(signConfirm(bound, '-', Date.now() - 11 * 60_000).confirmToken, bound)).toBe('confirm_expired');
+  });
+});
+
+describe('the in-memory rate limiter', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    hits.clear();
+  });
+  const expired = (n: number, at: number) => {
+    for (let i = 0; i < n; i++) hits.set(`old:${i}`, [at - 61_000]);
+  };
+
+  test('a check that records nothing stores nothing', () => {
+    for (let i = 0; i < 1000; i++) expect(limited(`fail:198.51.100.${i}`, 20, false)).toBe(0);
+    expect(hits.size).toBe(0);
+  });
+
+  test('expired keys are swept at most once every 5 seconds, however many keys there are', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const t0 = Date.now();
+    limited('k', 5);
+    expired(10_001, t0);
+    vi.setSystemTime(t0 + 1_000);
+    limited('k', 5);
+    expect(hits.size).toBe(10_002); // no sweep within 5 s, even past 10k keys
+    vi.setSystemTime(t0 + 6_000);
+    limited('k', 5);
+    expect([...hits.keys()]).toEqual(['k']);
+    expired(3, t0 + 6_000);
+    vi.setSystemTime(t0 + 11_000);
+    limited('k', 5);
+    expect([...hits.keys()]).toEqual(['k']); // a small map is swept too
+  });
+
+  test('past MAX_RATE_KEYS live keys a new key waits and is not stored; a tracked key still counts', () => {
+    const now = Date.now();
+    for (let i = 0; i < MAX_RATE_KEYS - 1; i++) hits.set(`live:${i}`, [now]);
+    expect(limited('tracked', 5)).toBe(0);
+    expect(limited('new', 5)).toBeGreaterThan(0);
+    expect(limited('new', 5, false)).toBeGreaterThan(0);
+    expect(hits.has('new')).toBe(false);
+    expect(limited('tracked', 5)).toBe(0);
+    expect(hits.get('tracked')).toHaveLength(2);
+  });
+
+  test('an IPv6 client is keyed by its /64, an IPv4 client by its address', () => {
+    expect(ipKey('2001:db8:1:2::a')).toBe(ipKey('2001:0db8:0001:0002:ffff:1:2:3'));
+    expect(ipKey('2001:db8:1:2::a')).not.toBe(ipKey('2001:db8:1:3::a'));
+    expect(ipKey('::1')).toBe('0:0:0:0::/64');
+    expect(ipKey('203.0.113.7')).toBe('203.0.113.7');
+    expect(ipKey('::ffff:203.0.113.7')).toBe('203.0.113.7');
+    expect(ipKey('unknown')).toBe('unknown');
   });
 });
