@@ -279,6 +279,8 @@ export const USERS = {
   // popular.e2e: the week's Run counts on the Apps cards and Explore's sort, seen from a workspace of its own (popw) and from the company's (popv).
   popw: { email: 'popw@e2e.test', name: 'E2E Popular W', role: 'member' },
   popv: { email: 'popv@e2e.test', name: 'E2E Popular V', role: 'member' },
+  // agent-bearer-page.e2e: an Admin whose access token opens the API but never a page.
+  agentadm: { email: 'agentadm@e2e.test', name: 'E2E Agent Admin', role: 'admin' },
 } as const;
 
 export type UserKey = keyof typeof USERS;
