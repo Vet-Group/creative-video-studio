@@ -6,6 +6,8 @@ import { canSkipCi, checkPr, ciVerdict, IN_FLIGHT_SQL, parseInFlight, parseStatu
 const HEAD = 'a'.repeat(40);
 const MERGE = 'b'.repeat(40);
 const MAIN = 'c'.repeat(40);
+const PREV = '9'.repeat(40);
+const DESC = 'd'.repeat(40);
 const T1 = '1'.repeat(40);
 const T2 = '2'.repeat(40);
 const pr = (over: Record<string, unknown> = {}, checks: unknown[] = [{ __typename: 'CheckRun', name: 'CI', status: 'COMPLETED', conclusion: 'SUCCESS' }]) =>
@@ -124,20 +126,25 @@ function harness(handlers: [RegExp, (call: string) => Partial<{ code: number; st
 const ok = (stdout = '') => () => ({ stdout });
 const green = [{ name: 'CI', status: 'completed', conclusion: 'success' }, { name: 'E2E', status: 'completed', conclusion: 'skipped' }];
 const statusOut = (sha: string) => `commit ${sha}\ncvs-web.service loaded active running web\ncvs-worker.service loaded active running worker\n`;
-const statusSeq = () => {
+const statusSeq = (after = MERGE.slice(0, 7)) => {
   let n = 0;
-  return () => ({ stdout: statusOut(n++ ? MERGE.slice(0, 7) : '1234567') });
+  return () => ({ stdout: statusOut(n++ ? after : '1234567') });
 };
+/** `git merge-base --is-ancestor A D` succeeds only for the listed pairs. */
+const ancestry = (pairs: [string, string][]) => (call: string) => ({ code: pairs.some(([a, dd]) => call.endsWith(` ${a} ${dd}`)) ? 0 : 1 });
 const prod = [
   [/ssh .*psql/, ok('0|0|0')],
   [/vet\.sh status/, ok(statusOut('1234567'))],
   [/git -C \/repo log/, ok('Add b (#12)\nAdd a (#11)\n')],
+  [/rev-parse --verify 1234567/, ok(PREV)],
 ] as [RegExp, () => object][];
 const readback = [
   [/vet\.sh (backup|deploy)/, ok()],
   [/^curl .*\/login/, ok('200')],
   [/ssh .*curl/, ok('200')],
   [/ssh .*journalctl/, ok('3\n')],
+  [/rev-parse --verify b{7}\^/, ok(MERGE)],
+  [/merge-base --is-ancestor/, ancestry([[MERGE, MERGE]])],
 ] as [RegExp, () => object][];
 const merged = (head = HEAD, mergeTree = T1, headTree = T1) =>
   [
@@ -151,6 +158,29 @@ const merged = (head = HEAD, mergeTree = T1, headTree = T1) =>
     [new RegExp(`rev-parse ${head}\\^\\{tree\\}`), ok(headTree)],
   ] as [RegExp, () => object][];
 const names = (calls: string[]) => calls.filter((c) => /gh pr merge|vet\.sh (backup|deploy)/.test(c));
+
+describe('ship when main moved', () => {
+  const setup = (after: string, extra: [RegExp, (call: string) => object][], opts: Partial<Options> = { pr: 5 }) =>
+    harness([...extra, ...merged(), ...prod.slice(0, 1), [/vet\.sh status/, statusSeq(after)], ...prod.slice(2), ...readback], opts);
+
+  test('accepts prod running a descendant of the target and lists the PRs up to it', async () => {
+    const h = setup('ddddddd', [[/rev-parse --verify d{7}/, ok(DESC)], [/merge-base --is-ancestor/, ancestry([[MERGE, DESC]])]]);
+    expect(await h.run()).toBe(`deployed ${'d'.repeat(8)} (#11, #12), verified`);
+    expect(h.calls).toContain(`git -C /repo log --format=%s 1234567..${DESC}`);
+    expect(h.logs.join('\n')).toContain('a descendant of');
+  });
+
+  test('refuses prod running a commit that does not contain the target', async () => {
+    const h = setup('ddddddd', [[/rev-parse --verify d{7}/, ok(DESC)], [/merge-base --is-ancestor/, ancestry([])]]);
+    await expect(h.run()).rejects.toThrow(/not bbbbbbbb or a descendant/);
+  });
+
+  test('skips the deploy when prod already contains the target', async () => {
+    const h = harness([[/merge-base --is-ancestor/, ancestry([[MAIN, PREV]])], [/rev-parse origin\/main/, ok(MAIN)], [/git -C \/repo fetch/, ok()], [/gh run list/, ok(JSON.stringify(green))], ...prod, ...readback]);
+    expect(await h.run()).toContain('nothing to ship');
+    expect(names(h.calls)).toEqual([]);
+  });
+});
 
 describe('ship', () => {
   test('dry run with no PR reads prod and changes nothing', async () => {

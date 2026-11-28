@@ -257,13 +257,20 @@ export async function ship(opts: Options, d: Deps): Promise<string> {
   const prev = before.code === 0 ? parseStatus(before.stdout).commit : null;
   if (!prev) return fail(`could not read the current prod commit from vet.sh status (exit ${before.code}): ${before.stderr.trim()}`);
   log(`prod runs ${prev}`);
-  if (target && target.startsWith(prev)) {
-    log(`prod already runs ${target.slice(0, 8)}; nothing to ship`);
-    return `nothing to ship, prod already runs ${prev}`;
+  // The gate deploys whatever main is at, so prod may run a descendant of the target: "contains" is an ancestor test, not equality.
+  const contains = (ancestor: string, descendant: string) => git('merge-base', '--is-ancestor', ancestor, descendant).code === 0;
+  const prevFull = git('rev-parse', '--verify', `${prev}^{commit}`);
+  if (prevFull.code !== 0) log(`WARN: prod commit ${prev} is not in this checkout, so "already deployed" and the PR list cannot be checked`);
+  else if (target && contains(target, prevFull.stdout.trim())) {
+    log(`prod already contains ${target.slice(0, 8)}; nothing to ship`);
+    return `nothing to ship, prod already runs ${prev}, which contains ${target.slice(0, 8)}`;
   }
-  const range = git('log', '--format=%s', `${prev}..${target ?? mainHead}`);
-  if (range.code !== 0) log(`WARN: git log ${prev}..${(target ?? mainHead).slice(0, 8)} failed, so the PR list may be incomplete: ${range.stderr.trim()}`);
-  const prs = prsFromLog(range.stdout);
+  const prsBetween = (to: string) => {
+    const range = git('log', '--format=%s', `${prev}..${to}`);
+    if (range.code !== 0) log(`WARN: git log ${prev}..${to.slice(0, 8)} failed, so the PR list may be incomplete: ${range.stderr.trim()}`);
+    return prsFromLog(range.stdout);
+  };
+  const prs = prsBetween(target ?? mainHead);
   if (extraPr !== null && !prs.includes(extraPr)) prs.push(extraPr);
 
   if (dry) {
@@ -284,9 +291,14 @@ export async function ship(opts: Options, d: Deps): Promise<string> {
   log('step 7: read-back');
   const st = vet('status');
   const parsed = st.code === 0 ? parseStatus(st.stdout) : null;
-  if (!parsed?.commit || !sha.startsWith(parsed.commit)) fail(`vet.sh status shows ${parsed?.commit ?? 'no commit'}, expected ${sha.slice(0, 8)}`);
-  for (const unit of ['cvs-web.service', 'cvs-worker.service']) if (!parsed!.active[unit]) fail(`${unit} is not active`);
-  log(`status shows ${sha.slice(0, 8)}, cvs-web and cvs-worker active`);
+  if (!parsed?.commit) return fail(`vet.sh status shows no commit (exit ${st.code})`);
+  mustGit('git fetch', 'fetch', 'origin', '--quiet');
+  const actualRev = git('rev-parse', '--verify', `${parsed.commit}^{commit}`);
+  const actual = actualRev.stdout.trim();
+  if (actualRev.code !== 0 || !contains(sha, actual)) fail(`vet.sh status shows ${parsed.commit}, which is not ${sha.slice(0, 8)} or a descendant of it`);
+  for (const unit of ['cvs-web.service', 'cvs-worker.service']) if (!parsed.active[unit]) fail(`${unit} is not active`);
+  log(actual === sha ? `status shows ${sha.slice(0, 8)}, cvs-web and cvs-worker active` : `status shows ${actual.slice(0, 8)}, a descendant of ${sha.slice(0, 8)} (main moved); cvs-web and cvs-worker active`);
+  prs.splice(0, prs.length, ...prsBetween(actual));
   const code = async (what: string, run: () => RunResult) => {
     let out = '';
     for (let i = 0; i < 6; i++) {
@@ -304,7 +316,7 @@ export async function ship(opts: Options, d: Deps): Promise<string> {
   const errors = Number(j.stdout.trim());
   log(j.code === 0 && Number.isInteger(errors) ? `worker journal: ${errors} error/fatal lines since ${since}${errors ? ' (WARN: read them)' : ''}` : `WARN: could not count worker journal errors: ${j.stderr.trim()}`);
 
-  const line = summaryLine(sha, prs);
+  const line = summaryLine(actual, prs);
   log(line);
   return line;
 }

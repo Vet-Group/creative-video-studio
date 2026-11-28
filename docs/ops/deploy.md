@@ -44,7 +44,8 @@ pnpm ship <PR> --dry-run      # read-only: PR checks, CI status, in-flight count
 pnpm ship --wait-idle <min>   # how long to wait for in-flight work (default 20)
 ```
 
-`pnpm ship` needs the standing permission above and `CVS_VET_HOST` set as for `vet.sh`; `CVS_SSH_HOST` (default `vet-linux`)
+Run `pnpm ship` from the main checkout. `vet.sh` needs the standing permission above, whose run manifest exists only there; in a
+worktree it fails with "no run manifest: the run has not been approved". Set `CVS_VET_HOST` as for `vet.sh`; `CVS_SSH_HOST` (default `vet-linux`)
 is the ssh profile used for the in-flight count and the read-back. It stops at the first failure with a non-zero exit and never
 retries a merge or a deploy. In order:
 
@@ -56,7 +57,8 @@ retries a merge or a deploy. In order:
    up to 40 minutes for the workflows `CI` and `E2E` on the merge commit (success or skipped), failing fast on a failure or cancel.
 3. It waits until no row in `jobs`, `analyses` or `remakes` is in a non-terminal state on prod (`--wait-idle`), then runs
    `vet.sh backup` and `vet.sh deploy <full sha>`.
-4. Read-back: `vet.sh status` shows the target commit with `cvs-web` and `cvs-worker` active, `/login` answers 200 publicly and on
+4. Read-back: `vet.sh status` shows the target commit, or a descendant of it when `main` moved before the gate ran (the gate deploys
+   whatever `main` is at), with `cvs-web` and `cvs-worker` active, `/login` answers 200 publicly and on
    the host, and it counts `error|fatal` lines in the `cvs-worker` journal since the deploy started (a warning, not a failure).
 
 Two sessions can run `pnpm ship` at the same moment: the second deploy waits on `ops.lock` (`install.sh`, shared with backup)
