@@ -287,6 +287,10 @@ export const USERS = {
   agentmem: { email: 'agentmem@e2e.test', name: 'E2E Agent Member', role: 'member' },
   // agent-oauth.e2e: an Admin who approves an MCP client on the consent page and disconnects it in Settings.
   agentoauth: { email: 'agentoauth@e2e.test', name: 'E2E Agent OAuth', role: 'admin' },
+  // image-cls.e2e: opens Image Generation and measures its layout shifts; makes no job.
+  clsimg: { email: 'clsimg@e2e.test', name: 'E2E CLS Image', role: 'member' },
+  // home-redirect.e2e: a member of a team that lands on Explore.
+  homea: { email: 'homea@e2e.test', name: 'E2E Home A', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;

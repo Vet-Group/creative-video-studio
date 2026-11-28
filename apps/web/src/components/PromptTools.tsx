@@ -41,7 +41,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
   const { jobs } = useJobs();
   const ai = useSuggest();
   const tr = useTranslate(value.trim());
-  const [prompts, setPrompts] = useState<string[]>([]);
+  const [prompts, setPrompts] = useState<string[] | null>(null); // null until the first answer: the Recent button is held in its place, so its arrival does not wrap the toolbar
   const [open, setOpen] = useState<'ai' | 'recent' | 'vi' | null>(null);
   // A reading is of the words it was asked for: new words close it.
   useEffect(() => setOpen((o) => (o === 'vi' ? null : o)), [value]);
@@ -56,7 +56,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
   const has = (p: PromptPart) => parts.includes(p);
 
   const load = useCallback(
-    () => void api<{ prompts: string[] }>(`/api/recent-prompts?feature=${feature}${format ? `&format=${format}` : ''}`).then((r) => setPrompts(r.prompts), () => undefined),
+    () => void api<{ prompts: string[] }>(`/api/recent-prompts?feature=${feature}${format ? `&format=${format}` : ''}`).then((r) => setPrompts(r.prompts), () => setPrompts((p) => p ?? [])),
     [feature, format],
   );
   // Again whenever a new job shows in the tray, so the words of a Run just sent are there.
@@ -106,8 +106,8 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
           {!compact && aiName}
         </button>
       )}
-      {has('recent') && prompts.length > 0 && (
-        <button type="button" className={btn} aria-expanded={open === 'recent'} aria-label="Mô tả gần đây" title={compact ? 'Mô tả gần đây' : undefined} onClick={() => (open === 'recent' ? setOpen(null) : (load(), setOpen('recent')))}>
+      {has('recent') && (!prompts || prompts.length > 0) && (
+        <button type="button" className={btn} style={prompts ? undefined : { visibility: 'hidden' }} disabled={!prompts} aria-expanded={open === 'recent'} aria-label="Mô tả gần đây" title={compact ? 'Mô tả gần đây' : undefined} onClick={() => (open === 'recent' ? setOpen(null) : (load(), setOpen('recent')))}>
           <Icon name="clock" size={13} />
           {!compact && <span aria-hidden="true">Gần đây</span>}
         </button>
@@ -217,7 +217,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
           <div className={s.popHead}>
             <span>Mô tả bạn đã dùng gần đây</span>
           </div>
-          {prompts.map((p) => (
+          {prompts?.map((p) => (
             <button key={p} type="button" className={s.option} onClick={() => pick(p)}>
               {p}
             </button>

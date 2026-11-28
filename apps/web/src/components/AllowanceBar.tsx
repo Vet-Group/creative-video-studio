@@ -64,8 +64,8 @@ export function freeLeftText({ monthUsd, freeUsd }: { monthUsd: string; freeUsd:
  * workspace, a non-billing team or no team shows nothing (the Run button already carries the price).
  * shortcut: read once when the form opens, so the team's spend since then shows after a reload; poll or refetch after a Run if sellers ask.
  */
-export function FreeLeft({ className = 'run-summary run-free' }: { className?: string }) {
-  const [team, setTeam] = useState<{ monthUsd: string; freeUsd: string } | null>(null);
+export function FreeLeft({ className = 'run-summary run-free', reserve = false }: { className?: string; reserve?: boolean }) {
+  const [team, setTeam] = useState<{ monthUsd: string; freeUsd: string } | null | undefined>(undefined); // undefined until the answer
   useEffect(() => {
     let live = true;
     api<{ team?: { monthUsd: string; freeUsd: string } }>('/api/me/limits').then(
@@ -77,5 +77,11 @@ export function FreeLeft({ className = 'run-summary run-free' }: { className?: s
     };
   }, []);
   const text = team && freeLeftText(team);
-  return text ? <p className={className}>{text}</p> : null;
+  if (text) return <p className={className}>{text}</p>;
+  // `reserve`: the page knows the line will show, so its row is held until the answer lands and the rows under it stay where they are.
+  return reserve && team === undefined ? (
+    <p className={className} aria-hidden="true" style={{ visibility: 'hidden' }}>
+      &nbsp;
+    </p>
+  ) : null;
 }
