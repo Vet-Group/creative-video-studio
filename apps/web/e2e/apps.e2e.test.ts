@@ -140,6 +140,51 @@ test('Media Optimizer: removing the image during a run frees the form instead of
   await expect(runButton(page)).toBeEnabled(); // the next image runs again
 });
 
+// Kiểm chuẩn sàn and Ảnh chính Amazon: the checks of dlazy-ai/ecommerce-skills platform-compliance and the white fill of rlvb/posewear (both MIT).
+test('Media Optimizer: the marketplace checks fail a product on a light grey wall, and Ảnh chính Amazon makes a 2000 px JPEG that passes them', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'appsa');
+  await page.goto('/apps/media-optimizer');
+  await expect(page.getByLabel('Ảnh cần tối ưu')).toBeEnabled();
+  // A 1200 × 900 photo: a dark 300 × 400 product on a wall of RGB 244, 244, 241, which looks white.
+  const drawn = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    [c.width, c.height] = [1200, 900];
+    const x = c.getContext('2d')!;
+    x.fillStyle = 'rgb(244, 244, 241)';
+    x.fillRect(0, 0, 1200, 900);
+    x.fillStyle = 'rgb(30, 60, 90)';
+    x.fillRect(450, 250, 300, 400);
+    return c.toDataURL('image/png');
+  });
+  await page.getByLabel('Ảnh cần tối ưu').setInputFiles({ name: 'tee.png', mimeType: 'image/png', buffer: Buffer.from(drawn.split(',')[1]!, 'base64') });
+  const look = 'Tự xem lại: không chữ, logo thừa, hình mờ, viền hay ghép nhiều ảnh';
+  const shot = (name: string) => page.screenshot({ path: process.env.CVS_E2E_SHOTS ? `${process.env.CVS_E2E_SHOTS}/${name}.png` : test.info().outputPath(`${name}.png`) });
+  await expect(page.getByRole('list', { name: 'Kiểm ảnh theo Amazon' }).getByRole('listitem')).toHaveText(['Nền chưa trắng tinh: 0% mép ảnh đạt, cần 98%', 'Cạnh dài 1200 px, nên từ 1600 px', 'Sản phẩm chỉ chiếm khoảng 44% khung, nên từ 85%', 'Định dạng PNG', 'Dung lượng dưới 10 MB', look]);
+  await page.getByRole('group', { name: 'Kiểm chuẩn sàn' }).getByRole('button', { name: 'TikTok Shop' }).click();
+  await expect(page.getByRole('list', { name: 'Kiểm ảnh theo TikTok Shop' })).toContainText('Cần tỉ lệ 1:1 hoặc 3:4');
+  await page.getByRole('group', { name: 'Kiểm chuẩn sàn' }).getByRole('button', { name: 'Amazon' }).click();
+  await shot('optimizer-checks-1440');
+
+  await page.getByRole('button', { name: 'Ảnh chính Amazon' }).click();
+  await expect(page.getByText('nền gần trắng được tô thành trắng tinh')).toBeVisible();
+  await runButton(page).click();
+  const history = page.getByRole('complementary', { name: 'Kết quả trong phiên này' });
+  await expect(history.getByRole('link', { name: 'Tải xuống' })).toHaveAttribute('download', 'tee-amazon.jpg');
+  await expect(history).toContainText('2000 × 2000 px');
+  // The wall is pure white and the product fills 85%: its 400 px grew to 1700 px, 4.25 times.
+  await expect(history.getByRole('list', { name: 'Kiểm tee-amazon.jpg theo Amazon' }).getByRole('listitem')).toHaveText(['Nền trắng tinh ở mép ảnh', 'Cạnh dài 2000 px', 'Sản phẩm chiếm khoảng 85% khung', 'Định dạng JPG', 'Dung lượng dưới 10 MB', 'Ảnh gốc nhỏ nên sản phẩm được phóng to 4.3 lần, có thể mờ', look]);
+  await shot('optimizer-amazon-result-1440');
+
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.getByRole('tab', { name: 'Tạo' }).click();
+  await expect(page.getByRole('list', { name: 'Kiểm ảnh theo Amazon' })).toBeVisible();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.getByRole('group', { name: 'Kiểm chuẩn sàn' }).scrollIntoViewIfNeeded();
+  await shot('optimizer-checks-390-dark');
+  expect(await fits(page)).toBe(true);
+});
+
 test('Background Remover takes several photos: one shows whole with a corner tile to add more, and Run sends one job per photo under one batch id', async ({ page }) => {
   await signIn(page, 'bulka');
   await openApp(page, 'Xoá nền', 'background-remover');

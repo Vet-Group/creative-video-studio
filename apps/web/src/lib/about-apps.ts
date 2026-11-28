@@ -19,7 +19,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Tối ưu media là gì?',
         blocks: [
-          'Tối ưu media là công cụ nén ảnh, đổi kích thước và chuyển định dạng trong một lần chạy. Bạn đưa vào một ảnh, gõ chiều rộng và chiều cao mới nếu cần, chọn PNG, JPG hoặc WEBP, rồi bấm Chạy để nhận một tệp mới, nhẹ hơn. Nút Ảnh listing Etsy/Shopify làm cùng lúc tới 50 ảnh vuông cho trang bán hàng.',
+          'Tối ưu media là công cụ nén ảnh, đổi kích thước và chuyển định dạng trong một lần chạy. Bạn đưa vào một ảnh, gõ chiều rộng và chiều cao mới nếu cần, chọn PNG, JPG hoặc WEBP, rồi bấm Chạy để nhận một tệp mới, nhẹ hơn. Nút Ảnh listing Etsy/Shopify làm cùng lúc tới 50 ảnh vuông cho trang bán hàng; mục Kiểm chuẩn sàn và nút Ảnh chính Amazon giúp ảnh chính qua được quy định của sàn.',
           'Công cụ miễn phí và chạy hoàn toàn trong trình duyệt của bạn: ảnh không được tải lên máy chủ, không dùng mô hình AI và không tính vào ngân sách nào. Hiện chỉ hỗ trợ ảnh; chưa hỗ trợ video MP4 hoặc WEBM.',
         ],
       },
@@ -43,6 +43,14 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         blocks: [
           'Bấm nút Ảnh listing Etsy/Shopify trên form. Mỗi ảnh thành một ảnh JPG vuông 2048 × 2048 px: giữ trọn ảnh, thêm nền trắng xung quanh và tô trắng vùng trong suốt, vì Etsy hiện ảnh PNG trong suốt trên nền đen. Kích thước và định dạng đã cố định, nên hai ô Kích thước và mục Định dạng tắt trong lúc nút này bật.',
           'Thêm tối đa 50 ảnh PNG, JPG hoặc WEBP, mỗi ảnh tối đa 20 MB, rồi bấm Chạy. Các ảnh được làm lần lượt ngay trong trình duyệt và gom vào một tệp .zip trong tab Lịch sử; một ảnh thì tải về một tệp JPG như thường. Tắt nút để quay lại một ảnh mỗi lần chạy.',
+        ],
+      },
+      {
+        title: 'Kiểm chuẩn sàn và ảnh chính Amazon',
+        lead: 'Xem ảnh đã đạt quy định ảnh chính của Amazon, TikTok Shop, Temu, Shopee hay Shopify chưa, rồi sửa cho đạt chuẩn Amazon.',
+        blocks: [
+          'Khi bạn thêm một ảnh, mục Kiểm chuẩn sàn ghi từng điều kiện đo được: nền trắng tinh ở mép ảnh (Amazon, Temu), cạnh dài, tỉ lệ khung, phần khung sản phẩm chiếm, vùng trong suốt, định dạng và dung lượng. Dòng cuối nhắc bạn tự xem chữ, logo thừa, hình mờ, viền hay ảnh ghép, vì máy không đo được. Một bức tường xám nhạt nhìn như trắng vẫn bị Amazon trả về.',
+          'Nút Ảnh chính Amazon tô nền gần trắng thành trắng tinh, căn sản phẩm vào giữa để chiếm 85% khung và xuất ảnh JPG vuông 2000 × 2000 px. Kết quả trong tab Lịch sử có các dòng kiểm của chính nó, thêm cảnh báo khi ảnh gốc nhỏ phải phóng to; nhiều ảnh một lần thì thẻ ghi số ảnh đạt chuẩn. Nền xám đậm hoặc có màu thì chạy Xoá nền trước.',
         ],
       },
       {
