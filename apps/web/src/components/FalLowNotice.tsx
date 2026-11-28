@@ -20,12 +20,30 @@ export function FalLowText({ balance, warningUsd, billingUrl }: { balance: numbe
   );
 }
 
-/** Admins: the notice on every page while fal's balance is low, read once when the app loads; a failed read shows nothing. */
+type Low = { balance: number; warningUsd: number; billingUrl: string };
+const CACHE_KEY = 'cvs.fal-low';
+const CACHE_MS = 5 * 60_000; // the balance moves slowly, and every page load asked the server (and fal) for it
+
+/** Admins: the notice on every page while fal's balance is low, read at most every five minutes of the tab's session; a failed read shows nothing and is not kept. */
 export function FalLowNotice() {
-  const [low, setLow] = useState<{ balance: number; warningUsd: number; billingUrl: string } | null>(null);
+  const [low, setLow] = useState<Low | null>(null);
   useEffect(() => {
+    try {
+      const hit = JSON.parse(sessionStorage.getItem(CACHE_KEY) ?? 'null') as { at: number; low: Low | null } | null;
+      if (hit && Date.now() - hit.at < CACHE_MS) return setLow(hit.low);
+    } catch {
+      // No storage, or a damaged entry: ask the server.
+    }
     api<Balances>('/api/admin/costs/balances')
-      .then((b) => b.fal.low && b.fal.balance !== undefined && setLow({ balance: b.fal.balance, warningUsd: b.warningUsd, billingUrl: b.fal.billingUrl }))
+      .then((b) => {
+        const next = b.fal.low && b.fal.balance !== undefined ? { balance: b.fal.balance, warningUsd: b.warningUsd, billingUrl: b.fal.billingUrl } : null;
+        try {
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), low: next }));
+        } catch {
+          // Storage is full or off: the next page asks again.
+        }
+        setLow(next);
+      })
       .catch(() => {});
   }, []);
   return low && <FalLowText {...low} />;

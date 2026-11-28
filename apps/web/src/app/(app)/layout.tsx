@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { SignOutButton } from '@/app/account/password/ForcedChange';
 import { AboutUpdates } from '@/components/AboutUpdates';
+import { HomeLanding } from '@/components/HomeLanding';
 import { Shell } from '@/components/Shell';
 import { VetLogo } from '@/components/VetLogo';
 import { SmartRemakeGate } from '@/components/SmartRemakeGate';
@@ -47,7 +48,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     userMethods(pool, user.id),
     // Read here, not from the session, which may be cached from before an Admin moved the user to another team.
     pool.query(
-      `select t.name as team, u.created_at, u.two_factor_enabled, u.avatar_color, (select count(*)::int from passkeys p where p.user_id = u.id) as passkeys from users u join teams t on t.id = u.team_id where u.id = $1`,
+      `select t.name as team, t.default_tool, u.created_at, u.two_factor_enabled, u.avatar_color, (select count(*)::int from passkeys p where p.user_id = u.id) as passkeys from users u join teams t on t.id = u.team_id where u.id = $1`,
       [user.id],
     ),
     activeWorkspaces(user.id, user.impersonatedBy),
@@ -71,6 +72,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <SmartRemakeGate enabled={smartRemakeAppEnabled()}>
       {/* The workspace this page rendered with: lib/api.ts sends it on every write (x-cvs-workspace). */}
       <meta name="cvs-workspace" content={workspaceId} />
+      {/* Same destination as app/page.tsx: the team's tool, else Create. */}
+      <HomeLanding tool={profile.rows[0]?.default_tool ?? '/create'} />
       <Shell userId={user.id} userName={user.name} isAdmin={isAdmin} workspace={{ id: workspaceId, owner: user.workspaceRole === 'owner', company }} workspaces={workspaces} feedbackNew={feedbackNew} analyzeEnabled={reaAnalyzeEnabled()} account={account} larkPrompt={larkPrompt && !user.impersonatedBy} impersonating={user.impersonatedBy !== null} changelog={visibleEntries(CHANGELOG, isAdmin).slice(0, 10)} initialCollapsed={(await cookies()).get(COLLAPSED_COOKIE)?.value === '1'}>
         <AboutUpdates updates={pageUpdates(CHANGELOG)}>{children}</AboutUpdates>
       </Shell>

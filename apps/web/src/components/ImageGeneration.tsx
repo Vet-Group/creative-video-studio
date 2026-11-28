@@ -5,6 +5,7 @@ import { type FocusEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { runTotal } from '@/lib/apps';
 import { type BrandKit, withBrand } from '@/lib/brand';
+import { NARROW_COOKIE } from '@/lib/narrow';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -31,9 +32,13 @@ type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 const NO_PROMPT = 'Nhập mô tả cảnh bạn muốn tạo.';
 
-export function ImageGeneration({ reuse, model }: { reuse?: string; model?: string }) {
+/** `initialNarrow`: the layout the server renders first (lib/narrow.ts), so a phone does not paint the wide one and flip when the page loads. */
+export function ImageGeneration({ reuse, model, initialNarrow, freeLine }: { reuse?: string; model?: string; initialNarrow?: boolean; freeLine?: boolean }) {
   const { refresh, notify, loading } = useJobs();
-  const narrow = useMediaQuery(NARROW);
+  const narrow = useMediaQuery(NARROW, initialNarrow);
+  useEffect(() => {
+    document.cookie = `${NARROW_COOKIE}=${narrow ? '1' : '0'}; path=/; max-age=31536000; samesite=lax`;
+  }, [narrow]);
   const [images, setImages] = useState<Img[]>([]);
   const [prompt, setPrompt, clearDraft] = useDraftState('image', reuse !== undefined);
   const [styleId, setStyleId] = useState(''); // '' for no style
@@ -296,7 +301,7 @@ ${style.prompt}` : prompt.trim();
             </p>
           )}
           {style && <p className="help">Phong cách: {style.label} · thêm vào cuối mô tả của bạn</p>}
-          <FreeLeft className="help" />
+          <FreeLeft className="help" reserve={freeLine} />
           <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
         </div>
 

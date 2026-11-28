@@ -247,7 +247,9 @@
   }
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: 'Inter Variable', Inter, Arial, sans-serif; font-size: 16px; line-height: 24px; color: var(--ink); background: var(--surface); }
+/* Arial sized to Inter's metrics (the values next/font works out for Inter), so text keeps its width and height when Inter arrives and swaps in. */
+@font-face { font-family: 'Inter Fallback'; src: local('Arial'); size-adjust: 107.4%; ascent-override: 90.2%; descent-override: 22.48%; line-gap-override: 0%; }
+body { margin: 0; font-family: 'Inter Variable', Inter, 'Inter Fallback', Arial, sans-serif; font-size: 16px; line-height: 24px; color: var(--ink); background: var(--surface); }
 h1 { font-size: 1.4rem; margin: 0 0 1rem; }
 h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
 p { margin: .25rem 0; }
@@ -2136,7 +2138,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .prompt-final-label { display: block; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .02em; }
 .prompt-preview .prompt-final p { margin: 4px 0 0; color: var(--ink); font-family: ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-preview .prompt-final p + p { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-strong); }
-.prompt-preview .prompt-final strong { font-family: 'Inter Variable', Inter, Arial, sans-serif; } /* a variant's name stays in the page's type */
+.prompt-preview .prompt-final strong { font-family: 'Inter Variable', Inter, 'Inter Fallback', Arial, sans-serif; } /* a variant's name stays in the page's type */
 .about-faq details p { margin: 0; padding: 0 20px 16px; font-size: 14px; line-height: 21px; }
 @container (max-width: 560px) {
   .about-cards, .about-cards[data-cols='3'], .about-steps > li, .about-example { grid-template-columns: minmax(0, 1fr); }
@@ -3583,7 +3585,7 @@ dialog.modal.compare-two { width: min(1100px, calc(100vw - 32px)); max-width: no
   .imagebar .field-label:not(dialog *) { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .imagebar .choice-optional:not(dialog *) { display: none; }
   .imagebar-top { flex-direction: row; align-items: flex-start; }
-  .imagebar-refs { flex: none; min-width: 112px; max-width: 40%; }
+  .imagebar-refs { flex: none; min-width: 144px; max-width: 40%; } /* the head's count and links fit in Inter and in its fallback, so the font swap does not move the prompt box beside it */
   .imagebar-top > :last-child { flex: 1; min-width: 0; }
   .imagebar .slot:not(dialog *) { max-width: 162px; }
   .imagebar .field-head:not(dialog *) { min-height: 18px; }
