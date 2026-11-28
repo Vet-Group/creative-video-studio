@@ -87,10 +87,10 @@ test('the picker opens on the featured models and the families; a family opens b
   await page.keyboard.press('Enter');
   const search = panel.getByRole('combobox', { name: 'Tìm mô hình' });
   const activeIs = async (option: Locator) => expect(search).toHaveAttribute('aria-activedescendant', (await option.getAttribute('id'))!);
-  // It reopens on the chosen model beside the recommended one; Tab reaches the Advanced button, which opens every model on the family that holds the chosen one.
+  // It reopens on the chosen model beside the recommended one; Tab reaches the Advanced button after the filter chips, which opens every model on the family that holds the chosen one.
   await expect(list.getByRole('option')).toHaveText([/^Kling 2\.6/, /^Seedance 2\.0/]);
   await activeIs(list.getByRole('option', { name: /Kling 2\.6/ }));
-  await page.keyboard.press('Tab');
+  for (let i = 0; i < 5; i++) await page.keyboard.press('Tab'); // past the four filter chips
   await expect(panel.getByRole('button', { name: /^Nâng cao/ })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(search).toBeFocused();

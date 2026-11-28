@@ -277,9 +277,13 @@ button.primary:hover:not(:disabled), .runbar button.primary.run:hover:not(:disab
   /* A tool page's tab panel fades in as it shows: a switched-in child mounts, a panel leaving [hidden] restarts its children's animation. Opacity only,
      after the switch, so nothing waits or moves; :where() keeps a child's own animation on top. */
   :where([role='tabpanel'] > :not(dialog)) { animation: panel-in var(--dur-fast) ease-out; }
+  /* The model panel grows out of its button's side (fade and scale, nothing reflows); it closes at once, as the dialogs do, so the focus is back on the button. */
+  .model-pop { animation: model-pop-in var(--dur-fast) var(--ease-out); transform-origin: left top; }
+  .model-pop[data-from='above'] { transform-origin: left bottom; }
 }
 @keyframes toast-in { from { opacity: 0; translate: 0 12px; } }
 @keyframes panel-in { from { opacity: 0; } }
+@keyframes model-pop-in { from { opacity: 0; scale: .96; } }
 select { border: 1px solid transparent; border-radius: 8px; background: var(--fill); }
 /* A select with a see-through background opens its list on the system's white: the options keep the theme's own colours instead. */
 option { background-color: var(--surface); color: var(--ink); }
@@ -1271,7 +1275,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .model-search { display: flex; align-items: center; flex: none; gap: 6px; height: 29px; margin: 12px 21px 8px; padding: 0 10px; border-radius: 8px; background: var(--fill); color: var(--text-muted); }
 .model-search:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 .model-search input { flex: 1; min-width: 0; padding: 0; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 14px; }
-.model-pop [role='listbox'] { overflow-y: auto; padding-bottom: 8px; }
+.model-pop [role='listbox'] { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; } /* a wheel at the list's end does not scroll the page */
 .model-group { padding: 8px 12px 4px; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 .model-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; padding: 6px 12px; cursor: pointer; }
 .model-row[data-active='true'] { background: rgb(var(--tint) / .04); }
@@ -1280,7 +1284,14 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .model-row-text { min-width: 0; }
 .model-name { display: block; font-size: 14px; line-height: 21px; font-weight: 500; }
 .model-sub { display: flex; flex-wrap: wrap; gap: 0 8px; color: var(--text-muted); font-size: 12px; line-height: 18px; }
-.model-empty { margin: 0; padding: 8px 12px; color: var(--text-muted); font-size: 14px; }
+.model-name mark { border-radius: 2px; background: rgb(var(--tint) / .12); color: inherit; font-weight: 600; } /* the characters a search matched */
+.model-chips { display: flex; flex-wrap: wrap; flex: none; gap: 6px; margin: 0 21px 8px; } /* wraps rather than clip a filter */
+.model-chip { min-height: 24px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-muted); font: inherit; font-size: 12px; line-height: 22px; white-space: nowrap; cursor: pointer; }
+.model-chip:hover { border-color: var(--border-strong); color: var(--ink); }
+.model-chip[aria-pressed='true'] { border-color: var(--ink); background: var(--fill); color: var(--ink); font-weight: 600; }
+.model-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: none; padding: 4px 12px 12px; color: var(--text-muted); font-size: 14px; }
+.model-empty p { margin: 0 0 4px; overflow-wrap: anywhere; } /* a long pasted query wraps inside the panel */
+.model-empty button { min-height: 32px; padding: 0 2px; border: 0; background: none; color: var(--link); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
 .model-more { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; margin: 0; padding: 6px 12px; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .model-more:hover { background: rgb(var(--tint) / .04); }
 .model-more:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
@@ -1291,7 +1302,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .model-family > .icon { flex: none; color: var(--text-muted); }
 .model-family[data-open='true'] { background: rgb(var(--tint) / .1); box-shadow: inset 3px 0 var(--brand); }
 /* A family's models: beside the panel (fixed to the screen, placed by the picker), or under the family's row when there is no room. */
-.model-fly[data-side] { position: fixed; z-index: 200; overflow-y: auto; padding: 8px 0; border-radius: 8px; background: var(--surface); box-shadow: 0 4px 16px rgb(var(--shade) / .12); }
+.model-fly[data-side] { position: fixed; z-index: 200; overflow-y: auto; overscroll-behavior: contain; padding: 8px 0; border-radius: 8px; background: var(--surface); box-shadow: 0 4px 16px rgb(var(--shade) / .12); }
 .model-fly:not([data-side]) { background: rgb(var(--tint) / .03); }
 .model-fly:not([data-side]) .model-row { padding-left: 24px; }
 
