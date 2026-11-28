@@ -1,7 +1,8 @@
 # Agent access
 
-An AI agent (Claude Code, a script, an automation) can call the CVS API as the Admin who created its token. This page covers the first release:
-personal access tokens over REST. Code: `apps/web/src/lib/agent-access.ts`, called only from `guard()` in `apps/web/src/lib/session.ts`.
+An AI agent (Claude Code, OpenMausBot, a script, an automation) can call the CVS API as the Admin who created its token, over REST or over MCP
+(below). Code: `apps/web/src/lib/agent-access.ts`, called only from `guard()` in `apps/web/src/lib/session.ts`; the MCP endpoint is
+`apps/web/src/app/api/mcp/route.ts` with `apps/web/src/lib/mcp/`.
 
 ## What a token is
 
@@ -99,7 +100,8 @@ routing and the deny list cannot read one path two ways.
 ## Rate limits
 
 Per token: 120 requests a minute, 30 dry runs a minute, 10 confirmed paid creates a minute. Failed sign-ins: 20 a minute per client IP (an IPv6
-client counts per /64). Over a limit the answer is 429 `rate_limited` with an `X-Retry-After` header in seconds.
+client counts per /64). Over a limit the answer is 429 `rate_limited` with an `X-Retry-After` header in seconds. Over MCP, each request to
+`/api/mcp` (one tool call) counts once against the 120; the dry-run and paid limits apply to tool calls exactly as to REST.
 
 The counters live in the memory of the single web process (they reset on a restart). Failed sign-ins are counted apart from tokens, up to
 50,000 addresses each: past that a new address is not limited (secrets are 256-bit, so guessing is moot), and a token not yet counted waits a
@@ -111,7 +113,8 @@ Never a token, secret or hash; the target is `api_token:<id>`.
 
 | Row | When |
 |---|---|
-| `agent.request` | every agent write that reaches its handler (method, path, workspace, confirm nonce) |
+| `agent.request` | every agent write that reaches its handler (method, path, workspace, confirm nonce), also when an MCP tool made it |
+| `agent.tool` | every MCP tool call, one row (tool, a 16-hex digest of its arguments, outcome); never the arguments |
 | `agent.read` | every agent GET under `/api/admin/` |
 | `agent.refused` | a request refused before its handler: 400 `bad_path`, 403 `not_allowed_for_agent`, 409 `confirm_invalid` / `confirm_expired` / `confirm_used` (method, path, reason) |
 | `agent.token_create`, `agent.token_update`, `agent.token_revoke` | token lifecycle, by the Admin who did it |
@@ -148,7 +151,65 @@ are refused (409 `agent_api_off`) and Settings shows agent access as off. Tokens
 - An agent's analyses and suggestions can pass the cap by the calls already running (see "Monthly cap").
 - The idle-refresh theft window applies only to OAuth refresh tokens, which come in a later update; personal access tokens have no refresh.
 
-## MCP and OAuth: coming in a later update
+## MCP
 
-An MCP endpoint (tools for Claude and other MCP clients, with the same confirms) and OAuth sign-in for clients that cannot hold a token will
-come in a later update. Until then, use a personal access token over REST.
+`POST <host>/api/mcp`, Streamable HTTP, stateless: the 2026-07-28 protocol, and 2025-era clients (`initialize`, then one POST per call) through
+the SDK's stateless fallback (`@modelcontextprotocol/server`). Send the same token as for REST in `Authorization: Bearer`. A request with no
+valid token (a session cookie alone included) is 401 with `WWW-Authenticate: Bearer realm="cvs"` (plus `error="invalid_token"` for a bad
+token; the OAuth update adds `resource_metadata`); `CVS_AGENT_API=0` answers 503. A JSON-RPC batch (an array body) is 400
+`batch_not_supported`: send one message per POST.
+
+The token is checked once per request at `/api/mcp`, as `guard()` checks it, and the request counts one unit of the per-minute limit (its tool
+call included). Each tool then calls the app's own route handler in-process, with the session carried by AsyncLocalStorage (never by a header,
+so no header a client sends can name another session) and honoured only for the requests the tool built: the caps, confirms, deny list, ledger
+and `agent.request` rows are the routes' own. A paid tool refuses `dryRun: true` with a `confirmToken` (`bad_input`), and `library_list` pages
+through the newest 1000 Library items.
+
+**Claude Code**
+
+```sh
+claude mcp add --scope user --transport http cvs https://<host>/api/mcp --header "Authorization: Bearer $CVS_TOKEN"
+claude mcp list   # cvs: ... - Connected
+```
+
+**OpenMausBot**: merge into `mcpServers` in `~/.openmausbot/config.json` (the entry shape OpenMausBot reads: `type`, `url`, `headers`,
+`enabled`):
+
+```json
+{ "mcpServers": { "cvs": { "type": "http", "url": "https://<host>/api/mcp", "headers": { "Authorization": "Bearer <token>" }, "enabled": true } } }
+```
+
+Check either one by asking the AI to call the `whoami` tool of `cvs`.
+
+| Tool | Does | Hints |
+|---|---|---|
+| `whoami` | the user, workspace, connection and its month spend against its cap; call it first | read |
+| `limits_get` | the member caps used and the connection's month spend | read |
+| `models_list` | models of a feature with their price and the recommended one | read |
+| `apps_list` | app features with their input slots, and the published one-tap apps | read |
+| `stores_list` | stores the user may bill | read |
+| `asset_upload` | an image as base64 (at most 5 MB), or a video by presign, PUT, finalize | write, free |
+| `job_create` | a video, image or app job, or a one-tap app run | paid, confirm |
+| `jobs_list` | the user's jobs, newest first, 20 a page with `nextCursor` | read |
+| `job_get` | status, error, output asset and its download path, app url | read |
+| `job_cancel` | cancel a queued job | destructive |
+| `analysis_create` | analyze a video into scenes | paid, confirm |
+| `analysis_get` | status and a short summary of the scenes | read |
+| `remake_create` | Smart Remake of chosen scenes with a product image | paid, confirm |
+| `remake_get` | status, cost, output asset and its download path | read |
+| `library_list` | the workspace Library, 20 a page with `nextCursor` | read |
+
+Read tools carry `readOnlyHint`; the paid ones `openWorldHint` and not idempotent; `job_cancel` `destructiveHint`.
+
+**Confirm through tools.** A paid tool called without `confirmToken` is the dry run: it answers `dryRun: true`, `estimateUsd` (null for an
+analysis, which is not priced upfront), `confirmToken` and the connection's month. The agent shows the estimate to the user and, once they
+agree, calls the tool again with the same arguments plus `confirmToken`. A changed argument is `confirm_invalid`, a changed price
+`confirm_stale` (with the new estimate and token). A `confirmToken` sent a second time is a tool error `confirm_used` with `replay: true` and
+the first answer (`firstAnswer.jobId`), never a second success: read the state (`job_get`) before asking for a new dry run.
+
+**Downloads**: `job_get` and `remake_get` give `downloadPath` (`/api/assets/<id>/content`); fetch it with the same header:
+`curl -H "Authorization: Bearer $CVS_TOKEN" -o clip.mp4 https://<host>/api/assets/<id>/content`. Humans use the item's `url`.
+
+## OAuth: coming in a later update
+
+OAuth sign-in for clients that cannot hold a token will come in a later update. Until then, use a personal access token.

@@ -36,15 +36,15 @@ const COPIED = 'Đã sao chép.';
 const COPY_FAILED = 'Không chép được, hãy bôi đen và chép tay.';
 const usd = (v: string | number) => `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/** The text to paste into each tool, with the token filled in. The MCP endpoint (/api/mcp) ships in a later update; REST works today. */
+/** The text to paste into each tool, with the token filled in: the MCP endpoint (/api/mcp) for Claude Code and OpenMausBot (its mcpServers entry shape), REST for a script. */
 export function snippet(kind: Snippet, origin: string, token: string): string {
   if (kind === 'claude') return `claude mcp add --scope user --transport http cvs ${origin}/api/mcp --header "Authorization: Bearer ${token}"`;
   if (kind === 'mausbot') return JSON.stringify({ mcpServers: { cvs: { type: 'http', url: `${origin}/api/mcp`, headers: { Authorization: `Bearer ${token}` }, enabled: true } } }, null, 2);
   return `curl -H "Authorization: Bearer ${token}" ${origin}/api/me/limits`;
 }
 const SNIPPETS: readonly (readonly [Snippet, string, string])[] = [
-  ['claude', 'Claude Code', 'Chạy lệnh này trong terminal. MCP có trong bản cập nhật tới, nên lệnh chưa kết nối được ngay hôm nay.'],
-  ['mausbot', 'OpenMausBot', 'Gộp vào mcpServers trong ~/.openmausbot/config.json. MCP có trong bản cập nhật tới, nên mục này chưa kết nối được ngay hôm nay.'],
+  ['claude', 'Claude Code', 'Chạy lệnh này trong terminal. Kiểm tra: hỏi AI “gọi whoami của cvs”.'],
+  ['mausbot', 'OpenMausBot', 'Gộp vào mcpServers trong ~/.openmausbot/config.json. Kiểm tra: hỏi AI “gọi whoami của cvs”.'],
   ['rest', 'REST', 'Dùng được ngay: lệnh này trả về hạn mức của bạn, để kiểm tra khoá.'],
 ];
 

@@ -79,7 +79,8 @@ test('the token is shown once with a warning, a copy note, and the setup text of
   expect(html).toMatch(new RegExp(`<input [^>]*readOnly=""[^>]*value="${SECRET}"`, 'i'));
   expect(html).toContain('aria-live="polite"></p>');
   expect(html).toContain('aria-pressed="true">Claude Code</button>');
-  expect(html).toContain('MCP có trong bản cập nhật tới');
+  expect(html).toContain('Kiểm tra: hỏi AI “gọi whoami của cvs”.');
+  expect(html).not.toContain('bản cập nhật tới');
   expect(html).toContain('>Tôi đã lưu khoá</button>');
   expect(render('Đã sao chép.')).toContain('aria-live="polite">Đã sao chép.</p>');
 });

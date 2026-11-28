@@ -85,7 +85,7 @@ async function clipProblem(modelId: string, s3Key: string, size: number): Promis
 }
 
 /**
- * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, whether the worker is offline
+ * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first (`before=<job id>` pages on from that job, `status` and `feature` filter; the MCP jobs_list tool), whether the worker is offline
  * (no heartbeat for 60 s), `clips`: the video clips made today against the daily clip cap, and `queue`: how many jobs of the whole app are queued and how many submitting or running (counts only). `retried` is true once the job has its one manual retry.
  * `failureReason` is `real_person` or `sensitive_input` when the provider refused the job's input image, `output_audio` when it refused the sound it made, `upper_body_image`,
  * `upper_body_video` or `motion_short` when Motion Control could not read its inputs (read from `error`), else null. `unbilled` is true once the ledger closed the job at $0.
@@ -96,7 +96,8 @@ async function clipProblem(modelId: string, s3Key: string, size: number): Promis
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  if (!new URL(request.url).searchParams.has('mine')) return bad('only ?mine is supported');
+  const q = new URL(request.url).searchParams;
+  if (!q.has('mine')) return bad('only ?mine is supported');
   const [jobs, worker, clips, queue] = await Promise.all([
     pool.query(
       `select j.id, j.status, j.error, j.is_mock, j.feature, j.aspect, j.duration_s, j.params, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.started_at, j.finished_at, j.provider_queue_position, j.face_match,
@@ -104,8 +105,11 @@ export async function GET(request: Request) {
               exists (select 1 from favorites f where f.user_id = $1 and f.job_id = j.id) as favorite,
               (select c.usd::text from cost_entries c where c.job_id = j.id and c.kind = 'estimate') as estimate_usd,
               coalesce((select bool_or(c.is_final) and sum(c.usd) = 0 from cost_entries c where c.job_id = j.id), false) as unbilled
-         from jobs j where j.user_id = $1 and j.workspace_id = $2 and j.deleted_at is null order by j.created_at desc, j.id desc limit 20`,
-      [g.session.user.id, g.workspaceId],
+         from jobs j where j.user_id = $1 and j.workspace_id = $2 and j.deleted_at is null
+          and ($3::text is null or (j.created_at, j.id) < (select b.created_at, b.id from jobs b where b.id = $3 and b.user_id = $1))
+          and ($4::text is null or j.status = $4) and ($5::text is null or j.feature = $5)
+        order by j.created_at desc, j.id desc limit 20`,
+      [g.session.user.id, g.workspaceId, q.get('before'), q.get('status'), q.get('feature')],
     ),
     pool.query(`select not exists (select 1 from worker_heartbeat where beat_at > now() - interval '60 seconds') as offline`),
     dailyClips(pool, g.session.user.id),

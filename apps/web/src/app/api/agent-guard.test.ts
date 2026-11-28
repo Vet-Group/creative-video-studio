@@ -24,7 +24,7 @@ for (const level of ['log', 'info', 'warn', 'error', 'debug'] as const) {
 }
 
 const { pool } = await import('@/lib/auth');
-const { agentContext, agentSession, bodyHash, failHits, hits, MAX_RATE_KEYS, newPat, signConfirm } = await import('@/lib/agent-access');
+const { agentContext, agentSession, bodyHash, failHits, hits, inProcessRequests, MAX_RATE_KEYS, newPat, signConfirm } = await import('@/lib/agent-access');
 const { bucketName, ensureBucket, s3 } = await import('@/lib/storage');
 const { stopBoss } = await import('@/lib/queue');
 const { default: sharp } = await import('sharp');
@@ -207,11 +207,20 @@ describe('who a token is', () => {
     const t = await fresh();
     const resolved = await agentSession(as(t.token, '/api/me/limits'));
     const session = resolved!.session!;
-    expect(await agentContext.run(session, async () => (await limits.GET(req('/api/me/limits'))).status)).toBe(200);
+    const inProcess = req('/api/me/limits');
+    inProcessRequests.add(inProcess);
+    expect(await agentContext.run(session, async () => (await limits.GET(inProcess)).status)).toBe(200);
     for (const headers of [{ cookie: 'cvs_ws=ws_b' }, { authorization: 'Bearer anything' }] as Record<string, string>[]) {
       const res = await agentContext.run(session, () => limits.GET(req('/api/me/limits', { headers })));
       expect([res.status, await errorOf(res)]).toEqual([400, 'ambiguous_credentials']);
     }
+  });
+
+  test('the MCP agent context applies only to a request an MCP tool built in-process; any other request in it has no credentials', async () => {
+    const t = await fresh();
+    const session = (await agentSession(as(t.token, '/api/me/limits')))!.session!;
+    const res = await agentContext.run(session, () => limits.GET(req('/api/me/limits')));
+    expect([res.status, await errorOf(res)]).toEqual([401, 'unauthenticated']);
   });
 });
 

@@ -13,6 +13,8 @@ export type AgentInfo = { tokenId: string; kind: 'pat' | 'oauth'; clientId: stri
 
 /** The agent session of an in-process MCP tool call (set only by /api/mcp): guard() takes it from here, never from a header. */
 export const agentContext = new AsyncLocalStorage<RequestSession>();
+/** The requests an MCP tool built in-process (lib/mcp/context.ts, and the custom-app run it delegates): the only ones agentContext's session applies to. */
+export const inProcessRequests = new WeakSet<Request>();
 
 export const CONFIRM_HEADER = 'x-cvs-confirm';
 /** Active (unrevoked, unexpired) connections a user may hold. */
@@ -221,14 +223,17 @@ type Resolved = { session: RequestSession; error?: never } | { error: Response; 
 
 /**
  * The agent session of a request, an error, or null (not an agent request: the cookie session applies). An MCP tool call's session comes from agentContext
- * and only when the request carries no cookie and no Authorization header. A `Bearer cvs_pat_` token is refused (401) when unknown, revoked, expired, its
+ * and only for a request in inProcessRequests that carries no cookie and no Authorization header; any other request ignores it. A `Bearer cvs_pat_` token is refused (401) when unknown, revoked, expired, its
  * owner banned, holding a temporary password, not an Admin (unless CVS_AGENT_API_MEMBERS=1: a demotion pauses the token, a re-promotion restores it), or no
  * longer an active member of the token's (enabled) workspace. The token's workspace is used, never the cvs_ws cookie.
  */
 export async function agentSession(request: Request): Promise<Resolved> {
   const authorization = request.headers.get('authorization');
   const store = agentContext.getStore();
-  if (store) return request.headers.has('cookie') || authorization !== null ? { error: fail('ambiguous_credentials', 400) } : { session: store };
+  if (store) {
+    if (request.headers.has('cookie') || authorization !== null) return { error: fail('ambiguous_credentials', 400) };
+    if (inProcessRequests.has(request)) return { session: store };
+  }
   const token = authorization?.match(BEARER)?.[1];
   if (!token) return null;
   if (process.env.CVS_AGENT_API === '0') return { error: fail('agent_api_off', 401) };
@@ -367,11 +372,14 @@ export async function agentGate(request: Request, session: RequestSession, works
 /** A paid create's call as agentPrecheck read it: the request it binds, and the confirm it carried (null on a dry run). */
 export type AgentCall = Bound & { confirm: { nonce: string; estimate: string } | null };
 
+/** Set on a replayed answer, so the MCP tools can say the confirm was already used instead of reporting a new success. */
+export const REPLAY_HEADER = 'x-cvs-replay';
+
 /** The stored first answer of a nonce this connection spent, or 'confirm_used' for one a guard confirm spent; null when the nonce is new. */
 async function replay(q: Queryable, nonce: string, tokenId: string): Promise<Response | 'confirm_used' | null> {
   const row = (await q.query('select result_status, result_body from agent_confirms where nonce = $1 and api_token_id = $2', [nonce, tokenId])).rows[0];
   if (!row) return null;
-  return row.result_status === null ? 'confirm_used' : Response.json(row.result_body, { status: row.result_status });
+  return row.result_status === null ? 'confirm_used' : Response.json(row.result_body, { status: row.result_status, headers: { [REPLAY_HEADER]: '1' } });
 }
 
 /**

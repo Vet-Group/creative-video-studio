@@ -14,7 +14,7 @@ process.env.REA_REMAKE_ENABLED = '1';
 process.env.REA_ANALYZE_ENABLED = '1';
 
 const { pool } = await import('@/lib/auth');
-const { agentContext, agentSession, canonicalJSON, newPat, signConfirm } = await import('@/lib/agent-access');
+const { agentContext, agentSession, canonicalJSON, inProcessRequests, newPat, signConfirm } = await import('@/lib/agent-access');
 const { forgetFalBalance } = await import('@/lib/provider-credit');
 const { stopBoss } = await import('@/lib/queue');
 const { CAP_MESSAGES } = await import('@/lib/caps');
@@ -199,9 +199,9 @@ describe('POST /api/jobs by an agent', () => {
     }
     expect((await run(a)).status).toBe(429);
     const session = (await agentSession(post('/api/jobs', { token: a.token, body: {} })))!.session!;
-    const inContext = await agentContext.run(session, () =>
-      jobs.POST(new Request('http://localhost/api/jobs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ modelId: 'fal-agent', presetId: 'gentle-push-in', ratio: '9:16', durationSec: 5, assetIds: [`img-${a.userId}`] }) })),
-    );
+    const inProcess = new Request('http://localhost/api/jobs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ modelId: 'fal-agent', presetId: 'gentle-push-in', ratio: '9:16', durationSec: 5, assetIds: [`img-${a.userId}`] }) });
+    inProcessRequests.add(inProcess);
+    const inContext = await agentContext.run(session, () => jobs.POST(inProcess));
     expect(inContext.status).toBe(429);
 
     const answers = [];
