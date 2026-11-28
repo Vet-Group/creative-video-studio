@@ -1,8 +1,9 @@
 import { expect, type Page, test } from '@playwright/test';
-import { hookEffectPrompt } from '../src/lib/apps';
+import { HOOK_EFFECTS, hookEffectPrompt } from '../src/lib/apps';
+import { inSeason } from '../src/lib/prompt-starters';
 import { modelButton, png, signIn } from './support.test';
 
-// The hook effects app on the two mock models of e2e/serve.ts (mock provider, the real endpoints): one photo, four effects, a 5 s vertical clip that ends on the photo.
+// The hook effects app on the two mock models of e2e/serve.ts (mock provider, the real endpoints): one photo, the effects of the season, a 5 s vertical clip that ends on the photo.
 // A mock job books $0, so the page shows $0 here; the prices of the real rows are checked in api/jobs/hook-effect.test.ts.
 const runButton = (page: Page) => page.getByRole('button', { name: /^Chạy(?! lại)/ }); // not a History card's rerun button
 const reason = (page: Page) => page.locator('.form-message').getByRole('status');
@@ -17,9 +18,10 @@ test('hook effects: the form, a Run of the box burst, its job, Reuse and the Lib
   await page.getByRole('list', { name: 'Danh sách ứng dụng' }).getByRole('link').filter({ hasText: 'Hiệu ứng mở đầu' }).click();
   await expect(page).toHaveURL(/\/apps\/hook-effects$/);
 
-  // The form: one product slot, four effects with the first picked, and no prompt, ratio, length, audio or model control.
+  // The form: one product slot, the effects of the season (the two Christmas ones lead from 15 November to 31 December) with the first picked, and no prompt, ratio,
+  // length, audio or model control.
   await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Giới thiệu']);
-  await expect(effects(page).getByRole('radio')).toHaveCount(4);
+  await expect(effects(page).getByRole('radio')).toHaveCount(inSeason(HOOK_EFFECTS).length);
   await expect(effects(page).getByRole('radio').first()).toBeChecked();
   for (const label of ['Phồng rồi bóp', 'Tan chảy thành sản phẩm', 'Rơi vào khung', 'Hộp bung mở']) await expect(effects(page).getByRole('radio', { name: label })).toHaveCount(1);
   await expect(page.getByRole('textbox')).toHaveCount(0);

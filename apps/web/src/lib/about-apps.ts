@@ -1278,7 +1278,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             steps: [
               { title: 'Tải ảnh sản phẩm', text: 'Dùng một ảnh rõ nét, sản phẩm ở giữa, nền trơn; ảnh nền trắng cho kết quả sạch nhất.' },
-              { title: 'Chọn hiệu ứng', text: 'Bốn hiệu ứng: Phồng rồi bóp, Tan chảy thành sản phẩm, Rơi vào khung và Hộp bung mở. Hiệu ứng đang chọn phát video mẫu.' },
+              { title: 'Chọn hiệu ứng', text: 'Bốn hiệu ứng: Phồng rồi bóp, Tan chảy thành sản phẩm, Rơi vào khung và Hộp bung mở. Từ 15/11 đến 31/12 có thêm hai hiệu ứng Giáng sinh, Quả cầu tuyết và Hộp quà Giáng sinh, xếp lên đầu. Hiệu ứng đang chọn phát video mẫu.' },
               { title: 'Chạy', text: 'Bấm Chạy và xem video trong tab Lịch sử. Muốn hiệu ứng khác với cùng ảnh, chọn hiệu ứng đó rồi chạy lại.' },
             ],
           },

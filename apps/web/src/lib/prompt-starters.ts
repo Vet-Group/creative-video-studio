@@ -9,8 +9,8 @@ export interface Starter {
   holiday?: true;
 }
 
-/** The chips to show on `now`: the holiday ones first from 15 November to 31 December (ICT), and none of them the rest of the year. */
-export function inSeason(list: Starter[], now = new Date()): Starter[] {
+/** The chips (or hook effects) to show on `now`: the holiday ones first from 15 November to 31 December (ICT), and none of them the rest of the year. */
+export function inSeason<T extends { holiday?: true }>(list: T[], now = new Date()): T[] {
   const monthDay = vnDay(now).slice(5);
   return monthDay >= '11-15' ? [...list.filter((s) => s.holiday), ...list.filter((s) => !s.holiday)] : list.filter((s) => !s.holiday);
 }

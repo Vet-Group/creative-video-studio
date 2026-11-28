@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-apps';
 import { GARMENT_PRESETS, POSE_PRESETS, POSES } from './try-on-stock';
 import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, colorLabel, csvNames, DEFAULT_VIEWS, DOG_BREEDS, filterApps, EDIT_BACKGROUNDS, HOOK_EFFECTS, hookEffect, hookEffectPrompt, hookReason, isBatchId, isHexColor, isNewApp, itemLabel, itemPrompt, JOB_APPS, jobImages, LISTING_SHOTS, listingShotPrompt, MAX_BATCH, MAX_MODELS, MAX_PICTURES, MAX_POSES, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameColumn, nameOk, nameSwapPrompt, OWN_POSE, parseHexColor, parseNames, PET_STYLES, petPortraitPrompt, POSE_BACKGROUNDS, posePrompt, poseRefPrompt, RECOLOR_COLORS, recolorPrompt, REF_POSE, relatedApps, runTotal, slotMax, splitImages, stockGroups, toggleTurntable, turntableOn, unsentPicks, videoEditPrompt, videoEditReason, VIEW_LABELS, visibleApps } from './apps';
+import { inSeason } from './prompt-starters';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -735,13 +736,19 @@ describe('the hook effects app', () => {
     expect(JOB_APPS.map((a) => a.slug)).toContain('hook-effects');
   });
 
-  it('has the four probed effects, each with its endpoint and exactly the prompt the probe sent', () => {
-    expect(HOOK_EFFECTS.map((e) => [e.id, e.label, e.endpoint])).toEqual([
-      ['squish', 'Phồng rồi bóp', 'minimax/h3-max-turbo/image-to-video'],
-      ['melt', 'Tan chảy thành sản phẩm', 'minimax/h3-max-turbo/image-to-video'],
-      ['drop', 'Rơi vào khung', 'minimax/h3-max-turbo/image-to-video'],
-      ['box-burst', 'Hộp bung mở', 'minimax/h3-max/reference-to-video'],
+  it('has the probed effects, each with its endpoint and exactly the prompt the probe sent, and the two Christmas ones only in season', () => {
+    expect(HOOK_EFFECTS.map((e) => [e.id, e.label, e.endpoint, e.holiday ?? false])).toEqual([
+      ['squish', 'Phồng rồi bóp', 'minimax/h3-max-turbo/image-to-video', false],
+      ['melt', 'Tan chảy thành sản phẩm', 'minimax/h3-max-turbo/image-to-video', false],
+      ['drop', 'Rơi vào khung', 'minimax/h3-max-turbo/image-to-video', false],
+      ['box-burst', 'Hộp bung mở', 'minimax/h3-max/reference-to-video', false],
+      ['snow-globe', 'Quả cầu tuyết', 'minimax/h3-max-turbo/image-to-video', true],
+      ['gift-unwrap', 'Hộp quà Giáng sinh', 'minimax/h3-max/reference-to-video', true],
     ]);
+    expect(inSeason(HOOK_EFFECTS, new Date('2026-12-24T12:00:00+07:00')).map((e) => e.id)).toEqual(['snow-globe', 'gift-unwrap', 'squish', 'melt', 'drop', 'box-burst']);
+    expect(inSeason(HOOK_EFFECTS, new Date('2027-01-01T00:00:00+07:00')).map((e) => e.id)).toEqual(['squish', 'melt', 'drop', 'box-burst']);
+    expect(hookEffectPrompt('snow-globe')).toBe(`In the first second a clear glass snow globe dome forms over the product with soft snowflakes swirling inside it, then at one and a half seconds the glass dissolves into a burst of falling snowflakes and tiny gold sparkles that drift away. ${END}`);
+    expect(hookEffectPrompt('gift-unwrap')).toBe('A red Christmas gift box tied with a shiny gold satin ribbon sits alone on a clean white surface, a few snowflakes drifting down. At one second the ribbon slips loose and the lid pops off in a shower of gold sparkles, the box walls falling open, revealing the product from Image 1 standing in the center. From two seconds on, the product holds still, sharp and undistorted, exactly as in Image 1: same shape, proportions, colors, print and text, with a steady camera. No added text or watermarks.');
     expect(hookEffectPrompt('squish')).toBe(`In the first second the product puffs up like a soft balloon, then an invisible press squishes it flat, and by two seconds it springs back to its exact original shape with a small wobble. ${END}`);
     expect(hookEffectPrompt('melt')).toBe(`In the first second the product melts down into a glossy puddle of liquid in its own colors, then the liquid surges back up and re-forms into the product, its edges snapping crisp again by two seconds. ${END}`);
     expect(hookEffectPrompt('drop')).toBe(`In the first instant the product is snapped up out of the top of the frame, then drops straight back into its place, landing with a weighty bounce and a small puff of dust by 1.5 seconds. ${END}`);

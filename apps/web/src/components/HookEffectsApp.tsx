@@ -1,11 +1,12 @@
 'use client';
-// The hook effects app: one product photo and one of four effects (lib/apps.ts HOOK_EFFECTS). The page sends the effect's fixed English prompt for a 5 s vertical clip
+// The hook effects app: one product photo and one of the effects (lib/apps.ts HOOK_EFFECTS; the Christmas ones only from 15 November to 31 December). The page sends the effect's fixed English prompt for a 5 s vertical clip
 // whose end frame is the photo itself, on the one model the effect was probed on; the worker pads the photo to 9:16 and never crops it. Laid out like the other app
 // pages (the form card beside History and About).
 import { useEffect, useId, useState } from 'react';
 import { api, errorText } from '@/lib/api';
-import { type AppConfig, HOOK_EFFECTS, HOOK_RATIO, HOOK_SECONDS, hookEffect, hookEffectPrompt, hookReason } from '@/lib/apps';
+import { type AppConfig, HOOK_EFFECTS, HOOK_RATIO, HOOK_SECONDS, type HookEffect, hookEffectPrompt, hookReason } from '@/lib/apps';
 import { cardSample } from '@/lib/examples';
+import { inSeason } from '@/lib/prompt-starters';
 import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
@@ -25,8 +26,8 @@ interface HookModel {
   estimateUsd: string;
 }
 
-/** The effect picker: four radio tiles, the chosen one playing its loop and the others showing their still (a tile with no sample shows its label alone). */
-export function EffectPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+/** The effect picker: a radio tile per effect, the chosen one playing its loop and the others showing their still (a tile with no sample shows its label alone). */
+export function EffectPicker({ effects, value, onChange }: { effects: HookEffect[]; value: string; onChange: (id: string) => void }) {
   const name = useId();
   const labelId = useId();
   const have = useSamples();
@@ -36,7 +37,7 @@ export function EffectPicker({ value, onChange }: { value: string; onChange: (id
         Hiệu ứng
       </span>
       <div className={s.tiles} role="radiogroup" aria-labelledby={labelId}>
-        {HOOK_EFFECTS.map((e) => {
+        {effects.map((e) => {
           const media = cardSample(have, `hook-effect-${e.id}`);
           const shown = e.id === value ? media : { video: null, poster: media.poster };
           return (
@@ -60,7 +61,8 @@ export function HookEffectsApp({ app, reuse }: { app: AppConfig; reuse?: string 
   const { refresh } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [photo, setPhoto] = useState<Img[]>([]);
-  const [effect, setEffect] = useState(HOOK_EFFECTS[0]!.id);
+  const [effects] = useState(() => inSeason(HOOK_EFFECTS)); // read once, so the picker does not change under the member at midnight
+  const [effect, setEffect] = useState(effects[0]!.id);
   const [tab, setTab] = useState<HookTab | null>(null); // null: the default for the width (the form below 1024 px, else About)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -88,7 +90,7 @@ export function HookEffectsApp({ app, reuse }: { app: AppConfig; reuse?: string 
     (j) => {
       if (j.images?.[0]) setPhoto([j.images[0]]);
       const wanted = 'effect' in j && typeof j.effect === 'string' ? j.effect : null;
-      if (wanted && hookEffect(wanted)) setEffect(wanted);
+      if (effects.some((e) => e.id === wanted)) setEffect(wanted!); // a Christmas effect out of season is not on the page
     },
     (e) => setError(copyError(e, 'Không tìm thấy lượt tạo để dùng lại.')),
   );
@@ -149,7 +151,7 @@ export function HookEffectsApp({ app, reuse }: { app: AppConfig; reuse?: string 
             <p className="help">Ảnh rõ nét, sản phẩm ở giữa, nền trơn. Ảnh không đúng khung dọc sẽ được thêm viền cùng màu nền, sản phẩm không bị cắt.</p>
             <p className="help">Chữ nhỏ trên sản phẩm có thể bị nhoè hoặc méo trong lúc hiệu ứng chạy.</p>
             <p className="help">Clip có sẵn âm thanh do mô hình tự tạo, có thể có tiếng nói; tắt tiếng khi ghép nếu không cần.</p>
-            <EffectPicker value={effect} onChange={setEffect} />
+            <EffectPicker effects={effects} value={effect} onChange={setEffect} />
           </div>
 
           <div className="form-message">
