@@ -312,7 +312,7 @@ export function AgentAccess() {
     <>
       <p className="settings-note agent-intro">
         Khoá truy cập cho Claude Code, OpenMausBot hay một script dùng CVS bằng tài khoản của bạn: xem hạn mức, tải ảnh lên, chạy việc. Việc tốn tiền và phần lớn thay đổi cần AI xác nhận
-        thêm một bước, và mỗi khoá có hạn mức chi riêng mỗi tháng. Khoá không đổi được mật khẩu, người dùng hay khoá khác.
+        thêm một bước, và mỗi khoá có hạn mức chi riêng mỗi tháng. Khoá không đổi được mật khẩu, người dùng hay khoá khác. Đổi mật khẩu hay đăng xuất mọi thiết bị khác sẽ thu hồi mọi khoá của bạn.
       </p>
       {!enabled && <p className="settings-note">Kết nối AI đang tạm tắt.</p>}
       {enabled && created && (

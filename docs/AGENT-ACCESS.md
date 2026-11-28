@@ -26,6 +26,8 @@ opened with "sign in as", and for a write only a request this app's page sent.
 - A user holds at most 10 active tokens (409 `too_many_tokens`).
 - Any Admin can list every token (`?all=1`), rename one, change its cap and revoke it. A revoked token fails on its next request. Each change is
   audited.
+- A user's active tokens are revoked (reason `credentials_reset`, audited) when the user changes the password, signs out every other session,
+  deletes a passkey or unlinks a sign-in method, and when an Admin sets a temporary password, turns 2FA off or removes a sign-in method.
 
 ## Calling the API
 

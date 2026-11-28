@@ -1,5 +1,6 @@
 import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
+import { revokeAgentTokens } from '@/lib/account-audit';
 import { bad } from '@/lib/admin';
 import { pool } from '@/lib/auth';
 import { guard, impersonationRefusal, isImpersonated } from '@/lib/session';
@@ -27,7 +28,10 @@ export async function GET(request: Request) {
   });
 }
 
-/** Signs out the caller's session `?id=`, or every other one without it; the session of this request stays. Audited with the count. */
+/**
+ * Signs out the caller's session `?id=`, or every other one without it, which also revokes the caller's agent connections; the session of this
+ * request stays. Audited with the count.
+ */
 export async function DELETE(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
@@ -41,6 +45,7 @@ export async function DELETE(request: Request) {
       ...(id === null ? [] : [id]),
     ]);
     if (rowCount) await audit(tx, { actorId: userId, action: 'user.sessions_revoke', target: `user:${userId}`, newValue: { sessions: rowCount, others: id === null } });
+    if (id === null) await revokeAgentTokens(tx, userId, userId);
     return rowCount ?? 0;
   });
   if (id !== null && revoked === 0) return bad('not found', 404);

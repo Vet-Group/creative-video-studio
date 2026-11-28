@@ -15,6 +15,7 @@ const route = await import('./[...all]/route');
 const { PATCH } = await import('../admin/users/[id]/route');
 const sessionsRoute = await import('../me/sessions/route');
 const { GET: limits } = await import('../me/limits/route');
+const { createPat } = await import('@/lib/agent-access');
 
 const PASSWORD = 'correct-horse-battery';
 afterAll(async () => {
@@ -153,5 +154,65 @@ describe('the sessions list', () => {
     expect((await sessions('')).status).toBe(401);
     expect((await get('/list-sessions', here)).status).toBe(404); // closed: it would hand every token to the page
     for (const path of ['/get-access-token', '/refresh-token', '/account-info']) expect((await get(path, here)).status, path).toBe(404); // provider tokens outlive a password change
+  });
+});
+
+describe('agent connections end with the credentials', () => {
+  const pat = async (userId: string) => {
+    const made = await createPat({ userId, workspaceId: 'ws_vet', name: 'agent', days: 30 });
+    if (made === 'too_many') throw new Error('refused');
+    return made.id;
+  };
+  const tokenRow = async (id: string) => (await pool.query('select revoked_at is not null as revoked, revoked_by, revoke_reason from api_tokens where id = $1', [id])).rows[0];
+  const revokeAudits = async (id: string) => (await pool.query(`select actor_id, new_value from audit_entries where action = 'agent.token_revoke' and target = $1`, [`api_token:${id}`])).rows;
+
+  test("a password change revokes every active connection of the user, audited, and no one else's", async () => {
+    const id = await user('eve@example.test');
+    const bystander = await user('finn@example.test');
+    const [a, b, kept] = [await pat(id), await pat(id), await pat(bystander)];
+    const here = (await signIn('eve@example.test')).cookie;
+    expect((await changePassword(here, PASSWORD, 'eve-new-password-1')).status).toBe(200);
+    for (const t of [a, b]) {
+      expect(await tokenRow(t)).toEqual({ revoked: true, revoked_by: id, revoke_reason: 'credentials_reset' });
+      expect(await revokeAudits(t)).toEqual([{ actor_id: id, new_value: { reason: 'credentials_reset', ownerId: id } }]);
+    }
+    expect((await tokenRow(kept)).revoked).toBe(false);
+  });
+
+  test('signing out every other session revokes the connections; signing out one does not', async () => {
+    const id = await user('gia@example.test');
+    const t = await pat(id);
+    const here = (await signIn('gia@example.test')).cookie;
+    await signIn('gia@example.test');
+    const other = ((await (await sessions(here)).json()) as { sessions: { id: string; current: boolean }[] }).sessions.find((s) => !s.current)!.id;
+    expect((await revoke(here, other)).status).toBe(200);
+    expect((await tokenRow(t)).revoked).toBe(false);
+    expect((await revoke(here)).status).toBe(200);
+    expect(await tokenRow(t)).toEqual({ revoked: true, revoked_by: id, revoke_reason: 'credentials_reset' });
+  });
+
+  test("better-auth's own revoke-other-sessions revokes the connections too", async () => {
+    const id = await user('hai@example.test');
+    const t = await pat(id);
+    const here = (await signIn('hai@example.test')).cookie;
+    expect((await post('/revoke-other-sessions', here, {})).status).toBe(200);
+    expect((await tokenRow(t)).revoked).toBe(true);
+  });
+
+  test("an Admin's temporary password or 2FA reset revokes the connections, by that Admin", async () => {
+    const boss = await user('ivan@example.test', 'admin');
+    const adminCookie = (await signIn('ivan@example.test')).cookie;
+    const id = await user('kim@example.test');
+    const patch = (body: unknown) =>
+      PATCH(new Request(`${ORIGIN}/api/admin/users/${id}`, { method: 'PATCH', headers: { cookie: adminCookie, 'content-type': 'application/json' }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) });
+    const first = await pat(id);
+    expect((await patch({ temporaryPassword: 'temporary-pass-2' })).status).toBe(200);
+    expect(await tokenRow(first)).toEqual({ revoked: true, revoked_by: boss, revoke_reason: 'credentials_reset' });
+    expect(await revokeAudits(first)).toEqual([{ actor_id: boss, new_value: { reason: 'credentials_reset', ownerId: id } }]);
+
+    const second = await pat(id);
+    await pool.query('update users set two_factor_enabled = true where id = $1', [id]);
+    expect((await patch({ twoFactor: false })).status).toBe(200);
+    expect(await tokenRow(second)).toEqual({ revoked: true, revoked_by: boss, revoke_reason: 'credentials_reset' });
   });
 });

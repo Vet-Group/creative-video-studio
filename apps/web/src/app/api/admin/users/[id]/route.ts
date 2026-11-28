@@ -1,5 +1,6 @@
 import { type AuditEntry, audit } from '@cvs/core/audit';
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
+import { revokeAgentTokens } from '@/lib/account-audit';
 import { PASSWORD_LENGTH } from '@/lib/account-security';
 import { type RouteContext } from '@/lib/assets';
 import { auth, pool } from '@/lib/auth';
@@ -141,6 +142,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
           await auth.api.setUserPassword({ headers: request.headers, body: { userId: id, newPassword: temporaryPassword as string } });
           // After better-auth's write, which would wait on this row lock; the user must replace the password at the next sign-in.
           await tx.query('update users set must_change_password = true, updated_at = now() where id = $1', [id]);
+          await revokeAgentTokens(tx, id, actorId);
         },
       );
     }
@@ -152,6 +154,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         // A device trusted with the lost phone's codes must not skip the step once 2FA is back on; a session it opened ends, like an unlink.
         await tx.query(`delete from verifications where value = $1 and identifier like 'trust-device-%'`, [id]);
         await tx.query('delete from sessions where user_id = $1', [id]);
+        await revokeAgentTokens(tx, id, actorId);
         await audit(tx, { actorId, action: 'user.two_factor_disable', target, oldValue: { twoFactor: true }, newValue: { twoFactor: false, sessionsRevoked: true } });
       });
     }
