@@ -3,6 +3,7 @@ import { withTransaction } from '@cvs/core/ledger';
 import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS } from '@cvs/core/queue';
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { reaAnalyzeEnabled } from '@/lib/analyze';
+import { agentCharge, agentPrecheck } from '@/lib/agent-access';
 import { readableAsset, readJson } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { STORE_TEAM_CODE, storeAllowed } from '@/lib/billing';
@@ -41,6 +42,8 @@ export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const b = (await readJson(request)) as { sourceAssetId?: unknown; storeId?: unknown } | null;
+  const agent = await agentPrecheck(g, request, b);
+  if (agent instanceof Response) return agent;
   const sourceAssetId = b?.sourceAssetId;
   const storeId = b?.storeId ?? null;
   if (typeof sourceAssetId !== 'string' || (storeId !== null && typeof storeId !== 'string')) return bad('sourceAssetId, and an optional storeId, are required');
@@ -91,10 +94,13 @@ export async function POST(request: Request) {
     ).rows[0] as { today: number; cap: number };
     if (day.cap === 0) return bad('Phân tích video đang tạm tắt.', 429);
     if (day.today >= day.cap) return bad(`Hôm nay bạn đã dùng hết ${day.cap} lượt phân tích. Mai bạn dùng tiếp được.`, 429);
+    // No upfront price: the LLM calls are booked as they return.
+    const charged = await agentCharge(tx, agent, null, { status: 201, body: { id } });
+    if (charged) return charged;
     await tx.query(
-      `insert into analyses (id, user_id, team_id, store_id, source_key, workspace_id)
-         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5)`,
-      [id, userId, storeId, found.asset.s3Key, g.workspaceId],
+      `insert into analyses (id, user_id, team_id, store_id, source_key, workspace_id, api_token_id)
+         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6)`,
+      [id, userId, storeId, found.asset.s3Key, g.workspaceId, agent?.tokenId ?? null],
     );
     return null;
   });
@@ -106,6 +112,7 @@ export async function POST(request: Request) {
     // 'queued': fail it so the caller retries cleanly instead of polling a spinner that never resolves.
     console.error(`Could not send analysis ${id} to the queue:`, e);
     await pool.query(`update analyses set status = 'failed', error = 'could not queue the analysis', finished_at = now() where id = $1`, [id]);
+    if (agent?.confirm) await pool.query('delete from agent_confirms where nonce = $1', [agent.confirm.nonce]); // the same confirm may be sent again
     return bad('could not queue the analysis; try again', 503);
   }
   return Response.json({ id }, { status: 201 });

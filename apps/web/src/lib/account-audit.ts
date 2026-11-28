@@ -39,6 +39,21 @@ export async function lastLinkedEmail(q: Queryable, userId: string, provider: st
 }
 
 /**
+ * Revokes every active agent connection of `userId` (lib/agent-access.ts), one agent.token_revoke row each, by `actorId`. Called wherever the
+ * user's other sessions end with a credential change (password, lost sign-in method, 2FA reset) or "sign out everywhere": a connection minted
+ * from one of those sessions must not outlive it. Signing out one other session leaves the connections alone.
+ */
+export async function revokeAgentTokens(q: Queryable, userId: string, actorId: string): Promise<number> {
+  const { rows } = await q.query(
+    `update api_tokens set revoked_at = now(), revoked_by = $2, revoke_reason = 'credentials_reset'
+      where user_id = $1 and revoked_at is null and (expires_at is null or expires_at > now()) returning id`,
+    [userId, actorId],
+  );
+  for (const r of rows) await audit(q, { actorId, action: 'agent.token_revoke', target: `api_token:${r.id}`, newValue: { reason: 'credentials_reset', ownerId: userId } });
+  return rows.length;
+}
+
+/**
  * databaseHooks.account for better-auth. The actor is the account's own user: all three flows run in that user's session.
  * shortcut: the hook runs after the account write on another statement, because better-auth gives hooks no handle on its connection;
  * a crash between the two loses the row, and a failing audit write fails the sign-in or link that was already saved. Upgrade by moving
@@ -74,7 +89,10 @@ export function accountAuditHooks(q: Queryable) {
         const email = googleEmail(a.idToken ?? null) ?? (await lastLinkedEmail(q, a.userId, a.providerId, a.accountId));
         const keep = ctx?.context.session?.session.id;
         // Like the Admin unlink, end the sessions the lost account may have opened; the caller's own stays.
-        if (keep) await q.query('delete from sessions where user_id = $1 and id <> $2', [a.userId, keep]);
+        if (keep) {
+          await q.query('delete from sessions where user_id = $1 and id <> $2', [a.userId, keep]);
+          await revokeAgentTokens(q, a.userId, a.userId);
+        }
         await audit(q, { actorId: a.userId, action: 'account.unlink', target: `user:${a.userId}`, oldValue: { provider: a.providerId, email }, ...(keep ? { newValue: { sessionsRevoked: true } } : {}) });
       },
     },
@@ -115,9 +133,11 @@ export function authAuditHook(q: Queryable) {
       await audit(q, { actorId: userId, action: 'account.link', target, newValue: { provider: 'passkey', accountId: (done as { id: string }).id, email: null } });
     } else if (ctx.path === '/passkey/delete-passkey') {
       await q.query('delete from sessions where user_id = $1 and id <> $2', [userId, session.session.id]);
+      await revokeAgentTokens(q, userId, userId);
       await audit(q, { actorId: userId, action: 'account.unlink', target, oldValue: { provider: 'passkey', accountId: (ctx.body as { id: string }).id, email: null }, newValue: { sessionsRevoked: true } });
     } else if (ctx.path === '/change-password') {
       await q.query('update users set must_change_password = false, updated_at = now() where id = $1', [userId]);
+      await revokeAgentTokens(q, userId, userId);
       await audit(q, { actorId: userId, action: 'user.password_change', target, newValue: { sessionsRevoked: (ctx.body as { revokeOtherSessions?: boolean }).revokeOtherSessions === true } });
       // The new session's token travels in its httpOnly cookie only, never in a body the page's scripts can read.
       return ctx.json({ user: (done as { user: unknown }).user });
@@ -130,6 +150,8 @@ export function authAuditHook(q: Queryable) {
       await audit(q, { actorId: userId, action: 'user.two_factor_disable', target, oldValue: { twoFactor: true }, newValue: { twoFactor: false } });
     } else if (ctx.path === '/two-factor/generate-backup-codes') {
       await audit(q, { actorId: userId, action: 'user.two_factor_backup_codes', target });
+    } else if (ctx.path === '/revoke-sessions' || ctx.path === '/revoke-other-sessions') {
+      await revokeAgentTokens(q, userId, userId);
     }
     if (twoFactorCheck) return ctx.json({ user: (done as { user: unknown }).user });
   });

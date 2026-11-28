@@ -5,6 +5,7 @@ import {
   bigserial,
   boolean,
   check,
+  customType,
   date,
   index,
   integer,
@@ -56,6 +57,9 @@ const workspaceId = () =>
   text('workspace_id')
     .notNull()
     .references((): AnyPgColumn => workspaces.id, { onDelete: 'restrict' });
+// The agent connection (api_tokens) a row was made through; null for a browser session (docs: plan "Connect AI", migration 0127).
+const apiTokenId = () => text('api_token_id').references((): AnyPgColumn => apiTokens.id, { onDelete: 'restrict' });
+const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 
 export const teams = pgTable(
   'teams',
@@ -173,6 +177,52 @@ export const workspaceMembers = pgTable(
     check('workspace_members_role_check', sql`${t.role} in ('owner', 'member')`),
   ],
 );
+
+// An agent connection (Claude Code, OpenMausBot): it acts as its creator in one workspace, under its own monthly USD cap (apps/web/src/lib/agent-access.ts).
+// A personal access token stores only the sha256 of its secret; an OAuth connection (migration 0128) has none and never expires while refreshed.
+export const API_TOKEN_KINDS = ['pat', 'oauth'] as const;
+export const apiTokens = pgTable(
+  'api_tokens',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    workspaceId: workspaceId(),
+    kind: text('kind', { enum: API_TOKEN_KINDS }).notNull(),
+    name: text('name').notNull(),
+    secretHash: bytea('secret_hash').unique(),
+    oauthClientId: text('oauth_client_id'),
+    monthlyCapUsd: numeric('monthly_cap_usd', { precision: 12, scale: 4 }).notNull().default('20'),
+    expiresAt: tstz('expires_at'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    lastUsedAt: tstz('last_used_at'),
+    lastUsedIp: text('last_used_ip'),
+    revokedAt: tstz('revoked_at'),
+    revokedBy: text('revoked_by').references(() => users.id, { onDelete: 'set null' }),
+    revokeReason: text('revoke_reason'),
+  },
+  (t) => [
+    index('api_tokens_user_id_idx').on(t.userId).where(sql`${t.revokedAt} is null`),
+    check('api_tokens_kind_check', sql`${t.kind} in ('pat', 'oauth')`),
+    check('api_tokens_name_check', sql`char_length(${t.name}) between 1 and 60`),
+    check('api_tokens_cap_check', sql`${t.monthlyCapUsd} >= 0 and ${t.monthlyCapUsd} <> 'NaN'`),
+    check('api_tokens_pat_check', sql`${t.kind} <> 'pat' or (${t.expiresAt} is not null and ${t.secretHash} is not null)`),
+  ],
+);
+
+// One confirm token used by an agent (apps/web/src/lib/agent-access.ts): its nonce is single-use. A paid create stores its first answer here and replays it.
+export const agentConfirms = pgTable('agent_confirms', {
+  nonce: text('nonce').primaryKey(),
+  apiTokenId: text('api_token_id')
+    .notNull()
+    .references(() => apiTokens.id, { onDelete: 'cascade' }),
+  method: text('method').notNull(),
+  path: text('path').notNull(),
+  resultStatus: integer('result_status'),
+  resultBody: jsonb('result_body'),
+  createdAt: tstz('created_at').notNull().defaultNow(),
+});
 
 export const sessions = pgTable(
   'sessions',
@@ -524,6 +574,7 @@ export const jobs = pgTable(
     finishedAt: tstz('finished_at'),
     deletedAt: tstz('deleted_at'),
     purgedAt: tstz('purged_at'),
+    apiTokenId: apiTokenId(),
   },
   (t) => [
     index('jobs_user_id_created_at_idx').on(t.userId, t.createdAt),
@@ -622,9 +673,12 @@ export const costEntries = pgTable(
     /** Never updated (append-only): rows from before workspaces got the column's constant default, which rewrites nothing and fires no row trigger. */
     workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
+    /** Copied from the row's job, analysis, suggestion run or remake at insert; the connection's monthly cap sums it (tokenMonthSpend). */
+    apiTokenId: apiTokenId(),
   },
   (t) => [
     index('cost_entries_month_idx').on(t.month),
+    index('cost_entries_api_token_id_month_idx').on(t.apiTokenId, t.month).where(sql`${t.apiTokenId} is not null`),
     index('cost_entries_job_id_idx').on(t.jobId),
     index('cost_entries_team_id_month_idx').on(t.teamId, t.month),
     uniqueIndex('cost_entries_job_kind_once_idx')
@@ -730,6 +784,7 @@ export const analyses = pgTable(
     sharedTitle: text('shared_title'),
     sharedAt: tstz('shared_at'),
     workspaceId: workspaceId(),
+    apiTokenId: apiTokenId(),
   },
   (t) => [
     check('analyses_shared_check', sql`(${t.sharedTitle} is null) = (${t.sharedAt} is null)`),
@@ -774,6 +829,7 @@ export const remakes = pgTable(
     createdAt: tstz('created_at').notNull().defaultNow(),
     startedAt: tstz('started_at'),
     finishedAt: tstz('finished_at'),
+    apiTokenId: apiTokenId(),
   },
   (t) => [index('remakes_user_id_created_at_idx').on(t.userId, t.createdAt)],
 );
@@ -951,6 +1007,7 @@ export const suggestionRuns = pgTable(
     status: text('status', { enum: ['queued', 'succeeded', 'failed'] }).notNull().default('queued'),
     workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
+    apiTokenId: apiTokenId(),
   },
   (t) => [index('suggestion_runs_user_created_idx').on(t.userId, t.createdAt)],
 );

@@ -2,6 +2,13 @@
 [extend]
 useDefault = true
 
+# An agent token of this app (apps/web/src/lib/agent-access.ts): a personal access token, or an OAuth access or refresh token.
+[[rules]]
+id = "cvs-agent-token"
+description = "Creative Video Studio agent token"
+regex = '''cvs_(pat|oat|ort)_[A-Za-z0-9_-]{20,}'''
+keywords = ["cvs_pat_", "cvs_oat_", "cvs_ort_"]
+
 [allowlist]
 description = "Local development placeholders from docker-compose.yml and .env.example"
 regexes = ['''cvs-local-only''']

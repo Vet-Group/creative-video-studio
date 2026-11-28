@@ -1,10 +1,11 @@
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
+import { type AgentInfo, agentBadPath, agentDenied, agentGate, agentRefused, agentSession } from './agent-access';
 import { auth, pool, type Session } from './auth';
 
 /** The workspace a request acts in (docs/WORKSPACES.md §3) and the caller's role in it. */
 export type Workspace = { workspaceId: string; workspaceRole: 'owner' | 'member' };
-/** A session with the workspace it resolved to; null when the user is an active member of no workspace. */
-export type RequestSession = Session & { workspace: Workspace | null };
+/** A session with the workspace it resolved to; null when the user is an active member of no workspace. `agent` is set only for an agent connection (guard). */
+export type RequestSession = Session & { workspace: Workspace | null; agent?: AgentInfo };
 
 type Guard = ({ session: RequestSession; error?: never } & Workspace) | { session?: never; workspaceId?: never; workspaceRole?: never; error: Response };
 
@@ -106,19 +107,27 @@ export function crossOrigin(request: Request): boolean {
  * no check, as from a tab opened before workspaces).
  */
 export async function guard(request: Request, role: 'member' | 'editor' | 'admin'): Promise<Guard> {
-  const session = await readSession(request.headers);
+  // An agent connection (Bearer token or in-process MCP call, lib/agent-access.ts) is accepted here only; without one the cookie session applies as before.
+  const agent = await agentSession(request);
+  if (agent?.error) return { error: agent.error };
+  const session = agent ? agent.session : await readSession(request.headers);
   if (!session || session.user.banned) return { error: Response.json({ error: 'unauthenticated' }, { status: 401 }) };
   if (session.user.mustChangePassword && !isImpersonated(session)) return { error: Response.json({ error: 'password_change_required' }, { status: 403 }) };
   const { workspace } = session;
   if (!workspace) return { error: Response.json({ error: 'no_workspace' }, { status: 403 }) };
+  if (session.agent && agentBadPath(new URL(request.url).pathname)) return { error: await agentRefused(session, request, 'bad_path', 400) };
+  if (session.agent && agentDenied(request.method, new URL(request.url).pathname)) return { error: await agentRefused(session, request, 'not_allowed_for_agent', 403) };
   if ((role === 'admin' && session.user.role !== 'admin') || (role === 'editor' && !isEditor(session.user, workspace.workspaceId))) return { error: Response.json({ error: 'forbidden' }, { status: 403 }) };
   const write = request.method !== 'GET' && request.method !== 'HEAD';
   // A page on a sibling subdomain gets the cookie (SameSite=Lax is per site) and a text/plain body needs no preflight, so the browser's own word decides.
-  if (write && crossOrigin(request)) return { error: Response.json({ error: 'forbidden origin' }, { status: 403 }) };
+  // An agent request carries no session cookie (refused with both), so no browser can send it from another site.
+  if (write && !session.agent && crossOrigin(request)) return { error: Response.json({ error: 'forbidden origin' }, { status: 403 }) };
   // An Admin signed in as an Admin only looks, on every route (member routes have Admin branches too): a change made here would be logged under that
   // Admin's name. Ending the impersonation, switching between the workspaces both share and the Library zip stay open.
   if (write && isImpersonated(session) && session.user.role === 'admin' && !IMPERSONATED_ADMIN_WRITES.has(new URL(request.url).pathname)) return { error: impersonationRefusal() };
   const rendered = request.headers.get(WORKSPACE_HEADER);
   if (write && rendered && rendered !== workspace.workspaceId) return { error: Response.json({ error: 'workspace_changed' }, { status: 409 }) };
+  const held = session.agent && (await agentGate(request, session, workspace.workspaceId));
+  if (held) return { error: held };
   return { session, ...workspace };
 }

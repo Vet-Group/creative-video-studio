@@ -23,7 +23,7 @@ import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
 import { burnEndText, closestRatio, ensureH264, extractPoster, probeSeconds, probeSize, probeVideoSeconds, sniffImage } from './media';
 import { compressVideoAsset } from './compress';
-import { purgeDeletedClips } from './purge';
+import { purgeAgentConfirms, purgeDeletedClips } from './purge';
 import { reframeVideoAsset } from './reframe';
 import { faceMatch } from './face';
 import { dropPreview, storePreview } from './preview';
@@ -704,6 +704,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   await boss.schedule(PURGE_QUEUE, PURGE_CRON, null, { tz: 'Asia/Ho_Chi_Minh' });
   await boss.work(PURGE_QUEUE, async () => {
     await purgeDeletedClips(pool, deleteObject, log);
+    await purgeAgentConfirms(pool);
   });
   await boss.createQueue(SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS);
   // Four at a time, so one slow scene pick on a large video does not hold up the quick text suggestions queued behind it.

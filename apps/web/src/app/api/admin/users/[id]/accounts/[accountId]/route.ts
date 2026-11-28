@@ -1,6 +1,6 @@
 import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
-import { lastLinkedEmail } from '@/lib/account-audit';
+import { lastLinkedEmail, revokeAgentTokens } from '@/lib/account-audit';
 import { pool } from '@/lib/auth';
 import { bad } from '@/lib/admin';
 import { guard } from '@/lib/session';
@@ -26,6 +26,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const passkey = (await tx.query('delete from passkeys where id = $1 and user_id = $2 returning id', [accountId, id])).rows[0];
     if (passkey) {
       await tx.query('delete from sessions where user_id = $1', [id]);
+      await revokeAgentTokens(tx, id, g.session.user.id);
       await audit(tx, { actorId: g.session.user.id, action: 'account.unlink', target: `user:${id}`, oldValue: { provider: 'passkey', accountId, email: null }, newValue: { sessionsRevoked: true } });
       return;
     }
@@ -37,6 +38,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const email = googleEmail(target.id_token) ?? (await lastLinkedEmail(tx, id, target.provider_id, target.account_id));
     await tx.query(`delete from accounts where id = $1 and user_id = $2 and provider_id in ('google', 'lark')`, [target.id, id]);
     await tx.query('delete from sessions where user_id = $1', [id]);
+    await revokeAgentTokens(tx, id, g.session.user.id);
     await audit(tx, { actorId: g.session.user.id, action: 'account.unlink', target: `user:${id}`, oldValue: { provider: target.provider_id, email }, newValue: { sessionsRevoked: true } });
   });
   return refusal ?? Response.json({ ok: true });

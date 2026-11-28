@@ -5,6 +5,7 @@ import { videoInputs, videoRefProblem } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { ASPECTS, COMPANY_WORKSPACE_ID, FEATURES } from '@cvs/db';
 import { fillInputSlots } from '@cvs/db/assets';
+import { agentCharge, agentPrecheck } from '@/lib/agent-access';
 import { pool } from '@/lib/auth';
 import { CAP_MESSAGES } from '@/lib/caps';
 import { STORE_TEAM_CODE, storeAllowed } from '@/lib/billing';
@@ -184,6 +185,9 @@ export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const body = (await readJson(request)) as Record<string, unknown> | null;
+  // An agent's Run is a dry run (428 with the estimate) until it is resent with that confirm; a resent confirm replays its first answer.
+  const agent = await agentPrecheck(g, request, body);
+  if (agent instanceof Response) return agent;
   const { retryOf = null, onTwin = false, rerunOf = null, maxUsd = null } = body ?? {};
   if (retryOf !== null && typeof retryOf !== 'string') return bad('retryOf must be a job id');
   if (rerunOf !== null && (typeof rerunOf !== 'string' || retryOf !== null)) return bad('rerunOf must be a job id, and does not go with retryOf');
@@ -588,12 +592,14 @@ export async function POST(request: Request) {
       const left = g.workspaceId === COMPANY_WORKSPACE_ID ? `chỉ còn $${Math.max(0, Number(credit)).toFixed(2)}, không đủ` : 'không đủ credits';
       return Response.json({ error: `fal.ai ${left} cho lần chạy này (khoảng $${Number(estimate).toFixed(2)}). Hãy chọn model rẻ hơn hoặc báo Admin nạp thêm credits.` }, { status: 429 });
     }
+    const charged = await agentCharge(tx, agent, provider === 'mock' ? '0' : estimate, { status: 201, body: { id, status: 'queued' } });
+    if (charged) return charged;
     await tx.query(
       // A retry keeps the original's brief, so it is not rewritten (and paid for) again.
       // A retry or rerun is of a job of this workspace (it is not found in another), so it keeps the original's workspace.
-      `insert into jobs (id, user_id, team_id, store_id, retry_of, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, is_mock, enhance, enhanced_prompt, workspace_id)
-       values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17, $18)`,
-      [id, userId, (rerunOf === null && original?.team_id) || null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock', enhance, original?.enhanced_prompt ?? null, g.workspaceId],
+      `insert into jobs (id, user_id, team_id, store_id, retry_of, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, is_mock, enhance, enhanced_prompt, workspace_id, api_token_id)
+       values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17, $18, $19)`,
+      [id, userId, (rerunOf === null && original?.team_id) || null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock', enhance, original?.enhanced_prompt ?? null, g.workspaceId, agent?.tokenId ?? null],
     );
     // Remember this as the caller's most recently used store, so it leads their picker next time and is the default choice.
     if (storeId !== null)

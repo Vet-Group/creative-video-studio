@@ -51,3 +51,8 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
   }
   return purged;
 }
+
+/** Deletes spent agent confirms older than a day; returns how many. A confirm token expires after 10 minutes, so none of them can be replayed or reused. */
+export async function purgeAgentConfirms(pool: LedgerPool): Promise<number> {
+  return (await pool.query(`delete from agent_confirms where created_at < now() - interval '1 day'`)).rowCount ?? 0;
+}
