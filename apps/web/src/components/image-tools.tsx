@@ -88,20 +88,23 @@ export function ExampleNote({ images }: { images: { example?: boolean }[] }) {
  * Nothing is rendered without a warning: an empty element would add a gap in the slot's column. */
 export function PhotoCheck({ images }: { images: Img[] }) {
   const [text, setText] = useState('');
+  // Keyed on the photos, not the array: some pages pass a new array on every render, and a photo whose check failed would be fetched again each time.
+  const photos = JSON.stringify(images.map((i) => [i.id, i.url, i.filename, i.example]));
   useEffect(() => {
     let live = true;
     void (async () => {
       const lines: string[] = [];
       for (const i of images) {
         const warnings = i.example ? [] : await checkPhoto(i);
+        if (!live) return; // the photos changed: a newer pass owns the text
         if (warnings.length > 0) lines.push(`${images.length > 1 ? i.filename : 'Lưu ý'}: ${warnings.join('; ')}.`);
       }
-      if (live) setText(lines.join(' '));
+      setText(lines.join(' '));
     })();
     return () => {
       live = false;
     };
-  }, [images]);
+  }, [photos]); // `images` changes exactly when `photos` does
   return text ? (
     <p className="help" role="status">
       {text}
