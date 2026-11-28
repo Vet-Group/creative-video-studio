@@ -213,6 +213,7 @@ The fal adapter always sends `X-Fal-Store-IO: 0` and an object lifecycle of at l
 - Provider keys live only in a server-side `.env`, which is gitignored. They are never logged, never sent to the client and never pasted into chat.
 - Uploads are checked on the server by size, number of files and image type read from magic bytes.
 - Every route checks the session and the role. Deletion checks ownership.
+- Agent access: `guard()` (`apps/web/src/lib/session.ts`) is the only place that also accepts a personal access token (`Authorization: Bearer cvs_pat_...`); it refuses identity routes to a token and holds every agent write to a dry run and a single-use confirm. Pages never accept a token. See [AGENT-ACCESS.md](AGENT-ACCESS.md).
 - MinIO is not public. It listens on 127.0.0.1 only, so URLs signed by MinIO itself cannot work.
 - Media is served by `GET /api/assets/:id/content`, an authenticated stream that supports `Range` (needed for video seeking).
 - Downloads use a download token: `GET /api/assets/:id/download?t=<token>`. The token is an HMAC of the asset id, the user id and an expiry of 5 minutes. The route checks both the token and the session. An expired token, or a token for another user, gets 403.
