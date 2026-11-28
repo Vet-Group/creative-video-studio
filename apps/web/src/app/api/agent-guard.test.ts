@@ -208,7 +208,7 @@ describe('who a token is', () => {
     const resolved = await agentSession(as(t.token, '/api/me/limits'));
     const session = resolved!.session!;
     expect(await agentContext.run(session, async () => (await limits.GET(req('/api/me/limits'))).status)).toBe(200);
-    for (const headers of [{ cookie: 'cvs_ws=ws_b' }, { authorization: 'Bearer anything' }]) {
+    for (const headers of [{ cookie: 'cvs_ws=ws_b' }, { authorization: 'Bearer anything' }] as Record<string, string>[]) {
       const res = await agentContext.run(session, () => limits.GET(req('/api/me/limits', { headers })));
       expect([res.status, await errorOf(res)]).toEqual([400, 'ambiguous_credentials']);
     }
