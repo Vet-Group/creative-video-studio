@@ -7,7 +7,8 @@ import { pool } from '@/lib/auth';
 // the answer to its POST, and never in the list.
 
 /**
- * The caller's connections, or with `?all=1` every user's (each with its owner), newest first and revoked ones last: no secret and no hash. `paused`
+ * The caller's connections, or with `?all=1` every user's (each with its owner), newest first and revoked ones last: no secret and no hash. An OAuth
+ * connection carries its client's self-declared name. `paused`
  * when the owner is no longer an Admin (lib/agent-access.ts refuses the token until a re-promotion), `monthSpendUsd` this month's spend through it.
  */
 export async function GET(request: Request) {
@@ -17,8 +18,8 @@ export async function GET(request: Request) {
   const all = new URL(request.url).searchParams.get('all') === '1';
   const { rows } = await pool.query(
     `select t.id, t.name, t.kind, t.user_id, u.name as owner_name, u.email as owner_email, u.role as owner_role, t.created_at, t.expires_at, t.last_used_at,
-            t.last_used_ip, t.revoked_at, t.monthly_cap_usd::text as cap, coalesce(t.expires_at <= now(), false) as expired
-       from api_tokens t join users u on u.id = t.user_id
+            t.last_used_ip, t.revoked_at, t.monthly_cap_usd::text as cap, coalesce(t.expires_at <= now(), false) as expired, c.name as client_name
+       from api_tokens t join users u on u.id = t.user_id left join oauth_clients c on c.id = t.oauth_client_id
       where $1::text is null or t.user_id = $1
       order by t.revoked_at is not null, t.created_at desc, t.id limit 100`,
     [all ? null : me],
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
         id: r.id as string,
         name: r.name as string,
         kind: r.kind as 'pat' | 'oauth',
+        clientName: r.client_name as string | null,
         owner: { id: r.user_id as string, name: r.owner_name as string, email: r.owner_email as string },
         mine: r.user_id === me,
         createdAt: r.created_at.toISOString(),

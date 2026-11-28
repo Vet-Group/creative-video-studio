@@ -1,3 +1,4 @@
+import type { Queryable } from '@cvs/core/ledger';
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { type AgentInfo, agentBadPath, agentDenied, agentGate, agentRefused, agentSession } from './agent-access';
 import { auth, pool, type Session } from './auth';
@@ -48,8 +49,8 @@ const cookieValue = (headers: Headers, name: string): string | null => {
  * The workspace of a user's request, in one query: the one `requested` names if the user is a member of it and it is not disabled, else the user's oldest
  * active membership, else null. With `sharedWith` (the Admin of an impersonated session) only a workspace both are members of counts.
  */
-export async function resolveWorkspace(userId: string, requested: string | null, sharedWith: string | null = null): Promise<Workspace | null> {
-  const { rows } = await pool.query<{ workspace_id: string; role: Workspace['workspaceRole'] }>(
+export async function resolveWorkspace(userId: string, requested: string | null, sharedWith: string | null = null, q: Queryable = pool): Promise<Workspace | null> {
+  const { rows } = await q.query(
     `select m.workspace_id, m.role from workspace_members m join workspaces w on w.id = m.workspace_id
       where m.user_id = $1 and w.disabled_at is null
         and ($3::text is null or exists (select 1 from workspace_members a where a.workspace_id = m.workspace_id and a.user_id = $3))

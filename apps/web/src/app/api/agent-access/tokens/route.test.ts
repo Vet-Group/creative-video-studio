@@ -106,7 +106,7 @@ describe('creating, listing, changing and revoking', () => {
 
     const text = await (await list(adminCookie)).text();
     expect(text).not.toContain(made.token);
-    expect(text).not.toContain(made.token.split('_').at(-1));
+    expect(text).not.toContain(made.token.slice(-43));
     const row = (JSON.parse(text) as { enabled: boolean; tokens: Row[] }).tokens.find((t) => t.id === made.id)!;
     expect(row).toMatchObject({ name: 'Claude Code', mine: true, status: 'active', paused: false, capUsd: '5.0000', monthSpendUsd: '0.0000' });
 

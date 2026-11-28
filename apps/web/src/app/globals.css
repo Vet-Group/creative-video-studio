@@ -1811,6 +1811,16 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .forced-pw-card .pw-submit { justify-self: stretch; }
 .forced-pw-signout { width: 100%; height: 40px; margin-top: 8px; border: 0; background: transparent; color: var(--text-2); font-size: 14px; }
 .forced-pw-signout:hover { background: var(--fill); color: var(--ink); }
+/* The OAuth consent page (app/(app)/oauth/authorize): the forced change card inside the app, with the client's name and return host large on their own lines. */
+.oauth-consent { display: grid; justify-items: center; padding: 32px 16px; }
+.oauth-consent .forced-pw-card h1 { margin-top: 0; }
+.oauth-facts { display: grid; gap: 4px; margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.oauth-facts dt { color: var(--text-muted); font-size: 13px; line-height: 18px; }
+.oauth-facts dd { margin: 0 0 8px; font-size: 20px; line-height: 28px; font-weight: 600; overflow-wrap: anywhere; }
+.oauth-facts dd:last-child { margin-bottom: 0; }
+.oauth-where { color: var(--text-muted); font-size: 14px; font-weight: 400; }
+.oauth-consent .pw-form > input { height: 44px; }
+.oauth-consent .oauth-buttons > * { flex: 1 1 8rem; height: 44px; justify-content: center; }
 @media (min-width: 768px) {
   /* One height for every section, so the dialog does not jump; the panel scrolls under the fixed nav. */
   .settings-grid { grid-template-columns: 260px minmax(0, 1fr); height: min(680px, calc(100vh - 96px)); min-height: 0; }

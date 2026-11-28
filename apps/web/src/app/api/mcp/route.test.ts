@@ -106,12 +106,13 @@ describe('/api/mcp', () => {
     expect(modern.rpc.result!.structuredContent).toMatchObject({ user: { email: a.email }, connection: { id: a.id } });
   });
 
-  test('no Bearer or a cookie alone is 401 with a plain Bearer challenge, a bad Bearer adds invalid_token (no resource metadata until OAuth)', async () => {
+  test('no Bearer or a cookie alone is 401 with a Bearer challenge naming the resource metadata, a bad Bearer adds invalid_token', async () => {
     const list = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} };
+    const challenge = `Bearer realm="cvs", resource_metadata="${process.env.APP_URL}/.well-known/oauth-protected-resource/api/mcp"`;
     const cases: [Record<string, string>, string][] = [
-      [{}, 'Bearer realm="cvs"'],
-      [{ authorization: `Bearer cvs_pat_${'x'.repeat(12)}_${'y'.repeat(43)}` }, 'Bearer realm="cvs", error="invalid_token"'],
-      [{ cookie: 'better-auth.session_token=abc.def' }, 'Bearer realm="cvs"'],
+      [{}, challenge],
+      [{ authorization: `Bearer cvs_pat_${'x'.repeat(12)}_${'y'.repeat(43)}` }, `${challenge}, error="invalid_token"`],
+      [{ cookie: 'better-auth.session_token=abc.def' }, challenge],
     ];
     for (const [headers, want] of cases) {
       const { status, res } = await post(list, headers);

@@ -24,6 +24,7 @@ const remakes = await import('./remakes/route');
 const analyses = await import('./analyses/route');
 const suggestions = await import('./suggestions/route');
 const customRun = await import('./custom-apps/[id]/run/route');
+const { oauthConnection, oauthKind } = await import('./agent-kind.testing');
 
 type Init = { body: unknown; confirm?: string; token: string };
 const post = (path: string, { body, confirm, token }: Init) =>
@@ -43,6 +44,7 @@ async function agent(cap = '20'): Promise<{ userId: string; id: string; token: s
   await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_vet', $1, 'member') on conflict do nothing`, [userId]);
   for (const [id, mime] of [['img', 'image/png'], ['vid', 'video/mp4']])
     await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, 'f', $3, 1, 'ws_vet')`, [`${id}-${userId}`, userId, mime]);
+  if (oauthKind()) return { userId, ...(await oauthConnection(pool, { userId, capUsd: cap })) };
   const { id, token, hash } = newPat();
   await pool.query(
     `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, monthly_cap_usd, expires_at) values ($1, $2, 'ws_vet', 'pat', 'test', $3, $4, now() + interval '30 days')`,
@@ -304,4 +306,21 @@ test('tokenMonthSpend counts the ICT month: 23:59 on the last day and 00:00 on t
     );
   expect(await tokenMonthSpend(pool, a.id, new Date('2026-10-31T16:59:59Z'))).toBe('1.5000');
   expect(await tokenMonthSpend(pool, a.id, new Date('2026-10-31T17:00:00Z'))).toBe('2.2500');
+});
+
+test('the spend of three successive access tokens of one OAuth connection adds up under its one cap', async () => {
+  const a = await agent();
+  const c = await oauthConnection(pool, { userId: a.userId, capUsd: '0.6' });
+  const { refresh } = await import('@/lib/oauth');
+  let refreshToken = c.refreshToken;
+  for (let i = 0; i < 3; i++) {
+    const pair = await refresh({ grant_type: 'refresh_token', refresh_token: refreshToken }, c.clientId);
+    refreshToken = pair.refresh_token;
+    expect((await confirmedRun({ userId: a.userId, token: pair.access_token })).status).toBe(201);
+  }
+  expect(await tokenMonthSpend(pool, c.id)).toBe('0.6000');
+  const fourth = await refresh({ grant_type: 'refresh_token', refresh_token: refreshToken }, c.clientId);
+  const refused = await run({ userId: a.userId, token: fourth.access_token });
+  expect([refused.status, (await json<Dry>(refused)).error]).toEqual([429, 'token_monthly_usd']);
+  expect((await pool.query('select expires_at from api_tokens where id = $1', [c.id])).rows[0].expires_at).toBeNull();
 });

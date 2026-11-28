@@ -192,7 +192,7 @@ export const apiTokens = pgTable(
     kind: text('kind', { enum: API_TOKEN_KINDS }).notNull(),
     name: text('name').notNull(),
     secretHash: bytea('secret_hash').unique(),
-    oauthClientId: text('oauth_client_id'),
+    oauthClientId: text('oauth_client_id').references((): AnyPgColumn => oauthClients.id, { onDelete: 'restrict' }),
     monthlyCapUsd: numeric('monthly_cap_usd', { precision: 12, scale: 4 }).notNull().default('20'),
     expiresAt: tstz('expires_at'),
     createdAt: tstz('created_at').notNull().defaultNow(),
@@ -223,6 +223,79 @@ export const agentConfirms = pgTable('agent_confirms', {
   resultBody: jsonb('result_body'),
   createdAt: tstz('created_at').notNull().defaultNow(),
 });
+
+// An MCP client that registered itself (RFC 7591) to ask an Admin for a connection (apps/web/src/lib/oauth.ts): loopback redirects only. A client no
+// Admin ever approved (first_consent_at null) is deleted after a day, and the oldest such client makes room once 200 wait.
+export const oauthClients = pgTable(
+  'oauth_clients',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    redirectUris: text('redirect_uris').array().notNull(),
+    registeredIp: text('registered_ip'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    firstConsentAt: tstz('first_consent_at'),
+  },
+  (t) => [
+    index('oauth_clients_pending_idx').on(t.createdAt).where(sql`${t.firstConsentAt} is null`),
+    check('oauth_clients_name_check', sql`char_length(${t.name}) between 1 and 80`),
+    check('oauth_clients_redirect_uris_check', sql`cardinality(${t.redirectUris}) between 1 and 3`),
+  ],
+);
+
+// A single-use authorization code (5 minutes) for the connection an Admin just approved; only its sha256 is stored.
+export const oauthCodes = pgTable('oauth_codes', {
+  codeHash: bytea('code_hash').primaryKey(),
+  clientId: text('client_id')
+    .notNull()
+    .references(() => oauthClients.id, { onDelete: 'cascade' }),
+  apiTokenId: text('api_token_id')
+    .notNull()
+    .references(() => apiTokens.id, { onDelete: 'cascade' }),
+  redirectUri: text('redirect_uri').notNull(),
+  codeChallenge: text('code_challenge').notNull(),
+  resource: text('resource'),
+  expiresAt: tstz('expires_at').notNull(),
+  usedAt: tstz('used_at'),
+});
+
+// An OAuth access token (`cvs_oat_`, one hour) of a connection; only its sha256 is stored.
+export const oauthAccessTokens = pgTable(
+  'oauth_access_tokens',
+  {
+    hash: bytea('hash').primaryKey(),
+    apiTokenId: text('api_token_id')
+      .notNull()
+      .references(() => apiTokens.id, { onDelete: 'cascade' }),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    expiresAt: tstz('expires_at').notNull(),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('oauth_access_tokens_api_token_id_idx').on(t.apiTokenId)],
+);
+
+// An OAuth refresh token (`cvs_ort_`, 30 days from issue); only its sha256 is stored. A use rotates it: `used_at`, `replaced_by` (the new one's hash) and
+// `grace`, the answer sealed with a key derived from this token, so a retry within 30 s gets the same pair; a later use revokes the connection.
+export const oauthRefreshTokens = pgTable(
+  'oauth_refresh_tokens',
+  {
+    hash: bytea('hash').primaryKey(),
+    apiTokenId: text('api_token_id')
+      .notNull()
+      .references(() => apiTokens.id, { onDelete: 'cascade' }),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    expiresAt: tstz('expires_at').notNull(),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    usedAt: tstz('used_at'),
+    replacedBy: bytea('replaced_by'),
+    grace: text('grace'),
+  },
+  (t) => [index('oauth_refresh_tokens_api_token_id_idx').on(t.apiTokenId)],
+);
 
 export const sessions = pgTable(
   'sessions',
