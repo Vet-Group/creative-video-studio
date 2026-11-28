@@ -1003,7 +1003,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
                 ))}
                 {picked.length > 0 && chosen && unit != null && (
                   <p className="help" role="status">
-                    {n} clip × ${unit} = ${total}
+                    {n} clip × {usd(unit)} = {usd(total ?? 0)}
                   </p>
                 )}
               </div>
@@ -1061,7 +1061,7 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
 
             {models?.monthToDate && (
               <p className="help">
-                Tháng này bạn đã dùng: ${models.monthToDate.usd}
+                Tháng này bạn đã dùng: {usd(models.monthToDate.usd)}
                 {models.monthToDate.provisional && <span className="tag">Tạm tính</span>}
                 {models.remainingBudgetUsd !== undefined && <span> · Ngân sách tháng còn lại của công ty: {usd(models.remainingBudgetUsd)}</span>}
               </p>

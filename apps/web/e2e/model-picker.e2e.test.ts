@@ -36,6 +36,8 @@ test('the panel stays open and follows its button while the page scrolls, and cl
   const panel = page.getByRole('dialog', { name: 'Chọn mô hình' });
   const search = panel.getByRole('combobox', { name: 'Tìm mô hình' });
   await expect(panel).toBeVisible();
+  await expect(panel).toContainText(/\$1\.50(?!\d)/); // a price reads as the forms' usd() prints it, never as the raw four decimals
+  await expect(panel).not.toContainText('$1.5000');
   await search.fill('kling');
   const attached = async () => {
     const b = (await button.boundingBox())!;

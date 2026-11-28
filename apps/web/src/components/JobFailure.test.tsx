@@ -102,7 +102,7 @@ test('a job refused for a real person can go once to its fal twin, with the twin
   expect(canRetryOnTwin({ ...refused(RAW), twin, status: 'succeeded' })).toBe(false);
   expect(canRetryOnTwin({ ...refused(RAW.replace('.PrivacyInformation', '.Other')), twin })).toBe(false); // another refusal is not a real person
   expect(canRetryOnTwin(job({ error: 'boom', twin }))).toBe(false);
-  expect(twinRetryText({ ...refused(RAW), twin })).toEqual({ button: 'Chạy lại trên fal.ai', ask: 'Chạy lại lượt tạo này bằng Seedance 1.0 Pro trên fal.ai (nhận ảnh có người thật) với giá khoảng $0.6200?' });
+  expect(twinRetryText({ ...refused(RAW), twin })).toEqual({ button: 'Chạy lại trên fal.ai', ask: 'Chạy lại lượt tạo này bằng Seedance 1.0 Pro trên fal.ai (nhận ảnh có người thật) với giá khoảng $0.62?' });
 });
 
 test('a clip whose sound BytePlus blocked says so, and can go once to its fal twin without the real-person note', () => {
@@ -113,7 +113,7 @@ test('a clip whose sound BytePlus blocked says so, and can go once to its fal tw
   const twin = { label: 'Seedance 2.0 Reference', estimateUsd: '1.8500' };
   expect(canRetry(audio)).toBe(false);
   expect(canRetryOnTwin({ ...audio, twin })).toBe(true);
-  expect(twinRetryText({ ...audio, twin })).toEqual({ button: 'Chạy lại trên fal.ai', ask: 'Chạy lại lượt tạo này bằng Seedance 2.0 Reference trên fal.ai với giá khoảng $1.8500?' });
+  expect(twinRetryText({ ...audio, twin })).toEqual({ button: 'Chạy lại trên fal.ai', ask: 'Chạy lại lượt tạo này bằng Seedance 2.0 Reference trên fal.ai với giá khoảng $1.85?' });
 });
 
 test('a Vertex billing refusal tells a Member to pick the model again, and an Admin sees the raw error too', () => {

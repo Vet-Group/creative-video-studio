@@ -18,7 +18,7 @@ import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
 import { userAvatarColor } from '@/lib/profile';
 import { loginFor } from '@/lib/return-to';
 import { APPS_OPEN_KEY, appShortcuts, COLLAPSED_COOKIE, isMac, isPaletteShortcut, isSettingsShortcut, navGroups } from '@/lib/sidebar';
-import { confirmRerun, confirmRun } from '@/lib/run-guard';
+import { confirmRerun, confirmRun, usd } from '@/lib/run-guard';
 import { type TurntableRun, turntableRuns } from '@/lib/turntable-runs';
 import { useHydrated } from '@/lib/use-hydrated';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -86,7 +86,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const thumb = job.posterAssetId ?? (job.resolution ? job.outputAssetId : null); // an image job's output is its own picture
   async function retry(onTwin = false) {
     setSending(true); // from the click on, so a double click cannot send two paid jobs
-    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại lượt tạo này với giá khoảng $${job.estimateUsd}?`)) {
+    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại lượt tạo này với giá khoảng ${usd(job.estimateUsd ?? 0)}?`)) {
       setProblem('');
       try {
         await api('/api/jobs', sendJson('POST', { retryOf: job.id, ...(onTwin && { onTwin }) }));
@@ -219,7 +219,7 @@ function HistoryCard({ job, isAdmin, select, selectBatch, onView }: { job: TrayJ
   }
   const retry = async (onTwin = false) => {
     setSending(true); // from the click on, so a double click cannot send two paid jobs
-    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại lượt tạo này với giá khoảng $${job.estimateUsd}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id, ...(onTwin && { onTwin }) })), await refresh()), 'Không thử lại được');
+    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại lượt tạo này với giá khoảng ${usd(job.estimateUsd ?? 0)}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id, ...(onTwin && { onTwin }) })), await refresh()), 'Không thử lại được');
     setSending(false);
   };
   // A new paid job with the same inputs: the same confirm as a Run, and the server applies the caps and the ledger as for any other.

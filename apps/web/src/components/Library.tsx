@@ -618,7 +618,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
   const rerun = async () => {
     setRerunning(true); // from the click on, so a double click cannot send two paid jobs
     await act(async () => {
-      if (await confirmRerun(clip.costUsd, (usd) => (usd ? `Chạy lại với giá khoảng $${usd}?` : 'Chạy lại?'), (maxUsd) => api('/api/jobs', sendJson('POST', { rerunOf: clip.id, maxUsd })))) {
+      if (await confirmRerun(clip.costUsd, (shown) => (shown ? `Chạy lại với giá khoảng ${usd(shown)}?` : 'Chạy lại?'), (maxUsd) => api('/api/jobs', sendJson('POST', { rerunOf: clip.id, maxUsd })))) {
         setNote('Đã gửi lượt chạy lại. Theo dõi trong Lịch sử của ứng dụng.');
         void refresh(); // the tray watches the new job at once
       }
@@ -781,7 +781,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
           {row('AI cải thiện', job?.enhance ? 'Có' : null)}
           {row('Người tạo', `${clip.creator.name} · ${fmtTime(clip.createdAt)}`)}
           {!stores && row('Cửa hàng', clip.storeName)}
-          {row('Chi phí thật', clip.costUsd === null ? null : `$${clip.costUsd}${clip.costFinal ? '' : ' (tạm tính)'}`)}
+          {row('Chi phí thật', clip.costUsd === null ? null : `${usd(clip.costUsd)}${clip.costFinal ? '' : ' (tạm tính)'}`)}
         </dl>
         {stores && (
           <label className="recipe-store">
@@ -885,7 +885,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
               {/* A new paid job: the quieter button, its price on it, beside Reuse. */}
               {clip.mine && (
                 <button type="button" className="lightbox-reuse lightbox-rerun" disabled={rerunning} onClick={() => void rerun()}>
-                  Chạy lại{clip.costUsd !== null && ` · $${clip.costUsd}`}
+                  Chạy lại{clip.costUsd !== null && ` · ${usd(clip.costUsd)}`}
                 </button>
               )}
               {onUse ? (

@@ -914,7 +914,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
             )}
             {n > 1 && clips && (
               <p className="help variants-usage">
-                {shape ? `${n} clip${shape}` : `${n} biến thể`}, tổng {total === undefined ? '…' : `$${total}`}: {clips.cap >= NO_CAP ? `dùng ${n} clip (hôm nay đã dùng ${clips.today})` : `dùng ${n} trong ${clips.cap} clip mỗi ngày của bạn (hôm nay đã dùng ${clips.today})`}.
+                {shape ? `${n} clip${shape}` : `${n} biến thể`}, tổng {total === undefined ? '…' : usd(total)}: {clips.cap >= NO_CAP ? `dùng ${n} clip (hôm nay đã dùng ${clips.today})` : `dùng ${n} trong ${clips.cap} clip mỗi ngày của bạn (hôm nay đã dùng ${clips.today})`}.
               </p>
             )}
             <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />

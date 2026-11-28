@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { isBillingDisabled } from '@cvs/core/providers/vertex-billing-disabled';
 import type { JobStatus, TrayJob } from '@/lib/api';
 import { type FailureReason, providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
+import { usd } from '@/lib/run-guard';
 
 /** A job its member canceled while it was queued: stored as failed with a marker, shown as canceled and never as an error. */
 export const isCanceled = (job: TrayJob): boolean => job.status === 'failed' && job.error === CANCELED_ERROR;
@@ -20,7 +21,7 @@ export const canRetryOnTwin = (job: TrayJob): boolean => RETRYABLE.includes(job.
  * two may share a name (0078 dropped the provider suffix), so the text names fal. */
 export const twinRetryText = (job: TrayJob) => ({
   button: `Chạy lại trên fal.ai`,
-  ask: `Chạy lại lượt tạo này bằng ${job.twin!.label} trên fal.ai${job.failureReason === 'real_person' ? ' (nhận ảnh có người thật)' : ''} với giá khoảng $${job.twin!.estimateUsd}?`,
+  ask: `Chạy lại lượt tạo này bằng ${job.twin!.label} trên fal.ai${job.failureReason === 'real_person' ? ' (nhận ảnh có người thật)' : ''} với giá khoảng ${usd(job.twin!.estimateUsd ?? 0)}?`,
 });
 
 // What a Member reads about a job that did not finish; the raw error is for Admins.
