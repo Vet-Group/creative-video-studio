@@ -83,20 +83,28 @@ export function ExampleNote({ images }: { images: { example?: boolean }[] }) {
   ) : null;
 }
 
-/** Under a photo field: what looks wrong with its photos (too small, too dark), measured in the browser. A warning only: the Run stays the member's call. */
+/** Under a photo field: what looks wrong with its photos (too small, too dark), measured in the browser. A warning only: the Run stays the member's call.
+ * The photos are checked one at a time and the text changes once, when all are done, so a screen reader reads it once per change of photos, not once per photo.
+ * Nothing is rendered without a warning: an empty element would add a gap in the slot's column. */
 export function PhotoCheck({ images }: { images: Img[] }) {
-  const [found, setFound] = useState<Record<string, string[]>>({});
+  const [text, setText] = useState('');
   useEffect(() => {
     let live = true;
-    for (const i of images) if (!i.example) void checkPhoto(i.url ?? `/api/assets/${i.id}/content`).then((w) => live && setFound((f) => (i.id in f ? f : { ...f, [i.id]: w })));
+    void (async () => {
+      const lines: string[] = [];
+      for (const i of images) {
+        const warnings = i.example ? [] : await checkPhoto(i);
+        if (warnings.length > 0) lines.push(`${images.length > 1 ? i.filename : 'Lưu ý'}: ${warnings.join('; ')}.`);
+      }
+      if (live) setText(lines.join(' '));
+    })();
     return () => {
       live = false;
     };
   }, [images]);
-  const lines = images.filter((i) => found[i.id]?.length).map((i) => `${images.length > 1 ? i.filename : 'Lưu ý'}: ${found[i.id]!.join('; ')}.`);
-  return lines.length > 0 ? (
+  return text ? (
     <p className="help" role="status">
-      {lines.join(' ')}
+      {text}
     </p>
   ) : null;
 }
@@ -409,8 +417,9 @@ type Drag = { preventDefault(): void; dataTransfer: DataTransfer };
  * `count` shows how many photos the slot holds of its `max` ("3/13") beside its name once it holds one, or from "0/14" on with 'always' (Image
  * Generation's strip, where the count is the only sign of the limit); more than `max` (a model with a lower cap chosen since) reads as an error.
  * `zone` widens the drop target to a box around the slot (Image Generation's whole prompt bar), so a file dropped beside the small tile is not lost.
+ * `check` false leaves out the size and light warning (PhotoCheck) where a line of text has no room: Image Generation's compact prompt bar.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, shelf = true, addRef, extra, count, zone, one }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; shelf?: boolean; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean | 'always'; zone?: RefObject<HTMLElement | null>; one?: boolean }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, shelf = true, addRef, extra, count, zone, one, check = true }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; shelf?: boolean; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean | 'always'; zone?: RefObject<HTMLElement | null>; one?: boolean; check?: boolean }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -582,7 +591,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         )}
       </div>
       <ExampleNote images={images} />
-      <PhotoCheck images={images} />
+      {check && <PhotoCheck images={images} />}
       {cut > 0 && (
         <p className="help" role="status">
           Chỉ lấy {cut} ảnh đầu.

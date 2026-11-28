@@ -6,18 +6,19 @@ const runButton = (page: Page) => page.getByRole('button', { name: /^Chạy(?! l
 const slot = (page: Page) => page.getByRole('group', { name: 'Sản phẩm', exact: true });
 const note = (page: Page) => page.getByRole('status').filter({ hasText: /^Lưu ý: / });
 
-/** A side × side PNG of one grey level, drawn in the page. */
-const flat = (page: Page, side: number, grey: number) =>
+/** A side × side PNG of one grey level, drawn in the page; with `print`, only a square of it in the middle of a see-through background. */
+const flat = (page: Page, side: number, grey: number, print = false) =>
   page.evaluate(
-    ([side, grey]) => {
+    ([side, grey, print]) => {
       const c = document.createElement('canvas');
       [c.width, c.height] = [side, side];
       const x = c.getContext('2d')!;
       x.fillStyle = `rgb(${grey}, ${grey}, ${grey})`;
-      x.fillRect(0, 0, side, side);
+      if (print) x.fillRect(side / 4, side / 4, side / 2, side / 2);
+      else x.fillRect(0, 0, side, side);
       return c.toDataURL('image/png').split(',')[1]!;
     },
-    [side, grey] as const,
+    [side, grey, print] as const,
   );
 
 test('photo check: a small photo and a dark one get a warning under the slot, a good one none, and Run stays enabled', async ({ page }) => {
@@ -40,4 +41,11 @@ test('photo check: a small photo and a dark one get a warning under the slot, a 
   await file.setInputFiles({ name: 'dark.png', mimeType: 'image/png', buffer: Buffer.from(await flat(page, 800, 20), 'base64') });
   await expect(note(page)).toHaveText('Lưu ý: ảnh tối nên dễ mất chi tiết, hãy tăng sáng hoặc chụp lại.');
   await expect(runButton(page)).toBeEnabled();
+
+  // A black print on a see-through background is measured on its thumbnail, flattened on white, so it is not called dark.
+  await slot(page).getByRole('button', { name: 'Bỏ ảnh dark.png' }).click();
+  await expect(note(page)).toHaveCount(0);
+  await file.setInputFiles({ name: 'print.png', mimeType: 'image/png', buffer: Buffer.from(await flat(page, 800, 0, true), 'base64') });
+  await expect(slot(page).getByRole('img', { name: 'print.png' })).toBeVisible();
+  await expect(note(page)).toHaveCount(0);
 });
