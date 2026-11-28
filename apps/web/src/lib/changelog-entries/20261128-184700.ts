@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-28T16:00:00+07:00',
+  at: '2026-11-28T18:47:00+07:00',
   kind: 'improved',
   title: 'Nhắc trước khi chạy khi ảnh quá nhỏ hoặc quá tối',
   details: [
