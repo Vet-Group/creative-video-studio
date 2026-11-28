@@ -1,6 +1,6 @@
-/** Why a provider refused a job: a real person or other sensitive content in its input image, sound it made that may break copyright, or a Motion Control input
- * the model cannot read (no whole upper body in the image or the video, or too little motion in the video). */
-export type FailureReason = 'real_person' | 'sensitive_input' | 'output_audio' | 'upper_body_image' | 'upper_body_video' | 'motion_short';
+/** Why a provider refused a job: a real person or other sensitive content in its input image, sound it made that may break copyright, a picture or clip Google
+ * withheld under its safety rules, or a Motion Control input the model cannot read (no whole upper body in the image or the video, or too little motion in the video). */
+export type FailureReason = 'real_person' | 'sensitive_input' | 'output_audio' | 'output_safety' | 'upper_body_image' | 'upper_body_video' | 'motion_short';
 
 // BytePlus answers a refused input photo with `InputImageSensitiveContentDetected.<Kind>`, either as a create 400 or as a failed task.
 const BYTEPLUS_INPUT_REFUSAL = /\bInputImageSensitiveContentDetected(?:\.(\w+))?/;
@@ -15,6 +15,11 @@ const FAL_REAL_PERSON = /likenesses? of real people/i;
 const FAL_NO_UPPER_BODY = /No complete upper body detected in the (image|video)/;
 const FAL_MOTION_TOO_SHORT = /continuous valid motion is too short/;
 
+// Google withholds what it made under its safety rules: a Vertex Omni clip fails with "...violates Google's Responsible AI practices" (2 prod jobs by 2026-11-28), and a
+// Gemini image answers without one, its candidate's finishReason (or the prompt's blockReason) naming the rule.
+const GOOGLE_VIDEO_SAFETY = /violates Google's Responsible AI practices/;
+const GOOGLE_IMAGE_SAFETY = /"(?:finishReason|blockReason)":"(IMAGE_SAFETY|SAFETY|PROHIBITED_CONTENT|IMAGE_PROHIBITED_CONTENT|BLOCKLIST)"/;
+
 /** The refusals a fal twin may get past: it takes a real person's photo, and makes its own sound. */
 export const TWIN_REASONS: readonly string[] = ['real_person', 'output_audio'];
 
@@ -27,5 +32,8 @@ export function providerRefusal(error: string | null): { reason: FailureReason; 
   const body = error?.match(FAL_NO_UPPER_BODY);
   if (body) return { reason: body[1] === 'video' ? 'upper_body_video' : 'upper_body_image', detail: `fal · no complete upper body in the ${body[1]}` };
   if (error && FAL_MOTION_TOO_SHORT.test(error)) return { reason: 'motion_short', detail: 'fal · motion too short' };
+  if (error && GOOGLE_VIDEO_SAFETY.test(error)) return { reason: 'output_safety', detail: 'vertex · Responsible AI' };
+  const google = error?.match(GOOGLE_IMAGE_SAFETY);
+  if (google) return { reason: 'output_safety', detail: `vertex · ${google[1]}` };
   return error && FAL_POLICY_REFUSAL.test(error) ? { reason: FAL_REAL_PERSON.test(error) ? 'real_person' : 'sensitive_input', detail: 'fal · content_policy_violation' } : null;
 }

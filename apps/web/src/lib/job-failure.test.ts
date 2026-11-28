@@ -41,6 +41,14 @@ test('a Motion Control 422 names what it could not read: the upper body in the i
   expect(providerRefusal(msg('Tail image without first image is not supported'))).toBeNull();
 });
 
+test('Google withholding a clip or a picture under its safety rules is output_safety', () => {
+  const clip = "Vertex Omni interaction failed: Unable to show the generated video. The output contains content that violates Google's Responsible AI practices on minor safety. Try rephrasing the prompt.";
+  expect(providerRefusal(clip)).toEqual({ reason: 'output_safety', detail: 'vertex · Responsible AI' });
+  expect(providerRefusal('vertex returned no image: {"candidates":[{"content":{"role":"model"},"finishReason":"IMAGE_SAFETY","index":0}]}')).toEqual({ reason: 'output_safety', detail: 'vertex · IMAGE_SAFETY' });
+  expect(providerRefusal('vertex returned no image: {"promptFeedback":{"blockReason":"PROHIBITED_CONTENT"}}')).toEqual({ reason: 'output_safety', detail: 'vertex · PROHIBITED_CONTENT' });
+  expect(providerRefusal('vertex returned no image: {"candidates":[{"finishReason":"STOP"}]}')).toBeNull(); // no image for another reason
+});
+
 test('any other fal content_policy_violation is sensitive_input', () => {
   const other = FAL_REAL_PERSON.replace('may contain likenesses of real people or other private information', 'may contain content that cannot be processed');
   expect(providerRefusal(other)).toEqual({ reason: 'sensitive_input', detail: 'fal · content_policy_violation' });
