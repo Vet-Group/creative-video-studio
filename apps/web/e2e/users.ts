@@ -264,6 +264,7 @@ export const USERS = {
   hooka: { email: 'hooka@e2e.test', name: 'E2E Hook A', role: 'member' },
   // video-edit.e2e: the video edit app, its History, Reuse and Library chip.
   edita: { email: 'edita@e2e.test', name: 'E2E Edit A', role: 'member' },
+  editb: { email: 'editb@e2e.test', name: 'E2E Edit B', role: 'member' }, // the product swap
   // one-tap-apps.e2e: the Admin who makes a custom app in the workspace ws_onetap, and the member of that workspace who runs it.
   tapadm: { email: 'tapadm@e2e.test', name: 'E2E Tap Admin', role: 'admin' },
   tapmem: { email: 'tapmem@e2e.test', name: 'E2E Tap Member', role: 'member' },

@@ -39,9 +39,11 @@ test('video edit: the form, a Run of a quick colour, its job, Reuse and the Libr
   await page.getByRole('list', { name: 'Danh sách ứng dụng' }).getByRole('link').filter({ hasText: 'Sửa video' }).click();
   await expect(page).toHaveURL(/\/apps\/video-edit$/);
 
-  // The form: the clip slot, the three kinds with the colour first, the swatches unpicked, and no prompt, ratio, length or model control.
+  // The form: the clip slot, the four kinds with the colour first, the swatches unpicked, and no prompt, ratio, length or model control.
   await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']);
-  await expect(kinds(page).getByRole('radio')).toHaveCount(3);
+  const radios = kinds(page).getByRole('radio');
+  await expect(radios).toHaveCount(4);
+  for (const [i, name] of ['Đổi màu áo', 'Đổi nền', 'Đổi sản phẩm', 'Tự mô tả'].entries()) await expect(radios.nth(i)).toHaveAccessibleName(name);
   await expect(kinds(page).getByRole('radio', { name: 'Đổi màu áo', exact: true })).toBeChecked();
   await expect(colors(page).getByRole('radio')).toHaveCount(RECOLOR_COLORS.length);
   await expect(colors(page).getByRole('radio', { checked: true })).toHaveCount(0);
@@ -101,4 +103,51 @@ test('video edit: the form, a Run of a quick colour, its job, Reuse and the Libr
   await page.getByRole('group', { name: 'Loại', exact: true }).getByRole('button', { name: 'Ứng dụng', exact: true }).click();
   await page.getByRole('group', { name: 'Theo ứng dụng' }).getByRole('button', { name: 'Sửa video', exact: true }).click();
   await expect(page.getByRole('article')).toHaveCount(1);
+});
+
+test('video edit: a product swap sends the clip and the new product photo, shows no English prompt, and Reuse brings both back', async ({ page }) => {
+  const video = await clip();
+  await signIn(page, 'editb');
+  await page.goto('/apps/video-edit');
+  await page.getByLabel('Tệp video cần sửa').setInputFiles({ name: 'shirt.mp4', mimeType: 'video/mp4', buffer: video });
+  await expect(page.getByText('shirt.mp4 · 4.0 giây')).toBeVisible();
+
+  // The swap asks for the new product's photo, which an upload, a Library photo or the product shelf gives.
+  await kinds(page).getByRole('radio', { name: 'Đổi sản phẩm', exact: true }).check();
+  await expect(reason(page)).toHaveText('Thêm ảnh sản phẩm mới.');
+  const slot = page.getByRole('group', { name: 'Sản phẩm mới' });
+  await expect(page.getByRole('button', { name: 'Từ kệ sản phẩm cho Sản phẩm mới' })).toBeVisible(); // on the slot's label line
+  const png = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    [c.width, c.height] = [600, 600];
+    const x = c.getContext('2d')!;
+    x.fillStyle = '#f5f0e6';
+    x.fillRect(0, 0, 600, 600);
+    x.fillStyle = '#c8102e';
+    x.fillRect(200, 200, 200, 120);
+    return c.toDataURL('image/png').split(',')[1]!;
+  });
+  await page.getByLabel('Ảnh sản phẩm mới').setInputFiles({ name: 'tee.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await expect(slot.getByRole('img', { name: 'tee.png' })).toBeVisible();
+  await expect(reason(page)).toHaveCount(0);
+
+  const sent: Record<string, unknown>[] = [];
+  page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/jobs' && sent.push(r.postDataJSON())));
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
+  expect(sent[0]).toMatchObject({ feature: 'video_edit', prompt: videoEditPrompt({ swap: 'product' }), params: { swap: 'product' } });
+  expect(sent[0]!.assetIds).toHaveLength(2);
+
+  // The card finishes without the English prompt as the member's words.
+  const [job] = await mine(page);
+  const card = page.locator('.job-card').filter({ has: page.getByRole('heading', { name: 'Sửa video', level: 3 }) });
+  await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 90_000 });
+  await expect(card).not.toContainText('Replace the product');
+
+  // Dùng lại brings the clip, the kind and the photo back.
+  await page.goto(`/apps/video-edit?reuse=${job!.id}`);
+  await expect(page.getByText('shirt.mp4 · 4.0 giây')).toBeVisible();
+  await expect(kinds(page).getByRole('radio', { name: 'Đổi sản phẩm', exact: true })).toBeChecked();
+  await expect(page.getByRole('group', { name: 'Sản phẩm mới' }).getByRole('img')).toHaveCount(1);
+  await expect(runButton(page)).toBeEnabled();
 });

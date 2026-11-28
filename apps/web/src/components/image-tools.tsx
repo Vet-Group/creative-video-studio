@@ -193,6 +193,8 @@ export interface ReuseJob {
   poseImages?: Img[];
   /** The pose generator's background (a value of POSE_BACKGROUNDS); null on a job from before it. */
   background?: string | null;
+  /** A video edit's product swap ('product'); its photo may have been deleted since. */
+  swap?: string | null;
   enhance: boolean | null;
   ratio: string | null;
   resolution: string | null;

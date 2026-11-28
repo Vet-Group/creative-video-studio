@@ -37,6 +37,7 @@ const READERS: Record<string, string[]> = {
   poseImages: ['components/AppPage.tsx'], // the pose photos of its Run that still exist
   background: ['components/AppPage.tsx', 'components/VideoEditApp.tsx'], // the pose generator's background and the video edit's backdrop
   color: ['components/AppPage.tsx', 'components/VideoEditApp.tsx'], // the product recolor app's colour and the video edit's
+  swap: ['components/VideoEditApp.tsx'], // the video edit's product swap
   shot: ['components/AppPage.tsx'], // the listing set's shot
   effect: ['components/HookEffectsApp.tsx'], // the hook effects app's effect
   format: ['components/MarketingStudio.tsx'],

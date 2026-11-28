@@ -788,7 +788,9 @@ describe('the video edit app', () => {
       `Replace the background of [Video1] with ${EDIT_BACKGROUNDS[0]!.scene}, lit to match. Keep every person and product exactly as in [Video1]: the face, hair, body, outfit, any print or text, ` +
         'and every movement, with the same framing and camera. Do not add any text, logos or watermarks.',
     );
-    for (const p of [{}, { color: '#123456' }, { background: 'keep' }, { background: 'beach' }]) expect(videoEditPrompt(p)).toBeUndefined();
+    expect(videoEditPrompt({ swap: 'product' })).toMatch(/^Replace the product in \[Video1\] that matches the one in \[Image1\] .* exactly as in \[Image1\], .* Do not add any other text, logos or watermarks\.$/);
+    for (const p of [{}, { color: '#123456' }, { background: 'keep' }, { background: 'beach' }, { swap: 'design' }]) expect(videoEditPrompt(p)).toBeUndefined();
+    expect(itemPrompt('video_edit', { swap: 'product' })).toBe(videoEditPrompt({ swap: 'product' }));
     expect(itemPrompt('video_edit', { color: red.hex })).toBe(videoEditPrompt({ color: red.hex }));
     expect(itemPrompt('video_edit', {})).toBeUndefined(); // the member's own words: any prompt
   });
@@ -809,6 +811,7 @@ describe('the video edit app', () => {
     for (const videoMs of [3000, 15000]) expect(draft({ videoMs })).toBeNull();
     expect(draft({ picked: false })).toBe('Chọn màu áo mới.');
     expect(draft({ kind: 'background', picked: false })).toBe('Chọn nền mới.');
+    expect(draft({ kind: 'product', picked: false })).toBe('Thêm ảnh sản phẩm mới.');
     expect(draft({ kind: 'own', picked: false, text: '  ' })).toBe('Mô tả thay đổi bạn muốn.');
     expect(draft({ kind: 'own', picked: false, text: 'đổi cốc sang màu xanh' })).toBeNull();
   });
