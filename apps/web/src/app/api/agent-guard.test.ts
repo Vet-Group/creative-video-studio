@@ -24,7 +24,7 @@ for (const level of ['log', 'info', 'warn', 'error', 'debug'] as const) {
 }
 
 const { pool } = await import('@/lib/auth');
-const { agentContext, agentSession, bodyHash, newPat, signConfirm } = await import('@/lib/agent-access');
+const { agentContext, agentSession, bodyHash, failHits, hits, MAX_RATE_KEYS, newPat, signConfirm } = await import('@/lib/agent-access');
 const { bucketName, ensureBucket, s3 } = await import('@/lib/storage');
 const { stopBoss } = await import('@/lib/queue');
 const { default: sharp } = await import('sharp');
@@ -271,6 +271,22 @@ describe('rate limits', () => {
     const t = await fresh();
     for (let i = 0; i < 30; i++) expect((await settings.PUT(as(t.token, '/api/admin/settings', { method: 'PUT', body: { monthlyCapUsd: String(i) } }))).status).toBe(428);
     expect((await settings.PUT(as(t.token, '/api/admin/settings', { method: 'PUT', body: { monthlyCapUsd: '31' } }))).status).toBe(429);
+  });
+
+  test('bad tokens from MAX_RATE_KEYS new addresses fill only their own map: a valid token and a new address still get their answer', async () => {
+    const warn = vi.mocked(console.warn);
+    const keep = warn.getMockImplementation()!;
+    warn.mockImplementation(() => {}); // one auth_fail line per request
+    try {
+      for (let i = 0; i < MAX_RATE_KEYS; i++) await agentSession(as('cvs_pat_x', '/api/me/limits', { headers: { 'cf-connecting-ip': `10.${i >> 16}.${(i >> 8) & 255}.${i & 255}` } }));
+      const t = await fresh();
+      expect((await limits.GET(as(t.token, '/api/me/limits'))).status).toBe(200);
+      expect((await limits.GET(as('cvs_pat_x', '/api/me/limits', { headers: { 'cf-connecting-ip': '198.51.100.7' } }))).status).toBe(401);
+    } finally {
+      warn.mockImplementation(keep);
+      hits.clear();
+      failHits.clear();
+    }
   });
 });
 

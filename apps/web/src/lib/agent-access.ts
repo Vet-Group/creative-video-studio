@@ -175,27 +175,35 @@ export function readConfirm(token: string, b: Bound): { nonce: string; estimate:
 // shortcut: in memory, for the single cvs-web process; move to Postgres if the web runs 2+ processes.
 /** The hits of the last minute per key (exported for tests). Only keys with a hit are kept. */
 export const hits = new Map<string, number[]>();
+/**
+ * The failed-sign-in hits per client IP, apart from the token-keyed ones so a flood of bad tokens from new addresses cannot fill `hits`. When this map is
+ * full a new address is not limited at all: token secrets are 256-bit, so the per-IP limit only trims noise and is not what stops a guess.
+ */
+export const failHits = new Map<string, number[]>();
 /** Past this many keys a key not yet tracked waits: forgetting a tracked key would reset its limit, so a flood of new IPs cannot wash one out. */
 export const MAX_RATE_KEYS = 50_000;
 let swept = 0;
-/** Seconds to wait when `key` already had `max` hits in the last minute (or is new while MAX_RATE_KEYS are tracked), else 0 (and, with `count`, records this one). */
-export function limited(key: string, max: number, count = true): number {
+/**
+ * Seconds to wait when `key` already had `max` hits in the last minute in `map`, else 0 (and, with `count`, records this one). A key new while MAX_RATE_KEYS
+ * are tracked waits 60 s in `hits` and is let through unrecorded in `failHits`.
+ */
+export function limited(key: string, max: number, count = true, map = hits): number {
   const now = Date.now();
   // Swept at most every 5 s, so a flood of new keys costs one pass per 5 s, not one per request.
   if (now - swept >= 5_000) {
     swept = now;
-    for (const [k, v] of hits) if (!(v.at(-1)! > now - 60_000)) hits.delete(k);
+    for (const m of [hits, failHits]) for (const [k, v] of m) if (!(v.at(-1)! > now - 60_000)) m.delete(k);
   }
-  const known = hits.get(key);
-  if (!known && hits.size >= MAX_RATE_KEYS) return 60;
+  const known = map.get(key);
+  if (!known && map.size >= MAX_RATE_KEYS) return map === failHits ? 0 : 60;
   const recent = (known ?? []).filter((t) => t > now - 60_000);
   if (recent.length >= max) {
-    hits.set(key, recent);
+    map.set(key, recent);
     return Math.max(1, Math.ceil((recent[0]! + 60_000 - now) / 1000));
   }
   if (count) recent.push(now);
-  if (recent.length) hits.set(key, recent);
-  else hits.delete(key);
+  if (recent.length) map.set(key, recent);
+  else map.delete(key);
   return 0;
 }
 /** The failed-sign-in key of a client IP: an IPv6 address by its /64 (one subscriber holds the whole /64), any other value as is. */
@@ -228,11 +236,11 @@ export async function agentSession(request: Request): Promise<Resolved> {
   if (SESSION_COOKIE.test(request.headers.get('cookie') ?? '')) return { error: fail('ambiguous_credentials', 400) };
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
   const failKey = `fail:${ipKey(ip)}`;
-  const waitIp = limited(failKey, 20, false);
+  const waitIp = limited(failKey, 20, false, failHits);
   if (waitIp) return { error: tooMany(waitIp) };
   const found = await lookup(token);
   if (typeof found === 'string') {
-    limited(failKey, 20);
+    limited(failKey, 20, true, failHits);
     console.warn(`agent.auth_fail ${JSON.stringify({ reason: found, ip })}`);
     return { error: fail('unauthenticated', 401) };
   }

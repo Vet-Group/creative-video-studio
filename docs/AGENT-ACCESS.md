@@ -99,8 +99,9 @@ routing and the deny list cannot read one path two ways.
 Per token: 120 requests a minute, 30 dry runs a minute, 10 confirmed paid creates a minute. Failed sign-ins: 20 a minute per client IP (an IPv6
 client counts per /64). Over a limit the answer is 429 `rate_limited` with an `X-Retry-After` header in seconds.
 
-The counters live in the memory of the single web process (they reset on a restart). While 50,000 clients are being counted, a client not yet
-counted waits a minute rather than evicting another one's counter: a flood of new addresses then slows new agents but cannot reset a limit.
+The counters live in the memory of the single web process (they reset on a restart). Failed sign-ins are counted apart from tokens, up to
+50,000 addresses each: past that a new address is not limited (secrets are 256-bit, so guessing is moot), and a token not yet counted waits a
+minute rather than evicting another one's counter. A flood of bad tokens from new addresses therefore never slows a valid token.
 
 ## Audit
 
