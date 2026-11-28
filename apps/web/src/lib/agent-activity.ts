@@ -47,7 +47,8 @@ function writeLabel(method: string, path: string): string {
 export function activityItem(row: { id: string | number; action: string; new_value: Record<string, unknown> | null; created_at: Date }, oauth: boolean): ActivityItem {
   const v = row.new_value ?? {};
   const method = typeof v.method === 'string' ? v.method : null;
-  const path = typeof v.path === 'string' ? v.path : null;
+  // An agent chooses the path of a refused request, so cap what an Admin reads.
+  const path = typeof v.path === 'string' ? v.path.slice(0, 120) : null;
   const base = { id: String(row.id), at: row.created_at.toISOString(), action: row.action, method, path, ok: true };
   switch (row.action) {
     case 'agent.request':
