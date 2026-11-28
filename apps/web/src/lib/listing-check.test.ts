@@ -39,7 +39,7 @@ describe('whitenBackground', () => {
 describe('contentBox and measure', () => {
   it('boxes what is not white, with a 1% margin, and gives the product’s own share of the longer side', () => {
     const d = picture(200, 100, [255, 255, 255], [0, 0, 0], 50);
-    const box = contentBox(d, 200, 100);
+    const box = contentBox(d, 200, 100)!;
     expect(box.x).toBeGreaterThanOrEqual(70);
     expect(box.width).toBeGreaterThanOrEqual(50);
     expect(box.width).toBeLessThanOrEqual(56);
@@ -52,6 +52,14 @@ describe('contentBox and measure', () => {
     const m = measure(picture(200, 100, [208, 208, 205], [30, 60, 90], 50), 200, 100);
     expect(m.fill).toBe(0.5);
     expect(m.edge.every((v) => v === 50)).toBe(true);
+  });
+
+  it('finds no product when nothing differs from the wall, and Amazon asks for a look instead of passing the share', () => {
+    const d = picture(60, 60, [250, 250, 250], [252, 252, 252], 30);
+    expect(contentBox(d, 60, 60)).toBeNull();
+    const m = measure(d, 60, 60);
+    expect(m.fill).toBe(0);
+    expect(checkFor('amazon', { ...m, width: 2000, height: 2000 }, { type: 'image/jpeg', size: 1 }).find((c) => c.level === 'look' && c.text.startsWith('Không tách'))).toEqual({ level: 'look', text: 'Không tách được sản phẩm khỏi nền: tự xem lại khung ảnh' });
   });
 });
 

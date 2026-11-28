@@ -173,7 +173,7 @@ test('Media Optimizer: the marketplace checks fail a product on a light grey wal
   await expect(history.getByRole('link', { name: 'Tải xuống' })).toHaveAttribute('download', 'tee-amazon.jpg');
   await expect(history).toContainText('2000 × 2000 px');
   // The wall is pure white and the product fills 85%: its 400 px grew to 1700 px, 4.25 times.
-  await expect(history.getByRole('list', { name: 'Kiểm tee-amazon.jpg theo Amazon' }).getByRole('listitem')).toHaveText(['Nền trắng tinh ở mép ảnh', 'Cạnh dài 2000 px', 'Sản phẩm chiếm khoảng 85% khung', 'Định dạng JPG', 'Dung lượng dưới 10 MB', 'Ảnh gốc nhỏ nên sản phẩm được phóng to 4.3 lần, có thể mờ', look]);
+  await expect(history.getByRole('list', { name: 'Kiểm tee-amazon.jpg theo Amazon' }).getByRole('listitem')).toHaveText(['Nền trắng tinh ở mép ảnh', 'Cạnh dài 2000 px', 'Sản phẩm chiếm khoảng 85% khung', 'Định dạng JPG', 'Dung lượng dưới 10 MB', 'Ảnh gốc nhỏ nên sản phẩm được phóng to 4,3 lần, có thể mờ', look]);
   await shot('optimizer-amazon-result-1440');
 
   await page.setViewportSize({ width: 390, height: 900 });
@@ -183,6 +183,24 @@ test('Media Optimizer: the marketplace checks fail a product on a light grey wal
   await page.getByRole('group', { name: 'Kiểm chuẩn sàn' }).scrollIntoViewIfNeeded();
   await shot('optimizer-checks-390-dark');
   expect(await fits(page)).toBe(true);
+
+  // A wall of RGB 208 is too dark to whiten: the result keeps it inside the white margin, so its .zip counts that picture as failed.
+  const grey = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    [c.width, c.height] = [1200, 900];
+    const x = c.getContext('2d')!;
+    x.fillStyle = 'rgb(208, 208, 208)';
+    x.fillRect(0, 0, 1200, 900);
+    x.fillStyle = 'rgb(30, 60, 90)';
+    x.fillRect(450, 250, 300, 400);
+    return c.toDataURL('image/png');
+  });
+  await page.getByLabel('Ảnh cần tối ưu').setInputFiles({ name: 'grey.png', mimeType: 'image/png', buffer: Buffer.from(grey.split(',')[1]!, 'base64') });
+  await expect(page.getByText('Chạy để tạo một tệp .zip gồm 2 ảnh chính Amazon.')).toBeVisible();
+  await runButton(page).click();
+  await page.getByRole('tab', { name: 'Lịch sử' }).click(); // at 390 px the History is its own tab
+  await expect(history.getByRole('link', { name: 'Tải xuống .zip' })).toHaveAttribute('download', 'amazon-2-anh.zip');
+  await expect(history).toContainText('1/2 ảnh đạt chuẩn Amazon');
 });
 
 test('Background Remover takes several photos: one shows whole with a corner tile to add more, and Run sends one job per photo under one batch id', async ({ page }) => {

@@ -307,7 +307,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
             <p className="help">Tối đa 20 MB, 8000 px mỗi chiều và 16 triệu điểm ảnh. Ảnh động chỉ xuất một khung hình.</p>
             {count > 1 ? (
               <p className="help">
-                {count} ảnh · {kb((file?.size ?? 0) + more.reduce((sum, m) => sum + m.file.size, 0))} · Chạy để tạo một tệp .zip gồm {count} ảnh listing.
+                {count} ảnh · {kb((file?.size ?? 0) + more.reduce((sum, m) => sum + m.file.size, 0))} · Chạy để tạo một tệp .zip gồm {count} {preset === 'amazon' ? 'ảnh chính Amazon' : 'ảnh listing'}.
               </p>
             ) : (
               file && (
@@ -390,7 +390,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
             </div>
 
             {!listing && <Select label="Định dạng (tuỳ chọn)" icon="preset" heading="Chọn định dạng" value={format} options={IMAGE_FORMATS.map((f) => ({ value: f, label: formatName(f) }))} onChange={(v) => { setFormat(v as ImageFormat); setNotice(''); }} />}
-            {file && <p className="help">JPG dùng nền trắng cho vùng trong suốt. JPG/WEBP dùng chất lượng 82%; dung lượng có thể lớn hơn bản gốc.</p>}
+            {file && <p className="help">{preset === 'amazon' ? 'Ảnh chính Amazon là JPG chất lượng 92%, vùng trong suốt thành nền trắng.' : 'JPG dùng nền trắng cho vùng trong suốt. JPG/WEBP dùng chất lượng 82%; dung lượng có thể lớn hơn bản gốc.'}</p>}
           </div>
 
           <div className="form-message">

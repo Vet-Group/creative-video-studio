@@ -31,7 +31,7 @@ function edgeRing(d: Uint8ClampedArray, w: number, h: number): number[][] {
   return out;
 }
 
-/** The box around what differs from the background `base` by more than `near` in a channel (sampled), with a margin of `margin` of the longer side; rlvb's contentBox on white. */
+/** The box around what differs from the background `base` by more than `near` in a channel (sampled), with a margin of `margin` of the longer side, or null when nothing does; rlvb's contentBox on white. */
 export function contentBox(d: Uint8ClampedArray, w: number, h: number, margin = 0.01, base = [255, 255, 255], near = 5) {
   let [minX, minY, maxX, maxY] = [w, h, -1, -1];
   const step = Math.max(1, Math.floor(Math.max(w, h) / 700));
@@ -40,7 +40,7 @@ export function contentBox(d: Uint8ClampedArray, w: number, h: number, margin = 
       const i = (y * w + x) * 4;
       if (Math.abs(d[i]! - base[0]!) > near || Math.abs(d[i + 1]! - base[1]!) > near || Math.abs(d[i + 2]! - base[2]!) > near) [minX, minY, maxX, maxY] = [Math.min(minX, x), Math.min(minY, y), Math.max(maxX, x), Math.max(maxY, y)];
     }
-  if (maxX < 0) return { x: 0, y: 0, width: w, height: h };
+  if (maxX < 0) return null;
   const pad = Math.round(Math.max(w, h) * margin);
   const [x, y] = [Math.max(0, minX - pad), Math.max(0, minY - pad)];
   return { x, y, width: Math.min(w, maxX + pad + 1) - x, height: Math.min(h, maxY + pad + 1) - y };
@@ -51,7 +51,7 @@ export function measure(d: Uint8ClampedArray, width: number, height: number): Me
   // The product is what differs from the wall by more than 18 (dlazy's subject_bbox), the wall's colour being the edge's median: a light grey wall is not the product.
   const base = [0, 1, 2].map((c) => ring.map((p) => p[c]!).sort((a, b) => a - b)[ring.length >> 1] ?? 255);
   const box = contentBox(d, width, height, 0, base, 18); // the product itself: a margin would add to its share
-  return { width, height, edge: ring.map((p) => 255 - Math.min(...p)), fill: Math.max(box.width / width, box.height / height), alpha: false };
+  return { width, height, edge: ring.map((p) => 255 - Math.min(...p)), fill: box ? Math.max(box.width / width, box.height / height) : 0, alpha: false };
 }
 
 export type Level = 'ok' | 'warn' | 'fail' | 'look';
@@ -72,7 +72,7 @@ export function checkFor(market: Market, m: Measure, file: { type: string; size:
     const fits = Math.abs(ratio - 1) <= 0.02 || (r.square === 'square-or-3:4' && Math.abs(ratio - 0.75) <= 0.02);
     out.push(fits ? { level: 'ok', text: r.square === true ? 'Ảnh vuông 1:1' : 'Tỉ lệ 1:1 hoặc 3:4' } : { level: 'fail', text: r.square === true ? 'Cần ảnh vuông 1:1' : 'Cần tỉ lệ 1:1 hoặc 3:4' });
   }
-  if (r.fill) out.push(m.fill >= r.fill - 0.03 ? { level: 'ok', text: `Sản phẩm chiếm khoảng ${Math.round(m.fill * 100)}% khung` } : { level: 'warn', text: `Sản phẩm chỉ chiếm khoảng ${Math.round(m.fill * 100)}% khung, nên từ ${Math.round(r.fill * 100)}%` });
+  if (r.fill) out.push(!m.fill ? { level: 'look', text: 'Không tách được sản phẩm khỏi nền: tự xem lại khung ảnh' } : m.fill >= r.fill - 0.03 ? { level: 'ok', text: `Sản phẩm chiếm khoảng ${Math.round(m.fill * 100)}% khung` } : { level: 'warn', text: `Sản phẩm chỉ chiếm khoảng ${Math.round(m.fill * 100)}% khung, nên từ ${Math.round(r.fill * 100)}%` });
   if (m.alpha && !r.alpha) out.push({ level: 'fail', text: 'Ảnh có vùng trong suốt: sàn có thể đổi thành nền đen' });
   out.push(r.formats.includes(file.type) ? { level: 'ok', text: `Định dạng ${file.type.split('/')[1]!.toUpperCase().replace('JPEG', 'JPG')}` } : { level: 'fail', text: 'Định dạng chưa đúng, hãy xuất JPG' });
   out.push(file.size <= r.maxBytes ? { level: 'ok', text: `Dung lượng dưới ${r.maxBytes / 1024 / 1024} MB` } : { level: 'fail', text: `Dung lượng quá ${r.maxBytes / 1024 / 1024} MB` });
@@ -147,8 +147,9 @@ export async function amazonMainImage(image: CanvasImageSource & { width: number
   try {
     const { width: w, height: h } = src.data;
     if (whitenBackground(src.data.data, w, h)) src.ctx.putImageData(src.data, 0, 0);
-    // The product itself fills 85%; its 1% margin (soft edges) is drawn around it, centred on the product.
-    const [inner, box] = [contentBox(src.data.data, w, h, 0), contentBox(src.data.data, w, h)];
+    // The product itself fills 85%; its 1% margin (soft edges) is drawn around it, centred on the product. Nothing but white: the whole picture is the product.
+    const whole = { x: 0, y: 0, width: w, height: h };
+    const [inner, box] = [contentBox(src.data.data, w, h, 0) ?? whole, contentBox(src.data.data, w, h) ?? whole];
     const scale = (AMAZON_SIDE * MARKETS.amazon.fill) / Math.max(inner.width, inner.height);
     out.width = out.height = AMAZON_SIDE;
     const ctx = out.getContext('2d', { willReadFrequently: true })!;
@@ -159,10 +160,11 @@ export async function amazonMainImage(image: CanvasImageSource & { width: number
     const blob = await new Promise<Blob | null>((done) => out.toBlob(done, 'image/jpeg', 0.92));
     if (!blob) throw new Error('Trình duyệt không hỗ trợ định dạng đã chọn.');
     const made = ctx.getImageData(0, 0, AMAZON_SIDE, AMAZON_SIDE);
-    const checks = checkFor('amazon', measure(made.data, AMAZON_SIDE, AMAZON_SIDE), blob);
+    // The result's own edge is the white margin and always passes: the background is judged on the picture's edge after the white fill, where a wall that stayed grey or a cut-off product shows.
+    const checks = checkFor('amazon', { ...measure(made.data, AMAZON_SIDE, AMAZON_SIDE), edge: measure(src.data.data, w, h).edge }, blob);
     // The product's own pixels were stretched past twice their size: the 2000 px are there, the detail may not be.
     const grown = scale * src.scale;
-    if (grown > 2) checks.splice(checks.length - 1, 0, { level: 'warn', text: `Ảnh gốc nhỏ nên sản phẩm được phóng to ${grown.toFixed(1)} lần, có thể mờ` });
+    if (grown > 2) checks.splice(checks.length - 1, 0, { level: 'warn', text: `Ảnh gốc nhỏ nên sản phẩm được phóng to ${grown.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} lần, có thể mờ` });
     return { blob, checks };
   } finally {
     src.canvas.width = src.canvas.height = 0;
