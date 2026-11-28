@@ -13,18 +13,25 @@ const { MIN_USES, usesLine, weeklyUses } = await import('./popular');
 
 let ann: string;
 let bob: string;
+let robot: string;
 let seq = 0;
 
-/** A job of `feature` made `ago` (a SQL interval) ago, in `workspace`, by `user`'s team; `o` adds a Run id (`batch`), a preset, the job it retries, or a deletion. */
-async function job(feature: string, ago: string, o: { workspace?: string; user?: string; batch?: string; preset?: string; retryOf?: string; deleted?: boolean } = {}) {
+/** A job of `feature` made `ago` (a SQL interval) ago, in `workspace`, by `user`'s team; `o` adds a Run id (`batch`), the custom app it ran (`app`), a preset, the job it retries, or a deletion. */
+async function job(feature: string, ago: string, o: { workspace?: string; user?: string; batch?: string; app?: string; preset?: string; retryOf?: string; deleted?: boolean } = {}) {
   const id = `j${++seq}`;
   const user = o.user ?? ann;
   await pool.query(
     `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, params, preset_id, retry_of, deleted_at, created_at, workspace_id)
      values ($1, $2, $3, 'fal-test', 'fal', 'p', '1:1', 0, '{}', $4, $5, $6, $7, ${o.deleted ? 'now()' : 'null'}, now() - $8::interval, $9)`,
-    [id, user, user === ann ? 'pt1' : 'pt2', feature, o.batch ? { batch: o.batch } : {}, o.preset ?? null, o.retryOf ?? null, ago, o.workspace ?? 'ws_vet'],
+    [id, user, user === ann ? 'pt1' : 'pt2', feature, { ...(o.batch && { batch: o.batch }), ...(o.app && { app: o.app }) }, o.preset ?? null, o.retryOf ?? null, ago, o.workspace ?? 'ws_vet'],
   );
   return id;
+}
+/** A Smart Remake row (no job) made `ago` ago by `user`. */
+async function remake(ago: string, user = ann) {
+  const id = `r${++seq}`;
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ($1, $2, 'pt1', 's', 'succeeded', 'ws_vet')`, [`a${id}`, user]);
+  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, created_at, workspace_id) values ($1, $2, 'pt1', $3, '[1]', now() - $4::interval, 'ws_vet')`, [id, user, `a${id}`, ago]);
 }
 const uses = async (workspace = 'ws_vet') => weeklyUses(pool, workspace);
 
@@ -32,6 +39,8 @@ beforeAll(async () => {
   const user = async (email: string) => (await auth.api.createUser({ body: { email, name: email, password: 'correct-horse-battery', role: 'member' } })).user.id;
   ann = await user('ann@example.test');
   bob = await user('bob@example.test');
+  robot = await user('robot@example.test');
+  await pool.query('update users set system = true where id = $1', [robot]);
   await pool.query(`insert into workspaces (id, name) values ('ws_partner', 'Partner')`);
   await pool.query(`insert into teams (id, name) values ('pt1', 'Team one'), ('pt2', 'Team two')`);
   await pool.query(
@@ -63,6 +72,20 @@ beforeAll(async () => {
   await job('video', '2 days', { preset: 'p-hot' });
   await job('video', '1 hour', { preset: 'p-cool' });
   await job('video', '1 hour');
+  // A system account's jobs and remakes never count, whatever they are.
+  for (let i = 0; i < 4; i++) await job('listing_set', '1 hour', { user: robot, preset: 'p-hot' });
+  await remake('1 hour', robot);
+  // A Marketing Run of three clips and a camera-angle Run of two share one batch id each: two uses; a clip sent on its own is a third.
+  for (let i = 0; i < 3; i++) await job('marketing', '1 hour', { batch: 'mk-run' });
+  for (let i = 0; i < 2; i++) await job('video', '1 hour', { batch: 'angles-run' });
+  await job('marketing', '1 hour');
+  // A custom app's jobs count under the app, not under Create (`video`) or Image Generation (`image`); another app and Smart Remake have their own.
+  for (const app of ['app-a', 'app-a', 'app-b']) await job('video', '1 hour', { app });
+  await job('image', '1 hour', { app: 'app-b' });
+  await job('image', '1 hour');
+  await remake('1 hour');
+  await remake('2 days', bob);
+  await remake('8 days');
 });
 
 afterAll(async () => {
@@ -112,4 +135,24 @@ test('a preset counts the Runs that named it', async () => {
   expect(presets.get('p-cool')).toBe(1);
   expect(presets.size).toBe(2);
   expect([...(await uses('ws_partner')).presets]).toEqual([]);
+});
+
+test("a system account's jobs and remakes do not count, and take no preset with them", async () => {
+  const { features, presets } = await uses();
+  expect(features.has('listing_set')).toBe(false);
+  expect(presets.get('p-hot')).toBe(3);
+});
+
+test('one Marketing Run or camera-angle Run counts once, however many clips it made', async () => {
+  const { features } = await uses();
+  expect(features.get('marketing')).toBe(2);
+  expect(features.get('video')).toBe(6); // p-hot x3, p-cool, one bare clip, and the two angles as one: the custom app's three are not among them
+});
+
+test("a custom app's Runs count under the app and not under their feature, and a Smart Remake under its own key", async () => {
+  const { features } = await uses();
+  expect(features.get('app:app-a')).toBe(2);
+  expect(features.get('app:app-b')).toBe(2);
+  expect(features.get('image')).toBe(1);
+  expect(features.get('smart_remake')).toBe(2);
 });

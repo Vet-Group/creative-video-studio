@@ -7,7 +7,7 @@ import { weeklyUses } from '@/lib/popular';
 
 export default async function AppsPage() {
   const user = await currentUser();
-  // Custom apps and Smart Remake run on the `video` and `image` features of Create, so they get no count of their own (JOB_APPS leaves Smart Remake out).
+  // A custom app counts under its id (its jobs carry params.app) and Smart Remake under `smart_remake` (a row of remakes, no job), so neither adds to Create's or Image Generation's count (lib/popular.ts); JOB_APPS leaves Smart Remake out.
   const [extra, { features }] = user?.workspaceId ? await Promise.all([publishedApps(user.workspaceId), weeklyUses(pool, user.workspaceId)]) : [[], { features: new Map<string, number>() }];
-  return <AppsIndex extra={extra} uses={Object.fromEntries(JOB_APPS.map((a) => [a.slug, features.get(a.feature) ?? 0]))} />;
+  return <AppsIndex extra={extra} uses={{ ...Object.fromEntries(JOB_APPS.map((a) => [a.slug, features.get(a.feature) ?? 0])), 'smart-remake': features.get('smart_remake') ?? 0, ...Object.fromEntries(extra.map((a) => [a.slug, features.get(`app:${a.slug}`) ?? 0])) }} />;
 }

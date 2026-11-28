@@ -42,12 +42,15 @@ test('Create: two camera angles start two clips with different prompts, and with
   // The preview names each clip's prompt by its angle.
   await expect(page.locator('.prompt-preview p')).toHaveText([`${first!.label}: ${anglePrompt(BODY, first!)}`, `${third!.label}: ${anglePrompt(BODY, third!)}`]);
 
-  const posted: { prompt: string }[] = [];
+  const posted: { prompt: string; params: { batch?: string } }[] = [];
   page.on('request', (r) => r.url().endsWith('/api/jobs') && r.method() === 'POST' && posted.push(r.postDataJSON()));
   await runButton(page, /^Tạo 2 clip/).click();
   await page.getByRole('dialog', { name: /^Tạo 2 clip/ }).getByRole('button', { name: 'Tiếp tục', exact: true }).click();
   await expect(page.getByText('Đã gửi 2 clip')).toBeVisible();
   expect(posted.map((p) => p.prompt)).toEqual([anglePrompt(BODY, first!), anglePrompt(BODY, third!)]);
+  // One Run of two clips: one shared batch id, by which the week's Run count counts it once.
+  expect(new Set(posted.map((p) => p.params.batch)).size).toBe(1);
+  expect(posted[0]!.params.batch).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   expect((await prompts(page)).sort()).toEqual([anglePrompt(BODY, first!), anglePrompt(BODY, third!)].sort());
 });
 

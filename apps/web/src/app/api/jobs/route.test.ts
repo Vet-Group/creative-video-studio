@@ -621,7 +621,7 @@ describe('POST /api/jobs for an image feature', () => {
     ['a resolution the model lacks', { params: { resolution: '4K' } }, /ratio, resolution or number of images/],
     ['a prototype key as the resolution', { params: { resolution: 'constructor' } }, /ratio, resolution or number of images/],
     ['no resolution', { params: {} }, /params\.resolution is required/],
-    ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution, quality, thinking, brief and batch/],
+    ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution, quality, thinking, brief, batch and app/],
     ['a quality that does not exist', { params: { resolution: '1K', quality: 'ultra' } }, /params\.quality must be one of/],
     ['a thinking level on a model with none', { params: { resolution: '2K', thinking: 'high' } }, /the model has no thinking level/],
     ['a thinking level the model lacks', { modelId: 'img-think', ratio: 'auto', params: { resolution: '1K', thinking: 'low' } }, /params\.thinking must be one of minimal, medium, high on this model/],
@@ -680,7 +680,7 @@ describe('POST /api/jobs for an image feature', () => {
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', pose: 'cartwheel' } }))).toMatch(/params.pose must be one of the Try On poses/);
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: '2' } }))).toMatch(/params.garments must count the garment images \(1 to 1\)/); // 2 inputs: the person and 1 garment
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: 'x' } }))).toMatch(/params.garments must count the garment images/);
-    expect(await error(await runImage(m, { params: { resolution: '1K', garments: '1' } }))).toMatch(/params may hold only resolution, quality, thinking, brief and batch/);
+    expect(await error(await runImage(m, { params: { resolution: '1K', garments: '1' } }))).toMatch(/params may hold only resolution, quality, thinking, brief, batch and app/);
     expect(await error(await runImage(m, { params: { resolution: '1K', brief: 'x'.repeat(5001) } }))).toMatch(/params.brief may be at most 5000/);
     expect(await jobCount()).toBe(before);
   });
@@ -1234,6 +1234,22 @@ describe('POST /api/jobs for an image feature', () => {
         expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '1.0000' }]);
       }));
 
+    test("the clips of one Run share a batch id, a UUID, as Create's camera angles do: the week's Run count counts them once", () =>
+      withMarketing(async () => {
+        const m = await newMember();
+        const RUN = '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a31';
+        const ids: string[] = [];
+        for (let i = 0; i < 2; i++) {
+          const res = await marketing(m, { params: { batch: RUN } });
+          expect(res.status).toBe(201);
+          ids.push(((await res.json()) as { id: string }).id);
+        }
+        expect((await pool.query('select params from jobs where id = any($1::text[])', [ids])).rows).toEqual([{ params: { batch: RUN } }, { params: { batch: RUN } }]);
+        expect(await error(await marketing(m, { params: { batch: 'run-1' } }))).toBe('params.batch must be a UUID');
+        const angle = await runAs(m, { params: { batch: RUN } });
+        expect(angle.status).toBe(201);
+      }));
+
     test('refuses anything but exactly 2 images, a preset, and a missing or blank prompt, in English', () =>
       withMarketing(async () => {
         const m = await newMember();
@@ -1314,8 +1330,8 @@ describe('POST /api/jobs for an image feature', () => {
         expect(await error(await advanced(m, 2, { presetId: 'gentle-push-in' }))).toMatch(/prompt and no preset/);
         expect(await error(await advanced(m, 2, { params: { format: 'bogus' } }))).toMatch(/params.format must be one of advanced, unboxing, review/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', audio: 'yes' } }))).toMatch(/params.audio must be on or off/);
-        expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format, audio, endAssetId, videoAssetId, hook, hookText, location, brief, script, ending, endText, endTextPos, roles and highlights, as text/);
-        expect(await error(await advanced(m, 2, { feature: 'video', prompt: 'x', params: { format: 'advanced' } }))).toMatch(/params may hold only audio, endAssetId, audioAssetIds, hookText and ending, as text/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format, audio, endAssetId, videoAssetId, hook, hookText, location, brief, script, ending, endText, endTextPos, roles, highlights and batch, as text/);
+        expect(await error(await advanced(m, 2, { feature: 'video', prompt: 'x', params: { format: 'advanced' } }))).toMatch(/params may hold only audio, endAssetId, audioAssetIds, hookText, ending, batch and app, as text/);
         expect(await jobCount()).toBe(before);
       });
 

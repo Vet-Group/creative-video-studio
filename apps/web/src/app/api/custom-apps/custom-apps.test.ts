@@ -265,7 +265,7 @@ describe('POST /api/custom-apps/[id]/run', () => {
     const res = await run(m, id, { assetIds: [photo] });
     expect(res.status).toBe(201);
     const job = (await pool.query('select * from jobs where id = $1', [(await json(res)).id])).rows[0];
-    expect(job).toMatchObject({ user_id: m.id, feature: 'video', model: 'app-fal', preset_id: null, prompt: 'spin it', aspect: '9:16', duration_s: 5, params: { audio: 'off' }, input_asset_ids: [photo, s.inputIds[1]], status: 'queued', workspace_id: 'ws_vet' });
+    expect(job).toMatchObject({ user_id: m.id, feature: 'video', model: 'app-fal', preset_id: null, prompt: 'spin it', aspect: '9:16', duration_s: 5, params: { audio: 'off', app: id }, input_asset_ids: [photo, s.inputIds[1]], status: 'queued', workspace_id: 'ws_vet' });
     expect((await pool.query(`select kind, usd::text as usd from cost_entries where job_id = $1`, [job.id])).rows).toEqual([{ kind: 'estimate', usd: '1.0000' }]);
   });
 
@@ -275,7 +275,19 @@ describe('POST /api/custom-apps/[id]/run', () => {
     const photo = await slotPhoto(m);
     const res = await run(m, id, { assetIds: [photo] });
     expect(res.status).toBe(201);
-    expect((await pool.query('select feature, model, aspect, duration_s, params, input_asset_ids from jobs where id = $1', [(await json(res)).id])).rows[0]).toEqual({ feature: 'image', model: 'app-img', aspect: '3:4', duration_s: 0, params: { resolution: '2K' }, input_asset_ids: [photo] });
+    expect((await pool.query('select feature, model, aspect, duration_s, params, input_asset_ids from jobs where id = $1', [(await json(res)).id])).rows[0]).toEqual({ feature: 'image', model: 'app-img', aspect: '3:4', duration_s: 0, params: { resolution: '2K', app: id }, input_asset_ids: [photo] });
+  });
+
+  test('a Run is marked with its app (params.app), which POST /api/jobs takes only for an app of the workspace sent with its own prompt', async () => {
+    const { s, id } = await published({ params: { audio: 'off' } });
+    const m = await fresh();
+    const photo = await slotPhoto(m);
+    const send = (params: Record<string, string>, prompt = 'spin it') => runJob(req(m, '/api/jobs', 'POST', { feature: 'video', assetIds: [photo, s.inputIds[1]], modelId: 'app-fal', prompt, ratio: '9:16', durationSec: 5, params }));
+    const refused = 'params.app must be a custom app of this workspace, run with its own prompt';
+    expect(((await json(await send({ audio: 'off', app: 'no-such-app' }))).error)).toBe(refused);
+    expect(((await json(await send({ audio: 'off', app: id }, 'something else'))).error)).toBe(refused);
+    expect((await send({ audio: 'off', app: id })).status).toBe(201);
+    expect(((await json(await runJob(req(m, '/api/jobs', 'POST', { feature: 'marketing', assetIds: [photo, s.inputIds[1]], modelId: 'app-fal', prompt: 'spin it', ratio: '9:16', durationSec: 5, params: { app: id } })))).error)).toMatch(/^params may hold only/);
   });
 
   test('takes nothing but the photos: any other key answers 400 with code custom_app, and no job is made', async () => {
