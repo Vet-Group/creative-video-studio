@@ -78,6 +78,14 @@ describe('stockGroups', () => {
       { label: 'Tay', names: ['jewelry-template-hand-01.png'] },
     ]);
   });
+  it("gives Background Changer's reference slot the stock scenes by group, and its photo slot none", () => {
+    const scenes = new Set(['bg-scene-outdoor-2.webp', 'bg-scene-outdoor-10.webp', 'bg-scene-studio-1.webp', 'bg-scene-indoor.webp']);
+    expect(stockGroups(appBySlug('background-changer')!.slots[1]!, scenes)).toEqual([
+      { label: 'Ngoài trời', names: ['bg-scene-outdoor-2.webp', 'bg-scene-outdoor-10.webp'] },
+      { label: 'Phông studio', names: ['bg-scene-studio-1.webp'] },
+    ]);
+    expect(stockGroups(appBySlug('background-changer')!.slots[0]!, scenes)).toEqual([]);
+  });
   it('offers nothing for a slot without stock photos or when no sample exists', () => {
     expect(stockGroups(appBySlug('lingerie-try-on')!.slots[0]!, have)).toEqual([]);
     expect(stockGroups(appBySlug('lingerie-try-on')!.slots[1]!, new Set())).toEqual([]);
