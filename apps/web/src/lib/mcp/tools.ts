@@ -90,15 +90,15 @@ const pick = (a: Args, keys: string[]): Json => Object.fromEntries(keys.filter((
 
 async function connection() {
   const s = mcpSession();
-  const t = (await pool.query(`select id, name, kind, expires_at, monthly_cap_usd::text as cap from api_tokens where id = $1`, [s.agent.tokenId])).rows[0];
-  return { id: t.id as string, name: t.name as string, kind: t.kind as string, expiresAt: t.expires_at, month: { usedUsd: await tokenMonthSpend(pool, t.id), capUsd: t.cap as string } };
+  const t = (await pool.query(`select id, name, kind, expires_at from api_tokens where id = $1`, [s.agent.tokenId])).rows[0];
+  return { id: t.id as string, name: t.name as string, kind: t.kind as string, expiresAt: t.expires_at, month: { usedUsd: await tokenMonthSpend(pool, t.id) } };
 }
 
 export const TOOLS: Tool[] = [
   {
     name: 'whoami',
     title: 'Who am I',
-    description: 'Call this first. The CVS user this connection acts as (name, email, role), its workspace, the connection (id, name, expiry) and its month spend against its USD cap.',
+    description: 'Call this first. The CVS user this connection acts as (name, email, role), its workspace, the connection (id, name, expiry) and its USD spend this month.',
     input: obj({}),
     annotations: READ,
     run: async () => {
@@ -118,7 +118,7 @@ export const TOOLS: Tool[] = [
   {
     name: 'limits_get',
     title: 'Limits',
-    description: "The user's Run caps used today and this month (clips, USD) and this connection's month spend against its cap.",
+    description: "The user's Run caps used today and this month (clips, USD) and this connection's USD spend this month.",
     input: obj({}),
     annotations: READ,
     run: async () => {

@@ -178,8 +178,9 @@ export const workspaceMembers = pgTable(
   ],
 );
 
-// An agent connection (Claude Code, OpenMausBot): it acts as its creator in one workspace, under its own monthly USD cap (apps/web/src/lib/agent-access.ts).
-// A personal access token stores only the sha256 of its secret; an OAuth connection (migration 0128) has none and never expires while refreshed.
+// An agent connection (Claude Code, OpenMausBot): it acts as its creator in one workspace, under the same team and company caps as a browser Run (apps/web/src/lib/agent-access.ts).
+// A personal access token stores only the sha256 of its secret and may never expire (migration 0129); an OAuth connection (migration 0128) has no
+// secret and never expires while refreshed.
 export const API_TOKEN_KINDS = ['pat', 'oauth'] as const;
 export const apiTokens = pgTable(
   'api_tokens',
@@ -193,7 +194,6 @@ export const apiTokens = pgTable(
     name: text('name').notNull(),
     secretHash: bytea('secret_hash').unique(),
     oauthClientId: text('oauth_client_id').references((): AnyPgColumn => oauthClients.id, { onDelete: 'restrict' }),
-    monthlyCapUsd: numeric('monthly_cap_usd', { precision: 12, scale: 4 }).notNull().default('20'),
     expiresAt: tstz('expires_at'),
     createdAt: tstz('created_at').notNull().defaultNow(),
     lastUsedAt: tstz('last_used_at'),
@@ -206,8 +206,7 @@ export const apiTokens = pgTable(
     index('api_tokens_user_id_idx').on(t.userId).where(sql`${t.revokedAt} is null`),
     check('api_tokens_kind_check', sql`${t.kind} in ('pat', 'oauth')`),
     check('api_tokens_name_check', sql`char_length(${t.name}) between 1 and 60`),
-    check('api_tokens_cap_check', sql`${t.monthlyCapUsd} >= 0 and ${t.monthlyCapUsd} <> 'NaN'`),
-    check('api_tokens_pat_check', sql`${t.kind} <> 'pat' or (${t.expiresAt} is not null and ${t.secretHash} is not null)`),
+    check('api_tokens_pat_check', sql`${t.kind} <> 'pat' or ${t.secretHash} is not null`),
   ],
 );
 
@@ -746,7 +745,7 @@ export const costEntries = pgTable(
     /** Never updated (append-only): rows from before workspaces got the column's constant default, which rewrites nothing and fires no row trigger. */
     workspaceId: workspaceId(),
     createdAt: tstz('created_at').notNull().defaultNow(),
-    /** Copied from the row's job, analysis, suggestion run or remake at insert; the connection's monthly cap sums it (tokenMonthSpend). */
+    /** Copied from the row's job, analysis, suggestion run or remake at insert; the connection's month spend sums it (tokenMonthSpend). */
     apiTokenId: apiTokenId(),
   },
   (t) => [

@@ -1793,14 +1793,14 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .agent-list-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 24px 0 0; }
 .agent-list-head .settings-kicker.settings-sub { margin: 0; }
 .agent-access .acct-rows { margin-top: 12px; }
-.agent-row > :is(.agent-paused, .agent-spend, .agent-actions, .agent-cap) { flex: 1 0 100%; margin: 0; padding-left: 48px; }
+.agent-row > :is(.agent-paused, .agent-spend, .agent-actions) { flex: 1 0 100%; margin: 0; padding-left: 48px; }
 .agent-paused { color: var(--text-2); font-size: 13px; line-height: 20px; }
 .agent-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .agent-access .agent-actions .agent-revoke { color: var(--danger-text); }
 .agent-access .agent-actions .agent-revoke:hover { background: var(--danger-soft); }
 .agent-reauth { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 0; font-size: 14px; line-height: 20px; }
 @media (max-width: 767.98px) {
-  .agent-row > :is(.agent-paused, .agent-spend, .agent-actions, .agent-cap) { justify-self: stretch; padding-left: 0; }
+  .agent-row > :is(.agent-paused, .agent-spend, .agent-actions) { justify-self: stretch; padding-left: 0; }
 }
 /* The forced change page: one card in the middle of the screen, nothing else of the app. */
 .forced-pw { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 24px 16px; background: var(--surface-1); }

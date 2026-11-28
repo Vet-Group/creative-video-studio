@@ -1,7 +1,7 @@
 // The OAuth 2.1 server of the MCP endpoint (docs/AGENT-ACCESS.md "OAuth"), so Claude Code and OpenMausBot connect with a sign-in instead of a pasted
 // token. Public clients register themselves (RFC 7591) with loopback redirects only, an Admin approves one on /oauth/authorize, and the code (PKCE S256)
 // becomes a one-hour access token (`cvs_oat_`) and a 30-day refresh token (`cvs_ort_`) rotated on every use. An approved client is an ordinary
-// api_tokens connection (kind 'oauth'), so guard(), the deny set, the monthly cap, the audit trail and Disconnect in Settings apply unchanged.
+// api_tokens connection (kind 'oauth'), so guard(), the deny set, the audit trail and Disconnect in Settings apply unchanged.
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import { audit } from '@cvs/core/audit';
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
@@ -226,11 +226,11 @@ export function backTo(redirectUri: string, params: Record<string, string | null
 }
 
 /**
- * Allow: a new connection (kind 'oauth', no expiry while refreshed) for `userId` in `workspaceId` under `capUsd`, and a single-use code for it,
+ * Allow: a new connection (kind 'oauth', no expiry while refreshed) for `userId` in `workspaceId`, and a single-use code for it,
  * audited as agent.oauth_consent. 'too_many' when the user already holds MAX_ACTIVE_TOKENS active connections, 'gone' when the client was
  * deleted (pruned or evicted) after the form was checked.
  */
-export async function approve(i: { userId: string; workspaceId: string; client: OAuthClient; request: AuthorizeRequest; capUsd: string }): Promise<{ code: string } | 'too_many' | 'gone'> {
+export async function approve(i: { userId: string; workspaceId: string; client: OAuthClient; request: AuthorizeRequest }): Promise<{ code: string } | 'too_many' | 'gone'> {
   return withTransaction(pool, async (tx) => {
     await tx.query(`select pg_advisory_xact_lock(hashtext('agent-create:' || $1))`, [i.userId]);
     // Connections whose code was never exchanged hold a slot for nothing: they end here.
@@ -244,13 +244,12 @@ export async function approve(i: { userId: string; workspaceId: string; client: 
     // Locks the client row too, so a prune or an eviction cannot delete it before the connection below refers to it.
     if (!(await tx.query(`update oauth_clients set first_consent_at = coalesce(first_consent_at, now()) where id = $1`, [i.client.id])).rowCount) return 'gone';
     const id = newTokenId();
-    await tx.query(`insert into api_tokens (id, user_id, workspace_id, kind, name, oauth_client_id, monthly_cap_usd) values ($1, $2, $3, 'oauth', $4, $5, $6)`, [
+    await tx.query(`insert into api_tokens (id, user_id, workspace_id, kind, name, oauth_client_id) values ($1, $2, $3, 'oauth', $4, $5)`, [
       id,
       i.userId,
       i.workspaceId,
       i.client.name.slice(0, 60),
       i.client.id,
-      i.capUsd,
     ]);
     const code = secret('cvs_oac_');
     await tx.query(
@@ -261,7 +260,7 @@ export async function approve(i: { userId: string; workspaceId: string; client: 
       actorId: i.userId,
       action: 'agent.oauth_consent',
       target: `api_token:${id}`,
-      newValue: { kind: 'oauth', clientId: i.client.id, clientName: i.client.name, redirectHost: new URL(i.request.redirectUri).host, workspaceId: i.workspaceId, capUsd: i.capUsd },
+      newValue: { kind: 'oauth', clientId: i.client.id, clientName: i.client.name, redirectHost: new URL(i.request.redirectUri).host, workspaceId: i.workspaceId },
     });
     return { code };
   });

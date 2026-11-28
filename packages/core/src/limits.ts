@@ -135,8 +135,8 @@ export async function checkCaps(tx: Queryable, userId: string, estimateUsd: stri
 
 /**
  * What the agent connection `tokenId` has spent in the ICT month of `at` (default now()), as numeric text: every ledger row booked for it, of every kind
- * (llm and adjustments too, owner decision 2026-11-28), plus what its open remakes have yet to book. The connection's monthly cap holds this
- * (apps/web/src/lib/agent-access.ts agentCharge), under the connection's lock.
+ * (llm and adjustments too, owner decision 2026-11-28), plus what its open remakes have yet to book. Settings shows it per connection, and a dry run
+ * reports it (apps/web/src/lib/agent-access.ts agentCharge).
  */
 export async function tokenMonthSpend(q: Queryable, tokenId: string, at?: Date): Promise<string> {
   const { rows } = await q.query(

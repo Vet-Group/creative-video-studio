@@ -8,8 +8,7 @@ import { type Account, Settings } from './Settings';
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 
 const noop = () => undefined;
-const list = (tokens: AgentToken[] | null | 'failed', all = false, editing: string | null = null) =>
-  renderToStaticMarkup(<TokenList tokens={tokens} all={all} editing={editing} onRetry={noop} onEdit={noop} onRevoke={noop} onSaved={noop} />);
+const list = (tokens: AgentToken[] | null | 'failed', all = false) => renderToStaticMarkup(<TokenList tokens={tokens} all={all} onRetry={noop} onRevoke={noop} />);
 const token = (o: Partial<AgentToken> = {}): AgentToken => ({
   id: 'abcdefghijkl',
   name: 'Claude Code văn phòng',
@@ -22,7 +21,6 @@ const token = (o: Partial<AgentToken> = {}): AgentToken => ({
   lastUsedIp: null,
   status: 'active',
   paused: false,
-  capUsd: '20.0000',
   monthSpendUsd: '4.5000',
   ...o,
 });
@@ -38,18 +36,25 @@ test('the list says it is loading, offers a retry on failure, and explains an em
   expect(list([], true)).toContain('Chưa ai tạo khoá nào.');
 });
 
-test('a row shows its dates, last use, spend against the cap, and its actions; the owner only in the everyone view', () => {
+test('a row shows its dates, last use, spend this month with no cap, and its actions; the owner only in the everyone view', () => {
   const html = list([token({ lastUsedAt: '2026-11-28T04:05:00.000Z', lastUsedIp: '203.0.113.9' })]);
   expect(html).toContain('<strong>Claude Code văn phòng</strong>');
   expect(html).toContain('Tạo 28/11/2026 · Hết hạn 28/12/2026');
   expect(html).toContain('Dùng lần cuối 11:05 28/11/2026 từ 203.0.113.9');
-  expect(html).toContain('aria-valuetext="$4.50 / $20.00"');
+  expect(html).toContain('<span>Đã chi tháng này</span><strong>$4.50</strong>');
+  expect(html).not.toContain('role="meter"');
   expect(html).toContain('data-on="true" data-status="active">Đang dùng</span>');
   expect(html).toContain('aria-label="Thu hồi khoá Claude Code văn phòng"');
-  expect(html).toContain('aria-label="Sửa hạn mức của khoá Claude Code văn phòng"');
+  expect(html).not.toContain('hạn mức');
   expect(html).not.toContain('Của Lan');
   expect(list([token({ mine: false })], true)).toContain('Của Lan');
   expect(list([token()], true)).toContain('Của bạn');
+});
+
+test('a token with no expiry says it never expires and stays active', () => {
+  const html = list([token({ expiresAt: null })]);
+  expect(html).toContain('Tạo 28/11/2026 · Không hết hạn');
+  expect(html).toContain('data-status="active">Đang dùng</span>');
 });
 
 test("a paused row says why; a revoked or expired one has no actions", () => {
@@ -60,16 +65,8 @@ test("a paused row says why; a revoked or expired one has no actions", () => {
   for (const status of ['revoked', 'expired'] as const) {
     const html = list([token({ status })]);
     expect(html).not.toContain('Thu hồi khoá');
-    expect(html).not.toContain('Sửa hạn mức');
   }
   expect(list([token({ status: 'expired' })])).toContain('Đã hết hạn 28/12/2026');
-});
-
-test('editing a cap shows its form in the row', () => {
-  const html = list([token()], false, 'abcdefghijkl');
-  expect(html).toContain('Hạn mức mỗi tháng (USD)');
-  expect(html).toContain('value="20"');
-  expect(html).not.toContain('aria-label="Sửa hạn mức');
 });
 
 test('the token is shown once with a warning, a copy note, and the setup text of the first tool', () => {

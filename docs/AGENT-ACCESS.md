@@ -24,10 +24,10 @@ Settings > "Connect AI". The routes behind it (`/api/agent-access/tokens`) take 
 opened with "sign in as", and for a write only a request this app's page sent.
 
 - Creating a token needs a sign-in in the last 10 minutes (403 `reauth_required`; sign out and in again).
-- Expiry: 7, 30 or 90 days (default 30). There is no token without an expiry.
-- Monthly cap: 0 to 1000 USD (default 20), checked on the server too.
+- Expiry: 7, 30 or 90 days (default 30), or never (`days: null`). A token that never expires works until it is revoked by
+  hand or by one of the credential resets below; it is paused while its owner is not an Admin.
 - A user holds at most 10 active tokens (409 `too_many_tokens`).
-- Any Admin can list every token (`?all=1`), rename one, change its cap and revoke it. A revoked token fails on its next request. Each change is
+- Any Admin can list every token (`?all=1`), rename one and revoke it. A revoked token fails on its next request. Each change is
   audited.
 - A user's active tokens are revoked (reason `credentials_reset`, audited) when the user changes the password, signs out every other session,
   deletes a passkey or unlinks a sign-in method, and when an Admin sets a temporary password, turns 2FA off or removes a sign-in method.
@@ -62,7 +62,7 @@ The 428 `summary` shows the body's top-level fields so a human can check what wi
 
 **Paid creates** (`POST /api/jobs`, `/api/remakes`, `/api/analyses`, `/api/suggestions`, and `/api/custom-apps/<id>/run`, which goes through
 `/api/jobs`) check their own confirm. Their 428 also carries `estimateUsd` (null for analyses and suggestions, which have no upfront price) and
-`tokenMonth: { usedUsd, capUsd }`. Nothing is written by a dry run.
+`tokenMonth: { usedUsd }`, the connection's spend this month. Nothing is written by a dry run.
 
 Writes that need no confirm: `POST /api/assets`, `/api/assets/presign-video`, `/api/assets/finalize-video` (uploads cost nothing),
 `POST /api/jobs/<id>/cancel`, and `POST /api/library/zip`, `/api/library/lookbook` (reads sent as POST). Matched by exact method and route,
@@ -74,21 +74,19 @@ confirm is 415 `multipart_not_confirmable`.
 ### Replay and retries
 
 - **Paid creates replay.** Resending a confirm that already created something returns the first answer (same status, same body, for example the
-  same job id) and does no new work, even if the cap has been reached since. A safe retry after a timeout is simply the same request.
+  same job id) and does no new work, even if a cap has been reached since. A safe retry after a timeout is simply the same request.
 - **Every other write spends its confirm before the handler runs.** A resend gets **409 `confirm_used`**, even if the first attempt failed or
   timed out. On `confirm_used` an agent must read the current state (the resource, or the list it belongs to). If the change is there, it is
   done; if not, it starts again with a new dry run. It must never treat a 409 as success.
 - `confirm_invalid`: the request differs from the one the token was made for, or the token is malformed. `confirm_expired`: older than 10
   minutes. `confirm_stale` (paid creates): the price changed; the answer carries a fresh confirm token for the new price.
 
-### Monthly cap
+### Spend and caps
 
-The spend of a token is everything booked through it in the current month (Asia/Ho_Chi_Minh time): its jobs' estimates and actual costs,
-remakes, and the LLM cost of its analyses and suggestions, plus the estimate of its open remakes. A Run or remake whose estimate would take the
-spend over the cap is refused (429 `token_monthly_usd`); an analysis or suggestion is refused once the spend reaches the cap. Because those two
-have no upfront price, the spend can pass the cap by the calls already running: at most one analysis per user plus the day's remaining
-suggestions. Measured on production over the 30 days to 2026-11-28, the costliest analysis booked $0.0222 (p99 $0.0216, 37 calls) and the
-costliest suggestion $0.0028 (p99 $0.0022, 88 calls), so the overrun is cents, not dollars. The cap is an extra ceiling: the team and company caps and team billing apply to agent runs exactly as to runs from the browser.
+A connection has no cap of its own (owner decision 2026-11-28). The member and company caps and team billing apply to agent runs exactly as
+to runs from the browser, with the same 429 answers. The spend of a connection is everything booked through it in the current month
+(Asia/Ho_Chi_Minh time): its jobs' estimates and actual costs, remakes, and the LLM cost of its analyses and suggestions, plus the estimate of
+its open remakes. Settings shows it for each connection, and a paid dry run reports it as `tokenMonth.usedUsd`.
 
 ## What a token can never do
 
@@ -120,11 +118,11 @@ Never a token, secret or hash; the target is `api_token:<id>`.
 | `agent.read` | every agent GET under `/api/admin/` |
 | `agent.refused` | a request refused before its handler: 400 `bad_path`, 403 `not_allowed_for_agent`, 409 `confirm_invalid` / `confirm_expired` / `confirm_used` (method, path, reason) |
 | `agent.token_create`, `agent.token_update`, `agent.token_revoke` | token lifecycle, by the Admin who did it (an OAuth code reuse revokes with reason `code_reuse`, a client's own RFC 7009 revoke with `oauth_revoke`) |
-| `agent.oauth_consent` | an Admin approved an OAuth client: client id, its self-declared name, the redirect host, workspace, cap |
+| `agent.oauth_consent` | an Admin approved an OAuth client: client id, its self-declared name, the redirect host, workspace |
 | `agent.oauth_refresh_reuse` | a spent refresh token came back after the grace: the connection was revoked |
 
 Log lines (no audit row): `agent.dry_run` for each 428 of a non-paid write (a dry run is the first step of every write, and the confirmed write
-gets its own row; the 30-a-minute limit bounds them), `agent.auth_fail` for a failed sign-in, `agent.cap_refused` for a cap refusal.
+gets its own row; the 30-a-minute limit bounds them), `agent.auth_fail` for a failed sign-in.
 Spent confirms (`agent_confirms`) are deleted after a day by the daily purge job.
 
 ## Kill switch
@@ -144,19 +142,22 @@ are refused (409 `agent_api_off`) and Settings shows agent access as off. Tokens
 | 409 `workspace_changed` | an `x-cvs-workspace` header names another workspace than the token's; leave it out |
 | 413, 415 | body too large, chunked or multipart for a confirm |
 | 428 `confirm_required` | resend with `x-cvs-confirm` |
-| 429 `rate_limited` / `token_monthly_usd` | wait `X-Retry-After` seconds / raise the cap or wait for next month |
+| 429 `rate_limited` | wait `X-Retry-After` seconds |
+| 429 with a cap message | a member or company cap is full, as in the browser; wait for the next day or month, or ask an Admin |
 
 ## Residual risks
 
 - **A leaked token can confirm its own writes, including Admin writes.** The confirm makes an agent state each write and its price, and lets a
-  human in the loop check it; it does not stop whoever holds the token. The bounds are the monthly cap, the deny list (no users, no tokens, no
-  sign-in or sessions), the rate limits, the expiry, the audit rows and revoking. The owner accepted this (Q1). Keep tokens out of chats, logs
-  and repositories, give each agent its own token with a short expiry and a low cap, and revoke one at the first doubt.
-- An agent's analyses and suggestions can pass the cap by the calls already running (see "Monthly cap").
+  human in the loop check it; it does not stop whoever holds the token. The bounds are the member and company caps, the deny list (no users, no
+  tokens, no sign-in or sessions), the rate limits, the expiry, the audit rows and revoking. The owner accepted this (Q1). Keep tokens out of
+  chats, logs and repositories, give each agent its own token with a short expiry, and revoke one at the first doubt.
+- **A leaked token that never expires stays valid** until it is revoked by hand or by its owner's password change (or
+  another credential reset revokes it). Prefer an expiry; a never-expiring token is for an agent that runs unattended, and it is listed as
+  never expiring in Settings so an Admin can find and revoke it.
 - **OAuth idle refresh.** A stolen refresh token can be rotated by the thief while the real client is idle, and the thief keeps a working
   connection until the real client next refreshes; that refresh then hits reuse detection and revokes the connection
-  (`agent.oauth_refresh_reuse`). Meanwhile the bounds are the connection's cap, the deny list, the audit rows with the last-used IP in Settings,
-  and Disconnect in Settings. Personal access tokens have no refresh.
+  (`agent.oauth_refresh_reuse`). Meanwhile the bounds are the member and company caps, the deny list, the rate limits, the audit rows with the
+  last-used IP in Settings, and Disconnect in Settings. Personal access tokens have no refresh.
 
 ## MCP
 
@@ -191,7 +192,7 @@ Check either one by asking the AI to call the `whoami` tool of `cvs`.
 
 | Tool | Does | Hints |
 |---|---|---|
-| `whoami` | the user, workspace, connection and its month spend against its cap; call it first | read |
+| `whoami` | the user, workspace, connection and its spend this month; call it first | read |
 | `limits_get` | the member caps used and the connection's month spend | read |
 | `models_list` | models of a feature with their price and the recommended one | read |
 | `apps_list` | app features with their input slots, and the published one-tap apps | read |
@@ -221,7 +222,7 @@ the first answer (`firstAnswer.jobId`), never a second success: read the state (
 ## OAuth
 
 A client that supports MCP sign-in (Claude Code, OpenMausBot) connects without a pasted token: it registers itself, opens the CVS consent page in
-the browser, and an Admin approves it there. The approved client is a connection like a token (same deny list, cap, confirms, audit and revoke), of
+the browser, and an Admin approves it there. The approved client is a connection like a token (same deny list, caps, confirms, audit and revoke), of
 kind `oauth`, and it does not expire while it is used. Settings > "Connect AI" shows the setup text as the first way, sign-in (recommended).
 
 **Claude Code**
@@ -246,8 +247,8 @@ then use the sign-in card OpenMausBot shows for `cvs`. It registers as `OpenMaus
 refused, see below).
 
 **The consent page** (`/oauth/authorize`, Admins only). A signed-out visitor goes through the login and comes back with the full query. The page
-shows the client's self-declared name and the host it returns to (for example `127.0.0.1:PORT`, "on this computer") on their own lines, the workspace and
-the monthly cap (default 20 USD), then Allow or Deny. Approving needs a sign-in in the last 10 minutes (else a "sign in again" button). An unknown
+shows the client's self-declared name and the host it returns to (for example `127.0.0.1:PORT`, "on this computer") on their own lines and the workspace, then
+Allow or Deny. Approving needs a sign-in in the last 10 minutes (else a "sign in again" button). An unknown
 client or a redirect it did not register gets an error page and is never redirected to; a member is sent back with `error=access_denied`, as is
 Deny. A user holds at most 10 active connections, tokens and approved clients together; an approved connection whose code was never exchanged
 is revoked (`code_unused`) at the next approval after 10 minutes.

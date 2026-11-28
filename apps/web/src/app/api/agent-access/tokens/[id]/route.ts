@@ -1,34 +1,26 @@
 import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
-import { bad, money, readBody } from '@/lib/admin';
+import { bad, readBody } from '@/lib/admin';
 import { tokenAdmin } from '@/lib/agent-access';
 import { type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 
-/** Renames a connection (`name`, 1-60) or sets its monthly cap (`capUsd`, 0-1000), any Admin's; a revoked one is 409. Audited with the old and new value. */
+/** Renames a connection (`name`, 1-60), any Admin's; a revoked one is 409. A `capUsd` from an older client is ignored. Audited with the old and new name. */
 export async function PATCH(request: Request, { params }: RouteContext) {
   const g = await tokenAdmin(request);
   if (g.error) return g.error;
   const { id } = await params;
   const body = (await readBody(request)) ?? {};
   const name = typeof body.name === 'string' ? body.name.trim() : body.name;
-  if (name === undefined && body.capUsd === undefined) return bad('give name or capUsd');
-  if (name !== undefined && !(typeof name === 'string' && name.length >= 1 && name.length <= 60)) return bad('name must have 1 to 60 characters');
-  const capUsd = body.capUsd === undefined ? undefined : money(body.capUsd);
-  if (capUsd === null || (capUsd !== undefined && Number(capUsd) > 1000)) return bad('capUsd must be 0 to 1000');
+  if (name === undefined) return bad('give name');
+  if (!(typeof name === 'string' && name.length >= 1 && name.length <= 60)) return bad('name must have 1 to 60 characters');
   return withTransaction(pool, async (tx) => {
-    const old = (await tx.query('select user_id, name, monthly_cap_usd::text as cap, revoked_at from api_tokens where id = $1 for update', [id])).rows[0];
+    const old = (await tx.query('select user_id, name, revoked_at from api_tokens where id = $1 for update', [id])).rows[0];
     if (!old) return bad('not found', 404);
     if (old.revoked_at) return bad('revoked', 409);
-    const now = (
-      await tx.query('update api_tokens set name = coalesce($2, name), monthly_cap_usd = coalesce($3::numeric, monthly_cap_usd) where id = $1 returning name, monthly_cap_usd::text as cap', [
-        id,
-        name ?? null,
-        capUsd ?? null,
-      ])
-    ).rows[0];
-    await audit(tx, { actorId: g.session.user.id, action: 'agent.token_update', target: `api_token:${id}`, oldValue: { name: old.name, capUsd: old.cap }, newValue: { name: now.name, capUsd: now.cap, ownerId: old.user_id } });
-    return Response.json({ id, name: now.name, capUsd: now.cap });
+    await tx.query('update api_tokens set name = $2 where id = $1', [id, name]);
+    await audit(tx, { actorId: g.session.user.id, action: 'agent.token_update', target: `api_token:${id}`, oldValue: { name: old.name }, newValue: { name, ownerId: old.user_id } });
+    return Response.json({ id, name });
   });
 }
 
