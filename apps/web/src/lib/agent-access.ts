@@ -21,6 +21,7 @@ export const CONFIRM_HEADER = 'x-cvs-confirm';
 export const MAX_ACTIVE_TOKENS = 10;
 export const PAT_DAYS = [7, 30, 90] as const;
 const PAT = /^cvs_pat_([A-Za-z0-9]{12})_[A-Za-z0-9_-]{43}$/;
+const OAT = /^cvs_oat_[A-Za-z0-9_-]{43}$/;
 const BEARER = /^Bearer (cvs_(?:pat|oat)_\S*)$/;
 const SESSION_COOKIE = /(?:^|;)\s*(?:__Secure-)?better-auth\.session_token=/;
 const CONFIRM_TTL_S = 600;
@@ -32,9 +33,12 @@ const sha256 = (data: string | Uint8Array) => createHash('sha256').update(data).
 const units = (usd: string) => Math.round(Number(usd) * 10_000);
 const fail = (error: string, status: number) => Response.json({ error }, { status });
 
+/** The 12-character public id of a connection (api_tokens.id). */
+export const newTokenId = () => Array.from(randomBytes(12), (b) => ALNUM[b % ALNUM.length]).join('');
+
 /** A new personal access token: `cvs_pat_<12-char public id>_<43-char secret>`; only the sha256 of the whole string is stored. */
 export function newPat(): { id: string; token: string; hash: Buffer } {
-  const id = Array.from(randomBytes(12), (b) => ALNUM[b % ALNUM.length]).join('');
+  const id = newTokenId();
   const token = `cvs_pat_${id}_${randomBytes(32).toString('base64url')}`;
   return { id, token, hash: sha256(token) };
 }
@@ -223,7 +227,7 @@ type Resolved = { session: RequestSession; error?: never } | { error: Response; 
 
 /**
  * The agent session of a request, an error, or null (not an agent request: the cookie session applies). An MCP tool call's session comes from agentContext
- * and only for a request in inProcessRequests that carries no cookie and no Authorization header; any other request ignores it. A `Bearer cvs_pat_` token is refused (401) when unknown, revoked, expired, its
+ * and only for a request in inProcessRequests that carries no cookie and no Authorization header; any other request ignores it. A `Bearer cvs_pat_` or `cvs_oat_` token is refused (401) when unknown, revoked, expired, its
  * owner banned, holding a temporary password, not an Admin (unless CVS_AGENT_API_MEMBERS=1: a demotion pauses the token, a re-promotion restores it), or no
  * longer an active member of the token's (enabled) workspace. The token's workspace is used, never the cvs_ws cookie.
  */
@@ -259,16 +263,26 @@ export async function agentSession(request: Request): Promise<Resolved> {
 }
 
 async function lookup(token: string): Promise<(RequestSession & { agent: AgentInfo }) | string> {
-  const m = PAT.exec(token);
-  if (!m) return 'unknown'; // cvs_oat_ access tokens come with OAuth (migration 0128)
+  const pat = PAT.exec(token);
+  if (pat) return connection('t.secret_hash = $1 and t.id = $2', [sha256(token), pat[1]]);
+  // An OAuth access token (lib/oauth.ts) names its connection; an expired one is as unknown.
+  if (OAT.test(token)) return connection('t.id = (select a.api_token_id from oauth_access_tokens a where a.hash = $1 and a.expires_at > now())', [sha256(token)]);
+  return 'unknown';
+}
+
+/** The session of connection `tokenId`, or why its owner may not use it now: what each OAuth refresh re-checks (lib/oauth.ts). */
+export const connectionSession = (tokenId: string) => connection('t.id = $1', [tokenId]);
+
+/** The session of the connection `where` finds (`t` is api_tokens), or the reason it is refused: the same checks for a PAT, an access token and a refresh. */
+async function connection(where: string, params: unknown[]): Promise<(RequestSession & { agent: AgentInfo }) | string> {
   const r = (
     await pool.query(
-      `select t.id as token_id, t.kind, t.workspace_id, t.created_at as token_created_at, t.expires_at, t.revoked_at is not null as revoked,
+      `select t.id as token_id, t.kind, t.workspace_id, t.oauth_client_id, t.created_at as token_created_at, t.expires_at, t.revoked_at is not null as revoked,
               coalesce(t.expires_at <= now(), false) as expired, u.banned and (u.ban_expires is null or u.ban_expires > now()) as banned,
               u.id, u.email, u.name, u.role, u.email_verified, u.image, u.created_at, u.updated_at, u.team_id, u.must_change_password, u.can_edit_templates,
               u.system, u.outside_lark, u.can_impersonate, u.two_factor_enabled
-         from api_tokens t join users u on u.id = t.user_id where t.secret_hash = $1 and t.id = $2`,
-      [sha256(token), m[1]],
+         from api_tokens t join users u on u.id = t.user_id where ${where}`,
+      params,
     )
   ).rows[0];
   if (!r) return 'unknown';
@@ -290,7 +304,7 @@ async function lookup(token: string): Promise<(RequestSession & { agent: AgentIn
       expiresAt: r.expires_at ?? new Date(Date.now() + 3_600_000), ipAddress: null, userAgent: null, impersonatedBy: null,
     },
     workspace,
-    agent: { tokenId: r.token_id, kind: r.kind, clientId: null, via: 'bearer' },
+    agent: { tokenId: r.token_id, kind: r.kind, clientId: r.oauth_client_id, via: 'bearer' },
   };
 }
 

@@ -1,13 +1,17 @@
 import { createMcpHandler, originValidationResponse } from '@modelcontextprotocol/server';
 import { agentContext, agentSession } from '@/lib/agent-access';
 import { createServer } from '@/lib/mcp/server';
+import { resourceMetadataUrl } from '@/lib/oauth';
 
 // Stateless: the 2026-07-28 protocol per request, and 2025-era clients through the SDK's stateless legacy fallback (the default).
 const handler = createMcpHandler(createServer, { maxRequestBodySize: 8 * 1024 * 1024 });
 
-// shortcut: no resource_metadata while /.well-known/oauth-protected-resource does not exist; OAuth (PR2) adds it back.
+// resource_metadata points an MCP client at the OAuth sign-in (RFC 9728), so a client with no token starts it.
 const unauthorized = (error: string, badToken: boolean) =>
-  Response.json({ error }, { status: 401, headers: { 'WWW-Authenticate': `Bearer realm="cvs"${badToken ? ', error="invalid_token"' : ''}` } });
+  Response.json(
+    { error },
+    { status: 401, headers: { 'WWW-Authenticate': `Bearer realm="cvs", resource_metadata="${resourceMetadataUrl()}"${badToken ? ', error="invalid_token"' : ''}` } },
+  );
 
 /** True when a POST body is a JSON-RPC batch (a JSON array): only a clone's first non-blank bytes are read, at most 1 MB of them. */
 async function isBatch(request: Request): Promise<boolean> {

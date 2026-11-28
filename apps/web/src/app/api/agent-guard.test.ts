@@ -48,6 +48,7 @@ const cancel = await import('./jobs/[id]/cancel/route');
 const job = await import('./jobs/[id]/route');
 const zip = await import('./library/zip/route');
 const lookbook = await import('./library/lookbook/route');
+const { oauthConnection, oauthKind } = await import('./agent-kind.testing');
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 type Init = { method?: string; body?: unknown; headers?: Record<string, string>; raw?: BodyInit };
@@ -70,6 +71,7 @@ async function user(role: 'admin' | 'member' = 'admin'): Promise<string> {
 }
 /** A PAT row for `userId`, inserted directly so a test may make it expired or bound elsewhere. */
 async function token(userId: string, o: { workspaceId?: string; expired?: boolean } = {}): Promise<{ id: string; token: string }> {
+  if (oauthKind()) return oauthConnection(pool, { userId, workspaceId: o.workspaceId, accessExpired: o.expired });
   const { id, token: secret, hash } = newPat();
   await pool.query(
     `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, expires_at) values ($1, $2, $3, 'pat', 'test', $4, now() + $5 * interval '1 day')`,
