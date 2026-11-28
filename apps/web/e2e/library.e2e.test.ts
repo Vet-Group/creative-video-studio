@@ -622,10 +622,14 @@ test('the photo tools in a picture’s Library detail open the tool with the pic
     expect(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await phone.context().close();
 
-    // The creator: the Image Upscale button opens it with the picture in its slot.
+    // The creator: Chép ảnh puts the picture on the clipboard as a PNG and says so; then the Image Upscale button opens it with the picture in its slot.
     const detail = await open(page);
     await expect(detail.getByRole('button', { name: 'Xoá nền' })).toBeVisible();
     await shot(page, 'library-detail-tools-1440-light');
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await detail.getByRole('button', { name: 'Chép ảnh' }).click();
+    await expect(detail.getByText('Đã chép ảnh. Dán vào Lark, Canva hoặc nơi khác.')).toBeVisible();
+    expect(await page.evaluate(async () => (await navigator.clipboard.read()).flatMap((item) => [...item.types]))).toContain('image/png');
     await detail.getByRole('button', { name: 'Tăng độ phân giải' }).click();
     await expect(page).toHaveURL(/\/apps\/image-upscale\?image=[\w-]+$/);
     await inSlot(page);

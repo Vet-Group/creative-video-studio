@@ -626,6 +626,23 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
     setRerunning(false);
   };
   const copy = () => act(async () => (await navigator.clipboard.writeText(copyText ?? ''), setNote('Đã sao chép.')), 'Không sao chép được.');
+  // Chép ảnh (idea from atuizz/posewear, MIT): the picture as a PNG on the clipboard, to paste into Lark or Canva. The PNG goes in as a promise so Safari still counts the click.
+  const copyImage = () =>
+    act(async () => {
+      const png = fetch(content(shown?.id ?? clip.videoAssetId)) // the picture on screen: the result, or the input stepped to
+        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`HTTP ${r.status}`))))
+        .then(async (blob) => {
+          if (blob.type === 'image/png') return blob;
+          const bitmap = await createImageBitmap(blob);
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
+          return new Promise<Blob>((done, fail) => canvas.toBlob((p) => (p ? done(p) : fail(new Error('no png'))), 'image/png'));
+        });
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+      setNote('Đã chép ảnh. Dán vào Lark, Canva hoặc nơi khác.');
+    }, 'Không chép được ảnh. Hãy dùng Tải xuống.');
   // Fash's "Use this frame": the video stops on the frame shown, which goes up as a photo and opens Create video as its first image.
   const router = useRouter();
   const { notify, refresh } = useJobs();
@@ -799,11 +816,17 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
           </label>
         )}
         <div className="job-actions">
-          {/* Download and Use this frame carry their words: the bare glyphs read alike (compress, fullscreen). */}
+          {/* Download, Copy picture and Use this frame carry their words: the bare glyphs read alike (compress, fullscreen, copy the words). */}
           <button type="button" className="icon-button labelled" onClick={() => void download()} title="Tải xuống">
             <Icon name="download" />
             Tải xuống
           </button>
+          {image && (
+            <button type="button" className="icon-button labelled" onClick={() => void copyImage()} title="Chép ảnh để dán vào nơi khác">
+              <Icon name="copy" />
+              Chép ảnh
+            </button>
+          )}
           {boards && (
             <>
               <button type="button" className={`icon-button labelled ${boardStyles.boardsButton}`} aria-haspopup="dialog" onClick={() => setBoardsFor(clip.id)}>
