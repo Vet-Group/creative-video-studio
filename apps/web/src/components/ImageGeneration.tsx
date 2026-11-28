@@ -256,7 +256,7 @@ ${style.prompt}` : prompt.trim();
       >
         <div className="imagebar-top">
           <div className="imagebar-refs">
-            <Slot label="Ảnh tham chiếu" optional icon="plus" empty={`Tối đa ${max} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={images} max={max} busy={busy} onAdd={(files) => void upload(files)} onRemove={(id) => setImages((cur) => cur.filter((x) => x.id !== id))} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))} storeId={storeId} slot="image" count="always" zone={bar} />
+            <Slot label="Ảnh tham chiếu" optional icon="plus" empty={`Tối đa ${max} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={images} max={max} busy={busy} onAdd={(files) => void upload(files)} onRemove={(id) => setImages((cur) => cur.filter((x) => x.id !== id))} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))} storeId={storeId} slot="image" count="always" zone={bar} check={false} />
           </div>
           <PromptComposer
             id={promptId}

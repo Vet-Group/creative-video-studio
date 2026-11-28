@@ -14,6 +14,7 @@ import { PRODUCT_TYPES } from '@/lib/product-types';
 import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useHydrated } from '@/lib/use-hydrated';
+import { checkPhoto } from '@/lib/photo-check';
 import { reloadSamples, sampleThumb, samplesFailed, useSamples } from '@/lib/use-samples';
 import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES, MAX_VIDEO_BYTES_R2 } from '@/lib/upload-limits';
 import type { RefVideo } from './ReferenceVideo';
@@ -78,6 +79,35 @@ export function ExampleNote({ images }: { images: { example?: boolean }[] }) {
   return images.some((i) => i.example) ? (
     <p className="help" role="note">
       Đang dùng ảnh của ví dụ. Thay bằng ảnh sản phẩm của bạn.
+    </p>
+  ) : null;
+}
+
+/** Under a photo field: what looks wrong with its photos (too small, too dark), measured in the browser. A warning only: the Run stays the member's call.
+ * The photos are checked one at a time and the text changes once, when all are done, so a screen reader reads it once per change of photos, not once per photo.
+ * Nothing is rendered without a warning: an empty element would add a gap in the slot's column. */
+export function PhotoCheck({ images }: { images: Img[] }) {
+  const [text, setText] = useState('');
+  // Keyed on the photos, not the array: some pages pass a new array on every render, and a photo whose check failed would be fetched again each time.
+  const photos = JSON.stringify(images.map((i) => [i.id, i.url, i.filename, i.example]));
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const lines: string[] = [];
+      for (const i of images) {
+        const warnings = i.example ? [] : await checkPhoto(i);
+        if (!live) return; // the photos changed: a newer pass owns the text
+        if (warnings.length > 0) lines.push(`${images.length > 1 ? i.filename : 'Lưu ý'}: ${warnings.join('; ')}.`);
+      }
+      setText(lines.join(' '));
+    })();
+    return () => {
+      live = false;
+    };
+  }, [photos]); // `images` changes exactly when `photos` does
+  return text ? (
+    <p className="help" role="status">
+      {text}
     </p>
   ) : null;
 }
@@ -390,8 +420,9 @@ type Drag = { preventDefault(): void; dataTransfer: DataTransfer };
  * `count` shows how many photos the slot holds of its `max` ("3/13") beside its name once it holds one, or from "0/14" on with 'always' (Image
  * Generation's strip, where the count is the only sign of the limit); more than `max` (a model with a lower cap chosen since) reads as an error.
  * `zone` widens the drop target to a box around the slot (Image Generation's whole prompt bar), so a file dropped beside the small tile is not lost.
+ * `check` false leaves out the size and light warning (PhotoCheck) where a line of text has no room: Image Generation's compact prompt bar.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, shelf = true, addRef, extra, count, zone, one }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; shelf?: boolean; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean | 'always'; zone?: RefObject<HTMLElement | null>; one?: boolean }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, shelf = true, addRef, extra, count, zone, one, check = true }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; shelf?: boolean; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean | 'always'; zone?: RefObject<HTMLElement | null>; one?: boolean; check?: boolean }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -563,6 +594,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         )}
       </div>
       <ExampleNote images={images} />
+      {check && <PhotoCheck images={images} />}
       {cut > 0 && (
         <p className="help" role="status">
           Chỉ lấy {cut} ảnh đầu.

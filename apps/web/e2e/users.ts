@@ -287,6 +287,7 @@ export const USERS = {
   agentmem: { email: 'agentmem@e2e.test', name: 'E2E Agent Member', role: 'member' },
   // agent-oauth.e2e: an Admin who approves an MCP client on the consent page and disconnects it in Settings.
   agentoauth: { email: 'agentoauth@e2e.test', name: 'E2E Agent OAuth', role: 'admin' },
+  photochk: { email: 'photochk@e2e.test', name: 'E2E Photo Check', role: 'member' }, // the pre-flight photo check
 } as const;
 
 export type UserKey = keyof typeof USERS;
