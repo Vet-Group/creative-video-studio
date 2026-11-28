@@ -1772,18 +1772,18 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Settings > Connect AI (AgentAccess): the create form, the token shown once with its setup text, and the token rows. Every control here takes a full 44 px
    tap at every width (an Admin may open it on an iPad); the token and the setup text are monospace, as the 2FA key and backup codes are. */
 .agent-access .agent-intro { margin-top: 0; }
-.agent-access :is(.tf-buttons > *, .tf-buttons .pw-submit, .agent-secret-row button, .agent-actions button, .agent-reauth button, .segmented.agent-switch button) { height: 44px; }
+.agent-access :is(.tf-buttons > *, .tf-buttons .pw-submit, .agent-secret-row button, .agent-actions button, .agent-reauth button, .segmented.agent-switch button, .agent-more) { height: 44px; }
 .agent-access .pw-form > :is(input, select) { height: 44px; }
 .agent-form > select { width: 100%; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
 .agent-form > select:focus-visible { border-color: var(--ink); outline: 1px solid var(--ink); outline-offset: 0; }
 .agent-once { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .agent-once .tf-step { margin-bottom: 6px; }
 .agent-label { display: block; margin: 8px 0 0; font-size: 14px; line-height: 21px; font-weight: 500; }
-.agent-secret-row { display: flex; gap: 8px; }
-.agent-secret { flex: 1; min-width: 0; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--fill); color: var(--ink); font-family: ui-monospace, Consolas, monospace; font-size: 14px; }
+.agent-secret-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.agent-secret { flex: 1 1 12rem; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--fill); color: var(--ink); font-family: ui-monospace, Consolas, monospace; font-size: 14px; }
 .agent-secret:focus-visible { border-color: var(--ink); outline: 1px solid var(--ink); outline-offset: 0; }
-.agent-access :is(.agent-secret-row, .agent-actions, .agent-reauth) button { display: inline-flex; flex: none; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; white-space: nowrap; }
-.agent-access :is(.agent-secret-row, .agent-actions, .agent-reauth) button:hover { background: var(--fill); }
+.agent-access :is(.agent-secret-row button, .agent-actions button, .agent-reauth button, .agent-more) { display: inline-flex; flex: none; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; white-space: nowrap; }
+.agent-access :is(.agent-secret-row button, .agent-actions button, .agent-reauth button, .agent-more):hover:not(:disabled) { background: var(--fill); }
 .agent-copied { min-height: 20px; margin: 0; color: var(--cat-utility-fg); font-size: 13px; line-height: 20px; font-weight: 500; }
 .segmented.agent-switch { flex-wrap: wrap; justify-self: start; max-width: 100%; }
 .segmented.agent-switch button { width: auto; padding: 0 12px; color: var(--text-2); font-size: 13px; font-weight: 500; }
@@ -1793,14 +1793,68 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .agent-list-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 24px 0 0; }
 .agent-list-head .settings-kicker.settings-sub { margin: 0; }
 .agent-access .acct-rows { margin-top: 12px; }
-.agent-row > :is(.agent-paused, .agent-spend, .agent-actions) { flex: 1 0 100%; margin: 0; padding-left: 48px; }
+.agent-row > :is(.agent-paused, .agent-spend, .agent-actions, .agent-check, .agent-log) { flex: 1 0 100%; margin: 0; padding-left: 48px; }
 .agent-paused { color: var(--text-2); font-size: 13px; line-height: 20px; }
 .agent-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .agent-access .agent-actions .agent-revoke { color: var(--danger-text); }
 .agent-access .agent-actions .agent-revoke:hover { background: var(--danger-soft); }
 .agent-reauth { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 0; font-size: 14px; line-height: 20px; }
+/* The three setup steps: a number on a thin rail, the step's work beside it. Only a finished check turns the numbers into ticks. */
+.agent-steps { display: grid; margin: 16px 0 0; padding: 20px; list-style: none; }
+.agent-step { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 0 14px; }
+.agent-step:not(:last-child) { padding-bottom: 24px; }
+.agent-step:not(:last-child)::before { content: ''; position: absolute; top: 34px; bottom: 6px; left: 13.5px; width: 1px; background: rgb(var(--tint) / .12); }
+.agent-step-n { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); color: var(--text-2); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.agent-step[data-done] .agent-step-n { border-color: var(--ok-border); background: var(--ok-soft); color: var(--ok-text); }
+.agent-step-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; }
+.agent-step-title { margin: 3px 0 4px; font-size: 15px; line-height: 22px; font-weight: 600; }
+.agent-steps .agent-once { padding: 16px; background: var(--surface); }
+.agent-steps .segmented.agent-switch { display: grid; grid-template-columns: repeat(3, auto); justify-self: stretch; }
+.agent-steps .segmented.agent-switch button { padding: 0 8px; line-height: 16px; text-align: center; }
+.agent-steps .agent-form { margin: 0; }
+.agent-way { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.agent-way-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 14px; line-height: 21px; }
+.agent-tag { padding: 1px 8px; border-radius: 6px; background: var(--ok-soft); color: var(--ok-text); font-size: 12px; line-height: 18px; font-weight: 600; }
+.agent-then { margin: 2px 0 0; color: var(--text-2); font-size: 14px; line-height: 22px; }
+.agent-then b { color: var(--ink); font-weight: 600; }
+.agent-then kbd { padding: 1px 6px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--fill); color: var(--ink); font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.agent-probe, .agent-check { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text-2); font-size: 14px; line-height: 21px; }
+.agent-probe { min-height: 24px; }
+.agent-probe > .icon, .agent-check > .icon { flex: none; }
+.agent-probe[data-state='ok'], .agent-check[data-ok='true'] { color: var(--ok-text); font-weight: 500; }
+.agent-probe[data-state='warn'], .agent-check[data-ok='false'] { color: var(--danger-text); font-weight: 500; }
+.agent-probe-sub { color: var(--text-2); }
+.agent-check { font-size: 13px; line-height: 20px; }
+.agent-spin { flex: none; width: 14px; height: 14px; border: 2px solid rgb(var(--tint) / .18); border-top-color: var(--ink); border-radius: 50%; }
+.agent-actions .agent-revoke { margin-left: auto; }
+.agent-actions button[aria-expanded] > .icon:last-child { margin-left: -2px; }
+.agent-actions button[aria-expanded='true'] > .icon:last-child { rotate: 180deg; }
+.agent-log-rows { margin: 0; padding: 0; list-style: none; border: 1px solid rgb(var(--tint) / .08); border-radius: 8px; background: var(--surface); }
+.agent-log-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 8px 12px; font-size: 14px; line-height: 21px; }
+.agent-log-row + .agent-log-row { border-top: 1px solid rgb(var(--tint) / .06); }
+.agent-log-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; min-width: 0; color: var(--text-2); font-size: 13px; line-height: 20px; }
+.agent-log-meta time { font-variant-numeric: tabular-nums; }
+.agent-log-label { font-weight: 500; }
+.agent-log-row[data-ok='false'] .agent-log-label { color: var(--danger-text); }
+.agent-log-path { min-width: 0; color: var(--text-2); font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.agent-log-empty { margin: 0; color: var(--text-2); font-size: 14px; line-height: 21px; }
+.agent-log .agent-more { margin-top: 8px; }
+.agent-copy[data-done] > .icon { color: var(--ok-text); }
+@media (prefers-reduced-motion: no-preference) {
+  .agent-spin { animation: agent-spin .8s linear infinite; }
+  .agent-copy[data-done] > .icon { animation: agent-tick .2s var(--ease-out); }
+  .agent-actions button[aria-expanded] > .icon:last-child { transition: rotate .18s var(--ease-out); }
+  .agent-log:not([hidden]) { animation: panel-in .16s ease-out; }
+}
+@keyframes agent-spin { to { rotate: 360deg; } }
+@keyframes agent-tick { from { opacity: 0; scale: .8; } }
 @media (max-width: 767.98px) {
-  .agent-row > :is(.agent-paused, .agent-spend, .agent-actions) { justify-self: stretch; padding-left: 0; }
+  .agent-row > :is(.agent-paused, .agent-spend, .agent-actions, .agent-check, .agent-log) { justify-self: stretch; padding-left: 0; }
+  .agent-steps { padding: 16px 12px; }
+  .agent-step { gap: 0 10px; }
+  .agent-steps .agent-once { padding: 12px; }
+  .acct-row.agent-row > :is(.agent-check, .agent-log) { grid-column: 1 / -1; }
+  .agent-actions .agent-revoke { margin-left: 0; }
 }
 /* The forced change page: one card in the middle of the screen, nothing else of the app. */
 .forced-pw { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 24px 16px; background: var(--surface-1); }

@@ -1,8 +1,9 @@
 // Settings > "Connect AI": the token list in each state (loading, error, empty, rows, a paused row), the token shown once with its setup text and copy
-// note, and the entry that only an Admin sees.
+// note, the entry that only an Admin sees, the three setup steps, and each row's check line and activity panel.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test, vi } from 'vitest';
-import { type AgentToken, ShowOnce, signInSnippet, snippet, TokenList } from './AgentAccess';
+import type { ActivityItem } from '@/lib/agent-activity';
+import { ActivityLog, AgentAccess, type AgentToken, CheckLine, ConnectCheck, ShowOnce, SignInSetup, signInSnippet, snippet, type TokenCheck, TokenList } from './AgentAccess';
 import { type Account, Settings } from './Settings';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => undefined }) }));
@@ -75,7 +76,8 @@ test('the token is shown once with a warning, a copy note, and the setup text of
   expect(html).toContain('Khoá chỉ hiện một lần. Đóng mục này là mất.');
   expect(html).toMatch(new RegExp(`<input [^>]*readOnly=""[^>]*value="${SECRET}"`, 'i'));
   expect(html).toContain('aria-live="polite"></p>');
-  expect(html).toContain('aria-pressed="true">Claude Code</button>');
+  expect(html).toContain('Dán vào Claude Code');
+  expect(html).toContain(`--header &quot;Authorization: Bearer ${SECRET}&quot;`);
   expect(html).toContain('Kiểm tra: hỏi AI “gọi whoami của cvs”.');
   expect(html).not.toContain('bản cập nhật tới');
   expect(html).toContain('>Tôi đã lưu khoá</button>');
@@ -120,4 +122,91 @@ test('an app that signed in (OAuth) shows its client, no expiry while used, and 
 test('the sign-in setup text carries no token: Claude Code adds the server, OpenMausBot gets an mcpServers entry without headers', () => {
   expect(signInSnippet('claude', 'https://cvs.example')).toBe('claude mcp add --scope user --transport http cvs https://cvs.example/api/mcp');
   expect(JSON.parse(signInSnippet('mausbot', 'https://cvs.example'))).toEqual({ mcpServers: { cvs: { type: 'http', url: 'https://cvs.example/api/mcp', enabled: true } } });
+});
+
+test('the setup reads as three steps: pick the tool, connect by signing in first, then check', () => {
+  const html = renderToStaticMarkup(<AgentAccess />);
+  expect(html.match(/class="agent-step"/g)).toHaveLength(3);
+  for (const [n, title] of [[1, 'Chọn công cụ'], [2, 'Kết nối'], [3, 'Kiểm tra']] as const) expect(html).toContain(`<span class="sr-only">Bước ${n}: </span>${title}</h4>`);
+  expect(html).toContain('role="group" aria-label="Công cụ AI"');
+  expect(html).toContain('aria-pressed="true">Claude Code</button>');
+  expect(html).toContain('aria-pressed="false">OpenMausBot</button>');
+  expect(html).toContain('aria-pressed="false">Script (REST)</button>');
+  expect(html).toContain('Khuyên dùng');
+  expect(html).toContain('claude mcp add --scope user --transport http cvs /api/mcp');
+  expect(html).not.toContain('Bearer');
+  expect(html).toContain('Dùng khoá truy cập</button>');
+  expect(html).not.toContain('Tên khoá'); // the key form waits behind the key-way button
+  expect(html).toContain('Sau khi bấm Cho phép, bấm Kiểm tra.');
+  expect(html).toContain('Khoá và kết nối');
+});
+
+test('OpenMausBot signs in with an mcpServers entry and its own button, and the key way stays one tap away', () => {
+  const html = renderToStaticMarkup(<SignInSetup kind="mausbot" origin="https://cvs.example" note="" onCopy={noop} onUseKey={noop} />);
+  expect(html).toContain('&quot;url&quot;: &quot;https://cvs.example/api/mcp&quot;');
+  expect(html).not.toContain('headers');
+  expect(html).toContain('Rồi bấm <b>Đăng nhập</b> ở thẻ cvs');
+  expect(html).toContain('Sao chép cấu hình</button>');
+  expect(html).toContain('Dùng khoá truy cập</button>');
+  const claude = renderToStaticMarkup(<SignInSetup kind="claude" origin="https://cvs.example" note="" onCopy={noop} onUseKey={noop} />);
+  expect(claude).toContain('Rồi gõ <kbd translate="no">/mcp</kbd> → <b>cvs</b> → <b>Authenticate</b>');
+});
+
+test('a script gets the key with a curl example', () => {
+  const html = renderToStaticMarkup(<ShowOnce created={{ name: 'Báo cáo', token: SECRET, origin: 'https://cvs.example' }} kind="rest" note="" onCopy={noop} onClose={noop} />);
+  expect(html).toContain('Dán vào Script (REST)');
+  expect(html).toContain(`curl -H &quot;Authorization: Bearer ${SECRET}&quot; https://cvs.example/api/me/limits`);
+});
+
+test('step 3 asks for a key first on the key way, and offers the check on the sign-in way', () => {
+  const none = renderToStaticMarkup(<ConnectCheck keyId={null} oauth={false} arm={0} onConnected={noop} tool="rest" />);
+  expect(none).toContain('Tạo khoá ở bước 2, rồi quay lại đây.');
+  expect(none).not.toContain('<button');
+  const oauth = renderToStaticMarkup(<ConnectCheck keyId={null} oauth arm={0} onConnected={noop} tool="claude" />);
+  expect(oauth).toContain('role="status"');
+  expect(oauth).toContain('Kiểm tra</button>');
+  const key = renderToStaticMarkup(<ConnectCheck keyId="abcdefghijkl" oauth={false} arm={0} onConnected={noop} tool="rest" />);
+  expect(key).toContain('Bấm Kiểm tra sau khi dán khoá vào công cụ.');
+});
+
+test('each row offers a check and its recent activity next to the revoke, the panel closed until opened', () => {
+  const html = list([token()]);
+  expect(html).toContain('aria-label="Kiểm tra kết nối Claude Code văn phòng"');
+  expect(html).toMatch(/aria-expanded="false" aria-controls="[^"]+">.*Hoạt động gần đây/);
+  expect(html).toMatch(/class="agent-log" hidden="" role="region" aria-label="Hoạt động gần đây của Claude Code văn phòng"><\/div>/);
+  const revoked = list([token({ status: 'revoked' })]);
+  expect(revoked).toContain('Kiểm tra kết nối');
+  expect(revoked).toContain('Hoạt động gần đây');
+});
+
+test('the check line says OK with the last use, ready when unused, or why it cannot be used', () => {
+  const check = (o: Partial<TokenCheck>): TokenCheck => ({ id: 'a', ok: true, status: 'active', reason: null, lastUsedAt: null, lastUsedIp: null, monthSpendUsd: '0', ...o });
+  const line = (c: TokenCheck | 'busy' | 'failed') => renderToStaticMarkup(<CheckLine check={c} />);
+  const used = line(check({ lastUsedAt: '2026-11-28T04:05:00.000Z', lastUsedIp: '203.0.113.9' }));
+  expect(used).toContain('data-ok="true" role="status"');
+  expect(used).toContain('Kết nối tốt. Dùng lần cuối 11:05 28/11/2026 từ 203.0.113.9.');
+  expect(line(check({}))).toContain('Sẵn sàng, nhưng AI chưa gọi lần nào.');
+  expect(line(check({ ok: false, status: 'paused', reason: 'not_admin' }))).toContain('Tạm dừng: chủ khoá không còn là Admin.');
+  expect(line(check({ ok: false, reason: 'agent_api_off' }))).toContain('Kết nối AI đang tạm tắt cho cả hệ thống.');
+  expect(line(check({ ok: false, status: 'revoked', reason: 'revoked' }))).toContain('data-ok="false"');
+  expect(line('busy')).toContain('Đang kiểm tra…');
+  expect(line('failed')).toContain('Không kiểm tra được. Hãy thử lại.');
+});
+
+test('the activity panel lists time, label and method with path, marks refusals, and pages with Xem thêm', () => {
+  const item = (o: Partial<ActivityItem>): ActivityItem => ({ id: '1', at: '2026-11-28T04:05:00.000Z', action: 'agent.request', label: 'Tạo ảnh hoặc video', method: 'POST', path: '/api/jobs', ok: true, ...o });
+  const log = (items: ActivityItem[] | null, next: string | null = null, failed = false) =>
+    renderToStaticMarkup(<ActivityLog items={items} next={next} busy={false} failed={failed} onMore={noop} onRetry={noop} />);
+  const html = log(
+    [item({}), item({ id: '2', action: 'agent.refused', label: 'Bị chặn: không được phép', ok: false }), item({ id: '3', action: 'agent.tool', label: 'Gọi công cụ whoami', method: null, path: null })],
+    '3',
+  );
+  expect(html).toContain('<span class="agent-log-label">Tạo ảnh hoặc video</span><span class="agent-log-meta"><time dateTime="2026-11-28T04:05:00.000Z">11:05 28/11/2026</time><code class="agent-log-path" translate="no">POST /api/jobs</code></span>');
+  expect(html).toContain('data-ok="false"><span class="agent-log-label">Bị chặn: không được phép</span>');
+  expect(html).toContain('<span class="agent-log-label">Gọi công cụ whoami</span><span class="agent-log-meta"><time dateTime="2026-11-28T04:05:00.000Z">11:05 28/11/2026</time></span></li>');
+  expect(html).toContain('>Xem thêm</button>');
+  expect(log([item({})])).not.toContain('Xem thêm');
+  expect(log([])).toContain('Chưa có hoạt động nào.');
+  expect(log(null)).toContain('Đang tải hoạt động…');
+  expect(log(null, null, true)).toContain('Không tải được hoạt động.');
 });
