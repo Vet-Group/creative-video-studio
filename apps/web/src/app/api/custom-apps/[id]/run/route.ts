@@ -54,7 +54,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     new Request(new URL('/api/jobs', request.url), {
       method: 'POST',
       headers,
-      body: JSON.stringify({ feature: app.feature, modelId, prompt: app.prompt, ratio: app.aspect, ...(app.feature === 'video' && { durationSec: app.duration_s }), params: app.params, assetIds: ids }),
+      body: JSON.stringify({ feature: app.feature, modelId, prompt: app.prompt, ratio: app.aspect, ...(app.feature === 'video' && { durationSec: app.duration_s }), params: { ...app.params, app: id }, assetIds: ids }),
     }),
   );
 }

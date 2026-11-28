@@ -115,8 +115,10 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     weeklyUses(pool, workspaceId),
   ]);
   // The sorts are stable, so the curated order breaks ties; the free-prompt tile stays first, as it counts no preset.
-  const count = (features: string[]) => features.reduce((n, f) => n + (uses.features.get(f) ?? 0), 0);
-  const tools = popular ? [...FEATURES].sort((a, b) => count(b.features) - count(a.features)) : FEATURES;
+  // The Apps tool also counts Smart Remake and the workspace's custom apps (`app:<id>`), which are not Runs of Create or Image Generation.
+  const appRuns = [...uses.features].reduce((n, [f, c]) => n + (f === 'smart_remake' || f.startsWith('app:') ? c : 0), 0);
+  const count = (t: (typeof FEATURES)[number]) => t.features.reduce((n, f) => n + (uses.features.get(f) ?? 0), t.href === '/apps' ? appRuns : 0);
+  const tools = popular ? [...FEATURES].sort((a, b) => count(b) - count(a)) : FEATURES;
   const motion = popular ? [...presets.rows].sort((a, b) => (uses.presets.get(b.id) ?? 0) - (uses.presets.get(a.id) ?? 0)) : presets.rows;
   // One model of each duplicate pair (lib/model-twins.ts); fal's balance lock is not read here, as the cards name no price to lock.
   const offered = await onePerPair(pool, models.rows);

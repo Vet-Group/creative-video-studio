@@ -559,9 +559,10 @@ export function CreateForm({ reuse, preset, model, image, end, seedPrompt }: { r
     setError('');
     setNotice('');
     let started = 0;
+    const batch = n > 1 ? crypto.randomUUID() : undefined; // one id on the angles' clips, by which the week's Run count (lib/popular.ts) counts them once
     try {
       for (; started < n; started++) {
-        const body = { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: sent[started], enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } };
+        const body = { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: sent[started], enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(batch && { batch }), ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } };
         // The first clip of a batch stands for it: a batch the same as the last one asks before anything is sent.
         if (started > 0) await api('/api/jobs', sendJson('POST', body));
         else if (!(await sendRun(body))) return;

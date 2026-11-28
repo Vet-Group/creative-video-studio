@@ -588,16 +588,17 @@ export function Tray({ feature, format }: { feature?: string; format?: string })
         )
       : undefined,
   });
-  // A batch app's card offers its Run when the list shows another result of it. The Run's results are read from the job, as a Run can hold more than the 20 latest jobs.
+  // A batch Run's card (a batch app's, a Create camera-angle or a Marketing Studio Run's) offers its Run when the list shows another result of it. The Run's results are read from the job, as a Run can hold more than the 20 latest jobs.
   const inBatch = (j: TrayJob) => !!j.batch && jobs.some((b) => b.id !== j.id && b.batch === j.batch && b.status === 'succeeded' && b.outputAssetId);
   async function selectBatch(j: TrayJob) {
+    const what = j.feature === 'video' || j.feature === 'marketing' ? 'clip' : 'ảnh'; // the only video features whose Runs carry a batch id
     try {
       const { batchItems } = await api<{ batchItems: { id: string; status: JobStatus; outputAssetId: string | null }[] | null }>(`/api/jobs/${j.id}`);
       const ids = (batchItems ?? []).filter((b) => b.status === 'succeeded' && b.outputAssetId).map((b) => b.id);
       zip.pickMany(ids);
-      all.notify(`Đã chọn ${ids.length} ảnh của lô. Tải chúng bằng nút "Tải xuống .zip" dưới danh sách.`);
+      all.notify(`Đã chọn ${ids.length} ${what} của lô. Tải chúng bằng nút "Tải xuống .zip" dưới danh sách.`);
     } catch (e) {
-      all.notify(errorText(e, 'Không tải được các ảnh của lô, hãy thử lại.'));
+      all.notify(errorText(e, `Không tải được các ${what} của lô, hãy thử lại.`));
     }
   }
   // A multi-angle Run of all 7 horizontal views gets its 360 turntable video under its last card.

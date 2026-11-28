@@ -10,20 +10,22 @@ url.pathname = `/${process.env.CVS_E2E_DB ?? 'cvs_e2e'}`;
 const db = createPool(url.toString(), 2);
 const WS = 'ws_popular';
 let presetIds: string[] = [];
+const APP = 'pop-app'; // a published custom app of the workspace: its Runs count on its card
 
 test.beforeAll(async () => {
   const popw = (await db.query('select id from users where email = $1', [USERS.popw.email])).rows[0].id as string;
+  const system = (await db.query('select id from users where email = $1 and system', [USERS.syslib.email])).rows[0].id as string; // serve.ts marks it a system account
   await db.query(`insert into workspaces (id, name) values ($1, 'E2E Popular Co') on conflict do nothing`, [WS]);
   await db.query(`delete from workspace_members where user_id = $1 and workspace_id = 'ws_vet'`, [popw]);
   await db.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner') on conflict do nothing`, [WS, popw]);
   presetIds = (await db.query(`select id from presets where feature = 'video' and enabled order by sort_order, id`)).rows.map((r) => r.id as string);
   const [hot, warm] = [presetIds.at(-1)!, presetIds.at(-2)!]; // the last two in the curated order, so the sort has to move them
-  /** `n` failed mock jobs of `feature` made `ago` ago in the workspace, named `prefix-1`..`prefix-n`; `batch` is the Run id they share. */
-  const run = (prefix: string, n: number, feature: string, o: { preset?: string; batch?: string; ago?: string } = {}) =>
+  /** `n` failed mock jobs of `feature` made `ago` ago in the workspace, named `prefix-1`..`prefix-n`; `params` is what the page sends, `batch` the Run id they share, `user` who ran them. */
+  const run = (prefix: string, n: number, feature: string, o: { preset?: string; batch?: string; ago?: string; params?: Record<string, string>; user?: string } = {}) =>
     db.query(
       `insert into jobs (id, user_id, team_id, feature, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, params, status, is_mock, created_at, workspace_id)
        select $1 || '-' || n, $2, 'team-unassigned', $3, 'mock-e2e', 'mock', $4, 'p', '9:16', 5, '{}', $5::jsonb, 'failed', true, now() - $6::interval, $7 from generate_series(1, $8::int) n`,
-      [prefix, popw, feature, o.preset ?? null, o.batch ? { batch: o.batch } : {}, o.ago ?? '1 hour', WS, n],
+      [prefix, o.user ?? popw, feature, o.preset ?? null, { ...o.params, ...(o.batch && { batch: o.batch }) }, o.ago ?? '1 hour', WS, n],
     );
   await run('pop-media', 3, 'media_optimizer'); // three Runs: the line shows
   await run('pop-face', 2, 'face_swap'); // two: nothing
@@ -32,11 +34,40 @@ test.beforeAll(async () => {
   await run('pop-hot', 4, 'video', { preset: hot });
   await run('pop-warm', 2, 'video', { preset: warm });
   await run('pop-old', 5, 'video', { preset: hot, ago: '8 days' }); // outside the window
+  // A system account's Runs never count: 5 of Reframe would make 12, and 8 more of Try On would put it far above Create.
+  await run('pop-sys', 5, 'reframe', { user: system });
+  await run('pop-sys-tryon', 8, 'try_on', { user: system });
+  await run('pop-tryon', 8, 'try_on');
+  await run('pop-image', 2, 'image');
+  // A Marketing Run of 4 clips and a camera-angle Run of 3 each share one batch id, as the pages send them: one use each (Marketing 1, Create 6 + 1 = 7, under Try On's 8).
+  await run('pop-mk', 4, 'marketing', { batch: '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a41', params: { audio: 'on' } });
+  await run('pop-angles', 3, 'video', { batch: '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a42', params: { audio: 'on' } });
+  // A custom app's Runs are marked with the app (params.app), as api/custom-apps/[id]/run makes them: 3 on its card, none on Create.
+  const model = (await db.query(`select id from model_configs where kind = 'video' order by id limit 1`)).rows[0].id as string;
+  await db.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('pop-app-out', $1, 'output', 'pop/app-out', 'out.mp4', 'video/mp4', 10, $2)`, [popw, WS]);
+  await db.query(
+    `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, params, status, output_asset_id, is_mock, workspace_id)
+     values ('pop-app-src', $1, 'team-unassigned', 'video', 'mock-e2e', 'mock', 'spin it', '9:16', 5, '{}', '{}', 'succeeded', 'pop-app-out', true, $2)`,
+    [popw, WS],
+  );
+  await db.query(
+    `insert into custom_apps (id, workspace_id, source_job_id, feature, name, description, category, model, prompt, aspect, duration_s, params, inputs, created_by, published_at)
+     values ($1, $2, 'pop-app-src', 'video', 'E2E Popular App', 'x', 'video', $3, 'spin it', '9:16', 5, '{}', '[{"slot":{"label":"Ảnh","hint":""}}]', $4, now())`,
+    [APP, WS, model, popw],
+  );
+  await run('pop-custom', 3, 'video', { params: { audio: 'on', app: APP } });
+  // A Smart Remake makes no job but a remakes row: one use on its card, and none for Create.
+  await db.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ('pop-an', $1, 'team-unassigned', 's', 'succeeded', $2)`, [popw, WS]);
+  await db.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, workspace_id) select 'pop-rm-' || n, $1, 'team-unassigned', 'pop-an', '[1]', $2 from generate_series(1, 3) n`, [popw, WS]);
 });
 
 test.afterAll(async () => {
   try {
+    await db.query('delete from remakes where workspace_id = $1', [WS]);
+    await db.query('delete from analyses where workspace_id = $1', [WS]);
+    await db.query('delete from custom_apps where workspace_id = $1', [WS]);
     await db.query('delete from jobs where workspace_id = $1', [WS]);
+    await db.query('delete from assets where workspace_id = $1', [WS]);
     await db.query('delete from workspace_members where workspace_id = $1', [WS]);
     await db.query('delete from workspaces where id = $1', [WS]);
   } finally {
@@ -50,11 +81,15 @@ test("an Apps card shows the week's Runs of the member's workspace from three, n
   await signIn(page, 'popw');
   await page.goto('/apps');
   await expect(card(page, 'Tối ưu media').locator('.app-card-uses')).toHaveText('3 lượt dùng tuần này');
-  await expect(card(page, 'Đổi khung hình').locator('.app-card-uses')).toHaveText('7 lượt dùng tuần này');
+  await expect(card(page, 'Đổi khung hình').locator('.app-card-uses')).toHaveText('7 lượt dùng tuần này'); // the system account's 5 Reframes are not in it
   await expect(card(page, 'Tăng độ phân giải')).toBeVisible();
   await expect(card(page, 'Tăng độ phân giải').locator('.app-card-uses')).toHaveCount(0); // 25 photos in one Run is one use
   await expect(card(page, 'Đổi khuôn mặt').locator('.app-card-uses')).toHaveCount(0); // two Runs
-  await expect(page.locator('.app-card-uses')).toHaveCount(2);
+  // A custom app counts its own Runs (3), which are not Create's; Smart Remake (3 remakes) only where its flags put its card on the page.
+  await expect(card(page, 'E2E Popular App').locator('.app-card-uses')).toHaveText('3 lượt dùng tuần này');
+  const remake = card(page, 'Smart Remake');
+  if ((await remake.count()) > 0) await expect(remake.locator('.app-card-uses')).toHaveText('3 lượt dùng tuần này');
+  await expect(page.locator('.app-card-uses')).toHaveCount(3 + (await remake.count()));
   expect(await card(page, 'Tối ưu media').locator('.app-card-uses').evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(12);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -67,7 +102,7 @@ test("an Apps card shows the week's Runs of the member's workspace from three, n
   await expect(card(page, 'Tối ưu media')).toBeVisible();
   // The company workspace shows its own week (earlier specs make Runs there in the shared e2e database), never popw's 3 and 7.
   for (const [name, feature] of [['Tối ưu media', 'media_optimizer'], ['Đổi khung hình', 'reframe']] as const) {
-    const { n } = (await db.query(`select count(distinct coalesce(params->>'batch', id))::int as n from jobs where workspace_id = 'ws_vet' and feature = $1 and created_at > now() - interval '7 days' and retry_of is null`, [feature])).rows[0];
+    const { n } = (await db.query(`select count(distinct coalesce(j.params->>'batch', j.id))::int as n from jobs j join users u on u.id = j.user_id where j.workspace_id = 'ws_vet' and j.feature = $1 and j.created_at > now() - interval '7 days' and j.retry_of is null and not u.system`, [feature])).rows[0];
     const line = card(page, name).locator('.app-card-uses');
     if (n >= 3) await expect(line).toHaveText(`${n} lượt dùng tuần này`);
     else await expect(line).toHaveCount(0);
@@ -93,8 +128,9 @@ test("Explore's sort switch puts the most used tools and motion presets first, k
   await popular.click();
   await expect(page).toHaveURL(/\/explore\?sort=popular$/);
   await expect(popular).toHaveAttribute('aria-pressed', 'true');
-  // Apps: 3 + 2 + 7 + 1 Runs this week; Create: the 6 preset Runs (the 8-day-old ones are outside the window); the rest tie at 0 in the curated order.
-  await expect.poll(tools).toEqual(['/apps', '/create', '/try-on', '/image-generation', '/marketing-studio', '/library']);
+  // Apps: 3 + 2 + 7 + 1 Runs, the custom app's 3 and the 3 Smart Remakes; Try On: 8 (the system account's 8 more do not count); Create: the 6 preset Runs and the camera-angle Run (the 8-day-old
+  // ones are outside the window, the custom app's 3 are the app's, not Create's); Image Generation: 2; Marketing Studio: its one Run of 4 clips; the Library has none. The order is by count, the curated one breaking ties.
+  await expect.poll(tools).toEqual(['/apps', '/try-on', '/create', '/image-generation', '/marketing-studio', '/library']);
   expect(await presets()).toEqual(['none', hot, warm, ...presetIds.slice(0, -2)]);
   await expect(tile(hot)).toHaveAccessibleName(/, 4 lượt dùng tuần này$/);
   await expect(tile(hot).locator('.explore-prompt-uses')).toHaveText('4 lượt dùng tuần này');

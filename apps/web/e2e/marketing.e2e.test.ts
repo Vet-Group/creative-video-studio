@@ -418,8 +418,11 @@ test('hook variants: up to 3 hooks make one clip each, with the total, the daily
   await confirm.getByRole('button', { name: 'Tiếp tục', exact: true }).click();
   await expect(page.getByText(`Đã gửi 2/3 biến thể: ${picks[0]!.name}, ${picks[2]!.name}.`)).toBeVisible();
   await expect(page.locator('.form-message').getByRole('alert')).toContainText(`Không gửi được ${picks[1]!.name}: Bạn đã dùng hết số clip trong ngày hôm nay`);
-  const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[]; clips: { today: number } };
+  const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; batch: string | null }[]; clips: { today: number } };
   expect(jobs.jobs).toHaveLength(2);
+  // The two clips that went are one Run: one shared batch id, by which the week's Run count counts it once.
+  expect(new Set(jobs.jobs.map((j) => j.batch)).size).toBe(1);
+  expect(jobs.jobs[0]!.batch).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   const hooks = await Promise.all(jobs.jobs.map(async (j) => ((await (await page.request.get(`/api/jobs/${j.id}`)).json()) as { hook: string }).hook));
   expect(hooks.sort()).toEqual([picks[0]!.id, picks[2]!.id].sort());
   expect(jobs.clips.today).toBe(2);

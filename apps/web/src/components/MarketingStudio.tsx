@@ -620,6 +620,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
     setNotice('');
     const sentOk: string[] = [];
     const refused: string[] = [];
+    const batch = n > 1 ? crypto.randomUUID() : undefined; // one id on the Run's clips, by which the week's Run count (lib/popular.ts) counts them once
     for (const [i, { hook, ratio: r }] of matrix.entries()) {
       // A clip is named by its hook, and by its ratio when the Run makes several: "Mua ngay · 1:1".
       const label = [hook && hookName(hook), shape && r].filter(Boolean).join(' · ');
@@ -636,7 +637,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         durationSec,
         storeId: storeId || null,
         useBrand,
-        params: { ...(pf && { format: pf }), audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && (advanced || review) && { script: script.trim() }), ...formInputs, ...(advanced && video && { videoAssetId: video.id }) },
+        params: { ...(pf && { format: pf }), audio: audioOn ? 'on' : 'off', ...(batch && { batch }), ...inputs, ...(script.trim() && (advanced || review) && { script: script.trim() }), ...formInputs, ...(advanced && video && { videoAssetId: video.id }) },
       };
       try {
         // The first variant stands for the batch: a batch the same as the last one asks before anything is sent.
