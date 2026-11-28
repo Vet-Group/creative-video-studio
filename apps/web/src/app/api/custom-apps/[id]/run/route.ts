@@ -1,4 +1,5 @@
 import { estimateUsd } from '@cvs/core/models';
+import { inProcessRequests } from '@/lib/agent-access';
 import { type RouteContext, readJson } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { LIVE_CLIP } from '@/lib/clips';
@@ -50,11 +51,12 @@ export async function POST(request: Request, { params }: RouteContext) {
   if (!modelId) return refuse('Mô hình của ứng dụng này đang tắt.', 409);
   const headers = new Headers(request.headers);
   headers.delete('content-length');
-  return createJob(
-    new Request(new URL('/api/jobs', request.url), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ feature: app.feature, modelId, prompt: app.prompt, ratio: app.aspect, ...(app.feature === 'video' && { durationSec: app.duration_s }), params: { ...app.params, app: id }, assetIds: ids }),
-    }),
-  );
+  const job = new Request(new URL('/api/jobs', request.url), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ feature: app.feature, modelId, prompt: app.prompt, ratio: app.aspect, ...(app.feature === 'video' && { durationSec: app.duration_s }), params: { ...app.params, app: id }, assetIds: ids }),
+  });
+  // An MCP tool's run (lib/mcp/context.ts) hands its in-process session on to the job it makes.
+  if (inProcessRequests.has(request)) inProcessRequests.add(job);
+  return createJob(job);
 }

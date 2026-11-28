@@ -34,6 +34,7 @@ export type Tool = { name: string; title: string; description: string; input: Js
 const READ: Annotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const PAID: Annotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true };
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_LIBRARY_OFFSET = 1000;
 
 const origin = () => new URL(process.env.APP_URL!).origin;
 const appUrl = (path: string) => `${origin()}${path}`;
@@ -45,7 +46,7 @@ const str = (description: string, extra: Json = {}): Json => ({ type: 'string', 
 const CURSOR = str('The nextCursor of the previous page; omit for the first page.');
 const LIMIT = { type: 'integer', minimum: 1, maximum: 20, description: 'Items per page (default 20).' };
 const CONFIRM = {
-  dryRun: { type: 'boolean', description: 'Default true: price the run and get a confirmToken; nothing is created or charged.' },
+  dryRun: { type: 'boolean', description: 'Default true without confirmToken: price the run and get a confirmToken; nothing is created or charged. true with a confirmToken is refused.' },
   confirmToken: str('The confirmToken of the dry run of these exact arguments, sent only after the user agreed to the estimate.'),
 };
 const PAID_NOTE =
@@ -79,6 +80,8 @@ function answer(a: RouteAnswer, shape: (body: Json) => Json): Outcome {
 /** A paid create: a dry run without confirmToken, the real call with it. */
 async function paid(a: Args, run: (confirm: string | undefined) => Promise<RouteAnswer>, shape: (body: Json) => Json): Promise<Outcome> {
   if (a.dryRun === false && !a.confirmToken) return { error: 'confirm_required', data: { error: 'confirm_required', next: 'Call with dryRun true first, show the estimate, then send its confirmToken.' } };
+  // A dry run must never spend: refused rather than priced again, so the model learns the two steps apart.
+  if (a.dryRun === true && a.confirmToken) return { error: 'bad_input', data: { error: 'bad_input', next: 'dryRun true never charges: to run it, send the confirmToken without dryRun (or with dryRun false); to price again, drop confirmToken.' } };
   return answer(await run(a.confirmToken), shape);
 }
 
@@ -366,10 +369,12 @@ export const TOOLS: Tool[] = [
     run: async (a) => {
       const limit = a.limit ?? 20;
       const offset = Number(a.cursor ?? 0);
-      if (!Number.isInteger(offset) || offset < 0) return { error: 'bad_cursor', data: { error: 'bad_cursor' } };
+      // /api/library takes any offset; a deep one makes Postgres walk and drop every row before it.
+      if (!Number.isInteger(offset) || offset < 0 || offset > MAX_LIBRARY_OFFSET) return { error: 'bad_cursor', data: { error: 'bad_cursor', next: `Use a nextCursor from library_list; the Library lists its newest ${MAX_LIBRARY_OFFSET} items here.` } };
       const q = new URLSearchParams({ offset: String(offset), ...(a.kind && { kind: a.kind }) });
       return answer(await callRoute(library.GET, { path: `/api/library?${q}` }), (b) => {
         const rows = b.clips as Json[];
+        const next = offset + Math.min(limit, rows.length);
         return {
           items: rows.slice(0, limit).map((c) => ({
             id: c.id,
@@ -380,7 +385,7 @@ export const TOOLS: Tool[] = [
             outputAssetId: c.videoAssetId,
             url: appUrl(`/library?item=${encodeURIComponent(String(c.id))}`),
           })),
-          nextCursor: rows.length > limit || b.hasMore ? String(offset + Math.min(limit, rows.length)) : null,
+          nextCursor: (rows.length > limit || b.hasMore) && next <= MAX_LIBRARY_OFFSET ? String(next) : null,
         };
       });
     },

@@ -14,8 +14,10 @@ process.env.APP_URL = 'http://localhost';
 process.env.FAL_KEY = '';
 
 const { pool } = await import('@/lib/auth');
-const { hits, newPat } = await import('@/lib/agent-access');
+const { agentContext, agentSession, hits, newPat } = await import('@/lib/agent-access');
 const { stopBoss } = await import('@/lib/queue');
+const { createMcpHandler } = await import('@modelcontextprotocol/server');
+const { createServer } = await import('@/lib/mcp/server');
 const route = await import('./route');
 
 type Rpc = { result?: { tools?: Tool[]; structuredContent?: Record<string, any>; isError?: boolean; protocolVersion?: string }; error?: { code: number; message: string } };
@@ -104,13 +106,59 @@ describe('/api/mcp', () => {
     expect(modern.rpc.result!.structuredContent).toMatchObject({ user: { email: a.email }, connection: { id: a.id } });
   });
 
-  test('no Bearer, a bad Bearer or a cookie alone is 401 with the resource metadata in WWW-Authenticate', async () => {
-    const want = 'Bearer resource_metadata="http://localhost/.well-known/oauth-protected-resource/api/mcp"';
+  test('no Bearer or a cookie alone is 401 with a plain Bearer challenge, a bad Bearer adds invalid_token (no resource metadata until OAuth)', async () => {
     const list = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} };
-    for (const headers of [{}, { authorization: `Bearer cvs_pat_${'x'.repeat(12)}_${'y'.repeat(43)}` }, { cookie: 'better-auth.session_token=abc.def' }] as Record<string, string>[]) {
+    const cases: [Record<string, string>, string][] = [
+      [{}, 'Bearer realm="cvs"'],
+      [{ authorization: `Bearer cvs_pat_${'x'.repeat(12)}_${'y'.repeat(43)}` }, 'Bearer realm="cvs", error="invalid_token"'],
+      [{ cookie: 'better-auth.session_token=abc.def' }, 'Bearer realm="cvs"'],
+    ];
+    for (const [headers, want] of cases) {
       const { status, res } = await post(list, headers);
       expect([status, res.headers.get('www-authenticate')]).toEqual([401, want]);
     }
+  });
+
+  test('a JSON-RPC batch is 400 batch_not_supported and runs no tool', async () => {
+    const a = await agent();
+    const call = (id: number) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'whoami', arguments: {} } });
+    for (const body of [JSON.stringify([call(1), call(2)]), `  \n [${JSON.stringify(call(3))}]`]) {
+      const res = await route.POST(
+        new Request('http://localhost/api/mcp', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': LEGACY, ...auth(a.token) },
+          body,
+        }),
+      );
+      expect([res.status, ((await res.json()) as { error: string }).error]).toEqual([400, 'batch_not_supported']);
+    }
+    expect(await toolRows(a.id)).toBe(0);
+  });
+
+  test('past the first tool call of a request, each one counts against the per-minute limit, so a batch that reached the server cannot fan out', async () => {
+    const a = await agent();
+    const resolved = await agentSession(new Request('http://localhost/api/mcp', { headers: auth(a.token) }));
+    const session = { ...resolved!.session!, agent: { ...resolved!.session!.agent!, via: 'mcp' as const } };
+    hits.set(`req:${a.id}`, Array<number>(119).fill(Date.now()));
+    const handler = createMcpHandler(createServer);
+    const batch = [1, 2, 3].map((id) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'whoami', arguments: {} } }));
+    const res = await agentContext.run(session, () =>
+      handler.fetch(
+        new Request('http://localhost/api/mcp', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': LEGACY },
+          body: JSON.stringify(batch),
+        }),
+      ),
+    );
+    const text = await res.text();
+    const rpcs: Rpc[] = res.headers.get('content-type')?.startsWith('text/event-stream')
+      ? text.split('\n').filter((l) => l.startsWith('data: ')).flatMap((l) => JSON.parse(l.slice(6)))
+      : JSON.parse(text);
+    const refused = rpcs.filter((r) => r.result?.isError);
+    expect([rpcs.length, refused.length]).toEqual([3, 1]);
+    expect(refused[0]!.result!.structuredContent).toMatchObject({ error: 'rate_limited', retryAfterSec: expect.any(Number) });
+    expect(hits.get(`req:${a.id}`)!.length).toBe(120);
   });
 
   test('job_create: the dry run prices and writes nothing; the confirmed call makes the job under the connection; a reused confirmToken is a confirm_used error', async () => {
@@ -135,6 +183,43 @@ describe('/api/mcp', () => {
 
     const got = await out(legacyCall(a.token, 'job_get', { id: jobId }));
     expect(got.structuredContent).toMatchObject({ id: jobId, status: 'queued', url: 'http://localhost/create' });
+  });
+
+  test('job_create with dryRun true and a confirmToken is refused and charges nothing', async () => {
+    const a = await agent();
+    const dry = await out(legacyCall(a.token, 'job_create', runArgs(a.userId)));
+    const before = await Promise.all(['jobs', 'cost_entries', 'agent_confirms'].map(count));
+    const both = await out(legacyCall(a.token, 'job_create', runArgs(a.userId, { dryRun: true, confirmToken: dry.structuredContent!.confirmToken })));
+    expect(both.isError).toBe(true);
+    expect(both.structuredContent).toMatchObject({ error: 'bad_input' });
+    expect(await Promise.all(['jobs', 'cost_entries', 'agent_confirms'].map(count))).toEqual(before);
+  });
+
+  test('job_create with a customAppId runs the app as the connection: its dry run prices the job the app makes', async () => {
+    const a = await agent();
+    const source = `job-app-${a.userId}`;
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, workspace_id, output_asset_id)
+         values ($1, $2, 'team-unassigned', 'fal-mcp', 'fal', 'p', '9:16', 5, '{}', 'succeeded', 'ws_vet', $3)`,
+      [source, a.userId, `img-${a.userId}`],
+    );
+    const appId = `app-${a.userId}`;
+    await pool.query(
+      `insert into custom_apps (id, workspace_id, source_job_id, feature, name, category, model, prompt, aspect, duration_s, inputs, published_at)
+         values ($1, 'ws_vet', $2, 'video', 'MCP app', 'video', 'fal-mcp', 'p', '9:16', 5, $3::jsonb, now())`,
+      [appId, source, JSON.stringify([{ slot: { label: 'Photo', hint: '' } }])],
+    );
+    const dry = await out(legacyCall(a.token, 'job_create', { customAppId: appId, assetIds: [`img-${a.userId}`] }));
+    expect(dry.isError).toBeFalsy();
+    expect(dry.structuredContent).toMatchObject({ dryRun: true, estimateUsd: '0.2000', confirmToken: expect.any(String) });
+  });
+
+  test('library_list refuses a cursor past 1000 items', async () => {
+    const a = await agent();
+    expect((await out(legacyCall(a.token, 'library_list', { cursor: '1000' }))).isError).toBeFalsy();
+    const deep = await out(legacyCall(a.token, 'library_list', { cursor: '5000' }));
+    expect(deep.isError).toBe(true);
+    expect(deep.structuredContent).toMatchObject({ error: 'bad_cursor' });
   });
 
   test('one tool call is one unit of the per-minute limit and one agent.tool row, and the 31st dry run in a minute is refused', async () => {

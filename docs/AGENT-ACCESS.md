@@ -155,12 +155,15 @@ are refused (409 `agent_api_off`) and Settings shows agent access as off. Tokens
 
 `POST <host>/api/mcp`, Streamable HTTP, stateless: the 2026-07-28 protocol, and 2025-era clients (`initialize`, then one POST per call) through
 the SDK's stateless fallback (`@modelcontextprotocol/server`). Send the same token as for REST in `Authorization: Bearer`. A request with no
-valid token (a session cookie alone included) is 401 with
-`WWW-Authenticate: Bearer resource_metadata="<host>/.well-known/oauth-protected-resource/api/mcp"`; `CVS_AGENT_API=0` answers 503.
+valid token (a session cookie alone included) is 401 with `WWW-Authenticate: Bearer realm="cvs"` (plus `error="invalid_token"` for a bad
+token; the OAuth update adds `resource_metadata`); `CVS_AGENT_API=0` answers 503. A JSON-RPC batch (an array body) is 400
+`batch_not_supported`: send one message per POST.
 
-The token is checked once per request at `/api/mcp`, as `guard()` checks it. Each tool then calls the app's own route handler in-process, with
-the session carried by AsyncLocalStorage (never by a header, so no header a client sends can name another session): the caps, confirms, deny
-list, ledger and `agent.request` rows are the routes' own.
+The token is checked once per request at `/api/mcp`, as `guard()` checks it, and the request counts one unit of the per-minute limit (its tool
+call included). Each tool then calls the app's own route handler in-process, with the session carried by AsyncLocalStorage (never by a header,
+so no header a client sends can name another session) and honoured only for the requests the tool built: the caps, confirms, deny list, ledger
+and `agent.request` rows are the routes' own. A paid tool refuses `dryRun: true` with a `confirmToken` (`bad_input`), and `library_list` pages
+through the newest 1000 Library items.
 
 **Claude Code**
 

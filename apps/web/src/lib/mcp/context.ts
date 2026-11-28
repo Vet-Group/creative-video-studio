@@ -1,7 +1,7 @@
 // How an MCP tool reaches the app: it calls an existing route handler in-process with a plain Request that carries no cookie and no Authorization. The
 // agent session comes only from agentContext (AsyncLocalStorage, set by /api/mcp around the call), so guard(), the caps, the confirms, the ledger and
 // the audit rows are the route's own.
-import { agentContext, CONFIRM_HEADER, REPLAY_HEADER } from '@/lib/agent-access';
+import { agentContext, CONFIRM_HEADER, inProcessRequests, REPLAY_HEADER } from '@/lib/agent-access';
 import type { RequestSession } from '@/lib/session';
 
 type Handler = (request: Request, context: { params: Promise<{ id: string }> }) => Promise<Response>;
@@ -27,6 +27,7 @@ export async function callRoute(handler: Handler, call: RouteCall): Promise<Rout
     headers,
     body: call.form ?? (call.body === undefined ? undefined : JSON.stringify(call.body)),
   });
+  inProcessRequests.add(request);
   const res = await handler(request, { params: Promise.resolve({ id: call.id ?? '' }) });
   const text = await res.text();
   let body: Record<string, unknown> | null = null;
