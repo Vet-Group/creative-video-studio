@@ -133,7 +133,7 @@ test('agent oauth: a signed-out Admin logs in, sees the client and its return ho
   const settings = await openSettings(page);
   await settings.getByRole('button', { name: 'Kết nối AI' }).click();
   const section = settings.locator('.agent-access');
-  await expect(section.getByText('Cách 1: Đăng nhập (khuyên dùng)')).toBeVisible();
+  await expect(section.locator('.agent-way-head')).toHaveText('Đăng nhậpKhuyên dùng');
   await expect(section.locator('.agent-snippet').first()).toContainText('claude mcp add --scope user --transport http cvs');
   const row = section.getByRole('listitem').filter({ hasText: name });
   await expect(row).toContainText('Không hết hạn khi còn dùng');
