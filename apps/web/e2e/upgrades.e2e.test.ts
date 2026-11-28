@@ -79,10 +79,10 @@ test("AC 11: Thử lại on a failed job of 1 USD or more asks with the job's pr
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
   const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'a costly retry' });
   await card.getByRole('button', { name: 'Thử lại' }).click();
-  await answer(page, 'Thử lại lượt tạo này với giá khoảng $3.0000?', false);
+  await answer(page, 'Thử lại lượt tạo này với giá khoảng $3.00?', false);
   expect(retried).toBe(0);
   await card.getByRole('button', { name: 'Thử lại' }).click();
-  await answer(page, 'Thử lại lượt tạo này với giá khoảng $3.0000?', true);
+  await answer(page, 'Thử lại lượt tạo này với giá khoảng $3.00?', true);
   await expect.poll(() => retried).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });

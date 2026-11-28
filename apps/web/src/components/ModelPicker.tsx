@@ -9,6 +9,7 @@ import { firstEnabled, moveActive } from '@/lib/listbox';
 import { byFamily, FEATURED, type Family, featured, shortList } from '@/lib/model-families';
 import { MIN_MARKS } from '@/lib/model-marks';
 import { CHIPS, type Chip, type Range as Match, searchModels, suggest } from '@/lib/model-search';
+import { usd } from '@/lib/run-guard';
 import { Icon } from './Icon';
 
 export interface ModelOption {
@@ -383,7 +384,7 @@ export function ModelPicker({ models: given, value, onChange, id }: { models: Mo
         <span className="model-sub">
           {m.resolution && <span>{m.resolution}</span>}
           {lengths(m.durationsSec) && <span>{lengths(m.durationsSec)}</span>}
-          <span>${m.estimateUsd}</span>
+          <span>{usd(m.estimateUsd)}</span>
           {m.marks !== undefined && m.marks > 0 && m.marks < MIN_MARKS ? (
             <span>Ít đánh giá ({m.marks})</span>
           ) : (

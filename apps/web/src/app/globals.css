@@ -3745,6 +3745,11 @@ dialog.modal.compare-two { width: min(1100px, calc(100vw - 32px)); max-width: no
 @media (prefers-reduced-motion: reduce) { .usage-real .switch::after { transition: none; } }
 
 /* Vietnamese line breaks: short centred text is balanced and longer text avoids a lone last word. */
-:is(.dropzone-hint, .slot-hint, .app-head strong, .banner-text strong, .explore-hero h1, .about h2, .about-start h3) { text-wrap: balance; }
-:is(.about p, .about-lead, .about-cards > li, .about-steps > li, .help) { text-wrap: pretty; }
-@media (max-width: 599px) { .about > h2 + p { text-align: left; } } /* seven centred lines are hard to read on a phone */
+:is(.dropzone-hint, .slot-hint, .app-head strong, .banner-text strong, .explore-hero h1, .about h2, .about-start h3, .tutorials > h1, .about-pair figcaption, .library-empty, .admin-empty, .soon) { text-wrap: balance; }
+:is(.about p, .about-lead, .about-cards > li, .about-steps > li, .help, .muted, .apps-sub, .library-sub, .changelog-sub, .explore-status) { text-wrap: pretty; }
+@media (max-width: 599px) { :is(.about > h2 + p, .tutorials > h1 + p) { text-align: left; } } /* seven centred lines are hard to read on a phone */
+
+/* Below 600 px the top bar already names the page, so the page's own heading stays for screen readers only and the content starts higher. */
+@media (max-width: 599.98px) {
+  :is(.apps > h1, #library-title, .changelog > h1, .tutorials > h1, .fb-head h1) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+}

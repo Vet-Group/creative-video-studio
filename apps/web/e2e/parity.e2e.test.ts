@@ -36,7 +36,7 @@ async function openCreate(page: Page): Promise<void> {
   await page.reload();
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false');
-  await expect(page.getByText('Tháng này bạn đã dùng: $0.0000')).toBeVisible();
+  await expect(page.getByText('Tháng này bạn đã dùng: $0.00')).toBeVisible();
 }
 
 const narrow = (page: Page) => (page.viewportSize()?.width ?? 0) < 1024;
