@@ -802,9 +802,11 @@ export interface HookEffect {
   endpoint: string;
   /** The English prompt the probe sent, word for word; a job keeps exactly this one. */
   prompt: string;
+  /** A Christmas effect: like a holiday starter chip (prompt-starters.ts inSeason), it leads the picker from 15 November to 31 December (ICT) and is left out the rest of the year. */
+  holiday?: true;
 }
 
-/** The effects of the hook effects app, in the page's order. Prompts are the probed ones (2026-11-27), shipped unchanged: the reference prompt says "Image 1" literally, which the reference builder passes through. */
+/** The effects of the hook effects app, in the page's order. Prompts are the probed ones (2026-11-27; the Christmas ones 2026-11-28), shipped unchanged: the reference prompts say "Image 1" literally, which the reference builder passes through. */
 export const HOOK_EFFECTS: HookEffect[] = [
   { id: 'squish', label: 'Phồng rồi bóp', endpoint: HOOK_I2V, prompt: `In the first second the product puffs up like a soft balloon, then an invisible press squishes it flat, and by two seconds it springs back to its exact original shape with a small wobble. ${HOOK_END}` },
   { id: 'melt', label: 'Tan chảy thành sản phẩm', endpoint: HOOK_I2V, prompt: `In the first second the product melts down into a glossy puddle of liquid in its own colors, then the liquid surges back up and re-forms into the product, its edges snapping crisp again by two seconds. ${HOOK_END}` },
@@ -814,6 +816,15 @@ export const HOOK_EFFECTS: HookEffect[] = [
     label: 'Hộp bung mở',
     endpoint: HOOK_REVEAL,
     prompt: 'A closed kraft gift box sits alone on a clean white surface. At one second the box bursts open, its walls flying outward out of frame, revealing the product from Image 1 standing in the center. From two seconds on, the product holds still, sharp and undistorted, exactly as in Image 1: same shape, proportions, colors, print and text, with a steady camera. No added text or watermarks.',
+  },
+  // Christmas: probed on a printed tee (2026-11-28), whose print and lettering stayed legible and whose clip ended on the photo.
+  { id: 'snow-globe', label: 'Quả cầu tuyết', endpoint: HOOK_I2V, holiday: true, prompt: `In the first second a clear glass snow globe dome forms over the product with soft snowflakes swirling inside it, then at one and a half seconds the glass dissolves into a burst of falling snowflakes and tiny gold sparkles that drift away. ${HOOK_END}` },
+  {
+    id: 'gift-unwrap',
+    label: 'Hộp quà Giáng sinh',
+    endpoint: HOOK_REVEAL,
+    holiday: true,
+    prompt: 'A red Christmas gift box tied with a shiny gold satin ribbon sits alone on a clean white surface, a few snowflakes drifting down. At one second the ribbon slips loose and the lid pops off in a shower of gold sparkles, the box walls falling open, revealing the product from Image 1 standing in the center. From two seconds on, the product holds still, sharp and undistorted, exactly as in Image 1: same shape, proportions, colors, print and text, with a steady camera. No added text or watermarks.',
   },
 ];
 /** Every hook effect clip is a 5 s vertical one. */
