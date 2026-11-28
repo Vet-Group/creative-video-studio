@@ -182,6 +182,16 @@ describe('creating, listing, changing and revoking', () => {
     expect((await patch(adminCookie, 'nope', { capUsd: 1 })).status).toBe(404);
   });
 
+  test("another Admin's change to a connection is audited with the connection's owner", async () => {
+    const made = (await (await create(adminCookie, { name: 'owned' })).json()) as { id: string };
+    expect((await patch(otherCookie, made.id, { capUsd: '4' })).status).toBe(200);
+    expect((await audits('agent.token_update')).at(-1)).toEqual({
+      actor_id: other,
+      target: `api_token:${made.id}`,
+      new_value: { name: 'owned', capUsd: '4.0000', ownerId: admin },
+    });
+  });
+
   test("a demoted owner's tokens show as paused in the list", async () => {
     const owner = await user('demoted@example.test', 'admin');
     const cookie = await signIn('demoted@example.test');
