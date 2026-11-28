@@ -9,5 +9,6 @@ export default {
     'Việc tốn tiền và phần lớn thay đổi phải qua một bước xác nhận: lần gọi đầu chỉ báo giá, gọi lại kèm mã xác nhận mới chạy thật. Khoá không đổi được mật khẩu, người dùng hay tạo khoá khác.',
     'Mỗi khoá có danh sách lần dùng cuối, số tiền đã chi trong tháng và nút thu hồi. Kết nối qua MCP sẽ có ở bản cập nhật tới.',
   ],
+  prs: [712],
   audience: 'admin',
 } satisfies ChangeEntry;
