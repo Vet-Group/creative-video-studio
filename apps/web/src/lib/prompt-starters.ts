@@ -99,6 +99,27 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       body: 'The model walks toward the camera wearing the outfit, smooth tracking shot, golden-hour light.',
       ending: 'The clip ends with the model stopping, turning to the camera and smiling.',
     },
+    // Fash's Fan Swap and Product Hanger presets (2026-11-27), probed on Minimax H3 Max Reference (2026-11-28): three colorways of one printed tee swapped on
+    // each fan-blade shadow with the print intact, and a cut-up detail tour of one tee photo.
+    {
+      id: 'doi-mau-canh-quat',
+      types: APPAREL,
+      name: 'Đổi màu theo cánh quạt',
+      desc: 'Mỗi lần bóng cánh quạt lướt qua, áo đổi sang màu kế tiếp',
+      needs: 'Cần 2–4 ảnh cùng thiết kế, mỗi ảnh một màu, theo thứ tự',
+      hook: 'The clip opens on a top-down view of the garment from the first reference image, laid flat on a clean white surface under a slowly turning ceiling fan.',
+      body: "Each time a fan blade's shadow sweeps across the frame, the garment is swapped for the next garment of the reference images, in their order: the same design in another color or style, in exactly the same place and pose, its print and text unchanged. The camera stays perfectly still.",
+      ending: 'The clip ends on the last garment, still and sharp, after the final sweep.',
+    },
+    {
+      id: 'can-canh-chi-tiet',
+      types: APPAREL,
+      name: 'Cận cảnh chi tiết',
+      desc: 'Cảnh toàn rồi cận hình in, sợi vải, cổ áo và gấu tay',
+      hook: 'The clip opens on a wide shot of the whole garment from the reference image, its front facing the camera in soft studio light.',
+      body: 'It then cuts between close-ups: a slow push in on the print, a macro of the fabric weave, the collar stitching and the sleeve hem, each shot sharp and steady, the garment exactly as in the reference image with its print and text unchanged.',
+      ending: 'The clip ends back on the wide shot of the whole garment, held still.',
+    },
     {
       id: 'treo-moc',
       types: APPAREL,
