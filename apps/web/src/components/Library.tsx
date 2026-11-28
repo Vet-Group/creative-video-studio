@@ -488,6 +488,32 @@ export function RepeatTiles({ src, label, tile, ratio }: { src: string; label: s
   );
 }
 
+/** What TikTok's own UI covers on a 1080 × 1920 video, in pixels: the tabs at the top, the like, comment and share buttons on the right, the account,
+ * caption and sound at the foot, and a margin on the left (TikTok's ad creative guides, as summed up by Manypixels, Skedsocial and Adaptly, 2025). */
+export const TIKTOK_SAFE = { top: 108, right: 120, bottom: 320, left: 60 };
+
+/** TikTok's covered areas shaded over a 9:16 video, the safe frame dashed. The SVG's 1080 × 1920 box scales and centres as the video does under
+ * object-fit: contain, so it sits on the picture at any player size with nothing measured. */
+function TikTokSafeZone() {
+  const { top, right, bottom, left } = TIKTOK_SAFE;
+  const [w, h] = [1080 - left - right, 1920 - top - bottom];
+  return (
+    <svg className="safe-zone" viewBox="0 0 1080 1920" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Vùng an toàn TikTok: giữ chữ và sản phẩm trong khung nét đứt">
+      <path d={`M0 0H1080V1920H0Z M${left} ${top}v${h}h${w}v-${h}Z`} fillRule="evenodd" fill="rgb(0 0 0 / 0.5)" />
+      <rect x={left} y={top} width={w} height={h} fill="none" stroke="#fff" strokeWidth="4" strokeDasharray="24 16" />
+      <g fill="#fff" fontSize="40" fontWeight="600" textAnchor="middle" dominantBaseline="middle">
+        <text x={540} y={top / 2}>
+          Thanh tab
+        </text>
+        <text x={540} y={1920 - bottom / 2}>
+          Tên tài khoản, chú thích, nhạc
+        </text>
+        <text transform={`translate(${1080 - right / 2} ${top + h / 2}) rotate(90)`}>Nút thích, bình luận, chia sẻ</text>
+      </g>
+    </svg>
+  );
+}
+
 /**
  * Fash's item detail (survey L3), grown into the recipe of the result: the result large on the left; beside it the title and mark, the words behind it
  * (the creator's prompt, or Marketing's brief and script, the enhanced prompt and the prompt the model got), the inputs, the model, template and
@@ -505,6 +531,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
   const [rerunning, setRerunning] = useState(false);
   const [shown, setShown] = useState<{ id: string; filename: string } | null>(null); // an input photo shown large in the result's place, instead of a new tab
   const [full, setFull] = useState<string | null>(null); // the picture in ImageViewer at its own size (the box shows a 1600 px preview)
+  const [safe, setSafe] = useState(false); // Vùng an toàn TikTok over a 9:16 video; kept while stepping, as Xem lặp is
   const [tile, setTile] = useState(1); // Xem lặp: the picture tiled tile × tile, to check that an all-over print's edges meet; kept while stepping, as the size slider is
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const side = useRef<HTMLDivElement>(null);
@@ -724,6 +751,7 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
               Bỏ qua video
             </button>
             <video key={clip.id} ref={media} controls autoPlay muted loop playsInline poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
+            {safe && clip.ratio === '9:16' && <TikTokSafeZone />}
           </>
         )}
       </div>
@@ -739,6 +767,19 @@ export function ClipDetail({ clips, index, stores, admin, boards, makeApp = fals
               {[1, 2, 3].map((n) => (
                 <button key={n} type="button" aria-pressed={tile === n} onClick={() => setTile(n)}>
                   {n === 1 ? 'Tắt' : `${n}×${n}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {!image && clip.ratio === '9:16' && (
+          // The same row as Xem lặp.
+          <div className="repeat-preview">
+            <span aria-hidden="true">Vùng an toàn TikTok</span>
+            <div className="segmented preset-chips" role="group" aria-label="Vùng an toàn TikTok">
+              {[false, true].map((on) => (
+                <button key={String(on)} type="button" aria-pressed={safe === on} onClick={() => setSafe(on)}>
+                  {on ? 'Hiện' : 'Tắt'}
                 </button>
               ))}
             </div>

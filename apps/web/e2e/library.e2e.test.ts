@@ -501,6 +501,22 @@ test('Dùng khung hình này in a video’s detail opens Create video with the f
     await page.locator(`article[data-clip-id="${id}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
     const detail = page.getByRole('dialog');
     await expect.poll(() => detail.locator('video').evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2); // a frame is decoded
+    // Vùng an toàn TikTok: the covered areas over the 9:16 picture, the safe frame centred on it at 900 × 1492 of 1080 × 1920, and clicks still reach the player.
+    const safe = detail.getByRole('group', { name: 'Vùng an toàn TikTok' });
+    await expect(safe.getByRole('button', { pressed: true })).toHaveText('Tắt');
+    await safe.getByRole('button', { name: 'Hiện' }).click();
+    const zone = detail.getByRole('img', { name: /^Vùng an toàn TikTok/ });
+    await expect(zone).toBeVisible();
+    const near = (actual: number, expected: number, what: string) => expect(Math.abs(actual - expected), `${what}: ${actual}, expected ${expected}`).toBeLessThanOrEqual(2);
+    const [box, frame] = [(await detail.locator('.lightbox-media').boundingBox())!, (await zone.locator('rect').boundingBox())!];
+    const scale = Math.min(box.width / 1080, box.height / 1920);
+    near(frame.width, 900 * scale, 'safe frame width');
+    near(frame.height, 1492 * scale, 'safe frame height');
+    near(frame.x - box.x, (box.width - 1080 * scale) / 2 + 60 * scale, 'safe frame left');
+    near(frame.y - box.y, (box.height - 1920 * scale) / 2 + 108 * scale, 'safe frame top');
+    expect(await zone.evaluate((e) => getComputedStyle(e).pointerEvents)).toBe('none');
+    await safe.getByRole('button', { name: 'Tắt' }).click();
+    await expect(zone).toHaveCount(0);
     // Download and the frame carry their words; the rerun, a new paid job, is the quieter button beside Reuse and names the price the clip cost.
     await expect(detail.locator('.job-actions .labelled')).toHaveText(['Tải xuống', 'Bảng', 'Dùng khung hình']);
     const rerun = detail.getByRole('button', { name: /^Chạy lại · \$\d+\.\d+$/ });
