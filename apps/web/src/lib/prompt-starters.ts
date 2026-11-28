@@ -106,9 +106,9 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       types: APPAREL,
       name: 'Đổi màu theo cánh quạt',
       desc: 'Mỗi lần bóng cánh quạt lướt qua, áo đổi sang màu kế tiếp',
-      needs: 'Cần 2–4 ảnh cùng thiết kế, mỗi ảnh một màu, theo thứ tự',
+      needs: 'Cần 2–4 ảnh áo trải phẳng, mỗi màu một ảnh, mô hình đa ảnh',
       hook: 'The clip opens on a top-down view of the garment from the first reference image, laid flat on a clean white surface under a slowly turning ceiling fan.',
-      body: "Each time a fan blade's shadow sweeps across the frame, the garment is swapped for the next garment of the reference images, in their order: the same design in another color or style, in exactly the same place and pose, its print and text unchanged. The camera stays perfectly still.",
+      body: "Each time a fan blade's shadow sweeps across the frame, the garment is swapped for the next garment of the reference images, in their order: the same design in another color, in exactly the same place and pose, its print and text unchanged. The camera stays perfectly still.",
       ending: 'The clip ends on the last garment, still and sharp, after the final sweep.',
     },
     {
