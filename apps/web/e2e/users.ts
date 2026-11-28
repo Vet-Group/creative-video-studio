@@ -284,6 +284,8 @@ export const USERS = {
   // agent-access.e2e: an Admin who makes and revokes a token in Settings, and a member who sees no entry for it.
   agentui: { email: 'agentui@e2e.test', name: 'E2E Agent UI', role: 'admin' },
   agentmem: { email: 'agentmem@e2e.test', name: 'E2E Agent Member', role: 'member' },
+  // agent-oauth.e2e: an Admin who approves an MCP client on the consent page and disconnects it in Settings.
+  agentoauth: { email: 'agentoauth@e2e.test', name: 'E2E Agent OAuth', role: 'admin' },
 } as const;
 
 export type UserKey = keyof typeof USERS;

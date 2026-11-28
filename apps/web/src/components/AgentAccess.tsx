@@ -1,6 +1,7 @@
 'use client';
-// Settings > "Connect AI" (Admins only): personal access tokens that let an AI tool (Claude Code, OpenMausBot) or a script call the API as the Admin,
-// each with its own expiry and monthly cap (lib/agent-access.ts). The secret is shown once, right after it is made, and is gone when this section closes.
+// Settings > "Connect AI" (Admins only): an AI tool (Claude Code, OpenMausBot) connects by signing in (OAuth, lib/oauth.ts) or with a personal access
+// token, and either way acts as the Admin under its own monthly cap (lib/agent-access.ts). A token's secret is shown once, right after it is made, and is
+// gone when this section closes; an app that signed in is listed with its name and ended with Disconnect.
 import { type FormEvent, useCallback, useEffect, useId, useState } from 'react';
 import { ApiError, api, sendJson, startSignOut } from '@/lib/api';
 import { sessionTime } from '@/lib/account-security';
@@ -16,6 +17,7 @@ export interface AgentToken {
   id: string;
   name: string;
   kind: 'pat' | 'oauth';
+  clientName?: string | null;
   owner: { id: string; name: string; email: string };
   mine: boolean;
   createdAt: string;
@@ -42,6 +44,52 @@ export function snippet(kind: Snippet, origin: string, token: string): string {
   if (kind === 'mausbot') return JSON.stringify({ mcpServers: { cvs: { type: 'http', url: `${origin}/api/mcp`, headers: { Authorization: `Bearer ${token}` }, enabled: true } } }, null, 2);
   return `curl -H "Authorization: Bearer ${token}" ${origin}/api/me/limits`;
 }
+/** The setup text of the sign-in way (OAuth): no token in it, the tool opens this site's consent page. */
+export function signInSnippet(kind: 'claude' | 'mausbot', origin: string): string {
+  if (kind === 'claude') return `claude mcp add --scope user --transport http cvs ${origin}/api/mcp`;
+  return JSON.stringify({ mcpServers: { cvs: { type: 'http', url: `${origin}/api/mcp`, enabled: true } } }, null, 2);
+}
+const SIGN_IN: readonly (readonly ['claude' | 'mausbot', string, string])[] = [
+  ['claude', 'Claude Code', 'Chạy lệnh này trong terminal, rồi gõ /mcp, chọn cvs, Authenticate. Trình duyệt mở trang của CVS để bạn bấm Cho phép.'],
+  ['mausbot', 'OpenMausBot', 'Gộp vào mcpServers trong ~/.openmausbot/config.json, rồi bấm đăng nhập ở thẻ cvs mà OpenMausBot hiện ra. Trình duyệt mở trang của CVS để bạn bấm Cho phép.'],
+];
+
+/** The sign-in way: the command or config that points a tool at /api/mcp, which then asks for the Admin's approval in the browser. */
+function SignInSetup({ note, onCopy }: { note: string; onCopy: (text: string) => void }) {
+  const [kind, setKind] = useState<'claude' | 'mausbot'>('claude');
+  const [origin, setOrigin] = useState('');
+  useEffect(() => setOrigin(window.location.origin), []);
+  const id = useId();
+  const text = signInSnippet(kind, origin);
+  return (
+    <div className="settings-card agent-once" role="group" aria-labelledby={`${id}-tools`}>
+      <p className="agent-label" id={`${id}-tools`}>
+        Công cụ AI
+      </p>
+      <div className="segmented agent-switch" role="group" aria-labelledby={`${id}-tools`}>
+        {SIGN_IN.map(([k, label]) => (
+          <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="pw-hint agent-hint">{SIGN_IN.find(([k]) => k === kind)![2]}</p>
+      <pre className="agent-snippet">
+        <code>{text}</code>
+      </pre>
+      <p className="agent-copied" aria-live="polite">
+        {note}
+      </p>
+      <div className="tf-buttons">
+        <button type="button" onClick={() => onCopy(text)}>
+          <Icon name="copy" size={16} />
+          Sao chép lệnh
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const SNIPPETS: readonly (readonly [Snippet, string, string])[] = [
   ['claude', 'Claude Code', 'Chạy lệnh này trong terminal. Kiểm tra: hỏi AI “gọi whoami của cvs”.'],
   ['mausbot', 'OpenMausBot', 'Gộp vào mcpServers trong ~/.openmausbot/config.json. Kiểm tra: hỏi AI “gọi whoami của cvs”.'],
@@ -195,17 +243,20 @@ export function TokenList({
     <ul className="acct-rows" aria-label="Các khoá truy cập">
       {tokens.map((t) => {
         const live = t.status === 'active' || t.status === 'paused';
+        const app = t.kind === 'oauth';
         return (
           <li key={t.id} className="acct-row agent-row" data-status={t.status}>
             <span className="acct-mark" aria-hidden="true">
-              <Icon name="key" size={16} />
+              <Icon name={app ? 'link' : 'key'} size={16} />
             </span>
             <span className="acct-text">
               <strong>{t.name}</strong>
+              {app && <span>Ứng dụng đã đăng nhập{t.clientName && t.clientName !== t.name ? ` · ${t.clientName}` : ''}</span>}
               {all && <span>{t.mine ? 'Của bạn' : `Của ${t.owner.name}`}</span>}
               <span>
                 Tạo {passkeyDate(t.createdAt)}
                 {t.expiresAt && ` · ${t.status === 'expired' ? 'Đã hết hạn' : 'Hết hạn'} ${passkeyDate(t.expiresAt)}`}
+                {app && ' · Không hết hạn khi còn dùng'}
               </span>
               <span>{t.lastUsedAt ? `Dùng lần cuối ${sessionTime(t.lastUsedAt)}${t.lastUsedIp ? ` từ ${t.lastUsedIp}` : ''}` : 'Chưa dùng lần nào'}</span>
             </span>
@@ -216,11 +267,11 @@ export function TokenList({
             <Spend used={t.monthSpendUsd} cap={t.capUsd} />
             {live && editing !== t.id && (
               <div className="agent-actions">
-                <button type="button" aria-label={`Sửa hạn mức của khoá ${t.name}`} onClick={() => onEdit(t.id)}>
+                <button type="button" aria-label={`Sửa hạn mức của ${app ? 'kết nối' : 'khoá'} ${t.name}`} onClick={() => onEdit(t.id)}>
                   Sửa hạn mức
                 </button>
-                <button type="button" className="agent-revoke" aria-label={`Thu hồi khoá ${t.name}`} onClick={() => onRevoke(t)}>
-                  Thu hồi
+                <button type="button" className="agent-revoke" aria-label={app ? `Ngắt kết nối ${t.name}` : `Thu hồi khoá ${t.name}`} onClick={() => onRevoke(t)}>
+                  {app ? 'Ngắt kết nối' : 'Thu hồi'}
                 </button>
               </div>
             )}
@@ -233,7 +284,7 @@ export function TokenList({
 }
 
 /** Signs out and opens the login, which comes back to this page: a token is made only from a sign-in of the last 10 minutes. */
-async function signInAgain() {
+export async function signInAgain() {
   startSignOut();
   await api('/api/auth/sign-out', sendJson('POST', {})).catch(() => null);
   window.location.assign(loginFor(window.location.pathname + window.location.search));
@@ -252,6 +303,7 @@ export function AgentAccess() {
   const [listError, setListError] = useState('');
   const [created, setCreated] = useState<Created | null>(null);
   const [note, setNote] = useState('');
+  const [signInNote, setSignInNote] = useState('');
   const id = useId();
 
   const load = useCallback(
@@ -297,24 +349,34 @@ export function AgentAccess() {
   }
 
   async function revoke(t: AgentToken) {
-    const yes = await confirmDialog({ title: `Thu hồi khoá “${t.name}”?`, body: 'AI đang dùng khoá này sẽ mất quyền ngay.', confirmLabel: 'Thu hồi', danger: true });
+    const yes = await confirmDialog(
+      t.kind === 'oauth'
+        ? { title: `Ngắt kết nối “${t.name}”?`, body: 'Ứng dụng này sẽ mất quyền ngay và phải đăng nhập lại.', confirmLabel: 'Ngắt kết nối', danger: true }
+        : { title: `Thu hồi khoá “${t.name}”?`, body: 'AI đang dùng khoá này sẽ mất quyền ngay.', confirmLabel: 'Thu hồi', danger: true },
+    );
     if (!yes) return;
     setListError('');
     try {
       await api(`/api/agent-access/tokens/${t.id}`, { method: 'DELETE' });
       await load();
     } catch {
-      setListError('Không thu hồi được khoá. Hãy thử lại.');
+      setListError(t.kind === 'oauth' ? 'Không ngắt được kết nối. Hãy thử lại.' : 'Không thu hồi được khoá. Hãy thử lại.');
     }
   }
 
   return (
     <>
       <p className="settings-note agent-intro">
-        Khoá truy cập cho Claude Code, OpenMausBot hay một script dùng CVS bằng tài khoản của bạn: xem hạn mức, tải ảnh lên, chạy việc. Việc tốn tiền và phần lớn thay đổi cần AI xác nhận
-        thêm một bước, và mỗi khoá có hạn mức chi riêng mỗi tháng. Khoá không đổi được mật khẩu, người dùng hay khoá khác. Đổi mật khẩu hay đăng xuất mọi thiết bị khác sẽ thu hồi mọi khoá của bạn.
+        Cho Claude Code, OpenMausBot hay một script dùng CVS bằng tài khoản của bạn: xem hạn mức, tải ảnh lên, chạy việc. Việc tốn tiền và phần lớn thay đổi cần AI xác nhận thêm một
+        bước, và mỗi kết nối có hạn mức chi riêng mỗi tháng. Kết nối không đổi được mật khẩu, người dùng hay khoá khác. Đổi mật khẩu hay đăng xuất mọi thiết bị khác sẽ ngắt mọi kết nối của bạn.
       </p>
       {!enabled && <p className="settings-note">Kết nối AI đang tạm tắt.</p>}
+      {enabled && !created && (
+        <>
+          <p className="settings-kicker settings-sub">Cách 1: Đăng nhập (khuyên dùng)</p>
+          <SignInSetup note={signInNote} onCopy={(text) => copyText(text, setSignInNote)} />
+        </>
+      )}
       {enabled && created && (
         <ShowOnce
           created={created}
@@ -329,7 +391,7 @@ export function AgentAccess() {
       {enabled && !created && (
         <>
           <p className="settings-kicker settings-sub" id={`${id}-new`}>
-            Tạo khoá truy cập
+            Cách 2: Tạo khoá truy cập
           </p>
           <form className="pw-form settings-card agent-form" aria-labelledby={`${id}-new`} onSubmit={create} noValidate>
             <label htmlFor={`${id}-name`}>Tên khoá</label>

@@ -2,7 +2,7 @@
 // note, and the entry that only an Admin sees.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test, vi } from 'vitest';
-import { type AgentToken, ShowOnce, snippet, TokenList } from './AgentAccess';
+import { type AgentToken, ShowOnce, signInSnippet, snippet, TokenList } from './AgentAccess';
 import { type Account, Settings } from './Settings';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => undefined }) }));
@@ -110,4 +110,17 @@ test('only an Admin sees the Kết nối AI entry in Settings', () => {
   const render = (isAdmin: boolean) => renderToStaticMarkup(<Settings open onClose={noop} userName="An" account={{ ...account, isAdmin }} />);
   expect(render(false)).not.toContain('Kết nối AI');
   expect(render(true)).toContain('<span id="settings-nav-agents">Kết nối AI</span>');
+});
+
+test('an app that signed in (OAuth) shows its client, no expiry while used, and "Ngắt kết nối" in place of "Thu hồi"', () => {
+  const html = list([token({ kind: 'oauth', name: 'OpenMausBot', clientName: 'OpenMausBot', expiresAt: null })]);
+  expect(html).toContain('Ứng dụng đã đăng nhập');
+  expect(html).toContain('Không hết hạn khi còn dùng');
+  expect(html).toContain('aria-label="Ngắt kết nối OpenMausBot"');
+  expect(html).not.toContain('Thu hồi khoá');
+});
+
+test('the sign-in setup text carries no token: Claude Code adds the server, OpenMausBot gets an mcpServers entry without headers', () => {
+  expect(signInSnippet('claude', 'https://cvs.example')).toBe('claude mcp add --scope user --transport http cvs https://cvs.example/api/mcp');
+  expect(JSON.parse(signInSnippet('mausbot', 'https://cvs.example'))).toEqual({ mcpServers: { cvs: { type: 'http', url: 'https://cvs.example/api/mcp', enabled: true } } });
 });
