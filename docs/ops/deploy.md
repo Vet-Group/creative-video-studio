@@ -32,6 +32,41 @@ The server gate deploys only a commit that is already on `origin/main`: it fetch
 checks it out and runs that commit's installer. After the gate changes, the owner uploads it again with
 `bash scripts/run/install-gate-key.sh --gate-only` (needs a live run pre-approval and the owner's `vet-linux` SSH profile).
 
+## Deploy when green
+
+Owner rule (2026-11-28): CVS deploys as soon as `main` is green. There are no time slots and no trains.
+
+```
+pnpm ship <PR>                # merge, then the steps below
+pnpm ship <PR> --watch        # first poll the PR every 60 s (up to 90 min) until its checks are green and it is mergeable
+pnpm ship                     # no PR: ship the current origin/main
+pnpm ship <PR> --dry-run      # read-only: PR checks, CI status, in-flight count, prod commit, the PRs that would ship
+pnpm ship --wait-idle <min>   # how long to wait for in-flight work (default 20)
+```
+
+Run `pnpm ship` from the main checkout. `vet.sh` needs the standing permission above, whose run manifest exists only there; in a
+worktree it fails with "no run manifest: the run has not been approved". Set `CVS_VET_HOST` as for `vet.sh`; `CVS_SSH_HOST` (default `vet-linux`)
+is the ssh profile used for the in-flight count and the read-back. It stops at the first failure with a non-zero exit and never
+retries a merge or a deploy. In order:
+
+1. With a PR: it must be open, not a draft, mergeable, with every check on its head green (skipped counts). It is squash-merged with
+   `--match-head-commit`, and the remote branch is deleted through the API (not `--delete-branch`, which removes local worktrees).
+   The target is the merge commit; with no PR it is `origin/main`.
+2. CI: when the merge commit has the same tree as the PR head whose checks were green, nothing new has to be tested and it deploys
+   at once (E2E's "Same tree already tested" does the same on `main`). When the PR was behind `main` the trees differ, so it waits
+   up to 40 minutes for the workflows `CI` and `E2E` on the merge commit (success or skipped), failing fast on a failure or cancel.
+3. It waits until no row in `jobs`, `analyses` or `remakes` is in a non-terminal state on prod (`--wait-idle`), then runs
+   `vet.sh backup` and `vet.sh deploy <full sha>`.
+4. Read-back: `vet.sh status` shows the target commit, or a descendant of it when `main` moved before the gate ran (the gate deploys
+   whatever `main` is at), with `cvs-web` and `cvs-worker` active, `/login` answers 200 publicly and on
+   the host, and it counts `error|fatal` lines in the `cvs-worker` journal since the deploy started (a warning, not a failure).
+
+Two sessions can run `pnpm ship` at the same moment: the second deploy waits on `ops.lock` (`install.sh`, shared with backup)
+and runs after the first.
+
+The last line it prints is the one to send to the other sessions: `deployed <sha8> (#A, #B, ...), verified`. The PR numbers
+come from the `(#N)` subjects between the commit prod ran before and the one it runs now.
+
 ## Dry run first
 
 ```
