@@ -31,6 +31,8 @@ interface JobRow {
   /** ICT month 'YYYY-MM' and date 'YYYY-MM-DD' of the job's Run. */
   month: string;
   day: string;
+  /** The agent connection the job was created through (its rows count toward that connection's cap), or null. */
+  api_token_id: string | null;
 }
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -59,7 +61,7 @@ export async function withTransaction<T>(pool: LedgerPool, fn: (tx: Queryable) =
 
 async function lockJob(tx: Queryable, jobId: string): Promise<JobRow> {
   const { rows } = await tx.query(
-    `select id, status, workspace_id, user_id, team_id, store_id, provider, model, is_mock,
+    `select id, status, workspace_id, user_id, team_id, store_id, provider, model, is_mock, api_token_id,
             coalesce(finished_at <= now() - interval '24 hours', false) as stale,
             to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as month,
             (created_at at time zone 'Asia/Ho_Chi_Minh')::date::text as day
@@ -84,9 +86,9 @@ async function balance(tx: Queryable, jobId: string): Promise<{ total: number; e
 
 async function append(tx: Queryable, job: JobRow, row: { kind: JobCostKind; usd: number; isFinal: boolean; storeId?: string | null }): Promise<void> {
   await tx.query(
-    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final, workspace_id)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-    [row.kind, job.is_mock ? fmt(0) : fmt(row.usd), job.month, job.day, job.user_id, job.team_id, row.storeId === undefined ? job.store_id : row.storeId, job.id, job.provider, job.model, row.isFinal, job.workspace_id],
+    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final, workspace_id, api_token_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [row.kind, job.is_mock ? fmt(0) : fmt(row.usd), job.month, job.day, job.user_id, job.team_id, row.storeId === undefined ? job.store_id : row.storeId, job.id, job.provider, job.model, row.isFinal, job.workspace_id, job.api_token_id],
   );
 }
 
@@ -232,17 +234,17 @@ export async function bookLlm(
   const usd = call.costUsd === null ? 0 : units(call.costUsd);
   if (usd === 0) return false;
   const [from, id, ref] = 'enhance' in source
-    ? [`select created_at, workspace_id, user_id, team_id, store_id, id as job_id, false as is_final from jobs where id = $4`, source.enhance, `llm:enhance:${source.enhance}`]
+    ? [`select created_at, workspace_id, user_id, team_id, store_id, id as job_id, false as is_final, api_token_id from jobs where id = $4`, source.enhance, `llm:enhance:${source.enhance}`]
     : 'suggestion' in source
-      ? [`select r.created_at, r.workspace_id, r.user_id, u.team_id, null::text as store_id, null::text as job_id, true as is_final
+      ? [`select r.created_at, r.workspace_id, r.user_id, u.team_id, null::text as store_id, null::text as job_id, true as is_final, r.api_token_id
             from suggestion_runs r join users u on u.id = r.user_id where r.id = $4`, source.suggestion, `llm:suggestion:${source.suggestion}`]
       : 'analysis' in source
-        ? [`select created_at, workspace_id, user_id, team_id, store_id, null::text as job_id, true as is_final from analyses where id = $4`, source.analysis, `llm:analysis:${source.analysis}${source.step ? `:${source.step}` : ''}`]
-        : [`select created_at, workspace_id, user_id, team_id, store_id, null::text as job_id, true as is_final from remakes where id = $4`, source.remake, `llm:remake:${source.remake}:${source.step}`];
+        ? [`select created_at, workspace_id, user_id, team_id, store_id, null::text as job_id, true as is_final, api_token_id from analyses where id = $4`, source.analysis, `llm:analysis:${source.analysis}${source.step ? `:${source.step}` : ''}`]
+        : [`select created_at, workspace_id, user_id, team_id, store_id, null::text as job_id, true as is_final, api_token_id from remakes where id = $4`, source.remake, `llm:remake:${source.remake}:${source.step}`];
   const { rowCount } = await db.query(
-    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final, ref, workspace_id)
+    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final, ref, workspace_id, api_token_id)
      select 'llm', $1, to_char(s.created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (s.created_at at time zone 'Asia/Ho_Chi_Minh')::date,
-            s.user_id, s.team_id, s.store_id, s.job_id, $5, $2, s.is_final, $3, s.workspace_id
+            s.user_id, s.team_id, s.store_id, s.job_id, $5, $2, s.is_final, $3, s.workspace_id, s.api_token_id
        from (${from}) s
      on conflict (ref) do nothing`,
     [fmt(usd), call.model, ref, id, call.provider],

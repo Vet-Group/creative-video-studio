@@ -132,3 +132,19 @@ export async function checkCaps(tx: Queryable, userId: string, estimateUsd: stri
   if (rows[0].member_month_full) return 'member_monthly_usd';
   return rows[0].month_full ? 'features_monthly_usd' : null;
 }
+
+/**
+ * What the agent connection `tokenId` has spent in the ICT month of `at` (default now()), as numeric text: every ledger row booked for it, of every kind
+ * (llm and adjustments too, owner decision 2026-11-28), plus what its open remakes have yet to book. The connection's monthly cap holds this
+ * (apps/web/src/lib/agent-access.ts agentCharge), under the connection's lock.
+ */
+export async function tokenMonthSpend(q: Queryable, tokenId: string, at?: Date): Promise<string> {
+  const { rows } = await q.query(
+    `with t as (select coalesce($2::timestamptz, now()) as at),
+          m as (select to_char(t.at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as month from t)
+     select ((select coalesce(sum(usd), 0) from cost_entries, m where cost_entries.api_token_id = $1 and cost_entries.month = m.month)
+             + ${openRemakes('r.api_token_id = $1', 'month')})::numeric(12, 4)::text as usd`,
+    [tokenId, at?.toISOString() ?? null],
+  );
+  return rows[0].usd;
+}

@@ -378,3 +378,65 @@ describe('cancelQueued', () => {
     expect(await rowsOf(id)).toEqual([]);
   });
 });
+
+describe('agent connection tagging (api_token_id)', () => {
+  const tokenRows = async (where: string, value: string) =>
+    (await pool.query(`select kind, api_token_id from cost_entries where ${where} = $1 order by id`, [value])).rows as { kind: string; api_token_id: string | null }[];
+
+  beforeAll(async () => {
+    await pool.query(
+      `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, expires_at) values ('tokLedger001', 'u1', 'ws_vet', 'pat', 'ledger', '\x01', now() + interval '30 days')`,
+    );
+  });
+
+  test("a job's estimate, settle, release and Enhance rows carry the job's connection", async () => {
+    const settled = await reservedJob('1.0000', { status: 'running' });
+    const released = await reservedJob('0.5000', { status: 'running' });
+    await pool.query(`update jobs set api_token_id = 'tokLedger001' where id in ($1, $2)`, [settled, released]);
+    // The estimates were booked before the tag was set; the rows booked from now on copy it.
+    expect(await settle(pool, settled, { status: 'succeeded', costUsd: '1.2000', outputAssetId: await asset(), posterAssetId: null })).toBe(true);
+    expect(await bookLlm(pool, { enhance: settled }, { costUsd: 0.001, provider: 'fal', model: 'm' })).toBe(true);
+    expect(await release(pool, released, 'unbilled')).toBe(true);
+    expect((await tokenRows('job_id', settled)).slice(1)).toEqual([
+      { kind: 'actual_adjustment', api_token_id: 'tokLedger001' },
+      { kind: 'llm', api_token_id: 'tokLedger001' },
+    ]);
+    expect((await tokenRows('job_id', released)).slice(1)).toEqual([{ kind: 'release', api_token_id: 'tokLedger001' }]);
+
+    const tagged = await newJob();
+    await pool.query(`update jobs set api_token_id = 'tokLedger001' where id = $1`, [tagged]);
+    expect(await withTransaction(pool, (tx) => reserve(tx, tagged, '0.3000'))).toBe(true);
+    expect(await tokenRows('job_id', tagged)).toEqual([{ kind: 'estimate', api_token_id: 'tokLedger001' }]);
+    // A browser job's rows stay untagged.
+    const plain = await reservedJob('0.2000');
+    expect(await tokenRows('job_id', plain)).toEqual([{ kind: 'estimate', api_token_id: null }]);
+  });
+
+  test('analysis, suggestion and remake llm rows carry their own row connection; shared and invoice rows none', async () => {
+    await pool.query(
+      `insert into analyses (id, user_id, team_id, source_key, workspace_id, api_token_id) values ('an-tok', 'u1', 'team-b', 'inputs/t.mp4', 'ws_vet', 'tokLedger001'),
+         ('an-plain', 'u1', 'team-b', 'inputs/p.mp4', 'ws_vet', null)`,
+    );
+    await pool.query(`insert into suggestion_runs (id, user_id, input, workspace_id, api_token_id) values ('run-tok', 'u1', '{}', 'ws_vet', 'tokLedger001')`);
+    await pool.query(
+      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('img-tok', 'u1', 'input', 'img-tok', 'a.png', 'image/png', 1, 'ws_vet')`,
+    );
+    await pool.query(
+      `insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, workspace_id, api_token_id) values ('rm-tok', 'u1', 'team-b', 'an-tok', 'img-tok', '[1]', 'ws_vet', 'tokLedger001')`,
+    );
+    expect(await bookLlm(pool, { analysis: 'an-tok' }, { costUsd: 0.02, provider: 'byteplus', model: 'm' })).toBe(true);
+    expect(await bookLlm(pool, { analysis: 'an-plain' }, { costUsd: 0.02, provider: 'byteplus', model: 'm' })).toBe(true);
+    expect(await bookLlm(pool, { suggestion: 'run-tok' }, { costUsd: 0.001, provider: 'openai', model: 'm' })).toBe(true);
+    expect(await bookLlm(pool, { remake: 'rm-tok', step: '1:edit' }, { costUsd: 0.4, provider: 'fal', model: 'm' })).toBe(true);
+    const byRef = async (ref: string) => (await pool.query('select api_token_id from cost_entries where ref = $1', [ref])).rows[0].api_token_id;
+    expect(await byRef('llm:analysis:an-tok')).toBe('tokLedger001');
+    expect(await byRef('llm:analysis:an-plain')).toBeNull();
+    expect(await byRef('llm:suggestion:run-tok')).toBe('tokLedger001');
+    expect(await byRef('llm:remake:rm-tok:1:edit')).toBe('tokLedger001');
+
+    expect(await bookShared(pool, { kind: 'manual_adjustment', usd: '1.0000', month: '2026-11', ref: 'tok-shared', note: 'n' })).toBe(true);
+    expect(await byRef('tok-shared')).toBeNull();
+    await bookInvoice(pool, { month: '2026-07', provider: 'tok-provider', totalUsd: '3.0000' });
+    expect((await pool.query(`select api_token_id from cost_entries where kind = 'invoice_diff' and provider = 'tok-provider'`)).rows).toEqual([{ api_token_id: null }]);
+  });
+});
