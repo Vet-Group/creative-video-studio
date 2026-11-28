@@ -82,7 +82,8 @@ The spend of a token is everything booked through it in the current month (Asia/
 remakes, and the LLM cost of its analyses and suggestions, plus the estimate of its open remakes. A Run or remake whose estimate would take the
 spend over the cap is refused (429 `token_monthly_usd`); an analysis or suggestion is refused once the spend reaches the cap. Because those two
 have no upfront price, the spend can pass the cap by the calls already running: at most one analysis per user plus the day's remaining
-suggestions. The cap is an extra ceiling: the team and company caps and team billing apply to agent runs exactly as to runs from the browser.
+suggestions. Measured on production over the 30 days to 2026-11-28, the costliest analysis booked $0.0222 (p99 $0.0216, 37 calls) and the
+costliest suggestion $0.0028 (p99 $0.0022, 88 calls), so the overrun is cents, not dollars. The cap is an extra ceiling: the team and company caps and team billing apply to agent runs exactly as to runs from the browser.
 
 ## What a token can never do
 
