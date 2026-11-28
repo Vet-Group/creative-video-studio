@@ -446,7 +446,7 @@ describe('fal reference video', () => {
       ['bytedance/seedance-2.5/us/reference-to-video', { max: 1, minSec: 1.8, maxSec: 30.2, maxMb: 200, maxImages: null, endFrame: false, silent: false }],
       ['bytedance/seedance-2.0/us/reference-to-video', { max: 1, minSec: 2, maxSec: 15, maxMb: 50, maxImages: null, endFrame: false, silent: false }],
       ['google/gemini-omni-flash/v1.2/reference-to-video', { max: 1, minSec: 0, maxSec: 15, maxMb: null, maxImages: null, endFrame: false, silent: false }],
-      ['fal-ai/kling-video/o3/standard/video-to-video/edit', { max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: null, endFrame: false, silent: false }], // the video edit's own clip (2026-11-27)
+      ['fal-ai/kling-video/o3/standard/video-to-video/edit', { max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4, endFrame: false, silent: false }], // the video edit's own clip (2026-11-27), and up to 4 photos (the product swap, 2026-11-28)
     ]);
     // Left out: MiniMax (video tokens unpriced), Wan, Grok, Veo, Kling O1, (the O3 row reaches the sibling).
     expect(videoInputs('minimax/h3-max/reference-to-video').videoRefs).toBeNull();
@@ -597,17 +597,24 @@ describe('fal video edit', () => {
     expect(calls.at(-1)!.body).toEqual({ prompt: 'Change the color of the shirt in @Video1 to red.', video_url: 'https://v3b.fal.media/files/video-quicktime', keep_audio: true });
   });
 
+  test('a product swap uploads the clip and the photo, and sends the photo as image_urls with [Image1] as @Image1', async () => {
+    const { fn, calls } = falFake();
+    const both = async (url: string) => (url === 'asset://clip' ? { bytes: new Uint8Array([9, 9]), contentType: 'video/quicktime' } : { bytes: new Uint8Array([1]), contentType: 'image/png' });
+    await createFalProvider({ apiKey: 'k', fetch: fn, readImage: both }).submit({ ...base, model: editModel, prompt: 'Replace the shirt in [Video1] with the one in [Image1].', imageUrls: ['asset://clip', 'asset://tee'], ratio: 'auto', durationSec: 5 });
+    expect(calls.at(-1)!.body).toEqual({ prompt: 'Replace the shirt in @Video1 with the one in @Image1.', video_url: 'https://v3b.fal.media/files/video-quicktime', image_urls: ['https://v3b.fal.media/files/image-png'], keep_audio: true });
+  });
+
   test('own words that do not name the clip are led by an edit of @Video1', async () => {
     const { fn, calls } = falFake();
     await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, model: editModel, prompt: 'đổi cốc sang màu xanh', imageUrls: ['asset://clip'], ratio: 'auto', durationSec: 8 });
     expect(calls.at(-1)!.body).toMatchObject({ prompt: 'Edit @Video1: đổi cốc sang màu xanh' });
   });
 
-  test('its picture size and frame rate limits come from the schema, and a Run without exactly one clip or with a failed upload submits nothing', async () => {
+  test('its picture size and frame rate limits come from the schema, and a Run without a clip, with more than 4 photos or with a failed upload submits nothing', async () => {
     const at = (width: number, height: number, fps: number | null = 30) => videoRefProblem(endpoint, { width, height, fps });
     expect([at(720, 1280), at(1080, 1920), at(3840, 2160), at(1280, 720, 23), at(1280, 720, 60)]).toEqual([null, null, null, null, null]);
     expect([at(540, 960), at(3841, 2160), at(1280, 720, 15), at(1280, 720, 120)].map((r) => r !== null)).toEqual([true, true, true, true]);
-    for (const imageUrls of [[], ['asset://a', 'asset://b']]) {
+    for (const imageUrls of [[], ['asset://clip', 'asset://1', 'asset://2', 'asset://3', 'asset://4', 'asset://5']]) {
       const none = falFake();
       await expect(createFalProvider({ apiKey: 'k', fetch: none.fn, readImage: read }).submit({ ...base, model: editModel, imageUrls, ratio: 'auto' })).rejects.toThrow(ImageReadError);
       expect(none.calls.some((c) => c.url.startsWith('https://queue.fal.run'))).toBe(false);

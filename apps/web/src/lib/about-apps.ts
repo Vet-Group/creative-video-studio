@@ -1309,7 +1309,8 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Sửa video là gì?',
         blocks: [
-          'Bạn chọn một video có sẵn và nói điều cần đổi: màu áo, nền phía sau, hoặc tự mô tả thay đổi bằng lời. AI, chạy trên Kling O3 Edit, trả về chính video đó với đúng thay đổi ấy; người, chuyển động, khung hình và âm thanh gốc được giữ nguyên.',
+          'Bạn chọn một video có sẵn và nói điều cần đổi: màu áo, nền phía sau, đổi sang một sản phẩm khác, hoặc tự mô tả thay đổi bằng lời. AI, chạy trên Kling O3 Edit, trả về chính video đó với đúng thay đổi ấy; người, chuyển động, khung hình và âm thanh gốc được giữ nguyên.',
+          'Đổi sản phẩm biến một video bán chạy thành video cho thiết kế mới: thêm ảnh sản phẩm mới, AI thay chiếc áo đang mặc (hay món đồ đang cầm) bằng sản phẩm trong ảnh, giữ màu, hình in và chữ.',
           `Video kết quả dài bằng video gốc. Chi phí tính theo số giây của video gốc, làm tròn lên. ${APP_COST}`,
         ],
       },
@@ -1320,8 +1321,8 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             steps: [
               { title: 'Chọn video', text: 'Tải lên một video MP4 hoặc MOV dài 3 đến 15 giây, mỗi cạnh từ 720 px trở lên, tối đa 20 MB, hoặc chọn một video trong Lịch sử của bạn.' },
-              { title: 'Chọn kiểu sửa', text: 'Đổi màu áo theo bảng màu có sẵn, đổi nền sang studio trắng hoặc lifestyle, hoặc chọn Tự mô tả và viết thay đổi bạn muốn.' },
-              { title: 'Chạy', text: 'Bấm Chạy và xem video trong tab Lịch sử. Muốn thử màu hay nền khác, chọn lại rồi chạy tiếp với cùng video.' },
+              { title: 'Chọn kiểu sửa', text: 'Đổi màu áo theo bảng màu có sẵn, đổi nền sang studio trắng hoặc lifestyle, chọn Đổi sản phẩm rồi thêm ảnh sản phẩm mới (tải lên, Ảnh đã tải hoặc Từ kệ sản phẩm), hoặc chọn Tự mô tả và viết thay đổi bạn muốn.' },
+              { title: 'Chạy', text: 'Bấm Chạy và xem video trong tab Lịch sử. Muốn thử màu, nền hay thiết kế khác, chọn lại rồi chạy tiếp với cùng video.' },
             ],
           },
         ],
@@ -1332,6 +1333,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             list: [
               'Mỗi lần chạy chỉ sửa một thứ; muốn đổi cả màu áo lẫn nền, chạy hai lần, lần sau dùng video vừa sửa.',
+              'Đổi sản phẩm cho kết quả tốt nhất khi ảnh mới chụp thẳng mặt trước, thấy rõ hình in, và sản phẩm trong video cùng loại (áo thay áo, cốc thay cốc).',
               'Khi tự mô tả, nói rõ cần đổi gì; Cải thiện (bật sẵn) dịch lời của bạn sang tiếng Anh thành một câu lệnh ngắn trước khi gửi cho mô hình.',
               'Chưa thêm được chữ vào video: mô hình không viết chữ chính xác. Hãy chèn chữ khi dựng video.',
             ],
@@ -1345,6 +1347,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
             faq: [
               ['Một lần chạy tốn bao nhiêu?', `${APP_COST} Với giá hiện tại, mỗi giây video khoảng $0.14, nên video 10 giây khoảng $1.40. Chi phí thật nằm trên video trong Thư viện.`],
               ['Hình in và chữ trên áo có giữ được không?', 'Câu lệnh đổi màu dặn giữ nguyên hình in và chữ, nhưng chữ nhỏ có thể bị nhoè ở vài khung hình. Hãy xem lại video trước khi đăng.'],
+              ['Đổi sản phẩm khác gì Smart Remake?', 'Đổi sản phẩm sửa một video ngắn trong một lần chạy và giữ âm thanh gốc. Smart Remake dành cho video mẫu dài nhiều cảnh: nó tự tìm các cảnh có sản phẩm và làm lại từng cảnh.'],
               ['Âm thanh của video gốc có còn không?', 'Còn: video sửa xong giữ âm thanh của video gốc.'],
               ['Vì sao video của tôi bị từ chối?', 'Mô hình chỉ nhận video dài 3 đến 15 giây, mỗi cạnh 720 đến 3840 px, 23 đến 60 khung hình mỗi giây. Video ngắn hơn, dài hơn hoặc nhỏ hơn cần được cắt hoặc xuất lại trước.'],
             ],

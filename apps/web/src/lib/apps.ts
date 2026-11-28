@@ -844,8 +844,17 @@ export function hookReason(d: HookDraft): string | null {
  * generator's POSE_BACKGROUNDS). Added text is left out: a video model does not spell it reliably (Marketing Studio burns its end text in instead). */
 export const EDIT_BACKGROUNDS = POSE_BACKGROUNDS.filter((b) => b.scene !== null);
 
-/** The English instruction of a quick edit, which POST /api/jobs holds the job to (`params.color` or `params.background`); undefined for the member's own words. [Video1] is the clip. */
-export function videoEditPrompt(p: { color?: string | null; background?: string | null }): string | undefined {
+/** The English instruction of a quick edit, which POST /api/jobs holds the job to (`params.color`, `params.background` or `params.swap`); undefined for the member's own words.
+ * [Video1] is the clip; the product swap's new product photo is [Image1]. */
+export function videoEditPrompt(p: { color?: string | null; background?: string | null; swap?: string | null }): string | undefined {
+  // The product swap (Krea's Video Swap, 2026-11-20): one proven clip, a new design. Two paid runs on 2026-11-28 kept the print and its lettering legible through the motion.
+  if (p.swap === 'product') {
+    return (
+      'Replace the product in [Video1] that matches the one in [Image1] (the garment someone wears, or the item they hold or show) with the product in [Image1]: ' +
+      'the same color, print, graphic and any text exactly as in [Image1], following the folds, light and every movement. Keep everything else exactly as in [Video1]: ' +
+      'any person, their face, hair, body and every movement, the rest of the outfit, the background, the light and the camera. Do not add any other text, logos or watermarks.'
+    );
+  }
   const swatch = RECOLOR_COLORS.find((c) => c.hex === p.color);
   if (swatch) {
     return (
@@ -864,8 +873,8 @@ export function videoEditPrompt(p: { color?: string | null; background?: string 
   return undefined;
 }
 
-/** The video edit page's kinds of edit: a swatch, a backdrop, or the member's own words. */
-export type EditKind = 'color' | 'background' | 'own';
+/** The video edit page's kinds of edit: a swatch, a backdrop, a new product, or the member's own words. */
+export type EditKind = 'color' | 'background' | 'product' | 'own';
 
 /** What the video edit page has: the model (null while the list loads), the clip's length (null until one is chosen) and the edit. */
 export interface EditDraft {
@@ -873,7 +882,7 @@ export interface EditDraft {
   failed: boolean;
   videoMs: number | null;
   kind: EditKind;
-  /** A swatch or a backdrop is picked, for those kinds. */
+  /** A swatch, a backdrop or the new product's photo is picked, for those kinds. */
   picked: boolean;
   text: string;
 }
@@ -888,6 +897,7 @@ export function videoEditReason(d: EditDraft): string | null {
   if (d.videoMs < allowed[0]! * 1000 || !allowed.includes(Math.ceil(d.videoMs / 1000))) return `Video cần sửa phải dài từ ${allowed[0]} đến ${allowed.at(-1)} giây.`;
   if (d.kind === 'color' && !d.picked) return 'Chọn màu áo mới.';
   if (d.kind === 'background' && !d.picked) return 'Chọn nền mới.';
+  if (d.kind === 'product' && !d.picked) return 'Thêm ảnh sản phẩm mới.';
   if (d.kind === 'own' && !d.text.trim()) return 'Mô tả thay đổi bạn muốn.';
   return null;
 }
@@ -908,6 +918,8 @@ export interface BatchItem {
   shot?: string | null;
   /** The hook effect (an id of HOOK_EFFECTS) a job made. */
   effect?: string | null;
+  /** A video edit's product swap ('product'). */
+  swap?: string | null;
 }
 
 /**

@@ -1,6 +1,7 @@
 'use client';
 // The video edit app: one of the member's clips (an upload or a History clip, as Motion Control takes its video) changed by one instruction, a quick edit that writes its
-// English prompt (lib/apps.ts videoEditPrompt) or the member's own words, which Enhance turns into one English edit instruction. The cost follows the clip's length.
+// English prompt (lib/apps.ts videoEditPrompt) or the member's own words, which Enhance turns into one English edit instruction. The product swap also takes the new product's
+// photo (an upload, a Library photo or one from the product shelf). The cost follows the clip's length.
 // Laid out like the other app pages (the form card beside History, Examples and About).
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
@@ -14,7 +15,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { FreeLeft } from './AllowanceBar';
 import { AppAbout, AppHeader, AppHistoryArt, TAB_LABEL, type Tab } from './AppPage';
 import { EnhanceToggle } from './EnhanceToggle';
-import { copyError, FormNotice, Gallery, type Img, uploadError, uploadImages, useReuse, WorkTabs } from './image-tools';
+import { copyError, FormNotice, Gallery, type Img, Slot, uploadError, uploadImages, useReuse, WorkTabs } from './image-tools';
 import { FormContext, useJobs } from './jobs';
 import { PromptComposer } from './PromptComposer';
 import { type RefVideo, ReferenceVideoSlot } from './ReferenceVideo';
@@ -32,6 +33,7 @@ interface EditModel {
 export const EDIT_KINDS: { id: EditKind; label: string }[] = [
   { id: 'color', label: 'Đổi màu áo' },
   { id: 'background', label: 'Đổi nền' },
+  { id: 'product', label: 'Đổi sản phẩm' },
   { id: 'own', label: 'Tự mô tả' },
 ];
 
@@ -63,6 +65,7 @@ export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; r
   const [kind, setKind] = useState<EditKind>('color');
   const [color, setColor] = useState('');
   const [background, setBackground] = useState('');
+  const [product, setProduct] = useState<Img[]>([]); // the product swap's new product photo
   const [text, setText, clearDraft] = useDraftState(`app.${app.slug}`, reuse !== undefined);
   const [enhance, setEnhance] = useState(true); // on by default, as on Create: the member's words reach the model as one English instruction
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else About)
@@ -88,14 +91,19 @@ export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; r
   // An answer for another length is still loading: its estimate would skip the price confirm of a longer clip.
   const list = answer?.seconds === seconds ? answer : null;
 
-  // Dùng lại: the clip and the edit (the swatch, the backdrop, or the member's own words and Enhance).
+  // Dùng lại: the clip and the edit (the swatch, the backdrop, the new product's photo, or the member's own words and Enhance).
   const recreate = useReuse(
     reuse,
     app.feature,
     (j) => {
-      const clip = (j.images as (Img & { mime?: string; durationMs?: number | null })[] | undefined)?.find((i) => i.mime?.startsWith('video/'));
+      const images = (j.images as (Img & { mime?: string; durationMs?: number | null })[] | undefined) ?? [];
+      const clip = images.find((i) => i.mime?.startsWith('video/'));
+      const photo = images.find((i) => !i.mime?.startsWith('video/')); // only a product swap has one
       if (clip) setVideo({ id: clip.id, filename: clip.filename, durationMs: clip.durationMs ?? 0 });
-      if (j.color && RECOLOR_COLORS.some((c) => c.hex === j.color)) {
+      if (photo) {
+        setKind('product');
+        setProduct([photo]);
+      } else if (j.color && RECOLOR_COLORS.some((c) => c.hex === j.color)) {
         setKind('color');
         setColor(j.color);
       } else if (j.background && EDIT_BACKGROUNDS.some((b) => b.value === j.background)) {
@@ -111,9 +119,10 @@ export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; r
   );
 
   const chosen = list?.models.find((m) => m.id === list.best) ?? list?.models[0];
-  const quick = kind === 'color' ? videoEditPrompt({ color }) : kind === 'background' ? videoEditPrompt({ background }) : undefined;
+  const quick = kind === 'color' ? videoEditPrompt({ color }) : kind === 'background' ? videoEditPrompt({ background }) : kind === 'product' ? videoEditPrompt({ swap: 'product' }) : undefined;
+  const picked = kind === 'product' ? product.length > 0 : quick !== undefined;
   const reason =
-    videoEditReason({ model: list === null ? null : chosen, failed: list?.failed ?? false, videoMs: video?.durationMs ?? null, kind, picked: quick !== undefined, text }) ??
+    videoEditReason({ model: list === null ? null : chosen, failed: list?.failed ?? false, videoMs: video?.durationMs ?? null, kind, picked, text }) ??
     (kind === 'own' ? promptTooLong(chosen, text.trim().length) : null);
   const canRun = reason === null && !busy;
 
@@ -125,6 +134,18 @@ export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; r
       if (v) setVideo({ id: v.id, filename: v.filename, durationMs: v.durationMs ?? 0 });
     } catch (e) {
       setError(uploadError(e, 'video'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addProduct(files: File[]) {
+    setError('');
+    setBusy(true);
+    try {
+      setProduct(await uploadImages(files.slice(0, 1), 'image', '', 'product').finally(loading('Đang tải lên…')));
+    } catch (e) {
+      setError(uploadError(e));
     } finally {
       setBusy(false);
     }
@@ -151,8 +172,8 @@ export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; r
     setNotice('');
     try {
       const body = {
-        feature: app.feature, modelId: chosen!.id, assetIds: [video!.id], ratio: 'auto',
-        ...(quick !== undefined ? { prompt: quick, params: kind === 'color' ? { color } : { background } } : { prompt: text.trim(), enhance }),
+        feature: app.feature, modelId: chosen!.id, assetIds: [video!.id, ...(kind === 'product' ? [product[0]!.id] : [])], ratio: 'auto',
+        ...(quick !== undefined ? { prompt: quick, params: kind === 'color' ? { color } : kind === 'background' ? { background } : { swap: 'product' } } : { prompt: text.trim(), enhance }),
       };
       if (!(await sendRun(body))) return;
       if (kind === 'own') clearDraft();
@@ -185,7 +206,7 @@ export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; r
               {/* Owners mixed it up with Smart Remake (2026-11-27): each form points to the other; this one only while Smart Remake's flags are on. */}
               {remake && (
                 <p className="help">
-                  Muốn đặt đúng sản phẩm của bạn, kể cả hình in, vào video? Dùng <Link href="/apps/smart-remake">Smart Remake</Link>.
+                  Video mẫu dài, nhiều cảnh? <Link href="/apps/smart-remake">Smart Remake</Link> tự tìm các cảnh có sản phẩm giống của bạn và làm lại từng cảnh.
                 </p>
               )}
               <ReferenceVideoSlot
@@ -205,6 +226,24 @@ export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; r
               {kind === 'color' && <Choice label="Màu áo mới" name={`${names}-color`} items={RECOLOR_COLORS.map((c) => ({ id: c.hex, label: c.label, swatch: c.hex }))} value={color} onChange={setColor} />}
               {kind === 'background' && <Choice label="Nền mới" name={`${names}-background`} items={EDIT_BACKGROUNDS.map((b) => ({ id: b.value, label: b.label }))} value={background} onChange={setBackground} />}
               {kind === 'color' && <p className="help">AI đổi màu áo, giữ nguyên hình in, chữ, người, chuyển động và nền. Chữ nhỏ có thể bị nhoè ở vài khung hình.</p>}
+              {kind === 'product' && (
+                <>
+                  <Slot
+                    label="Sản phẩm mới"
+                    empty="Thêm 1 ảnh rõ nét của sản phẩm mới"
+                    inputLabel="Ảnh sản phẩm mới"
+                    images={product}
+                    max={1}
+                    busy={busy}
+                    onAdd={(files) => void addProduct(files)}
+                    onRemove={() => setProduct([])}
+                    onPick={(img) => setProduct([img])}
+                    slot="product"
+                  />
+                  <p className="help">AI thay sản phẩm giống nó trong video (chiếc áo đang mặc, hay món đồ đang cầm) bằng sản phẩm trong ảnh, giữ màu, hình in và chữ; người, chuyển động, nền và âm thanh giữ nguyên.</p>
+                  <p className="help">Dùng ảnh chụp thẳng mặt trước, thấy rõ hình in. Chữ nhỏ có thể bị nhoè ở vài khung hình.</p>
+                </>
+              )}
               {kind === 'own' && (
                 <PromptComposer
                   id={promptId}

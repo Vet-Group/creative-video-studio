@@ -32,6 +32,8 @@ const call = (path: string, method = 'GET', body?: unknown) =>
   new Request(`http://localhost${path}`, { method, headers: { cookie, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 /** The body the page sends for a quick colour; `over` replaces any field. */
 const edit = (over: Record<string, unknown> = {}) => ({ feature: 'video_edit', modelId: MODEL, assetIds: ['clip'], ratio: 'auto', prompt: videoEditPrompt({ color: RED }), params: { color: RED }, ...over });
+/** The body the page sends for a product swap: the clip, then the new product's photo. */
+const swap = (over: Record<string, unknown> = {}) => edit({ assetIds: ['clip', 'img'], prompt: videoEditPrompt({ swap: 'product' }), params: { swap: 'product' }, ...over });
 const run = (body: Record<string, unknown>) => POST(call('/api/jobs', 'POST', body));
 const errorOf = async (res: Response) => ((await res.json()) as { error: string }).error;
 const estimateOf = async (id: string) => (await pool.query(`select usd::text from cost_entries where job_id = $1 and kind = 'estimate'`, [id])).rows[0].usd as string;
@@ -117,13 +119,26 @@ describe('POST /api/jobs for a video edit', () => {
     expect((await queued(await run(edit({ assetIds: ['ok720'] })))).row.duration_s).toBe(5); // a 720x1280 30 fps clip passes its header check
   });
 
+  test("queues a product swap with its exact prompt, the clip then the photo as its inputs, priced on the clip's seconds alone", async () => {
+    const { id, row } = await queued(await run(swap()));
+    expect(row).toMatchObject({ feature: 'video_edit', prompt: videoEditPrompt({ swap: 'product' }), params: { swap: 'product' }, input_asset_ids: ['clip', 'img'], duration_s: 6, enhance: false });
+    expect(await estimateOf(id)).toBe(await estimateOf((await queued(await run(edit()))).id)); // the photo adds nothing: fal bills the output seconds
+  });
+
   test('refuses, with 400 and never 500, the wrong inputs, quick edits that do not match their prompt, Enhance on a quick edit, other params and clips the model cannot take', async () => {
     const bad: [string, Record<string, unknown>, string?][] = [
       ['no input', edit({ assetIds: [] })],
       ['two inputs', edit({ assetIds: ['clip', 'clip-mov'] })],
-      ['an image', edit({ assetIds: ['img'] }), 'the video edit takes a video: the clip to edit'],
+      ['an image', edit({ assetIds: ['img'] }), 'the video edit takes a video: the clip to edit, then a product photo'],
       ['a preset', edit({ presetId: 'gentle-push-in', prompt: null })],
-      ['a colour and a backdrop', edit({ params: { color: RED, background: 'white' } }), 'the video edit takes params.color or params.background, not both'],
+      ['a colour and a backdrop', edit({ params: { color: RED, background: 'white' } }), 'the video edit takes one of params.color, params.background and params.swap'],
+      ['a photo without the swap', edit({ assetIds: ['clip', 'img'] }), 'the video edit takes the clip to edit, then the new product photo with params.swap, and no preset'],
+      ['a swap without its photo', swap({ assetIds: ['clip'] })],
+      ['a swap with a second clip', swap({ assetIds: ['clip', 'clip-mov'] }), 'the video edit takes a video: the clip to edit, then a product photo'],
+      ['a swap with the photo first', swap({ assetIds: ['img', 'clip'] })],
+      ['another swap', swap({ params: { swap: 'design' } }), 'params.swap must be product'],
+      ['a swap and a colour', swap({ params: { swap: 'product', color: RED } })],
+      ['own words for a swap', swap({ prompt: 'đổi áo' }), 'the prompt must be the one the quick edit makes'],
       ['a colour off the swatches', edit({ params: { color: '#123456' } })],
       ['the kept backdrop', edit({ params: { background: 'keep' } })],
       ['another prompt for a colour', edit({ prompt: 'make it blue' }), 'the prompt must be the one the quick edit makes'],
@@ -156,7 +171,9 @@ describe('History, retry and read-back', () => {
     const backdrop = await queued(await run(edit({ prompt: videoEditPrompt({ background: 'lifestyle' }), params: { background: 'lifestyle' } })));
     const own = await queued(await run(edit({ prompt: 'xoá logo trên tường', params: {} })));
     const colour = await queued(await run(edit()));
+    const swapped = await queued(await run(swap()));
     const list = (await (await GET_LIST(call('/api/jobs?mine=1'))).json()) as { jobs: { id: string; background: string | null; color: string | null; text: string | null }[] };
+    expect(list.jobs.find((j) => j.id === swapped.id)).toMatchObject({ color: null, background: null, text: null }); // its English prompt is not the member's words
     const of = (id: string) => list.jobs.find((j) => j.id === id)!;
     expect(of(backdrop.id)).toMatchObject({ background: 'lifestyle', text: null });
     expect(of(own.id)).toMatchObject({ background: null, color: null, text: 'xoá logo trên tường' });

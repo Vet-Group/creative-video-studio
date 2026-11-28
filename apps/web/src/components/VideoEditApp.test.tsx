@@ -11,10 +11,11 @@ const render = (remake = false) =>
     </JobsProvider>,
   );
 
-test('the kinds of edit are the quick colour, the quick backdrop and the own words, in that order; no added text', () => {
+test('the kinds of edit are the quick colour, the quick backdrop, the product swap and the own words, in that order; no added text', () => {
   expect(EDIT_KINDS.map((k) => [k.id, k.label])).toEqual([
     ['color', 'Đổi màu áo'],
     ['background', 'Đổi nền'],
+    ['product', 'Đổi sản phẩm'],
     ['own', 'Tự mô tả'],
   ]);
 });
@@ -33,8 +34,8 @@ test('the form has the clip slot, the kinds with the colour first and its swatch
   expect(html).toContain('Đang tải danh sách mô hình...'); // the models load in an effect, which a static render does not run
 });
 
-test("the form points to Smart Remake for the member's own product only while Smart Remake is on", () => {
-  const hint = 'Muốn đặt đúng sản phẩm của bạn, kể cả hình in, vào video? Dùng <a href="/apps/smart-remake">Smart Remake</a>.';
+test('the form points to Smart Remake for a long many-scene clip only while Smart Remake is on', () => {
+  const hint = 'Video mẫu dài, nhiều cảnh? <a href="/apps/smart-remake">Smart Remake</a> tự tìm các cảnh có sản phẩm giống của bạn và làm lại từng cảnh.';
   expect(render(true)).toContain(hint);
   expect(render()).not.toContain('/apps/smart-remake');
 });
