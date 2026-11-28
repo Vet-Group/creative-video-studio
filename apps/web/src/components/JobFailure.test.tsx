@@ -63,6 +63,15 @@ test('a Motion Control input the model cannot read says what to change, and offe
   }
 });
 
+test('a clip Google withheld under its safety rules asks for a new description instead of the generic line, and offers no same-input retry', () => {
+  const error = "Vertex Omni interaction failed: Unable to show the generated video. The output contains sexual content that violates Google's Responsible AI practices. Try rephrasing the prompt.";
+  const html = renderToStaticMarkup(<JobFailureNote job={refused(error)} isAdmin={false} />);
+  expect(html).toContain('Google chặn kết quả vì cho rằng có nội dung nhạy cảm');
+  expect(html).not.toContain(GENERIC);
+  expect(canRetry(refused(error))).toBe(false);
+  expect(renderToStaticMarkup(<JobFailureNote job={refused(error)} isAdmin />)).toContain('<summary>vertex · Responsible AI</summary>');
+});
+
 test('a failure the ledger closed at $0 tells the member it was not charged, and one still holding its estimate does not', () => {
   expect(renderToStaticMarkup(<JobFailureNote job={job({ error: 'boom', unbilled: true })} isAdmin={false} />)).toContain('Lượt này không bị tính phí.');
   expect(renderToStaticMarkup(<JobFailureNote job={job({ error: 'boom', unbilled: false })} isAdmin={false} />)).not.toContain('không bị tính phí');
