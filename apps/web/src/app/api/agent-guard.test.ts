@@ -382,6 +382,15 @@ describe('the write confirm', () => {
 });
 
 describe('review fixes', () => {
+  test('an encoded slash or backslash in the path is 400 before the deny set answers', async () => {
+    const t = await fresh();
+    for (const path of ['/api/admin/users%2Fx', '/api/admin/costs%5cx', '/api/me/limits%2f']) {
+      const res = await limits.GET(as(t.token, path));
+      expect([path, res.status, await errorOf(res)]).toEqual([path, 400, 'bad_path']);
+    }
+    expect((await limits.GET(as(t.token, '/api/me/limits'))).status).toBe(200);
+  });
+
   test('failed sign-ins from one IPv6 /64 share one limit', async () => {
     const wrong = `cvs_pat_${'C'.repeat(12)}_${'D'.repeat(43)}`;
     for (let i = 0; i < 20; i++) expect((await limits.GET(as(wrong, '/api/me/limits', { headers: { 'cf-connecting-ip': `2001:db8:1:2::${i + 1}` } }))).status).toBe(401);

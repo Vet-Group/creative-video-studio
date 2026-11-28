@@ -10,7 +10,7 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 
 const { pool } = await import('@/lib/auth');
-const { agentCharge, agentDenied, agentPrecheck, bodyHash, canonicalJSON, confirmExempt, createPat, hits, ipKey, limited, MAX_ACTIVE_TOKENS, MAX_RATE_KEYS, newPat, readConfirm, signConfirm } = await import('./agent-access');
+const { agentBadPath, agentCharge, agentDenied, agentPrecheck, bodyHash, canonicalJSON, confirmExempt, createPat, hits, ipKey, limited, MAX_ACTIVE_TOKENS, MAX_RATE_KEYS, newPat, readConfirm, signConfirm } = await import('./agent-access');
 
 beforeAll(async () => {
   await pool.query(`insert into users (id, email, name, role) values ('u-admin', 'a@example.test', 'A', 'admin')`);
@@ -239,4 +239,24 @@ test("a paid confirm replays only its own connection's stored answer", async () 
   const call = await agentPrecheck(g, request, body);
   expect(call).not.toBeInstanceOf(Response);
   expect(call).toMatchObject({ tokenId: mine.id, confirm: { nonce, estimate: '1.0000' } });
+});
+
+describe('paths an agent may not send', () => {
+  test.each([
+    ['/api/admin/users%2Fx', true],
+    ['/api/assets/a%2fb', true],
+    ['/api/assets/a%5Cb', true],
+    ['/api/assets/a%5cb', true],
+    ['/api/assets/./x', true],
+    ['/api/assets/../admin/users', true],
+    ['/api/assets/%2e%2E/admin/users', true],
+    ['/api/assets/.%2e', true],
+    ['/api/assets/%2E', true],
+    ['/api/assets/a.b', false],
+    ['/api/assets/..a', false],
+    ['/api/assets/a%20b', false],
+    ['/api/admin/users', false],
+  ])('%s -> refused %s', (path, refused) => {
+    expect(agentBadPath(path)).toBe(refused);
+  });
 });

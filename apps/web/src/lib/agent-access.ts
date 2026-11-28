@@ -76,6 +76,9 @@ const DENY_ALL = ['/api/admin/users', '/api/auth', '/api/me/stop-impersonating',
 const DENY_WRITES = ['/api/me/profile', '/api/admin/workspaces'];
 const under = (path: string, root: string) => path === root || path.startsWith(`${root}/`);
 
+/** A path an agent may not send at all (400): an encoded slash or backslash, or a `.` or `..` segment (plain or encoded), which routing and the deny set could read differently. */
+export const agentBadPath = (rawPath: string) => /%2f|%5c/i.test(rawPath) || /(^|\/)(\.|%2e){1,2}(\/|$)/i.test(rawPath);
+
 /** True when an agent may not send `method` to `rawPath`. The path is decoded and repeated slashes collapsed first, so `%2F` or `//` cannot slip past. */
 export function agentDenied(method: string, rawPath: string): boolean {
   let path: string;

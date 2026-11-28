@@ -1,5 +1,5 @@
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
-import { type AgentInfo, agentDenied, agentGate, agentSession } from './agent-access';
+import { type AgentInfo, agentBadPath, agentDenied, agentGate, agentSession } from './agent-access';
 import { auth, pool, type Session } from './auth';
 
 /** The workspace a request acts in (docs/WORKSPACES.md §3) and the caller's role in it. */
@@ -115,6 +115,7 @@ export async function guard(request: Request, role: 'member' | 'editor' | 'admin
   if (session.user.mustChangePassword && !isImpersonated(session)) return { error: Response.json({ error: 'password_change_required' }, { status: 403 }) };
   const { workspace } = session;
   if (!workspace) return { error: Response.json({ error: 'no_workspace' }, { status: 403 }) };
+  if (session.agent && agentBadPath(new URL(request.url).pathname)) return { error: Response.json({ error: 'bad_path' }, { status: 400 }) };
   if (session.agent && agentDenied(request.method, new URL(request.url).pathname)) return { error: Response.json({ error: 'not_allowed_for_agent' }, { status: 403 }) };
   if ((role === 'admin' && session.user.role !== 'admin') || (role === 'editor' && !isEditor(session.user, workspace.workspaceId))) return { error: Response.json({ error: 'forbidden' }, { status: 403 }) };
   const write = request.method !== 'GET' && request.method !== 'HEAD';
