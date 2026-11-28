@@ -281,6 +281,9 @@ export const USERS = {
   popv: { email: 'popv@e2e.test', name: 'E2E Popular V', role: 'member' },
   // agent-bearer-page.e2e: an Admin whose access token opens the API but never a page.
   agentadm: { email: 'agentadm@e2e.test', name: 'E2E Agent Admin', role: 'admin' },
+  // agent-access.e2e: an Admin who makes and revokes a token in Settings, and a member who sees no entry for it.
+  agentui: { email: 'agentui@e2e.test', name: 'E2E Agent UI', role: 'admin' },
+  agentmem: { email: 'agentmem@e2e.test', name: 'E2E Agent Member', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;

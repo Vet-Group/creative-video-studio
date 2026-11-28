@@ -45,7 +45,7 @@ export function snippet(kind: Snippet, origin: string, token: string): string {
 const SNIPPETS: readonly (readonly [Snippet, string, string])[] = [
   ['claude', 'Claude Code', 'Chạy lệnh này trong terminal. MCP có trong bản cập nhật tới, nên lệnh chưa kết nối được ngay hôm nay.'],
   ['mausbot', 'OpenMausBot', 'Gộp vào mcpServers trong ~/.openmausbot/config.json. MCP có trong bản cập nhật tới, nên mục này chưa kết nối được ngay hôm nay.'],
-  ['rest', 'REST (curl)', 'Dùng được ngay: lệnh này trả về hạn mức của bạn, để kiểm tra khoá.'],
+  ['rest', 'REST', 'Dùng được ngay: lệnh này trả về hạn mức của bạn, để kiểm tra khoá.'],
 ];
 
 /** Copies `text` and reports the result in the note; no clipboard outside a secure context (the LAN address over http). */
