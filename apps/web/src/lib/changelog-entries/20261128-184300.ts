@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-28T15:00:00+07:00',
+  at: '2026-11-28T18:43:00+07:00',
   kind: 'new',
   title: 'Hiệu ứng mở đầu: thêm hai hiệu ứng Giáng sinh',
   details: [

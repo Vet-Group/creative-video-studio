@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-28T15:30:00+07:00',
+  at: '2026-11-28T18:44:00+07:00',
   kind: 'new',
   title: 'Tạo video: hai khung prompt mới cho quần áo',
   details: [

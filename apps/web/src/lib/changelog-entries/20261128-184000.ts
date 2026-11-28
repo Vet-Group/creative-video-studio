@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-28T13:30:00+07:00',
+  at: '2026-11-28T18:40:00+07:00',
   kind: 'new',
   title: 'Tối ưu media kiểm ảnh theo chuẩn sàn và làm ảnh chính Amazon đạt chuẩn',
   details: [

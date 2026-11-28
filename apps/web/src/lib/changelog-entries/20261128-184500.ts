@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-28T16:30:00+07:00',
+  at: '2026-11-28T18:45:00+07:00',
   kind: 'new',
   title: 'Đổi nền: chọn nền có sẵn',
   details: [

@@ -1,7 +1,7 @@
 import type { ChangeEntry } from '../changelog';
 
 export default {
-  at: '2026-11-28T14:30:00+07:00',
+  at: '2026-11-28T18:42:00+07:00',
   kind: 'new',
   title: 'Sửa video: đổi sản phẩm trong video bằng một ảnh',
   details: [
