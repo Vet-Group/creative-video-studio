@@ -85,7 +85,7 @@ const revoked = async (id: string) => (await pool.query('select revoked_at is no
 
 type Pair = { access_token: string; refresh_token: string; token_type: string; expires_in: number };
 /** Registers a client, has the Admin allow it, and returns the code with what the client must send with it. */
-async function approved(o: { cookie?: string; redirect?: string; cap?: string } = {}) {
+async function approved(o: { cookie?: string; redirect?: string } = {}) {
   const client = await json<{ client_id: string }>(await registerClient({ client_name: 'OpenMausBot', redirect_uris: [o.redirect ?? REDIRECT] }, `203.0.113.${100 + (++seq % 100)}`));
   const { verifier, challenge } = pkce();
   const state = `st-${seq}`;
@@ -97,7 +97,6 @@ async function approved(o: { cookie?: string; redirect?: string; cap?: string } 
     code_challenge_method: 'S256',
     response_type: 'code',
     decision: 'allow',
-    cap_usd: o.cap ?? '20',
   });
   expect(res.status).toBe(303);
   const back = new URL(res.headers.get('location')!);
@@ -191,7 +190,7 @@ describe('consent', () => {
   test('a member, a stale sign-in, an unknown redirect and "Từ chối" never get a code; "Cho phép" makes a connection that never expires', async () => {
     const client = await json<{ client_id: string }>(await registerClient({ client_name: 'Claude Code', redirect_uris: [REDIRECT] }));
     const { challenge } = pkce();
-    const fields = { client_id: client.client_id, redirect_uri: REDIRECT, state: 'abc', code_challenge: challenge, code_challenge_method: 'S256', response_type: 'code', cap_usd: '15' };
+    const fields = { client_id: client.client_id, redirect_uri: REDIRECT, state: 'abc', code_challenge: challenge, code_challenge_method: 'S256', response_type: 'code' };
 
     expect((await consent(memberCookie, { ...fields, decision: 'allow' })).status).toBe(403);
     expect((await consent(adminCookie, { ...fields, redirect_uri: 'http://127.0.0.1:43123/elsewhere', decision: 'allow' })).status).toBe(400);
@@ -212,12 +211,11 @@ describe('consent', () => {
     expect(back.origin + back.pathname).toBe(REDIRECT);
     expect(back.searchParams.get('code')).toMatch(/^cvs_oac_/);
     expect([back.searchParams.get('state'), back.searchParams.get('iss')]).toEqual(['abc', ORIGIN]);
-    const row = (await pool.query(`select kind, expires_at, monthly_cap_usd::text as cap, name, oauth_client_id, user_id from api_tokens where oauth_client_id = $1`, [client.client_id])).rows;
-    expect(row).toEqual([{ kind: 'oauth', expires_at: null, cap: '15.0000', name: 'Claude Code', oauth_client_id: client.client_id, user_id: adminId }]);
-    expect((await pool.query(`select new_value from audit_entries where action = 'agent.oauth_consent' and new_value->>'clientId' = $1`, [client.client_id])).rows[0].new_value).toMatchObject({
-      clientName: 'Claude Code',
-      redirectHost: '127.0.0.1:43123',
-    });
+    const row = (await pool.query(`select kind, expires_at, name, oauth_client_id, user_id from api_tokens where oauth_client_id = $1`, [client.client_id])).rows;
+    expect(row).toEqual([{ kind: 'oauth', expires_at: null, name: 'Claude Code', oauth_client_id: client.client_id, user_id: adminId }]);
+    const consented = (await pool.query(`select new_value from audit_entries where action = 'agent.oauth_consent' and new_value->>'clientId' = $1`, [client.client_id])).rows[0].new_value;
+    expect(consented).toMatchObject({ clientName: 'Claude Code', redirectHost: '127.0.0.1:43123' });
+    expect(consented).not.toHaveProperty('capUsd');
   });
 
   test('approving a client pruned or evicted after the form was checked is "gone", with no connection and no server error', async () => {
@@ -225,7 +223,7 @@ describe('consent', () => {
     const check = await checkAuthorize({ client_id: client.client_id, redirect_uri: REDIRECT, state: 's', code_challenge: pkce().challenge, code_challenge_method: 'S256', response_type: 'code' });
     if (check.kind !== 'ok') throw new Error(check.kind);
     await pool.query('delete from oauth_clients where id = $1', [client.client_id]);
-    expect(await approve({ userId: adminId, workspaceId: 'ws_vet', client: check.client, request: check.request, capUsd: '5' })).toBe('gone');
+    expect(await approve({ userId: adminId, workspaceId: 'ws_vet', client: check.client, request: check.request })).toBe('gone');
     expect((await pool.query('select count(*)::int as n from api_tokens where oauth_client_id = $1', [client.client_id])).rows[0].n).toBe(0);
   });
 
@@ -240,7 +238,6 @@ describe('consent', () => {
       code_challenge_method: 'S256',
       response_type: 'code',
       decision: 'allow',
-      cap_usd: '5',
     });
     expect([res.status, (await json(res)).error]).toEqual([400, 'invalid_redirect_uri']);
   });

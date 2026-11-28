@@ -31,7 +31,7 @@ interface JobRow {
   /** ICT month 'YYYY-MM' and date 'YYYY-MM-DD' of the job's Run. */
   month: string;
   day: string;
-  /** The agent connection the job was created through (its rows count toward that connection's cap), or null. */
+  /** The agent connection the job was created through (its rows count toward that connection's month spend), or null. */
   api_token_id: string | null;
 }
 

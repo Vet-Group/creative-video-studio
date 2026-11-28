@@ -1,5 +1,6 @@
 // The paid creates of an agent (lib/agent-access.ts agentPrecheck + agentCharge): a dry run answers 428 with the price and a confirm token, the confirmed
-// call creates once and replays its answer, and the connection's monthly cap and limits hold, against the real routes on a disposable database (compose Postgres).
+// call creates once and replays its answer, the member and company caps and the limits hold (a connection has no cap of its own), against the real routes
+// on a disposable database (compose Postgres).
 import { createHash, randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -33,22 +34,22 @@ const post = (path: string, { body, confirm, token }: Init) =>
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...(confirm && { 'x-cvs-confirm': confirm }) },
     body: JSON.stringify(body),
   });
-type Dry = { error: string; estimateUsd: string | null; confirmToken: string; expiresAt: string; tokenMonth: { usedUsd: string; capUsd: string } };
+type Dry = { error: string; estimateUsd: string | null; confirmToken: string; expiresAt: string; tokenMonth: { usedUsd: string } };
 const json = async <T = Record<string, unknown>>(res: Response) => (await res.clone().json()) as T;
 const count = async (table: string) => (await pool.query(`select count(*)::int as n from ${table}`)).rows[0].n as number;
 
 let seq = 0;
-async function agent(cap = '20'): Promise<{ userId: string; id: string; token: string }> {
+async function agent(): Promise<{ userId: string; id: string; token: string }> {
   const userId = `u-charge-${++seq}`;
   await pool.query(`insert into users (id, email, name, role) values ($1, $2, $1, 'admin')`, [userId, `${userId}@example.test`]);
   await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_vet', $1, 'member') on conflict do nothing`, [userId]);
   for (const [id, mime] of [['img', 'image/png'], ['vid', 'video/mp4']])
     await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, 'f', $3, 1, 'ws_vet')`, [`${id}-${userId}`, userId, mime]);
-  if (oauthKind()) return { userId, ...(await oauthConnection(pool, { userId, capUsd: cap })) };
+  if (oauthKind()) return { userId, ...(await oauthConnection(pool, { userId })) };
   const { id, token, hash } = newPat();
   await pool.query(
-    `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, monthly_cap_usd, expires_at) values ($1, $2, 'ws_vet', 'pat', 'test', $3, $4, now() + interval '30 days')`,
-    [id, userId, hash, cap],
+    `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, expires_at) values ($1, $2, 'ws_vet', 'pat', 'test', $3, now() + interval '30 days')`,
+    [id, userId, hash],
   );
   return { userId, id, token };
 }
@@ -93,7 +94,8 @@ describe('POST /api/jobs by an agent', () => {
     const dry = await run(a);
     expect(dry.status).toBe(428);
     const body = await json<Dry>(dry);
-    expect(body).toMatchObject({ error: 'confirm_required', estimateUsd: '0.2000', tokenMonth: { usedUsd: '0.0000', capUsd: '20.0000' } });
+    expect(body).toMatchObject({ error: 'confirm_required', estimateUsd: '0.2000', tokenMonth: { usedUsd: '0.0000' } });
+    expect(body.tokenMonth).not.toHaveProperty('capUsd');
     expect(await Promise.all(['jobs', 'cost_entries', 'agent_confirms'].map(count))).toEqual(before);
 
     const ok = await run(a, body.confirmToken);
@@ -104,17 +106,20 @@ describe('POST /api/jobs by an agent', () => {
     expect(await tokenMonthSpend(pool, a.id)).toBe('0.2000');
   });
 
-  test('a resent confirm replays the first answer, even past the cap; an edited, expired or repriced confirm is 409', async () => {
+  test("a resent confirm replays the first answer, even past the company's cap; an edited, expired or repriced confirm is 409", async () => {
     const a = await agent();
     const dry = await json<Dry>(await run(a));
     const first = await run(a, dry.confirmToken);
     expect(first.status).toBe(201);
     const rows = await Promise.all(['jobs', 'cost_entries'].map(count));
-    await pool.query(`update api_tokens set monthly_cap_usd = 0 where id = $1`, [a.id]);
-    const again = await run(a, dry.confirmToken);
-    expect([again.status, await json(again)]).toEqual([201, await json(first)]);
-    expect(await Promise.all(['jobs', 'cost_entries'].map(count))).toEqual(rows);
-    await pool.query(`update api_tokens set monthly_cap_usd = 20 where id = $1`, [a.id]);
+    await pool.query('update settings set monthly_cap_usd = 0 where id = 1');
+    try {
+      const again = await run(a, dry.confirmToken);
+      expect([again.status, await json(again)]).toEqual([201, await json(first)]);
+      expect(await Promise.all(['jobs', 'cost_entries'].map(count))).toEqual(rows);
+    } finally {
+      await pool.query('update settings set monthly_cap_usd = 100000 where id = 1');
+    }
 
     const fresh = await json<Dry>(await run(a));
     const edited = await run(a, fresh.confirmToken, { durationSec: 10 });
@@ -136,28 +141,43 @@ describe('POST /api/jobs by an agent', () => {
     }
   });
 
-  test("past the connection's cap the run is 429 token_monthly_usd; a member cap refuses first", async () => {
+  test('a connection past the old 20 USD a month still runs while the caps allow; the member and company caps refuse an agent run', async () => {
     const a = await agent();
     await spent(a, '19.9000');
-    const refused = await run(a);
-    expect([refused.status, await json(refused)]).toEqual([429, { error: 'token_monthly_usd', tokenMonth: { usedUsd: '19.9000', capUsd: '20.0000' } }]);
-    await pool.query('update settings set member_daily_clip_cap = 0 where id = 1');
-    try {
-      const member = await run(a);
-      expect([member.status, (await json(member)).error]).toEqual([429, CAP_MESSAGES.daily_clips]);
-    } finally {
-      await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1');
+    const dry = await run(a);
+    expect(dry.status).toBe(428);
+    expect(await json<Dry>(dry)).toMatchObject({ estimateUsd: '0.2000', tokenMonth: { usedUsd: '19.9000' } });
+    expect((await run(a, (await json<Dry>(dry)).confirmToken)).status).toBe(201);
+    expect(await tokenMonthSpend(pool, a.id)).toBe('20.1000');
+
+    for (const [set, reset, message] of [
+      ['member_daily_clip_cap = 0', 'member_daily_clip_cap = 1000', CAP_MESSAGES.daily_clips],
+      ['monthly_cap_usd = 0', 'monthly_cap_usd = 100000', CAP_MESSAGES.monthly_usd],
+    ] as const) {
+      await pool.query(`update settings set ${set} where id = 1`);
+      try {
+        const refused = await run(a);
+        expect([refused.status, (await json(refused)).error]).toEqual([429, message]);
+      } finally {
+        await pool.query(`update settings set ${reset} where id = 1`);
+      }
     }
   });
 
-  test('five confirmed runs at the cap edge: only those that fit are created', async () => {
-    const a = await agent('0.6');
-    const tokens = [];
-    for (let i = 0; i < 5; i++) tokens.push((await json<Dry>(await run(a))).confirmToken);
-    const answers = await Promise.all(tokens.map((t) => run(a, t)));
-    expect(answers.map((r) => r.status).sort()).toEqual([201, 201, 201, 429, 429]);
-    expect((await pool.query('select count(*)::int as n from jobs where api_token_id = $1', [a.id])).rows[0].n).toBe(3);
-    expect(await tokenMonthSpend(pool, a.id)).toBe('0.6000');
+  test("five confirmed runs at the edge of the member's daily clip cap: only those that fit are created", async () => {
+    const a = await agent();
+    await pool.query('update settings set member_daily_clip_cap = 3 where id = 1');
+    try {
+      const tokens = [];
+      for (let i = 0; i < 5; i++) tokens.push((await json<Dry>(await run(a))).confirmToken);
+      const answers = await Promise.all(tokens.map((t) => run(a, t)));
+      expect(answers.map((r) => r.status).sort()).toEqual([201, 201, 201, 429, 429]);
+      expect((await json(answers.find((r) => r.status === 429)!)).error).toBe(CAP_MESSAGES.daily_clips);
+      expect((await pool.query('select count(*)::int as n from jobs where api_token_id = $1', [a.id])).rows[0].n).toBe(3);
+      expect(await tokenMonthSpend(pool, a.id)).toBe('0.6000');
+    } finally {
+      await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1');
+    }
   });
 
   test('a fal balance too low refuses the dry run as it would the real run, from the same cached balance', async () => {
@@ -262,11 +282,6 @@ describe('the other paid creates', () => {
     expect(queued.status).toBe(202);
     const runId = (await json<{ id: string }>(queued)).id;
     expect((await pool.query('select api_token_id from suggestion_runs where id = $1', [runId])).rows[0].api_token_id).toBe(a.id);
-
-    // An LLM route has no upfront price: at the cap it is refused outright.
-    await pool.query(`update api_tokens set monthly_cap_usd = $2 where id = $1`, [a.id, remakeDry.estimateUsd]);
-    const full = await suggestions.POST(post('/api/suggestions', { token: a.token, body: suggestBody }));
-    expect([full.status, (await json(full)).error]).toEqual([429, 'token_monthly_usd']);
   });
 
   test("a custom app's Run is confirmed by the inner /api/jobs and replays the same job", async () => {
@@ -308,9 +323,9 @@ test('tokenMonthSpend counts the ICT month: 23:59 on the last day and 00:00 on t
   expect(await tokenMonthSpend(pool, a.id, new Date('2026-10-31T17:00:00Z'))).toBe('2.2500');
 });
 
-test('the spend of three successive access tokens of one OAuth connection adds up under its one cap', async () => {
+test('the spend of three successive access tokens of one OAuth connection adds up on that one connection', async () => {
   const a = await agent();
-  const c = await oauthConnection(pool, { userId: a.userId, capUsd: '0.6' });
+  const c = await oauthConnection(pool, { userId: a.userId });
   const { refresh } = await import('@/lib/oauth');
   let refreshToken = c.refreshToken;
   for (let i = 0; i < 3; i++) {
@@ -320,7 +335,7 @@ test('the spend of three successive access tokens of one OAuth connection adds u
   }
   expect(await tokenMonthSpend(pool, c.id)).toBe('0.6000');
   const fourth = await refresh({ grant_type: 'refresh_token', refresh_token: refreshToken }, c.clientId);
-  const refused = await run({ userId: a.userId, token: fourth.access_token });
-  expect([refused.status, (await json<Dry>(refused)).error]).toEqual([429, 'token_monthly_usd']);
+  const dry = await run({ userId: a.userId, token: fourth.access_token });
+  expect([dry.status, (await json<Dry>(dry)).tokenMonth]).toEqual([428, { usedUsd: '0.6000' }]);
   expect((await pool.query('select expires_at from api_tokens where id = $1', [c.id])).rows[0].expires_at).toBeNull();
 });

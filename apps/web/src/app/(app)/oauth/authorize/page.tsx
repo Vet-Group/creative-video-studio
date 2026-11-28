@@ -26,7 +26,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
  * The OAuth consent page of an MCP client (lib/oauth.ts, docs/AGENT-ACCESS.md "OAuth"). A signed-out visitor comes here through /login with the full
  * query (the app layout). An unknown client or a redirect it did not register gets an error page, never a redirect; a bad request from a known client and
  * a non-Admin go back to the client with the error. The Admin sees the client's self-declared name and the host it returns to on their own lines, the
- * workspace and the monthly cap, then Allow or Deny (POST /api/oauth/authorize).
+ * workspace, then Allow or Deny (POST /api/oauth/authorize).
  */
 export default async function OAuthAuthorizePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
@@ -93,15 +93,6 @@ export default async function OAuthAuthorizePage({ searchParams }: { searchParam
         {Object.entries(params).map(([k, v]) => (
           <input key={k} type="hidden" name={k} value={v} />
         ))}
-        {fresh && (
-          <>
-            <label htmlFor="oauth-cap">Hạn mức mỗi tháng (USD)</label>
-            <input id="oauth-cap" name="cap_usd" type="number" inputMode="decimal" min={0} max={1000} step="0.01" defaultValue="20" required aria-describedby="oauth-cap-hint" />
-            <p className="pw-hint" id="oauth-cap-hint">
-              Chi qua kết nối này chạm hạn mức thì ứng dụng không chạy thêm việc tốn tiền. Đặt lại vào ngày 1 hằng tháng.
-            </p>
-          </>
-        )}
         {!fresh && (
           <p className="error" role="alert">
             Vì an toàn, hãy đăng nhập lại rồi cho phép.

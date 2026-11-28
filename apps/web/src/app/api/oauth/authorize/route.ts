@@ -1,4 +1,3 @@
-import { money } from '@/lib/admin';
 import { TOKEN_CREATE_FRESH_MS, tokenAdmin } from '@/lib/agent-access';
 import { approve, backTo, checkAuthorize, publicOrigin } from '@/lib/oauth';
 
@@ -6,8 +5,8 @@ const AUTHORIZE_PARAMS = ['client_id', 'redirect_uri', 'state', 'code_challenge'
 
 /**
  * The consent form of /oauth/authorize (an HTML form POST): an Admin's own cookie session sent from this app (tokenAdmin), never an agent (the deny set
- * covers /api/oauth). Deny goes back with error=access_denied; Allow needs a sign-in of the last 10 minutes, makes the connection under the
- * chosen cap and goes back with the code. The authorize parameters are checked again here, as the page checked them.
+ * covers /api/oauth). Deny goes back with error=access_denied; Allow needs a sign-in of the last 10 minutes, makes the connection and goes
+ * back with the code. The authorize parameters are checked again here, as the page checked them.
  */
 export async function POST(request: Request) {
   if (process.env.CVS_AGENT_API === '0') return Response.json({ error: 'agent_api_off' }, { status: 503 });
@@ -25,9 +24,7 @@ export async function POST(request: Request) {
   for (const [k, v] of Object.entries(params)) page.searchParams.set(k, v);
   // A stale sign-in goes back to the page, which asks for a new one.
   if (Date.now() - new Date(g.session.session.createdAt).getTime() > TOKEN_CREATE_FRESH_MS) return Response.redirect(page, 303);
-  const capUsd = money(form.get('cap_usd'));
-  if (capUsd === null || Number(capUsd) > 1000) return Response.json({ error: 'capUsd must be 0 to 1000' }, { status: 400 });
-  const made = await approve({ userId: g.session.user.id, workspaceId: g.workspaceId, client, request: asked, capUsd });
+  const made = await approve({ userId: g.session.user.id, workspaceId: g.workspaceId, client, request: asked });
   // The page then finds no client and says the registration has expired.
   if (made === 'gone') return Response.redirect(page, 303);
   if (made === 'too_many') {

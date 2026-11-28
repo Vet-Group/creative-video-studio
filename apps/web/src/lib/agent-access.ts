@@ -1,6 +1,6 @@
 // Agent access (the "Connect AI" settings section): a personal access token (or, later, an OAuth connection) acts as its creator in one workspace. `guard()` is the only place an
 // agent identity is accepted (lib/session.ts): pages and currentUser never read it. Every agent write needs a single-use confirm token bound to the exact
-// request; a paid create also checks the connection's monthly USD cap under the connection's lock, in the transaction that spends.
+// request; a paid create goes through the same team and company caps as a browser Run and takes the connection's lock in the transaction that spends.
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { audit } from '@cvs/core/audit';
@@ -30,7 +30,6 @@ const MAX_CONFIRM_BODY = 1_000_000;
 const ALNUM = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 const sha256 = (data: string | Uint8Array) => createHash('sha256').update(data).digest();
-const units = (usd: string) => Math.round(Number(usd) * 10_000);
 const fail = (error: string, status: number) => Response.json({ error }, { status });
 
 /** The 12-character public id of a connection (api_tokens.id). */
@@ -43,21 +42,23 @@ export function newPat(): { id: string; token: string; hash: Buffer } {
   return { id, token, hash: sha256(token) };
 }
 
-/** Creates a PAT connection for `userId` in `workspaceId`; 'too_many' when the user already holds MAX_ACTIVE_TOKENS active ones. The secret is returned once. */
-export async function createPat(i: { userId: string; workspaceId: string; name: string; days: (typeof PAT_DAYS)[number]; capUsd?: string }) {
-  return withTransaction(pool, async (tx): Promise<{ id: string; token: string; expiresAt: string } | 'too_many'> => {
+/**
+ * Creates a PAT connection for `userId` in `workspaceId` that expires after `days`, or never (null); 'too_many' when the user already holds
+ * MAX_ACTIVE_TOKENS active ones. The secret is returned once.
+ */
+export async function createPat(i: { userId: string; workspaceId: string; name: string; days: (typeof PAT_DAYS)[number] | null }) {
+  return withTransaction(pool, async (tx): Promise<{ id: string; token: string; expiresAt: string | null } | 'too_many'> => {
     await tx.query(`select pg_advisory_xact_lock(hashtext('agent-create:' || $1))`, [i.userId]);
     const active = (await tx.query(`select count(*)::int as n from api_tokens where user_id = $1 and revoked_at is null and (expires_at is null or expires_at > now())`, [i.userId])).rows[0].n;
     if (active >= MAX_ACTIVE_TOKENS) return 'too_many';
     const { id, token, hash } = newPat();
-    const capUsd = i.capUsd ?? '20';
     const expiresAt = (
       await tx.query(
-        `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, monthly_cap_usd, expires_at) values ($1, $2, $3, 'pat', $4, $5, $6, now() + $7 * interval '1 day') returning expires_at`,
-        [id, i.userId, i.workspaceId, i.name, hash, capUsd, i.days],
+        `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, expires_at) values ($1, $2, $3, 'pat', $4, $5, now() + $6::int * interval '1 day') returning expires_at`,
+        [id, i.userId, i.workspaceId, i.name, hash, i.days],
       )
-    ).rows[0].expires_at.toISOString();
-    await audit(tx, { actorId: i.userId, action: 'agent.token_create', target: `api_token:${id}`, newValue: { kind: 'pat', name: i.name, workspaceId: i.workspaceId, expiresAt, capUsd } });
+    ).rows[0].expires_at?.toISOString() ?? null;
+    await audit(tx, { actorId: i.userId, action: 'agent.token_create', target: `api_token:${id}`, newValue: { kind: 'pat', name: i.name, workspaceId: i.workspaceId, expiresAt } });
     return { id, token, expiresAt };
   });
 }
@@ -397,9 +398,9 @@ async function replay(q: Queryable, nonce: string, tokenId: string): Promise<Res
 }
 
 /**
- * The first step of a paid create (POST /api/jobs, /api/remakes, /api/analyses, /api/suggestions), before any estimate or cap work: null for a cookie
+ * The first step of a paid create (POST /api/jobs, /api/remakes, /api/analyses, /api/suggestions), before any estimate work: null for a cookie
  * session; a 409 for a confirm token that does not match this request or has expired; the stored first answer when its nonce was already spent (no new
- * work, even past the cap); else the call to hand to agentCharge.
+ * work); else the call to hand to agentCharge.
  */
 export async function agentPrecheck(g: { session: RequestSession }, request: Request, body: unknown): Promise<AgentCall | Response | null> {
   const agent = g.session.agent;
@@ -417,8 +418,8 @@ export async function agentPrecheck(g: { session: RequestSession }, request: Req
 
 /**
  * The last step of a paid create before its insert, in the route's transaction and after the route's own lock (so the lock order is the same everywhere):
- * takes the connection's lock, refuses past its monthly cap (429 token_monthly_usd: spend + estimate over the cap, or spend at the cap for an LLM route
- * with no upfront price), answers a dry run with 428 and a confirm token for this estimate (nothing is written), refuses a confirm for another price
+ * takes the connection's lock, answers a dry run with 428, a confirm token for this estimate and the connection's spend this month (nothing is
+ * written), refuses a confirm for another price
  * (409 confirm_stale with a fresh token), and else spends the nonce with `result`, the answer the route gives, to replay to a resend. Null goes on.
  */
 export async function agentCharge(tx: Queryable, call: AgentCall | null, estimate: string | number | null, result: { status: number; body: unknown }): Promise<Response | null> {
@@ -428,20 +429,12 @@ export async function agentCharge(tx: Queryable, call: AgentCall | null, estimat
   const done = call.confirm && (await replay(tx, call.confirm.nonce, call.tokenId));
   if (done) return done === 'confirm_used' ? fail(done, 409) : done;
   const price = estimate === null ? '-' : Number(estimate).toFixed(4);
-  const capUsd: string = (await tx.query('select monthly_cap_usd::text as cap from api_tokens where id = $1', [call.tokenId])).rows[0].cap;
-  const usedUsd = await tokenMonthSpend(tx, call.tokenId);
-  const tokenMonth = { usedUsd, capUsd };
-  // Fail closed: a NaN anywhere refuses.
-  if (!(price === '-' ? units(usedUsd) < units(capUsd) : units(usedUsd) + units(price) <= units(capUsd))) {
-    console.warn(`agent.cap_refused ${JSON.stringify({ tokenId: call.tokenId, usedUsd, capUsd })}`);
-    return Response.json({ error: 'token_monthly_usd', tokenMonth }, { status: 429 });
-  }
-  const fresh = (error: string) => ({ error, estimateUsd: price === '-' ? null : price, ...signConfirm(call, price), tokenMonth });
+  const fresh = async (error: string) => ({ error, estimateUsd: price === '-' ? null : price, ...signConfirm(call, price), tokenMonth: { usedUsd: await tokenMonthSpend(tx, call.tokenId) } });
   if (!call.confirm) {
     const wait = limited(`dry:${call.tokenId}`, 30);
-    return wait ? tooMany(wait) : Response.json(fresh('confirm_required'), { status: 428 });
+    return wait ? tooMany(wait) : Response.json(await fresh('confirm_required'), { status: 428 });
   }
-  if (call.confirm.estimate !== price) return Response.json(fresh('confirm_stale'), { status: 409 });
+  if (call.confirm.estimate !== price) return Response.json(await fresh('confirm_stale'), { status: 409 });
   const wait = limited(`paid:${call.tokenId}`, 10);
   if (wait) return tooMany(wait);
   await tx.query('insert into agent_confirms (nonce, api_token_id, method, path, result_status, result_body) values ($1, $2, $3, $4, $5, $6::jsonb)', [

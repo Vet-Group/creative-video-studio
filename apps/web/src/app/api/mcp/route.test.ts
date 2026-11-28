@@ -35,7 +35,7 @@ async function agent(): Promise<{ userId: string; id: string; token: string; ema
   await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, 'f', 'image/png', 1, 'ws_vet')`, [`img-${userId}`, userId]);
   const { id, token, hash } = newPat();
   await pool.query(
-    `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, monthly_cap_usd, expires_at) values ($1, $2, 'ws_vet', 'pat', 'mcp test', $3, 20, now() + interval '30 days')`,
+    `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, expires_at) values ($1, $2, 'ws_vet', 'pat', 'mcp test', $3, now() + interval '30 days')`,
     [id, userId, hash],
   );
   return { userId, id, token, email };
@@ -100,7 +100,8 @@ describe('/api/mcp', () => {
     const init = await post({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: LEGACY, capabilities: {}, clientInfo: { name: 'test', version: '1' } } }, auth(a.token));
     expect(init.rpc.result!.protocolVersion).toBe(LEGACY);
     const legacy = await out(legacyCall(a.token, 'whoami'));
-    expect(legacy.structuredContent).toMatchObject({ user: { email: a.email, role: 'admin' }, workspace: { workspaceId: 'ws_vet' }, connection: { id: a.id, name: 'mcp test', kind: 'pat' }, tokenMonth: { capUsd: '20.0000' } });
+    expect(legacy.structuredContent).toMatchObject({ user: { email: a.email, role: 'admin' }, workspace: { workspaceId: 'ws_vet' }, connection: { id: a.id, name: 'mcp test', kind: 'pat' }, tokenMonth: { usedUsd: '0.0000' } });
+    expect((legacy.structuredContent as { tokenMonth: object }).tokenMonth).not.toHaveProperty('capUsd');
     const modern = await modernCall(a.token, 'whoami');
     expect(modern.status).toBe(200);
     expect(modern.rpc.result!.structuredContent).toMatchObject({ user: { email: a.email }, connection: { id: a.id } });

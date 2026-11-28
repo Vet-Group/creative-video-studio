@@ -54,7 +54,7 @@ const patch = (cookie: string, id: string, body: unknown) => one.PATCH(req(`/api
 const errorOf = async (res: Response) => ((await res.clone().json()) as { error: string }).error;
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 const audits = async (action: string) => (await pool.query('select actor_id, target, new_value from audit_entries where action = $1 order by id', [action])).rows;
-type Row = { id: string; name: string; owner: { id: string }; mine: boolean; status: string; paused: boolean; capUsd: string; monthSpendUsd: string; expiresAt: string };
+type Row = { id: string; name: string; owner: { id: string }; mine: boolean; status: string; paused: boolean; monthSpendUsd: string; expiresAt: string };
 
 let admin: string, other: string;
 let adminCookie = '', otherCookie = '', memberCookie = '';
@@ -97,7 +97,7 @@ describe('who may use the routes', () => {
 
 describe('creating, listing, changing and revoking', () => {
   test('the secret is answered once and never listed; the token works as Bearer but not on these routes', async () => {
-    const res = await create(adminCookie, { name: '  Claude Code  ', days: 7, capUsd: 5 });
+    const res = await create(adminCookie, { name: '  Claude Code  ', days: 7 });
     expect(res.status).toBe(201);
     expect(res.headers.get('cache-control')).toBe('no-store');
     const made = (await res.json()) as { id: string; token: string; expiresAt: string };
@@ -108,7 +108,8 @@ describe('creating, listing, changing and revoking', () => {
     expect(text).not.toContain(made.token);
     expect(text).not.toContain(made.token.slice(-43));
     const row = (JSON.parse(text) as { enabled: boolean; tokens: Row[] }).tokens.find((t) => t.id === made.id)!;
-    expect(row).toMatchObject({ name: 'Claude Code', mine: true, status: 'active', paused: false, capUsd: '5.0000', monthSpendUsd: '0.0000' });
+    expect(row).toMatchObject({ name: 'Claude Code', mine: true, status: 'active', paused: false, monthSpendUsd: '0.0000' });
+    expect(row).not.toHaveProperty('capUsd');
 
     expect((await limits(new Request(`${ORIGIN}/api/me/limits`, { headers: bearer(made.token) }))).status).toBe(200);
     const asAgent = await tokens.GET(new Request(`${ORIGIN}/api/agent-access/tokens`, { headers: bearer(made.token) }));
@@ -124,25 +125,35 @@ describe('creating, listing, changing and revoking', () => {
   test('bad input is refused', async () => {
     expect(await errorOf(await create(adminCookie, { name: '' }))).toBe('name must have 1 to 60 characters');
     expect(await errorOf(await create(adminCookie, { name: 'x'.repeat(61) }))).toBe('name must have 1 to 60 characters');
-    expect(await errorOf(await create(adminCookie, { name: 'x', days: 14 }))).toBe('days must be 7, 30 or 90');
-    expect(await errorOf(await create(adminCookie, { name: 'x', capUsd: 1000.01 }))).toBe('capUsd must be 0 to 1000');
-    expect(await errorOf(await create(adminCookie, { name: 'x', capUsd: -1 }))).toBe('capUsd must be 0 to 1000');
+    for (const days of [14, 0, '30', 'never', false]) expect(await errorOf(await create(adminCookie, { name: 'x', days }))).toBe('days must be 7, 30, 90 or null');
   });
 
-  test('a cap that is not a plain number from 0 to 1000 is refused on create and change', async () => {
-    const made = (await (await create(adminCookie, { name: 'nan' })).json()) as { id: string };
-    for (const capUsd of ['NaN', 'Infinity', '-0.5', '1e3', ' ', null, true]) {
-      expect(await errorOf(await create(adminCookie, { name: 'x', capUsd }))).toBe('capUsd must be 0 to 1000');
-      expect(await errorOf(await patch(adminCookie, made.id, { capUsd }))).toBe('capUsd must be 0 to 1000');
+  test("an older client's capUsd is ignored on create, and a change of only capUsd is refused: a connection has no cap of its own", async () => {
+    for (const capUsd of [5, 'NaN', 2000, null]) {
+      const res = await create(adminCookie, { name: `old client ${capUsd}`, capUsd });
+      expect(res.status).toBe(201);
+      const { id } = (await res.json()) as { id: string };
+      expect((await pool.query('select * from api_tokens where id = $1', [id])).rows[0]).not.toHaveProperty('monthly_cap_usd');
+      expect(await errorOf(await patch(adminCookie, id, { capUsd }))).toBe('give name');
     }
-    expect((await pool.query('select monthly_cap_usd::text as cap from api_tokens where id = $1', [made.id])).rows[0].cap).toBe('20.0000');
   });
 
-  test('the defaults are 30 days and 20 USD, and an 11th active token is refused', async () => {
+  test('days null makes a token that never expires: it works, is listed active with no expiry, and the audit row says so', async () => {
+    const res = await create(adminCookie, { name: 'forever', days: null });
+    expect(res.status).toBe(201);
+    const made = (await res.json()) as { id: string; token: string; expiresAt: string | null };
+    expect(made.expiresAt).toBeNull();
+    expect((await pool.query('select expires_at from api_tokens where id = $1', [made.id])).rows[0].expires_at).toBeNull();
+    expect((await limits(new Request(`${ORIGIN}/api/me/limits`, { headers: bearer(made.token) }))).status).toBe(200);
+    const row = ((await (await list(adminCookie)).json()) as { tokens: Row[] }).tokens.find((t) => t.id === made.id);
+    expect(row).toMatchObject({ status: 'active', expiresAt: null });
+    expect((await audits('agent.token_create')).at(-1)).toMatchObject({ target: `api_token:${made.id}`, new_value: { expiresAt: null } });
+  });
+
+  test('the default is 30 days, and an 11th active token is refused', async () => {
     const res = await create(otherCookie, { name: 'first' });
     const made = (await res.json()) as { id: string; expiresAt: string };
     expect(Math.round((new Date(made.expiresAt).getTime() - Date.now()) / 86_400_000)).toBe(30);
-    expect((await pool.query('select monthly_cap_usd::text as cap from api_tokens where id = $1', [made.id])).rows[0].cap).toBe('20.0000');
     for (let i = 2; i <= 10; i++) expect((await create(otherCookie, { name: `t${i}` })).status).toBe(201);
     const eleventh = await create(otherCookie, { name: 't11' });
     expect([eleventh.status, await errorOf(eleventh)]).toEqual([409, 'too_many_tokens']);
@@ -164,31 +175,30 @@ describe('creating, listing, changing and revoking', () => {
     const after = (await (await list(adminCookie)).json()) as { tokens: Row[] };
     expect(after.tokens.at(-1)).toMatchObject({ id: made.id, status: 'revoked' });
     expect((await revoke(otherCookie, 'nope')).status).toBe(404);
-    expect((await patch(otherCookie, made.id, { capUsd: 3 })).status).toBe(409);
+    expect((await patch(otherCookie, made.id, { name: 'late' })).status).toBe(409);
   });
 
-  test('renaming and a new cap are saved and audited; bad values are refused', async () => {
-    const made = (await (await create(adminCookie, { name: 'cap me' })).json()) as { id: string };
-    expect(await errorOf(await patch(adminCookie, made.id, {}))).toBe('give name or capUsd');
-    expect(await errorOf(await patch(adminCookie, made.id, { capUsd: 2000 }))).toBe('capUsd must be 0 to 1000');
+  test('a rename is saved and audited, a capUsd beside it is ignored; bad values are refused', async () => {
+    const made = (await (await create(adminCookie, { name: 'rename me' })).json()) as { id: string };
+    expect(await errorOf(await patch(adminCookie, made.id, {}))).toBe('give name');
     expect(await errorOf(await patch(adminCookie, made.id, { name: ' ' }))).toBe('name must have 1 to 60 characters');
     const res = await patch(adminCookie, made.id, { name: 'Renamed', capUsd: '7.5' });
-    expect(await res.json()).toEqual({ id: made.id, name: 'Renamed', capUsd: '7.5000' });
+    expect(await res.json()).toEqual({ id: made.id, name: 'Renamed' });
     expect((await audits('agent.token_update')).at(-1)).toMatchObject({
       actor_id: admin,
       target: `api_token:${made.id}`,
-      new_value: { name: 'Renamed', capUsd: '7.5000' },
+      new_value: { name: 'Renamed', ownerId: admin },
     });
-    expect((await patch(adminCookie, 'nope', { capUsd: 1 })).status).toBe(404);
+    expect((await patch(adminCookie, 'nope', { name: 'x' })).status).toBe(404);
   });
 
   test("another Admin's change to a connection is audited with the connection's owner", async () => {
     const made = (await (await create(adminCookie, { name: 'owned' })).json()) as { id: string };
-    expect((await patch(otherCookie, made.id, { capUsd: '4' })).status).toBe(200);
+    expect((await patch(otherCookie, made.id, { name: 'owned too' })).status).toBe(200);
     expect((await audits('agent.token_update')).at(-1)).toEqual({
       actor_id: other,
       target: `api_token:${made.id}`,
-      new_value: { name: 'owned', capUsd: '4.0000', ownerId: admin },
+      new_value: { name: 'owned too', ownerId: admin },
     });
   });
 

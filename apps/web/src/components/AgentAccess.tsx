@@ -1,11 +1,10 @@
 'use client';
 // Settings > "Connect AI" (Admins only): an AI tool (Claude Code, OpenMausBot) connects by signing in (OAuth, lib/oauth.ts) or with a personal access
-// token, and either way acts as the Admin under its own monthly cap (lib/agent-access.ts). A token's secret is shown once, right after it is made, and is
+// token, and either way acts as the Admin under the same team and company caps (lib/agent-access.ts). A token's secret is shown once, right after it is made, and is
 // gone when this section closes; an app that signed in is listed with its name and ended with Disconnect.
 import { type FormEvent, useCallback, useEffect, useId, useState } from 'react';
 import { ApiError, api, sendJson, startSignOut } from '@/lib/api';
 import { sessionTime } from '@/lib/account-security';
-import { levelOf, shareOf } from '@/lib/profile';
 import { loginFor } from '@/lib/return-to';
 import { passkeyDate } from '@/lib/sign-in-methods';
 import { confirmDialog } from './Confirm';
@@ -26,7 +25,6 @@ export interface AgentToken {
   lastUsedIp: string | null;
   status: 'active' | 'paused' | 'revoked' | 'expired';
   paused: boolean;
-  capUsd: string;
   monthSpendUsd: string;
 }
 export type Created = { name: string; token: string; origin: string };
@@ -156,60 +154,15 @@ export function ShowOnce({ created, note, onCopy, onClose }: { created: Created;
   );
 }
 
-/** One token's spend this month against its cap, as the Limits section draws a cap. */
-function Spend({ used, cap }: { used: string; cap: string }) {
-  const share = shareOf(Number(used), Number(cap));
-  const text = `${usd(used)} / ${usd(cap)}`;
+/** One token's spend this month, as the Limits section heads a meter. */
+function Spend({ used }: { used: string }) {
   return (
-    <div className="meter agent-spend" data-level={levelOf(share)}>
+    <div className="meter agent-spend">
       <div className="meter-head">
-        <span>Chi tháng này</span>
-        <strong>{text}</strong>
-      </div>
-      <div className="meter-track" role="meter" aria-label="Chi tháng này" aria-valuemin={0} aria-valuemax={Number(cap)} aria-valuenow={Math.min(Number(used), Number(cap))} aria-valuetext={text}>
-        <span style={{ width: `${share * 100}%` }} />
+        <span>Đã chi tháng này</span>
+        <strong>{usd(used)}</strong>
       </div>
     </div>
-  );
-}
-
-/** The inline form that sets a token's monthly cap. */
-function CapForm({ token, onSaved, onCancel }: { token: AgentToken; onSaved: () => void; onCancel: () => void }) {
-  const [cap, setCap] = useState(String(Number(token.capUsd)));
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const id = useId();
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    const n = Number(cap);
-    if (cap.trim() === '' || !(n >= 0 && n <= 1000)) return setError('Hạn mức là số từ 0 đến 1000.');
-    setBusy(true);
-    try {
-      await api(`/api/agent-access/tokens/${token.id}`, sendJson('PATCH', { capUsd: n }));
-      onSaved();
-    } catch {
-      setError('Không lưu được hạn mức. Hãy thử lại.');
-      setBusy(false);
-    }
-  }
-  return (
-    <form className="pw-form agent-cap" onSubmit={save} noValidate>
-      <label htmlFor={`${id}-cap`}>Hạn mức mỗi tháng (USD)</label>
-      <input id={`${id}-cap`} type="number" inputMode="decimal" min={0} max={1000} step="0.01" autoFocus value={cap} onChange={(e) => setCap(e.target.value)} />
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="tf-buttons">
-        <button type="submit" className="pw-submit" disabled={busy}>
-          {busy ? 'Đang lưu...' : 'Lưu'}
-        </button>
-        <button type="button" onClick={onCancel}>
-          Huỷ
-        </button>
-      </div>
-    </form>
   );
 }
 
@@ -217,19 +170,13 @@ function CapForm({ token, onSaved, onCancel }: { token: AgentToken; onSaved: () 
 export function TokenList({
   tokens,
   all,
-  editing,
   onRetry,
-  onEdit,
   onRevoke,
-  onSaved,
 }: {
   tokens: AgentToken[] | null | 'failed';
   all: boolean;
-  editing: string | null;
   onRetry: () => unknown;
-  onEdit: (id: string | null) => void;
   onRevoke: (token: AgentToken) => void;
-  onSaved: () => void;
 }) {
   if (tokens === 'failed') return <LoadError text="Không tải được danh sách khoá." onRetry={onRetry} />;
   if (!tokens)
@@ -257,6 +204,7 @@ export function TokenList({
                 Tạo {passkeyDate(t.createdAt)}
                 {t.expiresAt && ` · ${t.status === 'expired' ? 'Đã hết hạn' : 'Hết hạn'} ${passkeyDate(t.expiresAt)}`}
                 {app && ' · Không hết hạn khi còn dùng'}
+                {!app && !t.expiresAt && ' · Không hết hạn'}
               </span>
               <span>{t.lastUsedAt ? `Dùng lần cuối ${sessionTime(t.lastUsedAt)}${t.lastUsedIp ? ` từ ${t.lastUsedIp}` : ''}` : 'Chưa dùng lần nào'}</span>
             </span>
@@ -264,18 +212,14 @@ export function TokenList({
               {STATUS[t.status]}
             </span>
             {t.paused && live && <p className="agent-paused">Đang tạm dừng: chủ khoá không còn là Admin.</p>}
-            <Spend used={t.monthSpendUsd} cap={t.capUsd} />
-            {live && editing !== t.id && (
+            <Spend used={t.monthSpendUsd} />
+            {live && (
               <div className="agent-actions">
-                <button type="button" aria-label={`Sửa hạn mức của ${app ? 'kết nối' : 'khoá'} ${t.name}`} onClick={() => onEdit(t.id)}>
-                  Sửa hạn mức
-                </button>
                 <button type="button" className="agent-revoke" aria-label={app ? `Ngắt kết nối ${t.name}` : `Thu hồi khoá ${t.name}`} onClick={() => onRevoke(t)}>
                   {app ? 'Ngắt kết nối' : 'Thu hồi'}
                 </button>
               </div>
             )}
-            {live && editing === t.id && <CapForm token={t} onSaved={onSaved} onCancel={() => onEdit(null)} />}
           </li>
         );
       })}
@@ -294,10 +238,8 @@ export function AgentAccess() {
   const [tokens, setTokens] = useState<AgentToken[] | null | 'failed'>(null);
   const [enabled, setEnabled] = useState(true);
   const [all, setAll] = useState(false);
-  const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState('');
-  const [days, setDays] = useState<(typeof DAYS)[number]>(30);
-  const [cap, setCap] = useState('20');
+  const [days, setDays] = useState<(typeof DAYS)[number] | null>(30);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | 'reauth'>('');
   const [listError, setListError] = useState('');
@@ -324,13 +266,11 @@ export function AgentAccess() {
 
   async function create(e: FormEvent) {
     e.preventDefault();
-    const n = Number(cap);
     if (!name.trim()) return setError('Hãy đặt tên cho khoá.');
-    if (cap.trim() === '' || !(n >= 0 && n <= 1000)) return setError('Hạn mức là số từ 0 đến 1000.');
     setBusy(true);
     setError('');
     try {
-      const made = await api<{ token: string }>('/api/agent-access/tokens', sendJson('POST', { name: name.trim(), days, capUsd: n }));
+      const made = await api<{ token: string }>('/api/agent-access/tokens', sendJson('POST', { name: name.trim(), days }));
       setCreated({ name: name.trim(), token: made.token, origin: window.location.origin });
       setNote('');
       setName('');
@@ -368,7 +308,7 @@ export function AgentAccess() {
     <>
       <p className="settings-note agent-intro">
         Cho Claude Code, OpenMausBot hay một script dùng CVS bằng tài khoản của bạn: xem hạn mức, tải ảnh lên, chạy việc. Việc tốn tiền và phần lớn thay đổi cần AI xác nhận thêm một
-        bước, và mỗi kết nối có hạn mức chi riêng mỗi tháng. Kết nối không đổi được mật khẩu, người dùng hay khoá khác. Đổi mật khẩu hay đăng xuất mọi thiết bị khác sẽ ngắt mọi kết nối của bạn.
+        bước. Việc tốn tiền vẫn tính vào hạn mức của team như khi dùng trên web. Kết nối không đổi được mật khẩu, người dùng hay khoá khác. Đổi mật khẩu hay đăng xuất mọi thiết bị khác sẽ ngắt mọi kết nối của bạn.
       </p>
       {!enabled && <p className="settings-note">Kết nối AI đang tạm tắt.</p>}
       {enabled && !created && (
@@ -400,28 +340,24 @@ export function AgentAccess() {
               Đặt theo nơi dùng, ví dụ Claude Code trên máy văn phòng. Tối đa 60 ký tự.
             </p>
             <label htmlFor={`${id}-days`}>Hạn dùng</label>
-            <select id={`${id}-days`} value={days} onChange={(e) => setDays(Number(e.target.value) as (typeof DAYS)[number])}>
+            <select
+              id={`${id}-days`}
+              value={days ?? 'never'}
+              aria-describedby={days === null ? `${id}-days-hint` : undefined}
+              onChange={(e) => setDays(e.target.value === 'never' ? null : (Number(e.target.value) as (typeof DAYS)[number]))}
+            >
               {DAYS.map((d) => (
                 <option key={d} value={d}>
                   {d} ngày
                 </option>
               ))}
+              <option value="never">Không hết hạn</option>
             </select>
-            <label htmlFor={`${id}-cap`}>Hạn mức mỗi tháng (USD)</label>
-            <input
-              id={`${id}-cap`}
-              type="number"
-              inputMode="decimal"
-              min={0}
-              max={1000}
-              step="0.01"
-              aria-describedby={`${id}-cap-hint`}
-              value={cap}
-              onChange={(e) => setCap(e.target.value)}
-            />
-            <p className="pw-hint" id={`${id}-cap-hint`}>
-              Chi qua khoá này chạm hạn mức thì AI không chạy thêm việc tốn tiền. Đặt lại vào ngày 1 hằng tháng.
-            </p>
+            {days === null && (
+              <p className="pw-hint" id={`${id}-days-hint`}>
+                Khoá chỉ mất quyền khi bạn thu hồi nó.
+              </p>
+            )}
             {error === 'reauth' ? (
               <div className="error agent-reauth" role="alert">
                 <span>Vì an toàn, hãy đăng nhập lại rồi tạo khoá.</span>
@@ -462,7 +398,7 @@ export function AgentAccess() {
           {listError}
         </p>
       )}
-      <TokenList tokens={tokens} all={all} editing={editing} onRetry={load} onEdit={setEditing} onRevoke={(t) => void revoke(t)} onSaved={() => (setEditing(null), void load())} />
+      <TokenList tokens={tokens} all={all} onRetry={load} onRevoke={(t) => void revoke(t)} />
     </>
   );
 }
