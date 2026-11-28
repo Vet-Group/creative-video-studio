@@ -14,6 +14,7 @@ import { PRODUCT_TYPES } from '@/lib/product-types';
 import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useHydrated } from '@/lib/use-hydrated';
+import { checkPhoto } from '@/lib/photo-check';
 import { reloadSamples, sampleThumb, samplesFailed, useSamples } from '@/lib/use-samples';
 import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES, MAX_VIDEO_BYTES_R2 } from '@/lib/upload-limits';
 import type { RefVideo } from './ReferenceVideo';
@@ -78,6 +79,24 @@ export function ExampleNote({ images }: { images: { example?: boolean }[] }) {
   return images.some((i) => i.example) ? (
     <p className="help" role="note">
       Đang dùng ảnh của ví dụ. Thay bằng ảnh sản phẩm của bạn.
+    </p>
+  ) : null;
+}
+
+/** Under a photo field: what looks wrong with its photos (too small, too dark), measured in the browser. A warning only: the Run stays the member's call. */
+export function PhotoCheck({ images }: { images: Img[] }) {
+  const [found, setFound] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    let live = true;
+    for (const i of images) if (!i.example) void checkPhoto(i.url ?? `/api/assets/${i.id}/content`).then((w) => live && setFound((f) => (i.id in f ? f : { ...f, [i.id]: w })));
+    return () => {
+      live = false;
+    };
+  }, [images]);
+  const lines = images.filter((i) => found[i.id]?.length).map((i) => `${images.length > 1 ? i.filename : 'Lưu ý'}: ${found[i.id]!.join('; ')}.`);
+  return lines.length > 0 ? (
+    <p className="help" role="status">
+      {lines.join(' ')}
     </p>
   ) : null;
 }
@@ -563,6 +582,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         )}
       </div>
       <ExampleNote images={images} />
+      <PhotoCheck images={images} />
       {cut > 0 && (
         <p className="help" role="status">
           Chỉ lấy {cut} ảnh đầu.
