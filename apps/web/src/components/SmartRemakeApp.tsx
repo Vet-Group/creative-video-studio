@@ -167,7 +167,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
     try {
       const { id } = await api<{ id: string }>('/api/analyses', sendJson('POST', { sourceAssetId: v.id }));
       // The member may have removed or replaced the video meanwhile.
-      if (wanted.current === v.id) setAnalysis({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: v.id });
+      if (wanted.current === v.id) setAnalysis({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: v.id, sourceDurationS: v.durationMs / 1000 || null });
     } catch (e) {
       if (wanted.current === v.id) (setError(errorText(e, 'Không bắt đầu phân tích được.')), setStartFailed(true));
     }

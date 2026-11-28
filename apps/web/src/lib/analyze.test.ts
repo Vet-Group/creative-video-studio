@@ -1,6 +1,21 @@
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { expect, test } from 'vitest';
-import { analysisError, analysisFormat, clock, frameTime, frameTimes, mergeShots, roleLabel, scriptPrompt, scriptText, sharpness, timeRange } from './analyze';
+import { runProgress, waitLabel } from './explore';
+import { analysisError, analysisFormat, analysisRun, clock, frameTime, frameTimes, mergeShots, roleLabel, scriptPrompt, scriptText, sharpness, timeRange } from './analyze';
+
+test('an analysis waits longer for a clip over 20 s, and keeps the short wait when the length is unknown', () => {
+  const label = (s: number | null | undefined) => waitLabel(analysisRun(s));
+  expect(label(8)).toBe('~2–4 phút');
+  expect(label(20)).toBe('~2–4 phút');
+  expect(label(21)).toBe('~5–8 phút');
+  expect(label(60)).toBe('~5–8 phút');
+  expect(label(null)).toBe('~2–4 phút');
+  expect(label(undefined)).toBe('~2–4 phút');
+  expect(runProgress(0, analysisRun(60)).label).toBe('Thường mất khoảng 5–8 phút');
+  expect(runProgress(300, analysisRun(60)).fraction).toBeLessThan(runProgress(300, analysisRun(8)).fraction); // the long wait's bar eases slower
+  expect(runProgress(300, analysisRun(8)).label).toBe('Lâu hơn thường lệ một chút');
+  expect(runProgress(300, analysisRun(60)).label).toBe('Thường mất khoảng 5–8 phút');
+});
 
 test('shot roles read in Vietnamese, in any case, and an unknown role stays as the model wrote it', () => {
   expect(roleLabel('hook')).toBe('Mở đầu');

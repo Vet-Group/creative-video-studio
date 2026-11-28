@@ -18,6 +18,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       `select id, status, case when user_id = $2 or $3 then provider end as provider, case when user_id = $2 or $3 then model end as model, result,
               case when (user_id = $2 or $3) and $4 = $5 then cost_usd end as "costUsd", case when user_id = $2 or $3 then error end as error, created_at as "createdAt", finished_at as "finishedAt",
               shared_title as "sharedTitle", (select a.id from assets a where a.s3_key = analyses.source_key and a.workspace_id = analyses.workspace_id) as "sourceAssetId",
+              (select a.duration_ms::float8 / 1000 from assets a where a.s3_key = analyses.source_key and a.workspace_id = analyses.workspace_id) as "sourceDurationS",
               case when user_id <> $2 and $3 then (select u.name from users u where u.id = analyses.user_id) end as "creatorName"
          from analyses where id = $1 and workspace_id = $4 and (user_id = $2 or $3 or shared_at is not null)`,
       [id, g.session.user.id, admin, g.workspaceId, COMPANY_WORKSPACE_ID],

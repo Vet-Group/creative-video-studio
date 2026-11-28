@@ -6,7 +6,7 @@
 import Link from 'next/link';
 import { ANALYZE_COST_USD, type Analysis } from '@cvs/core/analysis/breakdown';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { ANALYSIS_RUN, analysisError, analysisFormat, mergeShots, roleLabel, scriptPrompt, scriptText, timeRange } from '@/lib/analyze';
+import { analysisError, analysisRun, analysisFormat, mergeShots, roleLabel, scriptPrompt, scriptText, timeRange } from '@/lib/analyze';
 import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
 import { api, ApiError, errorText, sendJson } from '@/lib/api';
 import { runProgress } from '@/lib/explore';
@@ -35,6 +35,7 @@ export interface AnalysisRow {
   error: string | null;
   createdAt: string;
   sourceAssetId: string | null; // the input video, recovered from the analysis' source_key; null if that asset was deleted
+  sourceDurationS?: number | null; // that video's length in seconds, for the wait; null or absent when unknown
   sharedTitle?: string | null; // set while an Admin shares it as a Smart Remake reference video
   creatorName?: string | null; // an Admin viewing another member's analysis: who made it; null for their own (and for every member)
 }
@@ -201,7 +202,7 @@ const BUSY_TITLE = 'Đang phân tích · ';
 
 /** An analysis still running, on /analyze and in Smart Remake: the tray's wait bar and caption against an analysis' usual run time, with the time it has run, on a
  * 2 s ticker; the tab title says so meanwhile. `children` end the caption. */
-export function AnalysisWait({ row, children }: { row: Pick<AnalysisRow, 'status' | 'createdAt'>; children?: ReactNode }) {
+export function AnalysisWait({ row, children }: { row: Pick<AnalysisRow, 'status' | 'createdAt' | 'sourceDurationS'>; children?: ReactNode }) {
   const [now, setNow] = useState<number>();
   useEffect(() => {
     const tick = () => {
@@ -215,7 +216,7 @@ export function AnalysisWait({ row, children }: { row: Pick<AnalysisRow, 'status
       if (document.title.startsWith(BUSY_TITLE)) document.title = document.title.slice(BUSY_TITLE.length);
     };
   }, []);
-  const progress = runProgress(now === undefined ? 0 : Math.max(0, (now - Date.parse(row.createdAt)) / 1000), ANALYSIS_RUN);
+  const progress = runProgress(now === undefined ? 0 : Math.max(0, (now - Date.parse(row.createdAt)) / 1000), analysisRun(row.sourceDurationS));
   const elapsed = elapsedLabel(row, now);
   return (
     <div className="analysis-wait" role="status">
@@ -403,7 +404,7 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false,
     setBusy(true);
     try {
       const { id } = await api<{ id: string }>('/api/analyses', sendJson('POST', { sourceAssetId: video.id }));
-      show({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: video.id });
+      show({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: video.id, sourceDurationS: video.durationMs / 1000 || null });
       pollOne(id);
     } catch (e) {
       setError(errorText(e, 'Không bắt đầu phân tích được.'));

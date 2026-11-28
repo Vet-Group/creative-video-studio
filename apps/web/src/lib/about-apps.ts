@@ -1419,7 +1419,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         blocks: [
           {
             steps: [
-              { title: 'Thêm video mẫu', text: 'Tải video lên hoặc chọn từ Lịch sử. Video được phân tích ngay khi bạn thêm, mất khoảng một phút, và phân tích tốn khoảng $0.02.' },
+              { title: 'Thêm video mẫu', text: 'Tải video lên hoặc chọn từ Lịch sử. Video được phân tích ngay khi bạn thêm, mất vài phút (lâu hơn với video dài), và phân tích tốn khoảng $0.02.' },
               { title: 'Thêm ảnh sản phẩm', text: 'Chọn một ảnh rõ nét của sản phẩm, tốt nhất trên nền trơn và cùng loại sản phẩm với video mẫu. AI xem từng cảnh và tick sẵn các cảnh có sản phẩm giống của bạn.' },
               { title: 'Tạo video', text: 'Bỏ chọn cảnh không cần hoặc chọn thêm cảnh, xem giá ngay trên nút Tạo, rồi bấm. Bạn xác nhận giá trước khi tiền được tính.' },
             ],

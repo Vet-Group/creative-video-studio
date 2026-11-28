@@ -189,7 +189,7 @@ test('polls one of the caller’s analyses and hides another user’s', async ()
   const { id } = (await (await post({ sourceAssetId: 'v1' })).json()) as { id: string };
   const got = await ONE(call(`/api/analyses/${id}`), { params: Promise.resolve({ id }) });
   expect(got.status).toBe(200);
-  expect(((await got.json()) as { status: string }).status).toBe('queued');
+  expect(await got.json()).toMatchObject({ status: 'queued', sourceDurationS: 5 }); // v1 is a 5 s clip
   await pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, workspace_id) select 'an-theirs', u.id, u.team_id, null, 's3/x', 'ws_vet' from users u where u.email = 'other@example.test'`);
   expect((await ONE(call('/api/analyses/an-theirs'), { params: Promise.resolve({ id: 'an-theirs' }) })).status).toBe(404);
 });
@@ -198,6 +198,7 @@ test('lists the caller’s analyses newest first', async () => {
   const list = (await (await LIST(call('/api/analyses'))).json()) as { analyses: { id: string; status: string; createdAt: string }[] };
   expect(list.analyses.length).toBeGreaterThanOrEqual(2);
   expect(list.analyses[0]!.status).toBe('queued'); // the one the previous test sent
+  expect(list.analyses[0]).toMatchObject({ sourceDurationS: 5 });
   const times = list.analyses.map((a) => Date.parse(a.createdAt));
   expect(times).toEqual([...times].sort((a, b) => b - a));
   expect(list.analyses.some((a) => a.id === 'an-theirs')).toBe(false);
