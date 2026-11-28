@@ -98,11 +98,11 @@ export function VideoEditApp({ app, reuse, remake = false }: { app: AppConfig; r
     (j) => {
       const images = (j.images as (Img & { mime?: string; durationMs?: number | null })[] | undefined) ?? [];
       const clip = images.find((i) => i.mime?.startsWith('video/'));
-      const photo = images.find((i) => !i.mime?.startsWith('video/')); // only a product swap has one
+      const photo = images.find((i) => !i.mime?.startsWith('video/'));
       if (clip) setVideo({ id: clip.id, filename: clip.filename, durationMs: clip.durationMs ?? 0 });
-      if (photo) {
+      if (j.swap === 'product') {
         setKind('product');
-        setProduct([photo]);
+        setProduct(photo ? [photo] : []); // a deleted photo leaves the slot to fill again, never the swap's English prompt as own words
       } else if (j.color && RECOLOR_COLORS.some((c) => c.hex === j.color)) {
         setKind('color');
         setColor(j.color);

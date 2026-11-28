@@ -123,6 +123,7 @@ describe('POST /api/jobs for a video edit', () => {
     const { id, row } = await queued(await run(swap()));
     expect(row).toMatchObject({ feature: 'video_edit', prompt: videoEditPrompt({ swap: 'product' }), params: { swap: 'product' }, input_asset_ids: ['clip', 'img'], duration_s: 6, enhance: false });
     expect(await estimateOf(id)).toBe(await estimateOf((await queued(await run(edit()))).id)); // the photo adds nothing: fal bills the output seconds
+    expect(await jobOf(id)).toMatchObject({ feature: 'video_edit', swap: 'product', color: null, background: null }); // Dùng lại reads the swap, not the photo, to pick its kind
   });
 
   test('refuses, with 400 and never 500, the wrong inputs, quick edits that do not match their prompt, Enhance on a quick edit, other params and clips the model cannot take', async () => {

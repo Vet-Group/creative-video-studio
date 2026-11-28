@@ -604,6 +604,13 @@ describe('fal video edit', () => {
     expect(calls.at(-1)!.body).toEqual({ prompt: 'Replace the shirt in @Video1 with the one in @Image1.', video_url: 'https://v3b.fal.media/files/video-quicktime', image_urls: ['https://v3b.fal.media/files/image-png'], keep_audio: true });
   });
 
+  test('own words with no photo keep a typed [Image1] as written', async () => {
+    const { fn, calls } = falFake();
+    const clip = async () => ({ bytes: new Uint8Array([9, 9]), contentType: 'video/quicktime' });
+    await createFalProvider({ apiKey: 'k', fetch: fn, readImage: clip }).submit({ ...base, model: editModel, prompt: 'Edit [Video1]: copy the logo from [Image1].', imageUrls: ['asset://clip'], ratio: 'auto', durationSec: 5 });
+    expect(calls.at(-1)!.body).toEqual({ prompt: 'Edit @Video1: copy the logo from [Image1].', video_url: 'https://v3b.fal.media/files/video-quicktime', keep_audio: true });
+  });
+
   test('own words that do not name the clip are led by an edit of @Video1', async () => {
     const { fn, calls } = falFake();
     await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, model: editModel, prompt: 'đổi cốc sang màu xanh', imageUrls: ['asset://clip'], ratio: 'auto', durationSec: 8 });

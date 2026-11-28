@@ -303,7 +303,8 @@ function motion(req: SubmitRequest, [image_url, video_url, ...rest]: string[]): 
 function videoEdit(req: SubmitRequest, [video_url, ...images]: string[]): Record<string, unknown> {
   if (!video_url || images.length > 4) throw new ImageReadError('the video edit needs one clip and at most 4 photos');
   const prompt = req.prompt.includes('[Video1]') ? req.prompt : `Edit [Video1]: ${req.prompt}`;
-  return { prompt: imageTokens(videoTokens(prompt, atVideo), atImage), video_url, ...(images.length > 0 && ref(images)), keep_audio: true };
+  const tokens = videoTokens(prompt, atVideo);
+  return { prompt: images.length > 0 ? imageTokens(tokens, atImage) : tokens, video_url, ...(images.length > 0 && ref(images)), keep_audio: true }; // own words' "[Image1]" with no photo stays as typed
 }
 
 /**
