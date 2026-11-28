@@ -5,7 +5,7 @@ import { reframedKeys, turntableKey } from '@cvs/core/queue';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { purgeDeletedClips } from './purge';
+import { purgeAgentConfirms, purgeDeletedClips } from './purge';
 import { bucketName, deleteObject, ensureBucket, putObject, s3 } from './storage';
 
 const testDb = await createTestDatabase();
@@ -202,4 +202,15 @@ describe('purgeDeletedClips', () => {
     expect(await keys()).toEqual(expect.arrayContaining([turntable('run-a'), turntable('run-b')]));
     expect(await keys()).not.toContain(turntable('run-c'));
   });
+});
+
+test('purgeAgentConfirms deletes spent agent confirms older than a day and keeps newer ones', async () => {
+  await pool.query(
+    `insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, expires_at) values ('purgetoken01', 'u1', 'ws_vet', 'pat', 't', decode('01', 'hex'), now() + interval '7 days')`,
+  );
+  await pool.query(
+    `insert into agent_confirms (nonce, api_token_id, method, path, created_at) values ('old', 'purgetoken01', 'PUT', '/x', now() - interval '25 hours'), ('new', 'purgetoken01', 'PUT', '/x', now() - interval '23 hours')`,
+  );
+  expect(await purgeAgentConfirms(pool)).toBe(1);
+  expect((await pool.query('select nonce from agent_confirms')).rows).toEqual([{ nonce: 'new' }]);
 });
