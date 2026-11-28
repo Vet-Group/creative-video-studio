@@ -493,7 +493,9 @@ export function RepeatTiles({ src, label, tile, ratio }: { src: string; label: s
 export const TIKTOK_SAFE = { top: 108, right: 120, bottom: 320, left: 60 };
 
 /** TikTok's covered areas shaded over a 9:16 video, the safe frame dashed. The SVG's 1080 × 1920 box scales and centres as the video does under
- * object-fit: contain, so it sits on the picture at any player size with nothing measured. */
+ * object-fit: contain, so it sits on the picture at any player size with nothing measured.
+ * shortcut: it trusts the clip's ratio, not the file's size; a model that returned a picture off 9:16 would put the frame slightly off it. Gate on
+ * videoWidth / videoHeight if one ever does. */
 function TikTokSafeZone() {
   const { top, right, bottom, left } = TIKTOK_SAFE;
   const [w, h] = [1080 - left - right, 1920 - top - bottom];

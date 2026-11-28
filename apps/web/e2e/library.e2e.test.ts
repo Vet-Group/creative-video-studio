@@ -510,10 +510,13 @@ test('Dùng khung hình này in a video’s detail opens Create video with the f
     const near = (actual: number, expected: number, what: string) => expect(Math.abs(actual - expected), `${what}: ${actual}, expected ${expected}`).toBeLessThanOrEqual(2);
     const [box, frame] = [(await detail.locator('.lightbox-media').boundingBox())!, (await zone.locator('rect').boundingBox())!];
     const scale = Math.min(box.width / 1080, box.height / 1920);
-    near(frame.width, 900 * scale, 'safe frame width');
-    near(frame.height, 1492 * scale, 'safe frame height');
-    near(frame.x - box.x, (box.width - 1080 * scale) / 2 + 60 * scale, 'safe frame left');
-    near(frame.y - box.y, (box.height - 1920 * scale) / 2 + 108 * scale, 'safe frame top');
+    // The centre does not depend on the 4-unit dashed stroke; the size may take it in or not.
+    near(frame.x + frame.width / 2 - box.x, box.width / 2 + ((60 - 120) / 2) * scale, 'safe frame centre x');
+    near(frame.y + frame.height / 2 - box.y, box.height / 2 + ((108 - 320) / 2) * scale, 'safe frame centre y');
+    expect(frame.width / scale).toBeGreaterThan(898);
+    expect(frame.width / scale).toBeLessThan(906);
+    expect(frame.height / scale).toBeGreaterThan(1490);
+    expect(frame.height / scale).toBeLessThan(1498);
     expect(await zone.evaluate((e) => getComputedStyle(e).pointerEvents)).toBe('none');
     await safe.getByRole('button', { name: 'Tắt' }).click();
     await expect(zone).toHaveCount(0);
