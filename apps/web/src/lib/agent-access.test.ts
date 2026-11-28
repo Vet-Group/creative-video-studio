@@ -217,7 +217,7 @@ describe('the monthly cap', () => {
       query: async (sql: string) => ({ rows: sql.includes('monthly_cap_usd') ? [{ cap }] : sql.includes('cost_entries') ? [{ usd: used }] : [], rowCount: 0 }),
     });
     const call = { tokenId: 't', method: 'POST', path: '/api/jobs', hash: 'h', confirm: null };
-    for (const [cap, used] of [['NaN', '0.0000'], ['20.0000', 'NaN']]) {
+    for (const [cap, used] of [['NaN', '0.0000'], ['20.0000', 'NaN']] as const) {
       for (const estimate of ['1.0000', null]) {
         const res = await agentCharge(tx(cap, used) as never, call, estimate, { status: 201, body: {} });
         expect([cap, used, estimate, res?.status]).toEqual([cap, used, estimate, 429]);
