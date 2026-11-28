@@ -129,6 +129,15 @@ describe('creating, listing, changing and revoking', () => {
     expect(await errorOf(await create(adminCookie, { name: 'x', capUsd: -1 }))).toBe('capUsd must be 0 to 1000');
   });
 
+  test('a cap that is not a plain number from 0 to 1000 is refused on create and change', async () => {
+    const made = (await (await create(adminCookie, { name: 'nan' })).json()) as { id: string };
+    for (const capUsd of ['NaN', 'Infinity', '-0.5', '1e3', ' ', null, true]) {
+      expect(await errorOf(await create(adminCookie, { name: 'x', capUsd }))).toBe('capUsd must be 0 to 1000');
+      expect(await errorOf(await patch(adminCookie, made.id, { capUsd }))).toBe('capUsd must be 0 to 1000');
+    }
+    expect((await pool.query('select monthly_cap_usd::text as cap from api_tokens where id = $1', [made.id])).rows[0].cap).toBe('20.0000');
+  });
+
   test('the defaults are 30 days and 20 USD, and an 11th active token is refused', async () => {
     const res = await create(otherCookie, { name: 'first' });
     const made = (await res.json()) as { id: string; expiresAt: string };

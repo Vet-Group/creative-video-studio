@@ -10,7 +10,7 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 
 const { pool } = await import('@/lib/auth');
-const { agentDenied, bodyHash, canonicalJSON, confirmExempt, createPat, hits, ipKey, limited, MAX_ACTIVE_TOKENS, MAX_RATE_KEYS, newPat, readConfirm, signConfirm } = await import('./agent-access');
+const { agentCharge, agentDenied, bodyHash, canonicalJSON, confirmExempt, createPat, hits, ipKey, limited, MAX_ACTIVE_TOKENS, MAX_RATE_KEYS, newPat, readConfirm, signConfirm } = await import('./agent-access');
 
 beforeAll(async () => {
   await pool.query(`insert into users (id, email, name, role) values ('u-admin', 'a@example.test', 'A', 'admin')`);
@@ -186,5 +186,27 @@ describe('the in-memory rate limiter', () => {
     expect(ipKey('203.0.113.7')).toBe('203.0.113.7');
     expect(ipKey('::ffff:203.0.113.7')).toBe('203.0.113.7');
     expect(ipKey('unknown')).toBe('unknown');
+  });
+});
+
+describe('the monthly cap', () => {
+  test('a NaN cap cannot be stored', async () => {
+    const { id, hash } = newPat();
+    await expect(
+      pool.query(`insert into api_tokens (id, user_id, workspace_id, kind, name, secret_hash, monthly_cap_usd, expires_at) values ($1, 'u-admin', 'ws_vet', 'pat', 'n', $2, 'NaN', now() + interval '1 day')`, [id, hash]),
+    ).rejects.toThrow(/api_tokens_cap_check/);
+  });
+
+  test('a cap or spend that is not a number refuses the run', async () => {
+    const tx = (cap: string, used: string) => ({
+      query: async (sql: string) => ({ rows: sql.includes('monthly_cap_usd') ? [{ cap }] : sql.includes('cost_entries') ? [{ usd: used }] : [], rowCount: 0 }),
+    });
+    const call = { tokenId: 't', method: 'POST', path: '/api/jobs', hash: 'h', confirm: null };
+    for (const [cap, used] of [['NaN', '0.0000'], ['20.0000', 'NaN']]) {
+      for (const estimate of ['1.0000', null]) {
+        const res = await agentCharge(tx(cap, used) as never, call, estimate, { status: 201, body: {} });
+        expect([cap, used, estimate, res?.status]).toEqual([cap, used, estimate, 429]);
+      }
+    }
   });
 });

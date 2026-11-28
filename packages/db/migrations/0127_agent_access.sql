@@ -29,7 +29,7 @@ CREATE TABLE "api_tokens" (
 	CONSTRAINT "api_tokens_secret_hash_unique" UNIQUE("secret_hash"),
 	CONSTRAINT "api_tokens_kind_check" CHECK ("api_tokens"."kind" in ('pat', 'oauth')),
 	CONSTRAINT "api_tokens_name_check" CHECK (char_length("api_tokens"."name") between 1 and 60),
-	CONSTRAINT "api_tokens_cap_check" CHECK ("api_tokens"."monthly_cap_usd" >= 0),
+	CONSTRAINT "api_tokens_cap_check" CHECK ("api_tokens"."monthly_cap_usd" >= 0 and "api_tokens"."monthly_cap_usd" <> 'NaN'),
 	CONSTRAINT "api_tokens_pat_check" CHECK ("api_tokens"."kind" <> 'pat' or ("api_tokens"."expires_at" is not null and "api_tokens"."secret_hash" is not null))
 );
 --> statement-breakpoint

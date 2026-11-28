@@ -206,7 +206,7 @@ export const apiTokens = pgTable(
     index('api_tokens_user_id_idx').on(t.userId).where(sql`${t.revokedAt} is null`),
     check('api_tokens_kind_check', sql`${t.kind} in ('pat', 'oauth')`),
     check('api_tokens_name_check', sql`char_length(${t.name}) between 1 and 60`),
-    check('api_tokens_cap_check', sql`${t.monthlyCapUsd} >= 0`),
+    check('api_tokens_cap_check', sql`${t.monthlyCapUsd} >= 0 and ${t.monthlyCapUsd} <> 'NaN'`),
     check('api_tokens_pat_check', sql`${t.kind} <> 'pat' or (${t.expiresAt} is not null and ${t.secretHash} is not null)`),
   ],
 );

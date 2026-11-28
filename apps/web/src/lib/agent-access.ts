@@ -379,7 +379,8 @@ export async function agentCharge(tx: Queryable, call: AgentCall | null, estimat
   const capUsd: string = (await tx.query('select monthly_cap_usd::text as cap from api_tokens where id = $1', [call.tokenId])).rows[0].cap;
   const usedUsd = await tokenMonthSpend(tx, call.tokenId);
   const tokenMonth = { usedUsd, capUsd };
-  if (price === '-' ? units(usedUsd) >= units(capUsd) : units(usedUsd) + units(price) > units(capUsd)) {
+  // Fail closed: a NaN anywhere refuses.
+  if (!(price === '-' ? units(usedUsd) < units(capUsd) : units(usedUsd) + units(price) <= units(capUsd))) {
     console.warn(`agent.cap_refused ${JSON.stringify({ tokenId: call.tokenId, usedUsd, capUsd })}`);
     return Response.json({ error: 'token_monthly_usd', tokenMonth }, { status: 429 });
   }

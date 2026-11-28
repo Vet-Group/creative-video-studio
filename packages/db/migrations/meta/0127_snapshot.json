@@ -607,7 +607,7 @@
         },
         "api_tokens_cap_check": {
           "name": "api_tokens_cap_check",
-          "value": "\"api_tokens\".\"monthly_cap_usd\" >= 0"
+          "value": "\"api_tokens\".\"monthly_cap_usd\" >= 0 and \"api_tokens\".\"monthly_cap_usd\" <> 'NaN'"
         },
         "api_tokens_pat_check": {
           "name": "api_tokens_pat_check",
