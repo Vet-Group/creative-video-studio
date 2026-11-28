@@ -210,6 +210,14 @@ describe('POST /api/jobs by an agent', () => {
   });
 });
 
+test("a paid create's refused confirm is audited as agent.refused", async () => {
+  const a = await agent();
+  const dry = await json<Dry>(await run(a));
+  expect((await run(a, dry.confirmToken, { durationSec: 10 })).status).toBe(409);
+  const rows = (await pool.query(`select new_value from audit_entries where action = 'agent.refused' and target = $1`, [`api_token:${a.id}`])).rows;
+  expect(rows).toEqual([{ new_value: { method: 'POST', path: '/api/jobs', reason: 'confirm_invalid', workspaceId: 'ws_vet', via: 'bearer' } }]);
+});
+
 describe('the other paid creates', () => {
   test('one job and one analysis of one connection sent together both finish, with no deadlock', async () => {
     const a = await agent();

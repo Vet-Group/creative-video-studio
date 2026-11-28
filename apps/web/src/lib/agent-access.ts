@@ -76,6 +76,17 @@ const DENY_ALL = ['/api/admin/users', '/api/auth', '/api/me/stop-impersonating',
 const DENY_WRITES = ['/api/me/profile', '/api/admin/workspaces'];
 const under = (path: string, root: string) => path === root || path.startsWith(`${root}/`);
 
+/**
+ * Refuses an agent request before its handler runs (bad path, deny set, a bad or spent confirm) and audits it as agent.refused with the connection, method,
+ * path and reason, never the token or its hash. The per-connection rate limit bounds the rows.
+ */
+export async function agentRefused(session: RequestSession, request: Request, error: string, status: number): Promise<Response> {
+  const agent = session.agent!;
+  const newValue = { method: request.method, path: new URL(request.url).pathname, reason: error, workspaceId: session.workspace?.workspaceId ?? null, via: agent.via };
+  await audit(pool, { actorId: session.user.id, action: 'agent.refused', target: `api_token:${agent.tokenId}`, newValue });
+  return fail(error, status);
+}
+
 /** A path an agent may not send at all (400): an encoded slash or backslash, or a `.` or `..` segment (plain or encoded), which routing and the deny set could read differently. */
 export const agentBadPath = (rawPath: string) => /%2f|%5c/i.test(rawPath) || /(^|\/)(\.|%2e){1,2}(\/|$)/i.test(rawPath);
 
@@ -330,13 +341,15 @@ export async function agentGate(request: Request, session: RequestSession, works
     if (header === null) {
       const wait = limited(`dry:${agent.tokenId}`, 30);
       if (wait) return tooMany(wait);
+      // A log line, not an audit row: a dry run is the first step of every write, and the confirmed write gets its agent.request row.
+      console.info(`agent.dry_run ${JSON.stringify({ tokenId: agent.tokenId, method, path: url.pathname })}`);
       return Response.json({ error: 'confirm_required', method, path: bound.path, summary: summaryOf(bytes), ...signConfirm(bound, '-') }, { status: 428 });
     }
     const confirm = readConfirm(header, bound);
-    if (typeof confirm === 'string') return fail(confirm, 409);
+    if (typeof confirm === 'string') return agentRefused(session, request, confirm, 409);
     // Spent before the handler runs: a retry after a timeout gets confirm_used and must read the current state first.
     const spent = await pool.query(`insert into agent_confirms (nonce, api_token_id, method, path) values ($1, $2, $3, $4) on conflict do nothing`, [confirm.nonce, agent.tokenId, method, bound.path]);
-    if (!spent.rowCount) return fail('confirm_used', 409);
+    if (!spent.rowCount) return agentRefused(session, request, 'confirm_used', 409);
     nonce = confirm.nonce;
   }
   await audit(pool, { actorId: session.user.id, action: 'agent.request', target, newValue: { method, path: url.pathname, workspaceId, via: agent.via, nonce: nonce && /^[A-Za-z0-9_-]{22}$/.test(nonce) ? nonce : null } });
@@ -346,11 +359,11 @@ export async function agentGate(request: Request, session: RequestSession, works
 /** A paid create's call as agentPrecheck read it: the request it binds, and the confirm it carried (null on a dry run). */
 export type AgentCall = Bound & { confirm: { nonce: string; estimate: string } | null };
 
-/** The stored first answer of a nonce this connection spent, or 409 confirm_used for one a guard confirm spent; null when the nonce is new. */
-async function replay(q: Queryable, nonce: string, tokenId: string): Promise<Response | null> {
+/** The stored first answer of a nonce this connection spent, or 'confirm_used' for one a guard confirm spent; null when the nonce is new. */
+async function replay(q: Queryable, nonce: string, tokenId: string): Promise<Response | 'confirm_used' | null> {
   const row = (await q.query('select result_status, result_body from agent_confirms where nonce = $1 and api_token_id = $2', [nonce, tokenId])).rows[0];
   if (!row) return null;
-  return row.result_status === null ? fail('confirm_used', 409) : Response.json(row.result_body, { status: row.result_status });
+  return row.result_status === null ? 'confirm_used' : Response.json(row.result_body, { status: row.result_status });
 }
 
 /**
@@ -366,8 +379,10 @@ export async function agentPrecheck(g: { session: RequestSession }, request: Req
   const header = request.headers.get(CONFIRM_HEADER);
   if (header === null) return { ...bound, confirm: null };
   const confirm = readConfirm(header, bound);
-  if (typeof confirm === 'string') return fail(confirm, 409);
-  return (await replay(pool, confirm.nonce, agent.tokenId)) ?? { ...bound, confirm };
+  if (typeof confirm === 'string') return agentRefused(g.session, request, confirm, 409);
+  const done = await replay(pool, confirm.nonce, agent.tokenId);
+  if (done === 'confirm_used') return agentRefused(g.session, request, done, 409);
+  return done ?? { ...bound, confirm };
 }
 
 /**
@@ -381,7 +396,7 @@ export async function agentCharge(tx: Queryable, call: AgentCall | null, estimat
   await tx.query(`select pg_advisory_xact_lock(hashtext('agent:' || $1))`, [call.tokenId]);
   // A concurrent send of the same confirm waited on the lock above: it answers the winner's result.
   const done = call.confirm && (await replay(tx, call.confirm.nonce, call.tokenId));
-  if (done) return done;
+  if (done) return done === 'confirm_used' ? fail(done, 409) : done;
   const price = estimate === null ? '-' : Number(estimate).toFixed(4);
   const capUsd: string = (await tx.query('select monthly_cap_usd::text as cap from api_tokens where id = $1', [call.tokenId])).rows[0].cap;
   const usedUsd = await tokenMonthSpend(tx, call.tokenId);

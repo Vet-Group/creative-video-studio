@@ -382,6 +382,30 @@ describe('the write confirm', () => {
 });
 
 describe('review fixes', () => {
+  test('a refused agent request leaves an agent.refused row; a dry run leaves a log line', async () => {
+    const t = await fresh();
+    const refused = async () =>
+      (await pool.query(`select actor_id, new_value from audit_entries where action = 'agent.refused' and target = $1 order by created_at, id`, [`api_token:${t.id}`])).rows;
+    expect((await adminUsers.GET(as(t.token, '/api/admin/users'))).status).toBe(403);
+    expect((await limits.GET(as(t.token, '/api/me/limits%2Fx'))).status).toBe(400);
+    const body = { monthlyCapUsd: '1234' };
+    const dry = await settings.PUT(as(t.token, '/api/admin/settings', { method: 'PUT', body }));
+    expect(dry.status).toBe(428);
+    expect(logged.filter((l) => l.startsWith('agent.dry_run') && l.includes(t.id))).toEqual([`agent.dry_run ${JSON.stringify({ tokenId: t.id, method: 'PUT', path: '/api/admin/settings' })}`]);
+    const sent = await confirmed(dry, '/api/admin/settings', { method: 'PUT', body, token: t.token });
+    expect((await settings.PUT(sent.clone())).status).toBe(200);
+    expect((await settings.PUT(sent)).status).toBe(409);
+    expect((await settings.PUT(as(t.token, '/api/admin/settings', { method: 'PUT', body, headers: { 'x-cvs-confirm': 'a.b.c.d' } }))).status).toBe(409);
+    const row = (method: string, path: string, reason: string) => ({ actor_id: t.userId, new_value: { method, path, reason, workspaceId: 'ws_vet', via: 'bearer' } });
+    expect(await refused()).toEqual([
+      row('GET', '/api/admin/users', 'not_allowed_for_agent'),
+      row('GET', '/api/me/limits%2Fx', 'bad_path'),
+      row('PUT', '/api/admin/settings', 'confirm_used'),
+      row('PUT', '/api/admin/settings', 'confirm_invalid'),
+    ]);
+    expect(JSON.stringify(await refused())).not.toMatch(/cvs_pat_|[0-9a-f]{64}/);
+  });
+
   test('an encoded slash or backslash in the path is 400 before the deny set answers', async () => {
     const t = await fresh();
     for (const path of ['/api/admin/users%2Fx', '/api/admin/costs%5cx', '/api/me/limits%2f']) {
