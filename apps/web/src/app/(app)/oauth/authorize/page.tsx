@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { TOKEN_CREATE_FRESH_MS } from '@/lib/agent-access';
+import { ipKey, TOKEN_CREATE_FRESH_MS } from '@/lib/agent-access';
 import { pool } from '@/lib/auth';
 import { backTo, checkAuthorize } from '@/lib/oauth';
 import { isImpersonated, readSession } from '@/lib/session';
@@ -31,7 +31,8 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 export default async function OAuthAuthorizePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
   const params = Object.fromEntries(PARAMS.flatMap((k) => (typeof query[k] === 'string' ? [[k, query[k]]] : []))) as Record<string, string>;
-  const session = await readSession(await headers());
+  const requestHeaders = await headers();
+  const session = await readSession(requestHeaders);
   if (!session?.workspace) return null; // the app layout has already sent this visitor to /login or explained the missing workspace
   if (process.env.CVS_AGENT_API === '0')
     return (
@@ -62,6 +63,8 @@ export default async function OAuthAuthorizePage({ searchParams }: { searchParam
   const fresh = Date.now() - new Date(session.session.createdAt).getTime() <= TOKEN_CREATE_FRESH_MS;
   const workspace = (await pool.query('select name from workspaces where id = $1', [session.workspace.workspaceId])).rows[0]?.name as string;
   const returnTo = new URL(request.redirectUri);
+  // A client registered from another address may be someone else's, sent here to borrow this Admin's consent.
+  const elsewhere = ipKey(client.registeredIp ?? '') !== ipKey(requestHeaders.get('cf-connecting-ip') ?? 'unknown');
   return (
     <Card title="Cho phép ứng dụng dùng CVS thay bạn?">
       <dl className="oauth-facts">
@@ -76,6 +79,11 @@ export default async function OAuthAuthorizePage({ searchParams }: { searchParam
         Ứng dụng sẽ hành động như bạn, kể cả quyền Admin, trong không gian {workspace}. Chỉ cho phép nếu chính bạn vừa bắt đầu kết nối này. Ngắt kết nối bất cứ lúc
         nào trong Cài đặt, mục Kết nối AI.
       </p>
+      {elsewhere && (
+        <p className="error" role="alert">
+          App này được đăng ký từ một máy khác. Chỉ bấm Cho phép nếu chính bạn vừa kết nối.
+        </p>
+      )}
       {query.too_many === '1' && (
         <p className="error" role="alert">
           Bạn đã có 10 kết nối. Ngắt bớt trong Cài đặt, mục Kết nối AI, rồi thử lại.

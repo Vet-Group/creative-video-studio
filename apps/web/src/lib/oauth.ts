@@ -76,9 +76,12 @@ export function authorizationServerMetadata() {
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
-/** An `http://` redirect on a loopback host (a desktop client's local callback, RFC 8252 §7.3) with no fragment or userinfo, else null. */
+/**
+ * An `http://` redirect on a loopback host (a desktop client's local callback, RFC 8252 §7.3) with no query, fragment or userinfo, else null. A query is
+ * refused so a registered callback can never carry a parameter of its own (a forwarding `next=`) that the consent page does not show.
+ */
 export function loopbackRedirect(value: unknown): URL | null {
-  if (typeof value !== 'string' || value.length > 512 || value.includes('#')) return null;
+  if (typeof value !== 'string' || value.length > 512 || value.includes('#') || value.includes('?')) return null;
   try {
     const url = new URL(value);
     return url.protocol === 'http:' && LOOPBACK.has(url.hostname) && !url.username && !url.password ? url : null;
@@ -94,7 +97,7 @@ export function redirectMatches(registered: readonly string[], given: string): b
     g !== null &&
     registered.some((r) => {
       const u = loopbackRedirect(r);
-      return u !== null && u.hostname === g.hostname && u.pathname === g.pathname && u.search === g.search;
+      return u !== null && u.hostname === g.hostname && u.pathname === g.pathname;
     })
   );
 }
@@ -124,7 +127,7 @@ export async function registerClient(body: unknown, ip: string) {
   const input = (body && typeof body === 'object' && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
   const uris = input.redirect_uris;
   if (!Array.isArray(uris) || uris.length < 1 || uris.length > 3) throw new OAuthError('invalid_redirect_uri', 'Send 1 to 3 redirect_uris.');
-  if (!uris.every((u) => loopbackRedirect(u))) throw new OAuthError('invalid_redirect_uri', 'A redirect URI must be http on 127.0.0.1, localhost or [::1], without a fragment.');
+  if (!uris.every((u) => loopbackRedirect(u))) throw new OAuthError('invalid_redirect_uri', 'A redirect URI must be http on 127.0.0.1, localhost or [::1], without a query or fragment.');
   if (!offers(input.grant_types, 'authorization_code') || !offers(input.response_types, 'code')) {
     throw new OAuthError('invalid_client_metadata', 'Only the authorization_code grant (with refresh_token) and response_type code are offered.');
   }
@@ -163,12 +166,12 @@ async function prune(tx: Queryable) {
   for (const table of ['oauth_codes', 'oauth_access_tokens', 'oauth_refresh_tokens']) await tx.query(`delete from ${table} where expires_at < now() - interval '1 day'`);
 }
 
-export type OAuthClient = { id: string; name: string; redirectUris: string[] };
+export type OAuthClient = { id: string; name: string; redirectUris: string[]; registeredIp: string | null };
 
 async function findClient(q: Queryable, clientId: unknown): Promise<OAuthClient | null> {
   if (typeof clientId !== 'string' || !CLIENT_ID.test(clientId)) return null;
-  const r = (await q.query('select id, name, redirect_uris from oauth_clients where id = $1', [clientId])).rows[0];
-  return r ? { id: r.id, name: r.name, redirectUris: r.redirect_uris } : null;
+  const r = (await q.query('select id, name, redirect_uris, registered_ip from oauth_clients where id = $1', [clientId])).rows[0];
+  return r ? { id: r.id, name: r.name, redirectUris: r.redirect_uris, registeredIp: r.registered_ip } : null;
 }
 
 /** What /oauth/authorize was asked, checked. */
@@ -224,9 +227,10 @@ export function backTo(redirectUri: string, params: Record<string, string | null
 
 /**
  * Allow: a new connection (kind 'oauth', no expiry while refreshed) for `userId` in `workspaceId` under `capUsd`, and a single-use code for it,
- * audited as agent.oauth_consent. 'too_many' when the user already holds MAX_ACTIVE_TOKENS active connections.
+ * audited as agent.oauth_consent. 'too_many' when the user already holds MAX_ACTIVE_TOKENS active connections, 'gone' when the client was
+ * deleted (pruned or evicted) after the form was checked.
  */
-export async function approve(i: { userId: string; workspaceId: string; client: OAuthClient; request: AuthorizeRequest; capUsd: string }): Promise<{ code: string } | 'too_many'> {
+export async function approve(i: { userId: string; workspaceId: string; client: OAuthClient; request: AuthorizeRequest; capUsd: string }): Promise<{ code: string } | 'too_many' | 'gone'> {
   return withTransaction(pool, async (tx) => {
     await tx.query(`select pg_advisory_xact_lock(hashtext('agent-create:' || $1))`, [i.userId]);
     // Connections whose code was never exchanged hold a slot for nothing: they end here.
@@ -237,6 +241,8 @@ export async function approve(i: { userId: string; workspaceId: string; client: 
     );
     const active = (await tx.query(`select count(*)::int as n from api_tokens where user_id = $1 and revoked_at is null and (expires_at is null or expires_at > now())`, [i.userId])).rows[0].n;
     if (active >= MAX_ACTIVE_TOKENS) return 'too_many';
+    // Locks the client row too, so a prune or an eviction cannot delete it before the connection below refers to it.
+    if (!(await tx.query(`update oauth_clients set first_consent_at = coalesce(first_consent_at, now()) where id = $1`, [i.client.id])).rowCount) return 'gone';
     const id = newTokenId();
     await tx.query(`insert into api_tokens (id, user_id, workspace_id, kind, name, oauth_client_id, monthly_cap_usd) values ($1, $2, $3, 'oauth', $4, $5, $6)`, [
       id,
@@ -246,7 +252,6 @@ export async function approve(i: { userId: string; workspaceId: string; client: 
       i.client.id,
       i.capUsd,
     ]);
-    await tx.query(`update oauth_clients set first_consent_at = coalesce(first_consent_at, now()) where id = $1`, [i.client.id]);
     const code = secret('cvs_oac_');
     await tx.query(
       `insert into oauth_codes (code_hash, client_id, api_token_id, redirect_uri, code_challenge, resource, expires_at) values ($1, $2, $3, $4, $5, $6, now() + $7 * interval '1 second')`,
@@ -311,7 +316,7 @@ export async function exchangeCode(form: Record<string, string>, clientId: strin
     if (form.resource !== undefined && (knownResource(form.resource) === null || (code.resource && knownResource(form.resource) !== code.resource))) {
       return new OAuthError('invalid_target', 'resource does not match.');
     }
-    if (typeof (await connectionSession(code.api_token_id)) === 'string') return new OAuthError('invalid_grant', 'The account can no longer connect this app.');
+    if (typeof (await connectionSession(code.api_token_id, tx)) === 'string') return new OAuthError('invalid_grant', 'The account can no longer connect this app.');
     return (await mint(tx, code.api_token_id, clientId)).answer;
   });
   if (outcome instanceof OAuthError) throw outcome;
@@ -369,7 +374,7 @@ export async function refresh(form: Record<string, string>, clientId: string): P
       return unknownRefresh();
     }
     if (row.expired) return unknownRefresh();
-    if (typeof (await connectionSession(row.api_token_id)) === 'string') return new OAuthError('invalid_grant', 'The account can no longer use this connection.');
+    if (typeof (await connectionSession(row.api_token_id, tx)) === 'string') return new OAuthError('invalid_grant', 'The account can no longer use this connection.');
     const { answer, refreshHash } = await mint(tx, row.api_token_id, clientId);
     await tx.query(`update oauth_refresh_tokens set used_at = now(), replaced_by = $2, grace = $3 where hash = $1`, [row.hash, refreshHash, seal(token, answer)]);
     return answer;
@@ -414,7 +419,12 @@ export async function formOf(request: Request): Promise<Record<string, string>> 
 export function clientIdOf(request: Request, form: Record<string, string>): string | undefined {
   const basic = /^Basic ([A-Za-z0-9+/=]+)$/i.exec(request.headers.get('authorization') ?? '')?.[1];
   const id = basic ? Buffer.from(basic, 'base64').toString('utf8').split(':')[0] : undefined;
-  return id ? decodeURIComponent(id) : form.client_id;
+  if (!id) return form.client_id;
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    throw new OAuthError('invalid_client', 'The Basic client id is not valid percent-encoding.');
+  }
 }
 
 /**

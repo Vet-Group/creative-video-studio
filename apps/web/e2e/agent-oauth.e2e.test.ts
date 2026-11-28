@@ -95,6 +95,8 @@ test('agent oauth: a signed-out Admin logs in, sees the client and its return ho
   await expect(card.locator('.oauth-facts dd').first()).toHaveText(name);
   await expect(card.locator('.oauth-facts dd').nth(1)).toContainText(`127.0.0.1:${PORT}`);
   await expect(card).toContainText('kể cả quyền Admin');
+  // register() sends from 192.0.2.x and this browser from 10.x.x.x: the page warns that the app was registered on another machine.
+  await expect(card.getByRole('alert').filter({ hasText: 'App này được đăng ký từ một máy khác.' })).toBeVisible();
   await checkState(page, card, '.oauth-consent', 'consent');
 
   const origin = new URL(page.url()).origin;

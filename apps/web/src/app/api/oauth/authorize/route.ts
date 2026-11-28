@@ -28,6 +28,8 @@ export async function POST(request: Request) {
   const capUsd = money(form.get('cap_usd'));
   if (capUsd === null || Number(capUsd) > 1000) return Response.json({ error: 'capUsd must be 0 to 1000' }, { status: 400 });
   const made = await approve({ userId: g.session.user.id, workspaceId: g.workspaceId, client, request: asked, capUsd });
+  // The page then finds no client and says the registration has expired.
+  if (made === 'gone') return Response.redirect(page, 303);
   if (made === 'too_many') {
     page.searchParams.set('too_many', '1');
     return Response.redirect(page, 303);

@@ -25,7 +25,7 @@ for (const level of ['log', 'info', 'warn', 'error', 'debug'] as const) {
 
 const { auth, pool } = await import('@/lib/auth');
 const { hits } = await import('@/lib/agent-access');
-const { REFRESH_GRACE_MS, registrations } = await import('@/lib/oauth');
+const { approve, checkAuthorize, REFRESH_GRACE_MS, registrations } = await import('@/lib/oauth');
 const register = await import('./register/route');
 const authorize = await import('./authorize/route');
 const tokenRoute = await import('./token/route');
@@ -148,6 +148,8 @@ describe('registration', () => {
       ['http://example.com/callback'],
       ['http://127.0.0.1/a', 'http://127.0.0.1/b', 'http://127.0.0.1/c', 'http://127.0.0.1/d'],
       ['http://127.0.0.1/callback#x'],
+      ['http://127.0.0.1/callback?next=x'],
+      ['http://localhost:4000/callback?'],
       [],
     ]) {
       const res = await registerClient({ client_name: 'x', redirect_uris });
@@ -164,6 +166,24 @@ describe('registration', () => {
     expect(eleventh.status).toBe(429);
     expect(Number(eleventh.headers.get('retry-after'))).toBeGreaterThan(0);
     expect((await registerClient({ redirect_uris: [REDIRECT] }, '198.51.100.2')).status).toBe(201);
+  });
+
+  test('a body that is not sent as JSON is invalid_client_metadata and does not use up the hourly registrations', async () => {
+    const send = (contentType: string | null) =>
+      register.POST(
+        new Request(`${ORIGIN}/api/oauth/register`, {
+          method: 'POST',
+          headers: { 'cf-connecting-ip': '198.51.100.3', ...(contentType ? { 'content-type': contentType } : {}) },
+          body: JSON.stringify({ redirect_uris: [REDIRECT] }),
+        }),
+      );
+    for (let i = 0; i < 10; i++) {
+      for (const type of ['text/plain', 'application/x-www-form-urlencoded', null]) {
+        const res = await send(type);
+        expect([res.status, (await json(res)).error]).toEqual([400, 'invalid_client_metadata']);
+      }
+    }
+    expect((await send('application/json; charset=utf-8')).status).toBe(201);
   });
 });
 
@@ -200,6 +220,31 @@ describe('consent', () => {
     });
   });
 
+  test('approving a client pruned or evicted after the form was checked is "gone", with no connection and no server error', async () => {
+    const client = await json<{ client_id: string }>(await registerClient({ client_name: 'Pruned', redirect_uris: [REDIRECT] }));
+    const check = await checkAuthorize({ client_id: client.client_id, redirect_uri: REDIRECT, state: 's', code_challenge: pkce().challenge, code_challenge_method: 'S256', response_type: 'code' });
+    if (check.kind !== 'ok') throw new Error(check.kind);
+    await pool.query('delete from oauth_clients where id = $1', [client.client_id]);
+    expect(await approve({ userId: adminId, workspaceId: 'ws_vet', client: check.client, request: check.request, capUsd: '5' })).toBe('gone');
+    expect((await pool.query('select count(*)::int as n from api_tokens where oauth_client_id = $1', [client.client_id])).rows[0].n).toBe(0);
+  });
+
+  test('an authorize request whose redirect carries a query gets the error page, never a redirect', async () => {
+    const client = await json<{ client_id: string }>(await registerClient({ client_name: 'Q', redirect_uris: [REDIRECT] }));
+    const { challenge } = pkce();
+    const res = await consent(adminCookie, {
+      client_id: client.client_id,
+      redirect_uri: `${REDIRECT}?next=https://evil.example`,
+      state: 's',
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      response_type: 'code',
+      decision: 'allow',
+      cap_usd: '5',
+    });
+    expect([res.status, (await json(res)).error]).toEqual([400, 'invalid_redirect_uri']);
+  });
+
   test('an access token cannot reach the consent or token management routes', async () => {
     const { pair } = await connected();
     const res = await authorize.POST(
@@ -220,6 +265,17 @@ describe('code exchange', () => {
       expect([retry.status, (await json(retry)).error]).toEqual([400, 'invalid_grant']);
       expect(await revoked(a.connection)).toEqual({ r: true, revoke_reason: 'code_reuse' });
     }
+  });
+
+  test('a Basic client id with a broken percent escape is invalid_client (401), not a server error', async () => {
+    const res = await tokenRoute.POST(
+      new Request(`${ORIGIN}/api/oauth/token`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: `Basic ${Buffer.from('cvsc_%E0%A4%A:').toString('base64')}` },
+        body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: 'x' }),
+      }),
+    );
+    expect([res.status, (await json(res)).error]).toEqual([401, 'invalid_client']);
   });
 
   test('a code used a second time revokes the connection and its tokens stop working', async () => {
@@ -291,6 +347,21 @@ describe('refresh', () => {
       expect((await bearer(pair.access_token)).status).toBe(200);
     }
     expect((await pool.query('select expires_at, revoked_at from api_tokens where id = $1', [a.connection])).rows[0]).toEqual({ expires_at: null, revoked_at: null });
+  });
+
+  test('the code exchange and a refresh take one pool client each, so at the pool maximum they cannot wait on themselves', async () => {
+    const a = await approved();
+    const connect = vi.spyOn(pool, 'connect');
+    try {
+      const res = await exchange(a);
+      expect(res.status).toBe(200);
+      expect(connect).toHaveBeenCalledTimes(1);
+      connect.mockClear();
+      expect((await refreshWith((await json<Pair>(res)).refresh_token, a.clientId)).status).toBe(200);
+      expect(connect).toHaveBeenCalledTimes(1);
+    } finally {
+      connect.mockRestore();
+    }
   });
 });
 

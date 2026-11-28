@@ -258,12 +258,14 @@ is revoked (`code_unused`) at the next approval after 10 minutes.
 |---|---|
 | `/.well-known/oauth-protected-resource/api/mcp`, `/.well-known/oauth-protected-resource` | RFC 9728: `resource` `<APP_URL>/api/mcp`, `authorization_servers` `[APP_URL]` |
 | `/.well-known/oauth-authorization-server` | RFC 8414: PKCE `S256` only, grants `authorization_code` and `refresh_token`, auth method `none`, `iss` on responses (RFC 9207) |
-| `POST /api/oauth/register` | RFC 7591: 1 to 3 redirect URIs, each `http://` on `127.0.0.1`, `localhost` or `[::1]` (any port, RFC 8252), no fragment; https and other hosts are refused in this version. Name at most 80 characters. 10 registrations an hour per address (429). A client nobody approved is deleted after a day; at 200 waiting the oldest is evicted |
+| `POST /api/oauth/register` | RFC 7591, a JSON body (`content-type: application/json`, else 400 `invalid_client_metadata`): 1 to 3 redirect URIs, each `http://` on `127.0.0.1`, `localhost` or `[::1]` (any port, RFC 8252), no query or fragment; https and other hosts are refused in this version. Name at most 80 characters. 10 registrations an hour per address (429). A client nobody approved is deleted after a day; at 200 waiting the oldest is evicted |
 | `POST /api/oauth/authorize` | the consent form (cookie, same origin, Admin, not "sign in as"); not for clients |
 | `POST /api/oauth/token` | `authorization_code` (client, exact redirect and PKCE verifier must match; the code lives 5 minutes and is spent by the first attempt, right or wrong; a second use revokes the connection) and `refresh_token` |
 | `POST /api/oauth/revoke` | RFC 7009: ends the client's own connection; always 200 |
 
 Every `/api/oauth/*` endpoint takes 60 requests a minute per address.
+
+`localhost` is accepted beside the loopback literals `127.0.0.1` and `[::1]` because Claude Code's callback is `http://localhost:<port>/callback`; RFC 8252 §8.3 prefers the literals, but current browsers resolve `localhost` to loopback only. The consent page adds a warning line when the client was registered from another address than the approving browser's.
 
 **Tokens.** The access token `cvs_oat_<43>` lives one hour and is sent as `Authorization: Bearer` exactly like a personal access token. The refresh
 token `cvs_ort_<43>` lives 30 days from its issue and is rotated on every use: the same old token sent again by the same client within 30 seconds

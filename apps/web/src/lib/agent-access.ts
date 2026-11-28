@@ -270,13 +270,13 @@ async function lookup(token: string): Promise<(RequestSession & { agent: AgentIn
   return 'unknown';
 }
 
-/** The session of connection `tokenId`, or why its owner may not use it now: what each OAuth refresh re-checks (lib/oauth.ts). */
-export const connectionSession = (tokenId: string) => connection('t.id = $1', [tokenId]);
+/** The session of connection `tokenId`, or why its owner may not use it now: what each OAuth refresh re-checks (lib/oauth.ts), on its transaction `q`. */
+export const connectionSession = (tokenId: string, q: Queryable) => connection('t.id = $1', [tokenId], q);
 
 /** The session of the connection `where` finds (`t` is api_tokens), or the reason it is refused: the same checks for a PAT, an access token and a refresh. */
-async function connection(where: string, params: unknown[]): Promise<(RequestSession & { agent: AgentInfo }) | string> {
+async function connection(where: string, params: unknown[], q: Queryable = pool): Promise<(RequestSession & { agent: AgentInfo }) | string> {
   const r = (
-    await pool.query(
+    await q.query(
       `select t.id as token_id, t.kind, t.workspace_id, t.oauth_client_id, t.created_at as token_created_at, t.expires_at, t.revoked_at is not null as revoked,
               coalesce(t.expires_at <= now(), false) as expired, u.banned and (u.ban_expires is null or u.ban_expires > now()) as banned,
               u.id, u.email, u.name, u.role, u.email_verified, u.image, u.created_at, u.updated_at, u.team_id, u.must_change_password, u.can_edit_templates,
@@ -291,7 +291,7 @@ async function connection(where: string, params: unknown[]): Promise<(RequestSes
   if (r.banned) return 'banned';
   if (r.must_change_password) return 'password_change_required';
   if (r.role !== 'admin' && process.env.CVS_AGENT_API_MEMBERS !== '1') return 'not_admin';
-  const workspace = await resolveWorkspace(r.id, r.workspace_id);
+  const workspace = await resolveWorkspace(r.id, r.workspace_id, null, q);
   if (workspace?.workspaceId !== r.workspace_id) return 'workspace';
   return {
     user: {

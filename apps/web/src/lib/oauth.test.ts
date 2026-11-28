@@ -34,6 +34,8 @@ describe('loopback redirects', () => {
     ['http://user:pw@127.0.0.1/callback', false],
     ['http://127.0.0.1/callback#frag', false],
     ['http://127.0.0.1/callback#', false],
+    ['http://127.0.0.1/callback?next=https://evil.example', false],
+    ['http://localhost:4000/callback?', false],
     ['javascript:alert(1)', false],
     [42, false],
   ])('%s -> %s', (uri, ok) => {
