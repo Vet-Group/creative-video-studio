@@ -15,6 +15,7 @@ import { alignInputs, placesOf, type Skipped, skippedNote } from '@/lib/reuse';
 import { confirmRun, sendRun, usd } from '@/lib/run-guard';
 import { GARMENT_PRESETS, portraitGender, POSE_PRESETS, POSES } from '@/lib/try-on-stock';
 import { useFashionModels } from '@/lib/use-fashion-models';
+import { useHydrated } from '@/lib/use-hydrated';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
@@ -220,6 +221,18 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
     if (!colors.includes(hex) && colors.length >= MAX_PICTURES) return notify(`Tối đa ${MAX_PICTURES} màu mỗi lần chạy`);
     if (!colors.includes(hex)) setColors([...colors, hex]);
     setHexText('');
+  };
+  // "Lấy màu": Chrome and Edge's EyeDropper picks a colour anywhere on screen (a reference photo, a brand page) into the own-colour box; Esc cancels it.
+  const hydrated = useHydrated();
+  const dropper = hydrated && 'EyeDropper' in window;
+  const pickScreenColor = async () => {
+    try {
+      const { sRGBHex } = await new (window as unknown as { EyeDropper: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper().open();
+      setHexText(sRGBHex.toUpperCase());
+      setHexProblem('');
+    } catch {
+      // Esc or a click away closes the dropper with nothing picked.
+    }
   };
   // A preset's poses (marketplace or garment); the own words and each pose photo take one of the Run's slots, so only the first of the preset that are left are used.
   const presetPoses = (pr: { poses: readonly string[] }) => pr.poses.slice(0, MAX_POSES - (ownPose ? 1 : 0) - poseRefs.length);
@@ -752,6 +765,11 @@ function AppForm({ app, reuse, image }: { app: AppConfig; reuse?: string; image?
                     <button type="button" disabled={busy || !hexText.trim()} onClick={addHex}>
                       Thêm màu
                     </button>
+                    {dropper && (
+                      <button type="button" disabled={busy} onClick={() => void pickScreenColor()}>
+                        Lấy màu
+                      </button>
+                    )}
                   </div>
                   {hexProblem && (
                     <p id={hexErrorId} className="error">

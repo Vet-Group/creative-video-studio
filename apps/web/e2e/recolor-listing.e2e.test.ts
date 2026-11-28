@@ -57,6 +57,22 @@ test('product recolor: picks a swatch and an own colour code, sees the price of 
   await expect(colors.getByRole('checkbox', { name: 'Mã #2E8B57' })).toBeChecked();
   await expect(hex).toHaveValue('');
   await expect(cost(page)).toHaveText('2 ảnh × $0.15 = $0.30');
+
+  // "Lấy màu" (Chrome's EyeDropper, stubbed here) puts the picked colour in the box, in capitals; Esc on the dropper changes nothing.
+  await page.evaluate(() => {
+    let next: string | null = '#1a2b3c';
+    (window as unknown as { EyeDropper: unknown }).EyeDropper = class {
+      open = async () => (next === null ? Promise.reject(new DOMException('aborted', 'AbortError')) : { sRGBHex: next });
+    };
+    (window as unknown as { escNext: () => void }).escNext = () => void (next = null);
+  });
+  await expect(page.getByRole('button', { name: 'Lấy màu' })).toBeVisible(); // Chromium has the API, so the button showed at hydration
+  await page.getByRole('button', { name: 'Lấy màu' }).click();
+  await expect(hex).toHaveValue('#1A2B3C');
+  await page.evaluate(() => (window as unknown as { escNext: () => void }).escNext());
+  await page.getByRole('button', { name: 'Lấy màu' }).click();
+  await expect(hex).toHaveValue('#1A2B3C');
+  await hex.fill('');
   await expect(runButton(page)).toContainText('$0.30');
   await expect(preview(page)).toContainText(`Đen: ${recolorPrompt('#111111')}`);
   await expect(page.getByText('1 màu còn lại dùng prompt như trên, chỉ khác tên và mã màu.')).toBeVisible();
