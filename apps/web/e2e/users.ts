@@ -88,6 +88,7 @@ export const USERS = {
   cvpr: { email: 'cvpr@e2e.test', name: 'E2E Create Prompt', role: 'member' }, // create-prompt.e2e: the ?prompt= prefill
   cvxr: { email: 'cvxr@e2e.test', name: 'E2E Create Extras Reuse', role: 'member' }, // its end frame and audio refilled from a template and from History
   famsa: { email: 'famsa@e2e.test', name: 'E2E Families A', role: 'member' }, // model-families.e2e
+  pickra: { email: 'pickra@e2e.test', name: 'E2E Picker A', role: 'member' }, // model-picker.e2e: the panel on page scroll, the smart search, recent picks
   passa: { email: 'passa@e2e.test', name: 'E2E Passkey A', role: 'member' }, // passkey.e2e
   // account-security.e2e: a password change, a forced change of an Admin's temporary password and the sessions list.
   seca: { email: 'seca@e2e.test', name: 'E2E Security A', role: 'member' },

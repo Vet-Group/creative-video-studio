@@ -366,6 +366,7 @@ test.describe('1440x1000', () => {
     expect((await css(trigger, 'background-color'))[0]).toBe('rgb(242, 242, 242)');
     await trigger.click();
     const panel = page.getByRole('dialog', { name: 'Chọn mô hình' });
+    await panel.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished))); // it scales in from .96 over --dur-fast
     const t = await box(trigger);
     const p = await box(panel);
     near(p.x, t.x + t.width + 8, 'panel x');

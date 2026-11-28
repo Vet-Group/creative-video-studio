@@ -621,10 +621,13 @@ test('the model picker opens a panel beside its button, searches, and closes wit
   expect(Math.abs(p.y - t.y)).toBeLessThanOrEqual(2); // top aligned with it
 
   await search.fill('zzz');
-  await expect(panel.getByText('Không có mô hình nào khớp.')).toBeVisible();
-  // The page scrolling under the fixed panel closes it, and the next open starts with an empty search.
+  await expect(panel.getByRole('status')).toContainText('Không thấy mô hình khớp “zzz”.');
+  // A wheel over the page under the fixed panel keeps it open with its search (owner request 2026-11-28); Escape closes it, and the next open starts empty.
   await page.mouse.move(1200, 600); // over the Examples, clear of the panel
   await page.mouse.wheel(0, 400);
+  await expect(panel).toBeVisible();
+  await expect(search).toHaveValue('zzz');
+  await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();
   await trigger.click();
   await expect(search).toHaveValue('');
