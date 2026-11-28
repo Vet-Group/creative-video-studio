@@ -10,7 +10,7 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 
 const { pool } = await import('@/lib/auth');
-const { agentCharge, agentDenied, bodyHash, canonicalJSON, confirmExempt, createPat, hits, ipKey, limited, MAX_ACTIVE_TOKENS, MAX_RATE_KEYS, newPat, readConfirm, signConfirm } = await import('./agent-access');
+const { agentCharge, agentDenied, agentPrecheck, bodyHash, canonicalJSON, confirmExempt, createPat, hits, ipKey, limited, MAX_ACTIVE_TOKENS, MAX_RATE_KEYS, newPat, readConfirm, signConfirm } = await import('./agent-access');
 
 beforeAll(async () => {
   await pool.query(`insert into users (id, email, name, role) values ('u-admin', 'a@example.test', 'A', 'admin')`);
@@ -224,4 +224,19 @@ describe('the monthly cap', () => {
       }
     }
   });
+});
+
+test("a paid confirm replays only its own connection's stored answer", async () => {
+  const mine = await createPat({ userId: 'u-admin', workspaceId: 'ws_vet', name: 'mine', days: 7 });
+  const theirs = await createPat({ userId: 'u-admin', workspaceId: 'ws_vet', name: 'theirs', days: 7 });
+  if (mine === 'too_many' || theirs === 'too_many') throw new Error('refused');
+  const body = { model: 'm' };
+  const { confirmToken } = signConfirm({ tokenId: mine.id, method: 'POST', path: '/api/jobs', hash: createHash('sha256').update(canonicalJSON(body)).digest('hex') }, '1.0000');
+  const nonce = confirmToken.split('.')[0];
+  await pool.query(`insert into agent_confirms (nonce, api_token_id, method, path, result_status, result_body) values ($1, $2, 'POST', '/api/jobs', 201, '{"id":"other"}')`, [nonce, theirs.id]);
+  const g = { session: { agent: { tokenId: mine.id, kind: 'pat', clientId: null, via: 'bearer' } } } as never;
+  const request = new Request('http://localhost/api/jobs', { method: 'POST', headers: { 'x-cvs-confirm': confirmToken } });
+  const call = await agentPrecheck(g, request, body);
+  expect(call).not.toBeInstanceOf(Response);
+  expect(call).toMatchObject({ tokenId: mine.id, confirm: { nonce, estimate: '1.0000' } });
 });

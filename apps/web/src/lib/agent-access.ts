@@ -343,9 +343,9 @@ export async function agentGate(request: Request, session: RequestSession, works
 /** A paid create's call as agentPrecheck read it: the request it binds, and the confirm it carried (null on a dry run). */
 export type AgentCall = Bound & { confirm: { nonce: string; estimate: string } | null };
 
-/** The stored first answer of a spent nonce, or 409 confirm_used for one a guard confirm spent; null when the nonce is new. */
-async function replay(q: Queryable, nonce: string): Promise<Response | null> {
-  const row = (await q.query('select result_status, result_body from agent_confirms where nonce = $1', [nonce])).rows[0];
+/** The stored first answer of a nonce this connection spent, or 409 confirm_used for one a guard confirm spent; null when the nonce is new. */
+async function replay(q: Queryable, nonce: string, tokenId: string): Promise<Response | null> {
+  const row = (await q.query('select result_status, result_body from agent_confirms where nonce = $1 and api_token_id = $2', [nonce, tokenId])).rows[0];
   if (!row) return null;
   return row.result_status === null ? fail('confirm_used', 409) : Response.json(row.result_body, { status: row.result_status });
 }
@@ -364,7 +364,7 @@ export async function agentPrecheck(g: { session: RequestSession }, request: Req
   if (header === null) return { ...bound, confirm: null };
   const confirm = readConfirm(header, bound);
   if (typeof confirm === 'string') return fail(confirm, 409);
-  return (await replay(pool, confirm.nonce)) ?? { ...bound, confirm };
+  return (await replay(pool, confirm.nonce, agent.tokenId)) ?? { ...bound, confirm };
 }
 
 /**
@@ -377,7 +377,7 @@ export async function agentCharge(tx: Queryable, call: AgentCall | null, estimat
   if (!call) return null;
   await tx.query(`select pg_advisory_xact_lock(hashtext('agent:' || $1))`, [call.tokenId]);
   // A concurrent send of the same confirm waited on the lock above: it answers the winner's result.
-  const done = call.confirm && (await replay(tx, call.confirm.nonce));
+  const done = call.confirm && (await replay(tx, call.confirm.nonce, call.tokenId));
   if (done) return done;
   const price = estimate === null ? '-' : Number(estimate).toFixed(4);
   const capUsd: string = (await tx.query('select monthly_cap_usd::text as cap from api_tokens where id = $1', [call.tokenId])).rows[0].cap;
