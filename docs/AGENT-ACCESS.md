@@ -219,6 +219,54 @@ the first answer (`firstAnswer.jobId`), never a second success: read the state (
 **Downloads**: `job_get` and `remake_get` give `downloadPath` (`/api/assets/<id>/content`); fetch it with the same header:
 `curl -H "Authorization: Bearer $CVS_TOKEN" -o clip.mp4 https://<host>/api/assets/<id>/content`. Humans use the item's `url`.
 
+## CLI
+
+`scripts/cvs.ts` is a single-file command line for scripts, n8n, Hermes or a terminal: Node 24 or later, no install, no build, no
+dependencies. It calls the REST routes above with the same token; `whoami` and `apps` have no REST route, so they send one JSON-RPC
+`tools/call` to `/api/mcp` (no MCP client needed). The token is read only from `CVS_AGENT_TOKEN` (never a flag) and any `cvs_pat_`, `cvs_oat_` or
+`cvs_ort_` value in its output is redacted. `CVS_URL` picks the host (default `https://video.vetgroup.net`); it must be https, except
+`http://localhost`, `127.0.0.1` or `[::1]`, so the token never crosses the network in clear. Each request times out after 60 s (an upload or
+download body after 10 minutes).
+
+```sh
+export CVS_AGENT_TOKEN=cvs_pat_...            # from Settings > "Connect AI"; keep it out of shell history and logs
+alias cvs='node /path/to/creative-video-studio/scripts/cvs.ts'
+cvs whoami
+cvs models --kind video
+cvs upload shirt.png --json                   # {"id":"<assetId>",...}
+cat > run.json <<'EOF'
+{ "modelId": "<id from cvs models>", "presetId": "gentle-push-in", "assetIds": ["<assetId>"], "ratio": "9:16", "durationSec": 5 }
+EOF
+cvs estimate run.json                         # the 428 dry run only, nothing is charged
+cvs run run.json --yes --json                 # dry run, then the same request with x-cvs-confirm: {"id":"<jobId>","status":"queued"}
+cvs job <jobId> --wait                        # polls every 5 s until the job ends, then prints the result URLs
+cvs download <jobId> -o out/
+```
+
+| Command | Calls |
+|---|---|
+| `whoami`, `apps` | the `whoami` / `apps_list` tool |
+| `limits` | `GET /api/me/limits` |
+| `models [--kind video\|image]` | `GET /api/models?feature=video&ratio=9:16&durationSec=5` or `GET /api/image-models?feature=image` |
+| `presets [--kind video\|image]` | `GET /api/presets?feature=...` |
+| `estimate <run.json>`, `run <run.json> [--yes]` | `POST /api/jobs` with the file as the body (the `job_create` arguments without `dryRun`/`confirmToken`); a `customAppId` goes to `POST /api/custom-apps/<id>/run` with only `assetIds` |
+| `jobs [--limit N] [--status S] [--before ID]` | `GET /api/jobs?mine=1`, paged by `before` |
+| `job <id> [--wait] [--timeout M]` | `GET /api/jobs/<id>`; `--wait` gives up after M minutes (default 30) with exit 4 |
+| `cancel <id> [--yes]` | `POST /api/jobs/<id>/cancel` |
+| `download <id> [-o dir] [--force]` | the job, then `GET /api/assets/<id>/content` for its output (every output of a batch Run, from `batchItems`) |
+| `upload <file>` | `POST /api/assets` (multipart); a video over 20 MB goes by presign, PUT, finalize |
+| `library [--limit N]` | `GET /api/library`, paged by `offset`, at most 1000 items as `library_list` |
+
+`--json` prints the JSON answer; otherwise a short table. `run` shows the estimate, then asks `Proceed? [y/N]` on a terminal; without a terminal
+it refuses unless `--yes` is given, and `cancel` does the same. A changed price (`confirm_stale`) is shown and agreed to again with its new token.
+A lost answer to the confirmed request (a network error, 502, 503 or 504) is resent once with the same confirm, which a paid create replays (the
+CLI notes the replay). A `confirm_used`, or any other failure after the confirm, is never reported as success: check `cvs jobs` before running
+again; the CLI never starts a new dry run by itself. `download` saves the server's file name with Windows-invalid characters replaced, adds
+`-2`, `-3` to repeated names, and refuses to overwrite an existing file unless `--force` is given.
+
+Exit codes: 0 ok, 1 usage (and other 4xx such as 400 or 404), 2 auth (no token, 401, 403), 3 refused or a limit (409, 413, 415, 429, or a confirm
+refused or declined), 4 server or network. `job --wait` exits 0 for a failed job too; read its `status`.
+
 ## OAuth
 
 A client that supports MCP sign-in (Claude Code, OpenMausBot) connects without a pasted token: it registers itself, opens the CVS consent page in
