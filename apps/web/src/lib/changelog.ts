@@ -2,6 +2,7 @@
 // Every pull request with a change a member or an Admin can notice adds one entry file to changelog-entries/, named after its `at`
 // (2026-11-16T16:30:00+07:00 is 20261116-163000.ts), and exporting the entry `satisfies ChangeEntry`. Skip refactors, CI, tests and docs.
 // `at` is the squash-merge time of the pull request (the last one when several are folded together), in Vietnam time (+07:00).
+// It is the real merge time; it no longer has to be later than the entries already live, because a member's seen state is kept per entry.
 // `audience: 'admin'` hides the entry from members (and `kind: 'ops'` is only for such entries). Never write secrets, emails,
 // staff names or internal host names here. Everything an entry holds is shown to the reader, and an entry shows its `prs` to Admins only.
 
@@ -10,7 +11,7 @@ import { ENTRIES } from './changelog-entries';
 export type ChangeKind = 'new' | 'improved' | 'fixed' | 'ops';
 
 export interface ChangeEntry {
-  /** When it went live: an ISO time with the Vietnam offset. Unique, as it doubles as the id and the seen mark. */
+  /** When it went live: an ISO time with the Vietnam offset. Unique, as it doubles as the id and the key of the member's seen set. */
   at: string;
   kind: ChangeKind;
   title: string;
